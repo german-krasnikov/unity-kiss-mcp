@@ -1,0 +1,219 @@
+using System;
+using System.Globalization;
+using System.Reflection;
+using UnityEditor;
+using UnityEngine;
+
+namespace UnityMCP.Editor
+{
+    internal static class ValueParser
+    {
+        internal static float[] ParseFloats(string value, int expected)
+        {
+            var parts = value.Trim('(', ')').Split(',');
+            if (parts.Length != expected)
+                throw new ArgumentException($"Expected {expected} components but got {parts.Length}: {value}");
+            var result = new float[expected];
+            for (int i = 0; i < expected; i++)
+                if (!float.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out result[i]))
+                    throw new ArgumentException($"Invalid float at index {i}: {value}");
+            return result;
+        }
+
+        internal static Vector2 ParseVector2(string v) { var f = ParseFloats(v, 2); return new Vector2(f[0], f[1]); }
+        internal static Vector3 ParseVector3(string v) { var f = ParseFloats(v, 3); return new Vector3(f[0], f[1], f[2]); }
+        internal static Vector4 ParseVector4(string v) { var f = ParseFloats(v, 4); return new Vector4(f[0], f[1], f[2], f[3]); }
+        internal static Quaternion ParseQuaternion(string v) { var f = ParseFloats(v, 4); return new Quaternion(f[0], f[1], f[2], f[3]); }
+
+        internal static Color ParseColor(string value)
+        {
+            value = value.Trim();
+            if (value.StartsWith("#"))
+            {
+                if (!ColorUtility.TryParseHtmlString(value, out var c))
+                    throw new ArgumentException($"Invalid color: {value}");
+                return c;
+            }
+            if (value.Length == 6 || value.Length == 8)
+                if (ColorUtility.TryParseHtmlString("#" + value, out var c))
+                    return c;
+            var s = value.Trim('(', ')');
+            var p = s.Split(',');
+            if (p.Length < 3)
+                throw new ArgumentException($"Invalid color: {value}");
+            try
+            {
+                return new Color(
+                    float.Parse(p[0].Trim(), CultureInfo.InvariantCulture),
+                    float.Parse(p[1].Trim(), CultureInfo.InvariantCulture),
+                    float.Parse(p[2].Trim(), CultureInfo.InvariantCulture),
+                    p.Length > 3 ? float.Parse(p[3].Trim(), CultureInfo.InvariantCulture) : 1f);
+            }
+            catch (FormatException)
+            {
+                throw new ArgumentException($"Invalid color: {value}");
+            }
+        }
+
+        internal static void SetPropertyValue(SerializedProperty property, string value)
+        {
+            switch (property.propertyType)
+            {
+                case SerializedPropertyType.Integer: property.intValue = int.Parse(value); break;
+                case SerializedPropertyType.Float: property.floatValue = float.Parse(value, CultureInfo.InvariantCulture); break;
+                case SerializedPropertyType.Boolean: property.boolValue = bool.Parse(value); break;
+                case SerializedPropertyType.String: property.stringValue = value; break;
+                case SerializedPropertyType.Vector2: property.vector2Value = ParseVector2(value); break;
+                case SerializedPropertyType.Vector3: property.vector3Value = ParseVector3(value); break;
+                case SerializedPropertyType.Vector4: property.vector4Value = ParseVector4(value); break;
+                case SerializedPropertyType.Quaternion: property.quaternionValue = ParseQuaternion(value); break;
+                case SerializedPropertyType.Color: property.colorValue = ParseColor(value); break;
+                case SerializedPropertyType.Vector2Int:
+                    var v2i = ParseFloats(value, 2);
+                    property.vector2IntValue = new Vector2Int((int)v2i[0], (int)v2i[1]); break;
+                case SerializedPropertyType.Vector3Int:
+                    var v3i = ParseFloats(value, 3);
+                    property.vector3IntValue = new Vector3Int((int)v3i[0], (int)v3i[1], (int)v3i[2]); break;
+                case SerializedPropertyType.Enum:
+                    if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var enumIdx))
+                    {
+                        if (enumIdx < 0 || enumIdx >= property.enumNames.Length)
+                            throw new ArgumentException($"Enum index {enumIdx} out of range (0..{property.enumNames.Length - 1}): {property.propertyPath}");
+                        property.enumValueIndex = enumIdx;
+                    }
+                    else
+                    {
+                        var idx = Array.IndexOf(property.enumNames, value);
+                        if (idx >= 0) property.enumValueIndex = idx;
+                        else throw new ArgumentException($"Invalid enum value: {value}");
+                    }
+                    break;
+                case SerializedPropertyType.ArraySize: property.arraySize = int.Parse(value); break;
+                case SerializedPropertyType.ObjectReference: SetObjectReference(property, value); break;
+                default: throw new ArgumentException($"Unsupported property type: {property.propertyType}");
+            }
+        }
+
+        private static void SetObjectReference(SerializedProperty property, string value)
+        {
+            if (value == "null") { property.objectReferenceValue = null; return; }
+            if (value.StartsWith("#"))
+            {
+                var resolved = EditorUtility.InstanceIDToObject(int.Parse(value.Substring(1)));
+                if (resolved == null)
+                    throw new ArgumentException($"No object found for instance ID: {value}");
+                property.objectReferenceValue = resolved;
+                return;
+            }
+            var fieldType = GetSerializedFieldType(property);
+            var refGo = ComponentSerializer.FindObject(value);
+            if (refGo != null)
+            {
+                if (fieldType != null && typeof(Component).IsAssignableFrom(fieldType) && fieldType != typeof(GameObject))
+                {
+                    var comp = refGo.GetComponent(fieldType);
+                    if (comp == null)
+                        throw new ArgumentException($"Component {fieldType.Name} not found on {value}");
+                    property.objectReferenceValue = comp;
+                }
+                else property.objectReferenceValue = refGo;
+                return;
+            }
+            var sepIdx = value.IndexOf("::");
+            if (sepIdx > 0 && sepIdx < value.Length - 2)
+            {
+                var assetPath = value.Substring(0, sepIdx);
+                var subName = value.Substring(sepIdx + 2);
+                var allAssets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+                foreach (var a in allAssets)
+                    if (a.name == subName && (fieldType == null || fieldType.IsInstanceOfType(a)))
+                    {
+                        property.objectReferenceValue = a;
+                        return;
+                    }
+                throw new ArgumentException($"Sub-asset '{subName}' not found in: {assetPath}");
+            }
+            var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(value);
+            if (asset == null) throw new ArgumentException($"Not found in scene or assets: {value}");
+            if (fieldType != null && typeof(Component).IsAssignableFrom(fieldType) && asset is GameObject assetGo)
+            {
+                var comp = assetGo.GetComponent(fieldType);
+                if (comp == null)
+                    throw new ArgumentException($"Component {fieldType.Name} not found on asset: {value}");
+                property.objectReferenceValue = comp;
+            }
+            else property.objectReferenceValue = asset;
+        }
+
+        /// <summary>Split comma-separated array values, respecting parens/brackets.</summary>
+        internal static string[] SplitArrayValues(string value)
+        {
+            value = value?.Trim() ?? "";
+            if (value == "" || value == "[]") return Array.Empty<string>();
+            if (value.StartsWith("[") && value.EndsWith("]")) value = value.Substring(1, value.Length - 2).Trim();
+
+            var result = new System.Collections.Generic.List<string>();
+            int depth = 0;
+            int start = 0;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (c == '(' || c == '[') depth++;
+                else if (c == ')' || c == ']') depth--;
+                else if (c == ',' && depth == 0)
+                {
+                    result.Add(value.Substring(start, i - start).Trim());
+                    start = i + 1;
+                }
+            }
+            result.Add(value.Substring(start).Trim());
+            return result.ToArray();
+        }
+
+        // Fix C: iterative nested path traversal + Fix A dependency (internal visibility)
+        internal static Type GetSerializedFieldType(SerializedProperty property)
+        {
+            try
+            {
+                var targetObj = property.serializedObject.targetObject;
+                if (targetObj == null) return null;
+                var type = targetObj.GetType();
+                var segments = property.propertyPath.Split('.');
+                FieldInfo lastField = null;
+
+                for (int i = 0; i < segments.Length; i++)
+                {
+                    var seg = segments[i];
+                    if (seg == "Array" && i + 1 < segments.Length && segments[i + 1].StartsWith("data["))
+                    {
+                        if (lastField != null)
+                        {
+                            var ft = lastField.FieldType;
+                            type = ft.IsArray ? ft.GetElementType() :
+                                   ft.IsGenericType ? ft.GetGenericArguments()[0] : ft;
+                        }
+                        i++; // skip data[N]
+                        continue;
+                    }
+                    lastField = null;
+                    var search = type;
+                    while (search != null)
+                    {
+                        lastField = search.GetField(seg, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                        if (lastField != null) break;
+                        search = search.BaseType;
+                    }
+                    if (lastField == null) return null;
+                    type = lastField.FieldType;
+                }
+                if (lastField == null) return null;
+                var resultType = lastField.FieldType;
+                if (resultType.IsArray) return resultType.GetElementType();
+                if (resultType.IsGenericType) return resultType.GetGenericArguments()[0];
+                return resultType;
+            }
+            catch (Exception e) { Debug.LogWarning($"[MCP] GetSerializedFieldType: {e.Message}"); }
+            return null;
+        }
+    }
+}

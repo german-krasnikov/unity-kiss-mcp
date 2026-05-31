@@ -1,0 +1,17 @@
+{
+  "name": "com.unity-mcp.editor",
+  "version": "0.2.4",
+  "displayName": "Unity MCP",
+  "description": "MCP server for Unity Editor control",
+  "unity": "2021.3",
+  "license": "MIT",
+  "author": {
+    "name": "German Krasnikov",
+    "email": "german.krasnikov@gmail.com",
+    "url": "https://github.com/german-krasnikov"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/german-krasnikov/unity-kiss-mcp.git"
+  }
+}

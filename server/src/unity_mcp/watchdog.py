@@ -1,0 +1,69 @@
+"""Proactive watchdog: background scan after risky mutations.
+
+Enable with UNITY_MCP_WATCHDOG=1.
+"""
+import asyncio
+import time
+from typing import Optional, Callable
+
+from .middleware import WRITE_CMDS
+
+HIGH_BLAST_CMDS = {"delete_object", "scene", "batch"}
+
+
+class ProactiveWatchdog:
+    def __init__(self, send_fn: Callable, *, interval: int = 5):
+        self._send = send_fn
+        self.interval = interval
+        self._counter: int = 0
+        self._pending_alert: Optional[str] = None
+        self._last_alert_hash: Optional[int] = None
+        self._last_alert_time: float = 0.0
+        self._task: Optional[asyncio.Task] = None
+
+    def maybe_trigger(self, cmd: str) -> None:
+        if cmd not in WRITE_CMDS:
+            return
+        threshold = 1 if cmd in HIGH_BLAST_CMDS else self.interval
+        self._counter += 1
+        if self._counter >= threshold:
+            self._counter = 0
+            if self._task is None or self._task.done():
+                try:
+                    self._task = asyncio.get_running_loop().create_task(self._scan())
+                except RuntimeError:
+                    pass  # no event loop in sync context
+
+    async def _scan(self) -> None:
+        try:
+            refs, console = await asyncio.gather(
+                self._send("validate_references", {"path": "/", "depth": "3"}, timeout=5.0),
+                self._send("get_console", {"count": "5", "level": "Error"}, timeout=5.0),
+            )
+            issues = []
+            if "ERROR" in refs:
+                issues.append(refs.split("\n")[0])
+            if console.strip():
+                issues.append(f"console: {console.strip()[:80]}")
+            if issues:
+                msg = "[ISSUES] " + "; ".join(issues[:3])
+                h = hash(msg)
+                now = time.time()
+                if h != self._last_alert_hash or (now - self._last_alert_time) > 60:
+                    self._pending_alert = msg
+                    self._last_alert_hash = h
+                    self._last_alert_time = now
+        except Exception:
+            pass
+
+    def consume_alert(self) -> Optional[str]:
+        alert, self._pending_alert = self._pending_alert, None
+        return alert
+
+    async def cancel(self) -> None:
+        if self._task and not self._task.done():
+            self._task.cancel()
+            try:
+                await asyncio.wait_for(self._task, 2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                pass

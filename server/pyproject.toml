@@ -1,0 +1,45 @@
+[project]
+name = "unity-mcp"
+version = "0.1.17"
+description = "MCP server for Unity Editor control"
+license = {text = "MIT"}
+authors = [{name = "German Krasnikov", email = "german.krasnikov@gmail.com"}]
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "pydantic>=2.0",
+    "Pillow>=10.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/german-krasnikov/unity-kiss-mcp"
+Repository = "https://github.com/german-krasnikov/unity-kiss-mcp"
+Issues = "https://github.com/german-krasnikov/unity-kiss-mcp/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+unity-mcp = "unity_mcp.server:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+asyncio_mode = "auto"
+python_files = "test_*.py"
+markers = [
+    "live: requires running Unity Editor with MCP plugin on :9500",
+    "live_haiku: also calls real claude CLI (~$0.001/call) — opt-in via 'pytest -m \"live and live_haiku\"'",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.152.7",
+]

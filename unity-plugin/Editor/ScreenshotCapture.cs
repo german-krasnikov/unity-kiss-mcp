@@ -1,0 +1,157 @@
+using System;
+using UnityEditor;
+using UnityEngine;
+
+namespace UnityMCP.Editor
+{
+    public static class ScreenshotCapture
+    {
+        public static string Capture(int width = 640, int height = 480, string cameraName = null)
+        {
+            var pngData = RenderPng(width, height, cameraName);
+            return Convert.ToBase64String(pngData);
+        }
+
+        public static string CaptureToFile(int width = 640, int height = 480, string cameraName = null)
+        {
+            var pngData = RenderPng(width, height, cameraName);
+            return FileOutputHelper.WritePng(pngData);
+        }
+
+        private static byte[] RenderPng(int width, int height, string cameraName)
+        {
+            // Play Mode: capture composited Game View (includes all URP effects)
+            bool isGameCamera = string.IsNullOrEmpty(cameraName) || cameraName == "game";
+            if (EditorApplication.isPlaying && isGameCamera)
+                return CaptureGameViewPng();
+
+            // Scene View: read already-URP-rendered buffer from scene camera
+            if (cameraName != null && cameraName.StartsWith("scene_view"))
+                return CaptureSceneViewPng(cameraName, width, height);
+
+            return RenderCameraPng(FindCamera(cameraName), width, height);
+        }
+
+        private static void FocusGameView()
+        {
+            var gameViewType = typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView");
+            if (gameViewType == null) return;
+            var gameView = EditorWindow.GetWindow(gameViewType, false, null, true);
+            if (gameView != null) gameView.Focus();
+        }
+
+        private static byte[] CaptureGameViewPng()
+        {
+            FocusGameView();
+            var tex = ScreenCapture.CaptureScreenshotAsTexture();
+            try { return tex.EncodeToPNG(); }
+            finally { UnityEngine.Object.DestroyImmediate(tex); }
+        }
+
+        private static byte[] CaptureSceneViewPng(string cameraName, int width, int height)
+        {
+            var sv = SceneView.lastActiveSceneView;
+            if (sv == null) throw new ArgumentException("No active Scene View");
+            if (cameraName == "scene_view_frame" && Selection.activeGameObject != null)
+                sv.FrameSelected();
+            sv.Focus();
+            sv.Repaint();
+
+            RenderTexture rt = null;
+            Texture2D tex = null;
+            var prevActive = RenderTexture.active;
+            try
+            {
+                // Render directly into our own RT (avoids black-buffer from unrendered frame)
+                rt = new RenderTexture(width, height, 24);
+                sv.camera.targetTexture = rt;
+                sv.camera.Render();
+                sv.camera.targetTexture = null;
+
+                RenderTexture.active = rt;
+                tex = new Texture2D(width, height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                tex.Apply();
+                RenderTexture.active = null;
+
+                // If result is all black, fall back to already-rendered URP buffer
+                var pixels = tex.GetPixels(0, 0, 1, 1);
+                bool allBlack = pixels[0].r < 0.01f && pixels[0].g < 0.01f && pixels[0].b < 0.01f;
+
+                if (allBlack)
+                {
+                    UnityEngine.Object.DestroyImmediate(tex); tex = null;
+                    var active = sv.camera.activeTexture;
+                    if (active != null)
+                    {
+                        tex = new Texture2D(active.width, active.height, TextureFormat.RGB24, false);
+                        RenderTexture.active = active;
+                        tex.ReadPixels(new Rect(0, 0, active.width, active.height), 0, 0);
+                        tex.Apply();
+                        return tex.EncodeToPNG();
+                        // tex is cleaned up by the outer finally block
+                    }
+                    return RenderCameraPng(sv.camera, width, height);
+                }
+
+                return tex.EncodeToPNG();
+            }
+            finally
+            {
+                RenderTexture.active = prevActive;
+                if (rt != null) { rt.Release(); UnityEngine.Object.DestroyImmediate(rt); }
+                if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
+            }
+        }
+
+        private static byte[] RenderCameraPng(Camera camera, int width, int height)
+        {
+            RenderTexture renderTexture = null;
+            Texture2D texture = null;
+            var previousActive = RenderTexture.active;
+
+            try
+            {
+                renderTexture = new RenderTexture(width, height, 24);
+                texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+
+                var previousTarget = camera.targetTexture;
+                camera.targetTexture = renderTexture;
+                camera.Render();
+                camera.targetTexture = previousTarget;
+
+                RenderTexture.active = renderTexture;
+                texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                texture.Apply();
+
+                return texture.EncodeToPNG();
+            }
+            finally
+            {
+                RenderTexture.active = previousActive;
+                if (renderTexture != null) UnityEngine.Object.DestroyImmediate(renderTexture);
+                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static Camera FindCamera(string cameraName)
+        {
+            if (!string.IsNullOrEmpty(cameraName))
+            {
+                var cameraObj = GameObject.Find(cameraName);
+                if (cameraObj != null)
+                {
+                    var cam = cameraObj.GetComponent<Camera>();
+                    if (cam != null) return cam;
+                }
+            }
+
+            if (Camera.main != null) return Camera.main;
+
+            var allCameras = Camera.allCameras;
+            if (allCameras.Length > 0) return allCameras[0];
+
+            throw new ArgumentException("No camera found in scene");
+        }
+    }
+}

@@ -1,0 +1,74 @@
+"""Tests for idempotentHint on write tools that are safe to repeat."""
+import pytest
+from mcp.types import ToolAnnotations
+from unity_mcp.tools import objects, scene, asset, ui, connection, runtime
+
+
+def _get_annotation(module, fn_name: str) -> ToolAnnotations | None:
+    """Extract the _RW_IDEM / _RW / _RO constant used in register() for a given function."""
+    import ast, inspect, textwrap
+    src = inspect.getsource(module)
+    tree = ast.parse(textwrap.dedent(src))
+    # Find the register function body
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "register":
+            for stmt in node.body:
+                # mcp.tool(annotations=CONST)(fn_name)
+                if not isinstance(stmt, ast.Expr):
+                    continue
+                call = stmt.value
+                if not isinstance(call, ast.Call):
+                    continue
+                # inner call: mcp.tool(annotations=CONST) → the CONST name
+                if not isinstance(call.func, ast.Call):
+                    continue
+                inner = call.func  # mcp.tool(annotations=...)
+                # check positional arg to inner call is fn_name
+                if not call.args or not isinstance(call.args[0], ast.Name):
+                    continue
+                if call.args[0].id != fn_name:
+                    continue
+                # find annotations= kwarg in inner call
+                for kw in inner.keywords:
+                    if kw.arg == "annotations" and isinstance(kw.value, ast.Name):
+                        const_name = kw.value.id
+                        return getattr(module, const_name)
+    return None
+
+
+IDEM_TOOLS = [
+    (objects, "set_property"),
+    (objects, "set_active"),
+    (objects, "set_material"),
+    (scene, "recompile"),
+    (asset, "project_settings"),
+    (ui, "set_rect"),
+    (connection, "reconnect_unity"),
+    (runtime, "set_runtime_property"),
+    (runtime, "wait_until"),
+]
+
+NON_IDEM_TOOLS = [
+    (objects, "create_object"),
+    (objects, "delete_object"),
+    (objects, "manage_component"),
+    (objects, "wire_event"),
+    (scene, "scene"),
+    # editor mutates editor state (play/pause/stop) — not idempotent
+    (scene, "editor"),
+]
+
+
+@pytest.mark.parametrize("mod,fn", IDEM_TOOLS)
+def test_idempotent_tool_has_idempotentHint(mod, fn):
+    ann = _get_annotation(mod, fn)
+    assert ann is not None, f"{mod.__name__}.{fn}: no annotation found"
+    assert ann.idempotentHint is True, f"{mod.__name__}.{fn}: idempotentHint should be True"
+    assert ann.readOnlyHint is False, f"{mod.__name__}.{fn}: readOnlyHint should be False"
+
+
+@pytest.mark.parametrize("mod,fn", NON_IDEM_TOOLS)
+def test_non_idempotent_tool_lacks_idempotentHint(mod, fn):
+    ann = _get_annotation(mod, fn)
+    assert ann is not None, f"{mod.__name__}.{fn}: no annotation found"
+    assert ann.idempotentHint is not True, f"{mod.__name__}.{fn}: should NOT have idempotentHint=True"

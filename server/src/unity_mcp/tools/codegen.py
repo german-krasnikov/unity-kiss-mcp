@@ -1,0 +1,80 @@
+"""C# code execution, schema introspection, and sampling-backed error fixing."""
+import re
+from ._annotations import RO as _RO, RW as _RW
+
+_send = None
+_args = None
+
+
+async def execute_code(code: str, undo_label: str = "execute_code") -> str:
+    """Execute C# code in Unity Editor via Roslyn. 10-40x faster than recompile.
+    Security: no System.IO, System.Net, System.Diagnostics.
+    Bare statements are auto-wrapped in a static class — no boilerplate needed.
+    Example: \"var go = new GameObject(\\\"Test\\\"); return go.name;\""""
+    return await _send("execute_code", _args(code=code, undo_label=undo_label))
+
+
+async def get_schema(type: str) -> str:
+    """Get all serialized fields of a component type with types. Use before set_property to know exact field names."""
+    return await _send("get_schema", {"type": type})
+
+
+try:
+    from mcp.server.fastmcp import Context as _Context
+    _has_context = True
+except ImportError:
+    _Context = object
+    _has_context = False
+
+
+async def auto_fix(ctx: _Context) -> str:
+    """Auto-detect and fix Unity errors. Uses MCP sampling to ask Claude for fixes."""
+    console = await _send("get_console", {"count": 10, "level": "Error"})
+    compile_errors = await _send("get_compile_errors", {})
+    if "No compilation errors" in compile_errors and not console:
+        return "No errors to fix."
+    errors = []
+    if "No compilation errors" not in compile_errors:
+        errors.append(f"Compilation:\n{compile_errors}")
+    if console:
+        errors.append(f"Console:\n{console}")
+    error_text = "\n".join(errors)
+    try:
+        response = await ctx.session.create_message(
+            messages=[{"role": "user", "content": {"type": "text",
+                "text": f"Unity errors:\n{error_text}\n\nSuggest exact fix (file path + code change). Be specific."}}],
+            max_tokens=500,
+        )
+        suggestion = response.content[0].text if response.content else "No suggestion"
+        return f"ERRORS:\n{error_text}\n\nSUGGESTED FIX:\n{suggestion}"
+    except Exception as e:
+        return f"ERRORS:\n{error_text}\n\n(Auto-fix unavailable: {e})"
+
+
+async def smart_build(description: str, ctx: _Context) -> str:
+    """Build scene objects from natural language description using MCP sampling + execute_code."""
+    try:
+        response = await ctx.session.create_message(
+            messages=[{"role": "user", "content": {"type": "text",
+                "text": f"Write Unity C# code (bare statements, no class) to: {description}\nUse: new GameObject(), AddComponent, transform.position, etc."}}],
+            max_tokens=1000,
+        )
+        code = response.content[0].text if response.content else ""
+        m = re.search(r"```(?:csharp|cs)?\n(.*?)```", code, re.DOTALL)
+        if m:
+            code = m.group(1).strip()
+        if not code.strip():
+            return "Sampling returned empty code."
+        return await _send("execute_code", {"code": code})
+    except Exception as e:
+        return f"Sampling unavailable: {e}. Use execute_code manually."
+
+
+def register(mcp, send, args):
+    global _send, _args
+    _send = send
+    _args = args
+    mcp.tool(annotations=_RW)(execute_code)
+    mcp.tool(annotations=_RO)(get_schema)
+    mcp.tool(annotations=_RO)(auto_fix)
+    mcp.tool(annotations=_RW)(smart_build)

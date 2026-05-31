@@ -1,0 +1,805 @@
+import asyncio
+import json
+import struct
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
+from unity_mcp.bridge import UnityBridge
+from helpers import make_writer, make_idle_probe
+
+
+def test_bridge_default_port():
+    bridge = UnityBridge()
+    assert bridge._port == 9500
+
+
+def test_bridge_custom_port():
+    bridge = UnityBridge(port=9600)
+    assert bridge._port == 9600
+
+
+def test_bridge_env_port(monkeypatch):
+    monkeypatch.setenv("UNITY_MCP_PORT", "9700")
+    bridge = UnityBridge()
+    assert bridge._port == 9700
+
+
+def test_bridge_explicit_port_overrides_env(monkeypatch):
+    monkeypatch.setenv("UNITY_MCP_PORT", "9700")
+    bridge = UnityBridge(port=9600)
+    assert bridge._port == 9600
+
+
+def test_bridge_invalid_env_port_falls_back_to_default(monkeypatch):
+    monkeypatch.setenv("UNITY_MCP_PORT", "not_a_number")
+    bridge = UnityBridge()
+    assert bridge._port == 9500
+
+
+@pytest.mark.asyncio
+async def test_send_concurrent_unique_ids(mock_reader, mock_writer):
+    """Concurrent sends produce unique message IDs."""
+    import json, struct
+
+    def make_response(n):
+        r = {"id": f"{n:04x}", "ok": True, "data": "x"}
+        p = json.dumps(r).encode()
+        return [struct.pack("!I", len(p)), p]
+
+    responses = []
+    for i in range(1, 4):
+        responses.extend(make_response(i))
+    mock_reader.readexactly.side_effect = responses
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+        results = await asyncio.gather(
+            bridge.send("cmd1", {}),
+            bridge.send("cmd2", {}),
+            bridge.send("cmd3", {}),
+        )
+
+    calls = mock_writer.write.call_args_list
+    ids = [json.loads(c[0][0][4:])["id"] for c in calls]
+    assert len(set(ids)) == 3, f"Expected 3 unique IDs, got: {ids}"
+
+
+class TestUnityBridge:
+    @pytest.mark.asyncio
+    async def test_send_encodes_header_as_big_endian_uint32(
+        self, mock_reader, mock_writer
+    ):
+        """Verify 4-byte BE header is written correctly."""
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            bridge = UnityBridge()
+            await bridge.connect()
+
+            # Mock response
+            response = {"id": "0001", "ok": True, "data": "test"}
+            response_payload = json.dumps(response).encode("utf-8")
+            response_header = struct.pack("!I", len(response_payload))
+            mock_reader.readexactly.side_effect = [
+                response_header,
+                response_payload,
+            ]
+
+            await bridge.send("test_cmd", {})
+
+            # Verify header is big-endian uint32
+            written = mock_writer.write.call_args[0][0]
+            header = written[:4]
+            payload = written[4:]
+
+            # Header should be 4 bytes
+            assert len(header) == 4
+
+            # Unpack as big-endian
+            length = struct.unpack("!I", header)[0]
+            assert length == len(payload)
+
+    @pytest.mark.asyncio
+    async def test_send_encodes_payload_as_utf8_json(
+        self, mock_reader, mock_writer
+    ):
+        """Verify payload is UTF-8 encoded JSON."""
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            bridge = UnityBridge()
+            await bridge.connect()
+
+            # Mock response
+            response = {"id": "0001", "ok": True, "data": "test"}
+            response_payload = json.dumps(response).encode("utf-8")
+            response_header = struct.pack("!I", len(response_payload))
+            mock_reader.readexactly.side_effect = [
+                response_header,
+                response_payload,
+            ]
+
+            await bridge.send("test_cmd", {"arg": "value"})
+
+            # Extract payload
+            written = mock_writer.write.call_args[0][0]
+            payload = written[4:]
+
+            # Decode and parse
+            decoded = json.loads(payload.decode("utf-8"))
+
+            assert decoded["cmd"] == "test_cmd"
+            assert decoded["args"] == {"arg": "value"}
+            assert "id" in decoded
+
+    @pytest.mark.asyncio
+    async def test_send_includes_incremental_id(self, mock_reader, mock_writer):
+        """Verify hex IDs increment correctly."""
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            bridge = UnityBridge()
+            await bridge.connect()
+
+            # Mock responses
+            def make_response(msg_id):
+                response = {"id": msg_id, "ok": True}
+                payload = json.dumps(response).encode("utf-8")
+                header = struct.pack("!I", len(payload))
+                return [header, payload]
+
+            mock_reader.readexactly.side_effect = (
+                make_response("0001") + make_response("0002") + make_response("0003")
+            )
+
+            # Send 3 commands
+            await bridge.send("cmd1", {})
+            await bridge.send("cmd2", {})
+            await bridge.send("cmd3", {})
+
+            # Extract IDs from all calls
+            calls = mock_writer.write.call_args_list
+            ids = []
+            for call in calls:
+                written = call[0][0]
+                payload = written[4:]
+                decoded = json.loads(payload.decode("utf-8"))
+                ids.append(decoded["id"])
+
+            assert ids == ["0001", "0002", "0003"]
+
+    @pytest.mark.asyncio
+    async def test_read_response_decodes_json(self, mock_reader, mock_writer):
+        """Verify response parsing works."""
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            bridge = UnityBridge()
+            await bridge.connect()
+
+            # Mock response
+            response = {"id": "0001", "ok": True, "data": "hierarchy"}
+            response_payload = json.dumps(response).encode("utf-8")
+            response_header = struct.pack("!I", len(response_payload))
+            mock_reader.readexactly.side_effect = [
+                response_header,
+                response_payload,
+            ]
+
+            result = await bridge.send("get_hierarchy", {})
+
+            assert result["ok"] is True
+            assert result["data"] == "hierarchy"
+
+    @pytest.mark.asyncio
+    async def test_message_too_large_raises_error(self, mock_reader, mock_writer):
+        """Verify >10MB message raises ConnectionError (circuit breaker trips)."""
+        import unity_mcp.bridge as bmod
+        orig = bmod.SESSION_TIMEOUT
+        bmod.SESSION_TIMEOUT = 0.1
+        idle_probe = make_idle_probe()
+        try:
+            with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+                bridge = UnityBridge(probe=idle_probe)
+                await bridge.connect()
+
+                too_large = 10_000_001
+                response_header = struct.pack("!I", too_large)
+                mock_reader.readexactly.side_effect = [response_header]
+
+                with pytest.raises((ConnectionError, TimeoutError)):
+                    await bridge.send("test", {})
+        finally:
+            bmod.SESSION_TIMEOUT = orig
+
+    @pytest.mark.asyncio
+    async def test_close_cleans_up_writer(self, mock_reader, mock_writer):
+        """Verify writer.close() and wait_closed() are called."""
+        with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
+            bridge = UnityBridge()
+            await bridge.connect()
+
+            await bridge.close()
+
+            mock_writer.close.assert_called_once()
+            mock_writer.wait_closed.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_send_fails_fast_on_connection_error(self):
+        """Circuit breaker: first ConnectionError raises immediately (no retry)."""
+        first_reader = AsyncMock()
+        first_writer = make_writer()
+        first_writer.write = Mock(side_effect=ConnectionError("Connection lost"))
+
+        with patch("unity_mcp.bridge.asyncio.open_connection",
+                   return_value=(first_reader, first_writer)):
+            bridge = UnityBridge()
+            await bridge.connect()
+
+            with pytest.raises(ConnectionError):
+                await bridge.send("test", {})
+
+    @pytest.mark.asyncio
+    async def test_send_raises_on_connection_error(self):
+        """Circuit breaker: raises ConnectionError on write failure."""
+        from unittest.mock import MagicMock
+
+        idle_probe = make_idle_probe()
+
+        def create_failing_mock():
+            reader = AsyncMock()
+            writer = make_writer()
+            writer.write = Mock(side_effect=ConnectionError("Connection lost"))
+            return (reader, writer)
+
+        with patch("unity_mcp.bridge.asyncio.open_connection",
+                   return_value=create_failing_mock()):
+            bridge = UnityBridge(probe=idle_probe)
+            await bridge.connect()
+
+            with pytest.raises(ConnectionError):
+                await bridge.send("test", {})
+
+    @pytest.mark.asyncio
+    async def test_bridge_auto_retry_on_retry_hint(self):
+        """Bridge auto-waits and retries on retry hint."""
+        reader = AsyncMock()
+        writer = make_writer()
+
+        # First response: busy with retry hint
+        busy_response = {"id": "0001", "ok": False, "err": "Unity is compiling", "retry": 100}
+        busy_payload = json.dumps(busy_response).encode("utf-8")
+        busy_header = struct.pack("!I", len(busy_payload))
+
+        # Second response: success
+        ok_response = {"id": "0001", "ok": True, "data": "pong"}
+        ok_payload = json.dumps(ok_response).encode("utf-8")
+        ok_header = struct.pack("!I", len(ok_payload))
+
+        reader.readexactly.side_effect = [
+            busy_header, busy_payload,
+            ok_header, ok_payload,
+        ]
+
+        with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+            with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+                bridge = UnityBridge()
+                await bridge.connect()
+                result = await bridge.send("get_hierarchy", {})
+
+                assert result["ok"] is True
+                assert result["data"] == "pong"
+                # Verify sleep was called with retry_ms / 1000
+                mock_sleep.assert_called_once_with(0.1)  # 100ms = 0.1s
+
+    @pytest.mark.asyncio
+    async def test_bridge_no_retry_on_normal_error(self):
+        """Bridge does NOT retry on normal errors (no retry field)."""
+        reader = AsyncMock()
+        writer = make_writer()
+
+        error_response = {"id": "0001", "ok": False, "err": "Object not found"}
+        error_payload = json.dumps(error_response).encode("utf-8")
+        error_header = struct.pack("!I", len(error_payload))
+
+        reader.readexactly.side_effect = [error_header, error_payload]
+
+        with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+            bridge = UnityBridge()
+            await bridge.connect()
+            result = await bridge.send("get_hierarchy", {})
+
+            # Should return error directly without retry
+            assert result["ok"] is False
+            assert "Object not found" in result["err"]
+
+    @pytest.mark.asyncio
+    async def test_send_raises_timeout_error_after_max_retries(self):
+        """Bridge raises error after max retries on asyncio.TimeoutError."""
+        call_count = 0
+
+        def create_timeout_mock():
+            reader = AsyncMock()
+            writer = make_writer()
+            return (reader, writer)
+
+        async def open_connection_side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return create_timeout_mock()
+
+        idle_probe = make_idle_probe()
+
+        with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=open_connection_side_effect):
+            with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
+                bridge = UnityBridge(probe=idle_probe)
+                await bridge.connect()
+                # Patch _read_response to raise TimeoutError (avoids affecting wait_for in _reconnect)
+                with patch.object(bridge, "_read_response", side_effect=asyncio.TimeoutError):
+                    with pytest.raises((TimeoutError, ConnectionError), match="Unity not responding"):
+                        await bridge.send("test", {})
+
+    @pytest.mark.asyncio
+    async def test_bridge_retry_respects_max_retries(self):
+        """Bridge doesn't retry forever on compilation busy."""
+        reader = AsyncMock()
+        writer = make_writer()
+
+        # Always return busy response (simulates endless compilation)
+        busy_response = {"id": "0001", "ok": False, "err": "Unity is compiling", "retry": 50}
+        busy_payload = json.dumps(busy_response).encode("utf-8")
+        busy_header = struct.pack("!I", len(busy_payload))
+
+        # Return busy 5 times (initial + 3 retries + extra to be safe)
+        reader.readexactly.side_effect = [
+            busy_header, busy_payload,
+            busy_header, busy_payload,
+            busy_header, busy_payload,
+            busy_header, busy_payload,
+            busy_header, busy_payload,
+        ]
+
+        with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+            with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+                bridge = UnityBridge()
+                await bridge.connect()
+                result = await bridge.send("get_hierarchy", {})
+
+                assert result["ok"] is False
+                assert "compiling" in result["err"]
+                assert mock_sleep.call_count == 3
+
+
+# ── Tier 2a: Grace retries for non-busy ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_idle_retry_gets_one_grace_attempt():
+    """Non-busy disconnect retries once (1 grace) before giving up."""
+    call_count = 0
+    idle_probe = make_idle_probe()
+
+    async def failing_open(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        reader = AsyncMock()
+        writer = make_writer()
+        return reader, writer
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=failing_open):
+        with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
+            bridge = UnityBridge(probe=idle_probe)
+            await bridge.connect()
+            with patch.object(bridge, "_read_response", side_effect=ConnectionError("lost")):
+                with pytest.raises(ConnectionError):
+                    await bridge.send("test", {})
+
+    # attempt 0 → 1 grace retry → attempt 1 → give up (idle probe, no more retries)
+    # initial connect + 1 retry = 2 open_connection calls
+    assert call_count == 2  # initial connect + 1 grace retry
+
+
+# ── Tier 2c: Heartbeat ────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_heartbeat_detects_zombie_connection():
+    """Two consecutive ping timeouts → connection closed (no reconnect)."""
+    reader = AsyncMock()
+    writer = make_writer()
+    closed_event = asyncio.Event()
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+
+        orig_close = bridge.close
+        async def close_and_signal():
+            await orig_close()
+            closed_event.set()
+
+        # _raw_ping always times out; prevent reconnect so closed state persists
+        with patch.object(bridge, "_raw_ping", side_effect=asyncio.TimeoutError()), \
+             patch.object(bridge, "_reconnect", side_effect=ConnectionError("no reconnect")), \
+             patch.object(bridge, "close", side_effect=close_and_signal):
+            bridge.start_heartbeat(interval=0.01)
+            await asyncio.wait_for(closed_event.wait(), timeout=1.0)
+            bridge.stop_heartbeat()
+
+    assert not bridge.connected
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_reconnects_when_disconnected():
+    """Heartbeat attempts reconnect when not connected and not busy."""
+    reader = AsyncMock()
+    writer = make_writer()
+    idle_probe = make_idle_probe()
+    reconnect_calls = [0]
+    original_sleep = asyncio.sleep
+
+    async def fast_sleep(t, *a, **kw):
+        await original_sleep(0.005)
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge(probe=idle_probe)
+        bridge._last_reconnect_at = 0.0
+        async def mock_reconnect():
+            reconnect_calls[0] += 1
+
+        with patch.object(bridge, "_reconnect", side_effect=mock_reconnect), \
+             patch("unity_mcp.bridge.asyncio.sleep", side_effect=fast_sleep):
+            bridge.start_heartbeat(interval=0.01)
+            await original_sleep(0.08)
+            bridge.stop_heartbeat()
+
+    assert reconnect_calls[0] >= 1
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_reconnects_when_busy():
+    """Heartbeat calls _reconnect() even when probe is busy (probe controls timing only)."""
+    reader = AsyncMock()
+    writer = make_writer()
+    busy_probe = make_idle_probe()
+    busy_probe.has_strong_busy_signal.return_value = True
+    reconnect_calls = [0]
+    original_sleep = asyncio.sleep
+
+    async def fast_sleep(t, *a, **kw):
+        await original_sleep(0.005)
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge(probe=busy_probe)
+        bridge._last_reconnect_at = 0.0
+
+        async def mock_reconnect():
+            reconnect_calls[0] += 1
+
+        with patch.object(bridge, "_reconnect", side_effect=mock_reconnect), \
+             patch("unity_mcp.bridge.asyncio.sleep", side_effect=fast_sleep):
+            bridge.start_heartbeat(interval=0.01)
+            await original_sleep(0.08)
+            bridge.stop_heartbeat()
+
+    assert reconnect_calls[0] >= 1
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_stops_on_close():
+    """stop_heartbeat cancels the background task."""
+    reader = AsyncMock()
+    writer = make_writer()
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+
+        ping_calls = [0]
+
+        async def counting_ping(timeout=10.0):
+            ping_calls[0] += 1
+
+        with patch.object(bridge, "_raw_ping", side_effect=counting_ping):
+            bridge.start_heartbeat(interval=0.02)
+            await asyncio.sleep(0.08)
+            calls_before = ping_calls[0]
+            bridge.stop_heartbeat()
+            await asyncio.sleep(0.08)
+            calls_after = ping_calls[0]
+
+    # After stop, no more pings
+    assert calls_after == calls_before
+
+
+# ── FIX 4: Heartbeat 5s default + immediate close on dead PID ────────────────
+
+def test_heartbeat_default_interval_is_15():
+    """start_heartbeat default interval is 15.0 (reverted from 5.0 — too aggressive)."""
+    import inspect
+    from unity_mcp.bridge import UnityBridge
+    sig = inspect.signature(UnityBridge.start_heartbeat)
+    assert sig.parameters["interval"].default == 15.0
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_immediate_close_when_pid_dead():
+    """Single ping failure + PID dead → close after 1 failure (not 2)."""
+    reader = AsyncMock()
+    writer = make_writer()
+    closed_event = asyncio.Event()
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+
+        orig_close = bridge.close
+        async def close_and_signal():
+            await orig_close()
+            closed_event.set()
+
+        with patch.object(bridge, "_raw_ping", side_effect=asyncio.TimeoutError()), \
+             patch.object(bridge._probe, "is_process_dead", return_value=True), \
+             patch.object(bridge, "_reconnect", side_effect=ConnectionError("no reconnect")), \
+             patch.object(bridge, "close", side_effect=close_and_signal):
+            bridge.start_heartbeat(interval=0.01)
+            await asyncio.wait_for(closed_event.wait(), timeout=1.0)
+            bridge.stop_heartbeat()
+
+    # Closed after 1 failure (ping_failures == 1, but is_process_dead → immediate)
+    assert not bridge.connected
+
+
+def test_describe_failure_reports_crash_when_pid_dead():
+    """When PID is dead, _describe_failure mentions 'crashed'."""
+    bridge = UnityBridge(port=9500)
+    with patch.object(bridge._probe, "is_process_dead", return_value=True):
+        msg = bridge._describe_failure("ping", ConnectionError("timeout"))
+    assert "crash" in msg.lower()
+
+
+# ── Tier 2c: Reconnect cooldown + raw ping ──────────────────────────────────
+
+
+def test_reconnect_cooldown_default_2s():
+    """MIN_RECONNECT_INTERVAL defaults to 2.0s."""
+    from unity_mcp.bridge import MIN_RECONNECT_INTERVAL
+    assert MIN_RECONNECT_INTERVAL == 2.0
+
+
+def test_reconnect_cooldown_blocks_rapid_reconnect():
+    """_reconnect_cooldown_ok() returns False within cooldown window."""
+    import time as _time
+    bridge = UnityBridge(port=9500)
+    bridge._last_reconnect_at = _time.monotonic()  # just happened
+    assert not bridge._reconnect_cooldown_ok()
+
+
+def test_reconnect_cooldown_allows_after_interval():
+    """_reconnect_cooldown_ok() returns True after enough time."""
+    import time as _time
+    bridge = UnityBridge(port=9500)
+    bridge._last_reconnect_at = _time.monotonic() - 10.0  # 10s ago
+    assert bridge._reconnect_cooldown_ok()
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_respects_reconnect_cooldown():
+    """Heartbeat skips reconnect if cooldown hasn't elapsed."""
+    import time as _time
+    reader = AsyncMock()
+    writer = make_writer()
+    idle_probe = make_idle_probe()
+    reconnect_calls = [0]
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge(probe=idle_probe)
+        bridge._last_reconnect_at = _time.monotonic()  # just reconnected
+
+        async def mock_reconnect():
+            reconnect_calls[0] += 1
+
+        with patch.object(bridge, "_reconnect", side_effect=mock_reconnect):
+            bridge.start_heartbeat(interval=0.01)
+            await asyncio.sleep(0.08)
+            bridge.stop_heartbeat()
+
+    # Should NOT have reconnected due to cooldown
+    assert reconnect_calls[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_raw_ping_bypasses_send_retry():
+    """_raw_ping sends directly without going through send() retry logic."""
+    import json as _json
+    import struct as _struct
+    reader = AsyncMock()
+    writer = make_writer()
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+
+        # Make _read_response return a valid pong
+        async def mock_read():
+            return {"id": f"hb{bridge._counter:04x}", "ok": True, "data": "pong"}
+
+        with patch.object(bridge, "_read_response", side_effect=mock_read):
+            await bridge._raw_ping(timeout=5.0)
+            # Should have written something
+            assert writer.write.called
+            call_bytes = writer.write.call_args[0][0]
+            length = struct.unpack("!I", call_bytes[:4])[0]
+            assert b'"cmd": "ping"' in call_bytes[4:4 + length]
+
+
+@pytest.mark.asyncio
+async def test_raw_ping_raises_on_disconnected():
+    """_raw_ping raises ConnectionError if not connected."""
+    bridge = UnityBridge(port=9500)
+    with pytest.raises(ConnectionError, match="Not connected"):
+        await bridge._raw_ping()
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_immediate_close_on_domain_reload_error():
+    """DomainReloadError during heartbeat ping → close immediately (no 2-failure wait)."""
+    from unity_mcp.bridge import DomainReloadError
+    reader = AsyncMock()
+    writer = make_writer()
+    closed_event = asyncio.Event()
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+
+        orig_close = bridge.close
+        async def close_and_signal():
+            await orig_close()
+            closed_event.set()
+
+        with patch.object(bridge, "_raw_ping", side_effect=DomainReloadError("reload")), \
+             patch.object(bridge, "close", side_effect=close_and_signal):
+            bridge.start_heartbeat(interval=0.01)
+            await asyncio.wait_for(closed_event.wait(), timeout=1.0)
+            bridge.stop_heartbeat()
+
+    # Closed after FIRST failure (DomainReloadError = immediate close)
+    assert closed_event.is_set()
+
+
+@pytest.mark.asyncio
+async def test_ensure_heartbeat_restarts_dead_task():
+    """_ensure_heartbeat() auto-restarts heartbeat if task died."""
+    bridge = UnityBridge(port=9500)
+    bridge._heartbeat_task = asyncio.ensure_future(asyncio.sleep(0))
+    await asyncio.sleep(0.01)  # let it complete
+    assert bridge._heartbeat_task.done()
+    bridge._ensure_heartbeat()
+    assert bridge._heartbeat_task is not None
+    assert not bridge._heartbeat_task.done()
+    bridge.stop_heartbeat()
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_survives_tick_exception():
+    """Heartbeat loop continues after non-CancelledError exception in tick."""
+    tick_count = [0]
+    original_sleep = asyncio.sleep
+
+    async def counting_tick(interval):
+        tick_count[0] += 1
+        await original_sleep(0.005)  # yield so cancel() can land
+        if tick_count[0] == 1:
+            raise RuntimeError("unexpected boom")
+
+    async def fast_sleep(t, *a, **kw):
+        await original_sleep(0.005)
+
+    bridge = UnityBridge(port=9500)
+    with patch.object(bridge, "_heartbeat_tick", side_effect=counting_tick), \
+         patch("unity_mcp.bridge.asyncio.sleep", side_effect=fast_sleep):
+        bridge.start_heartbeat(interval=0.01)
+        await original_sleep(0.1)
+        bridge.stop_heartbeat()
+
+    assert tick_count[0] >= 2, f"Loop should have continued after exception, got {tick_count[0]} ticks"
+
+
+# ── Tier 2d: Callback debounce ──────────────────────────────────────────────
+
+
+def test_reconnect_callback_debounce_skips_rapid_calls():
+    """Debounced callback registered on bridge: rapid double-fire calls action once."""
+    import time as _time
+    refresh_calls = [0]
+    _last_refresh_ts = [0.0]
+
+    def _on_reconnect():
+        now = _time.monotonic()
+        if now - _last_refresh_ts[0] < 5.0:
+            return
+        _last_refresh_ts[0] = now
+        refresh_calls[0] += 1
+
+    bridge = UnityBridge(port=9500)
+    bridge.add_reconnect_callback(_on_reconnect)
+
+    for cb in bridge._on_reconnect_callbacks:
+        cb()
+    assert refresh_calls[0] == 1
+
+    for cb in bridge._on_reconnect_callbacks:
+        cb()
+    assert refresh_calls[0] == 1
+
+
+def test_reconnect_callback_debounce_allows_after_cooldown():
+    """Debounced callback fires again after cooldown window expires."""
+    import time as _time
+    refresh_calls = [0]
+    _last_refresh_ts = [0.0]
+
+    def _on_reconnect():
+        now = _time.monotonic()
+        if now - _last_refresh_ts[0] < 5.0:
+            return
+        _last_refresh_ts[0] = now
+        refresh_calls[0] += 1
+
+    bridge = UnityBridge(port=9500)
+    bridge.add_reconnect_callback(_on_reconnect)
+
+    for cb in bridge._on_reconnect_callbacks:
+        cb()
+    assert refresh_calls[0] == 1
+
+    _last_refresh_ts[0] = _time.monotonic() - 10.0
+    for cb in bridge._on_reconnect_callbacks:
+        cb()
+    assert refresh_calls[0] == 2
+
+
+# ── F04: mark_recompile_issued wired in DomainReloadError handlers ────────────
+
+@pytest.mark.asyncio
+async def test_send_marks_recompile_on_domain_reload():
+    """send() calls probe.mark_recompile_issued() when DomainReloadError occurs."""
+    from unittest.mock import MagicMock
+    from unity_mcp.bridge import DomainReloadError
+    from unity_mcp.compile_state import CompileStateProbe
+
+    idle_probe = make_idle_probe()
+    reader = AsyncMock()
+    writer = make_writer()
+    writer.write = Mock(side_effect=DomainReloadError("going away"))
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
+            bridge = UnityBridge(probe=idle_probe)
+            await bridge.connect()
+            with pytest.raises((ConnectionError, DomainReloadError)):
+                await bridge.send("get_hierarchy", {})
+
+    idle_probe.mark_recompile_issued.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_marks_recompile_on_domain_reload():
+    """_heartbeat_tick() calls probe.mark_recompile_issued() on DomainReloadError."""
+    from unity_mcp.bridge import DomainReloadError
+
+    reader = AsyncMock()
+    writer = make_writer()
+    idle_probe = make_idle_probe()
+    closed_event = asyncio.Event()
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+
+        orig_close = bridge.close
+        async def close_and_signal():
+            await orig_close()
+            closed_event.set()
+
+        with patch.object(bridge, "_raw_ping", side_effect=DomainReloadError("reload")), \
+             patch.object(bridge, "_reconnect", side_effect=ConnectionError("no")), \
+             patch.object(bridge, "close", side_effect=close_and_signal):
+            bridge.start_heartbeat(interval=0.01)
+            await asyncio.wait_for(closed_event.wait(), timeout=2.0)
+            bridge.stop_heartbeat()
+
+    idle_probe.mark_recompile_issued.assert_called()

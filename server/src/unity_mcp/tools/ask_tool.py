@@ -1,0 +1,37 @@
+"""ask() meta-tool: NL question → router → Unity tools → Haiku summarize."""
+from ..sampling import SamplingService
+from ..ask.router import route, is_mutating
+from ..ask.executor import AskExecutor
+from ..ask.summarizer import Summarizer
+from ._annotations import RO as _RO
+
+# Module-level references — patched in tests
+_send = None
+_sampling: SamplingService = SamplingService()
+
+
+async def ask(question: str) -> str:
+    """Answer a read-only question about the Unity scene.
+
+    Routes to deterministic tool plans for common patterns,
+    uses Haiku summarization for complex multi-tool results.
+    """
+    if is_mutating(question):
+        return "ask is read-only — use other tools to mutate the scene"
+
+    plan = route(question)
+
+    if plan is None:
+        return "ask is for scene questions only (no matching Unity context found)"
+
+    executor = AskExecutor(_send)
+    results = await executor.run(plan)
+
+    summarizer = Summarizer(_sampling)
+    return await summarizer.summarize(question, results, hint=plan.hint)
+
+
+def register(mcp, send, args):
+    global _send
+    _send = send
+    mcp.tool(annotations=_RO)(ask)

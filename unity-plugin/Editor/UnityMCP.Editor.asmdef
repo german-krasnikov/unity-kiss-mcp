@@ -1,0 +1,14 @@
+{
+    "name": "UnityMCP.Editor",
+    "rootNamespace": "UnityMCP.Editor",
+    "references": ["UnityEditor.TestRunner", "UnityEngine.TestRunner", "Unity.Timeline", "Unity.Timeline.Editor"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

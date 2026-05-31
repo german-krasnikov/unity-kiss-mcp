@@ -1,0 +1,377 @@
+"""Live test fixtures. All live tests skip automatically when Unity bridge is down."""
+import asyncio
+import os
+import re
+import socket
+import subprocess
+import time
+import uuid
+
+import pytest
+import pytest_asyncio
+
+from unity_mcp.bridge import UnityBridge
+
+
+def strip_markers(text: str) -> str:
+    """Strip [confidence: X.XX] middleware suffix appended to responses."""
+    return re.sub(r'\n?\[confidence: [\d.]+\].*$', '', text, flags=re.DOTALL).strip()
+
+LIVE_HOST = os.environ.get("UNITY_MCP_HOST", "127.0.0.1")
+LIVE_PORT = int(os.environ.get("UNITY_MCP_PORT", "9500"))
+GRIDTEST_SCENE = "Assets/Scenes/GridTest.unity"
+
+
+def _bridge_up(host: str = LIVE_HOST, port: int = LIVE_PORT, timeout: float = 0.2) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except (OSError, socket.timeout):
+        return False
+
+
+def pytest_collection_modifyitems(items):
+    """Order: edit-mode → play-mode → destructive reconnect (last).
+
+    Tests with ensure_edit_mode fixture go to edit bucket regardless of module.
+    """
+    edit_mode, play_mode, destructive = [], [], []
+    for item in items:
+        if "test_reconnect" in item.nodeid:
+            destructive.append(item)
+        elif "ensure_edit_mode" in getattr(item, "fixturenames", []):
+            edit_mode.append(item)
+        elif any(k in item.nodeid for k in ("gridtest_playmode", "gridtest_movement", "batch_runtime")):
+            play_mode.append(item)
+        else:
+            edit_mode.append(item)
+    items[:] = edit_mode + play_mode + destructive
+
+
+async def _connect_with_retry(b: UnityBridge, retries: int = 15, delay: float = 1.0):
+    """Connect with backoff — handles post-domain-reload window."""
+    last_err = None
+    for _ in range(retries):
+        try:
+            await b.connect()
+            return
+        except (OSError, asyncio.TimeoutError) as e:
+            last_err = e
+            await asyncio.sleep(delay)
+    raise ConnectionError(f"Bridge connect failed after {retries}s: {last_err}")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _require_unity():
+    """Skip all live tests if Unity is not available. Kill competing MCP server first."""
+    subprocess.run(["pkill", "-f", "unity_mcp.server"], capture_output=True)
+    time.sleep(2)  # let old process fully die + Unity drop old client
+    # Wait for Unity to accept connections
+    for _ in range(10):
+        if _bridge_up():
+            return
+        time.sleep(1)
+    pytest.skip(
+        f"Unity bridge not on {LIVE_HOST}:{LIVE_PORT} — skipping live suite",
+        allow_module_level=False,
+    )
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _ensure_gridtest_scene(_require_unity):
+    """Open GridTest scene if not already active."""
+    b = UnityBridge()
+    try:
+        await _connect_with_retry(b)
+        r = await b.send("get_hierarchy", {})
+        if "GridPlayer" not in r.get("data", ""):
+            await b.send("scene", {"action": "open", "path": GRIDTEST_SCENE})
+            await asyncio.sleep(2)
+    except Exception:
+        pass
+    finally:
+        await b.close()
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _cleanup_orphans():
+    """Yield, then destroy any Live* orphans left in scene by interrupted sessions."""
+    yield
+    if not _bridge_up():
+        return
+    b = UnityBridge()
+    try:
+        await b.connect()
+        code = (
+            'var roots = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects(); '
+            'int count = 0; '
+            'foreach(var go in roots) { '
+            '  if(go.name.StartsWith("Live")) { '
+            '    UnityEngine.Object.DestroyImmediate(go); count++; '
+            '  } '
+            '} '
+            'return count + " orphans cleaned";'
+        )
+        await b.send("execute_code", {"code": code})
+    except Exception:
+        pass
+    finally:
+        await b.close()
+
+
+@pytest_asyncio.fixture
+async def bridge():
+    b = UnityBridge()
+    await _connect_with_retry(b)
+    yield b
+    await b.close()
+
+
+# ---------------------------------------------------------------------------
+# Play Mode helpers (shared across test modules)
+# ---------------------------------------------------------------------------
+
+PLAYER = "/GridPlayer"
+COMP = "GridPlayer"
+
+
+async def _enter_play(b: UnityBridge) -> None:
+    """Enter Play Mode and poll until playing:True (max 20s).
+
+    Domain reload kills TCP. We reconnect manually each iteration.
+    No heartbeat — we ARE the only client, no race condition.
+    """
+    try:
+        await b.send("editor", {"action": "play"})
+    except Exception:
+        pass
+    for _ in range(20):
+        await asyncio.sleep(1)
+        if not b.connected:
+            try:
+                await b.connect()
+            except Exception:
+                continue
+        try:
+            r = await b.send("editor", {"action": "state"})
+            if "playing:True" in r.get("data", ""):
+                break
+        except Exception:
+            pass
+    else:
+        raise RuntimeError("Failed to enter Play Mode within 20s")
+
+    # Wait for scene objects to initialise after entering Play Mode (max 5s)
+    player_name = PLAYER.lstrip("/")
+    for _ in range(10):
+        try:
+            h = await b.send("get_hierarchy", {})
+            if player_name in h.get("data", ""):
+                return
+        except Exception:
+            pass
+        await asyncio.sleep(0.5)
+    raise RuntimeError(f"{player_name} not found in hierarchy after entering Play Mode")
+
+
+async def _stop_play(b: UnityBridge) -> None:
+    """Stop Play Mode and poll until playing:False (max 10s).
+
+    Exiting Play Mode also triggers domain reload on some Unity versions.
+    """
+    try:
+        await b.send("editor", {"action": "stop"})
+    except Exception:
+        pass
+    for _ in range(20):
+        await asyncio.sleep(0.5)
+        if not b.connected:
+            try:
+                await b.connect()
+            except Exception:
+                continue
+        try:
+            r = await b.send("editor", {"action": "state"})
+            if "playing:False" in r.get("data", ""):
+                return
+        except Exception:
+            pass
+
+
+def _data(result) -> str:
+    if isinstance(result, dict):
+        return result.get("data") or result.get("err", "")
+    return str(result)
+
+
+async def _reset(b: UnityBridge) -> None:
+    await b.send("invoke_method", {
+        "path": PLAYER, "component": COMP, "method": "ResetState", "args": ""
+    })
+    await asyncio.sleep(0.1)
+
+
+async def _reload_scene(b: UnityBridge) -> None:
+    """Reload GridTest scene in PlayMode for full state isolation (~0.5s).
+
+    Uses EditorSceneManager.LoadSceneAsyncInPlayMode — works without build settings.
+    """
+    code = (
+        'var op = UnityEditor.SceneManagement.EditorSceneManager'
+        '.LoadSceneAsyncInPlayMode('
+        f'"{GRIDTEST_SCENE}", '
+        'new UnityEngine.SceneManagement.LoadSceneParameters('
+        'UnityEngine.SceneManagement.LoadSceneMode.Single));'
+        'return "reload_started";'
+    )
+    await b.send("execute_code", {"code": code})
+    await asyncio.sleep(0.5)
+    for _ in range(10):
+        try:
+            h = await b.send("get_hierarchy", {})
+            if "GridPlayer" in h.get("data", ""):
+                return
+        except Exception:
+            pass
+        await asyncio.sleep(0.2)
+    raise RuntimeError("Scene reload failed: GridPlayer not found")
+
+
+async def _clear_console(b: UnityBridge) -> None:
+    """Clear Unity console (removes [MCP] reconnect messages)."""
+    code = (
+        'var m = typeof(UnityEditor.LogEntries).GetMethod("Clear", '
+        'System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public); '
+        'm.Invoke(null, null); return "ok";'
+    )
+    try:
+        await b.send("execute_code", {"code": code})
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Session-scoped Play Mode (enter once, exit once)
+# ---------------------------------------------------------------------------
+
+@pytest_asyncio.fixture(scope="session")
+async def _play_mode_session(_ensure_gridtest_scene):
+    """Enter Play Mode ONCE for all play-mode tests in the session."""
+    b = UnityBridge()
+    try:
+        await _connect_with_retry(b)
+        await _enter_play(b)
+        await _clear_console(b)
+    except Exception as e:
+        await b.close()
+        pytest.skip(f"Could not enter Play Mode: {e}")
+        return
+    yield
+    try:
+        await _stop_play(b)
+    except Exception:
+        pass
+    finally:
+        await b.close()
+
+
+@pytest_asyncio.fixture
+async def play_session(bridge, _play_mode_session):
+    """Per-test bridge. PlayMode already active from session fixture."""
+    r = await bridge.send("editor", {"action": "state"})
+    if "playing:True" not in r.get("data", ""):
+        await _enter_play(bridge)
+    yield bridge
+
+
+@pytest_asyncio.fixture
+async def fresh_scene(bridge, _play_mode_session):
+    """Per-test bridge with full scene reload for guaranteed isolation."""
+    r = await bridge.send("editor", {"action": "state"})
+    if "playing:True" not in r.get("data", ""):
+        await _enter_play(bridge)
+    await _reload_scene(bridge)
+    yield bridge
+
+
+@pytest_asyncio.fixture
+async def ensure_edit_mode(bridge):
+    """Ensure Edit Mode before test (for tests that may follow Play Mode modules)."""
+    r = await bridge.send("editor", {"action": "state"})
+    if "playing:True" in r.get("data", ""):
+        await _stop_play(bridge)
+    yield bridge
+
+
+async def _destroy(bridge: UnityBridge, name: str) -> None:
+    """Destroy a root-level GameObject by name using DestroyImmediate."""
+    code = (
+        f'var go = GameObject.Find("{name}"); '
+        f'if(go) {{ UnityEngine.Object.DestroyImmediate(go); return "ok"; }} '
+        f'return "not found";'
+    )
+    try:
+        await bridge.send("execute_code", {"code": code})
+    except Exception:
+        pass
+
+
+@pytest_asyncio.fixture
+async def sandbox(bridge):
+    """UUID-named GameObject, cleaned up in finally via DestroyImmediate."""
+    name = f"Live_{uuid.uuid4().hex[:8]}"
+    await bridge.send("create_object", {"name": name})
+    path = f"/{name}"
+    try:
+        yield path
+    finally:
+        await _destroy(bridge, name)
+
+
+@pytest.fixture
+def sampling_mock(monkeypatch):
+    monkeypatch.setattr(
+        "unity_mcp.sampling.SamplingService.enabled",
+        property(lambda self: False),
+        raising=False,
+    )
+
+
+@pytest.fixture
+def hinter_enabled(monkeypatch):
+    """Override the global UNITY_MCP_HINTS=0 default set by the unit-test conftest."""
+    monkeypatch.setenv("UNITY_MCP_HINTS", "1")
+
+
+@pytest.fixture
+def visual_verify_enabled(monkeypatch):
+    """Override for visual diff tests that need SamplingService.enabled=True."""
+    monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
+
+
+@pytest.fixture
+def cost_cap():
+    from unity_mcp.metrics import METRICS
+    counters = METRICS.snapshot().get("counters", {})
+    before = counters.get("sampling.calls", 0)
+    yield
+    counters = METRICS.snapshot().get("counters", {})
+    delta = counters.get("sampling.calls", 0) - before
+    assert delta <= 2, f"Test made {delta} Haiku calls (limit 2). Possible loop or retry."
+
+
+@pytest_asyncio.fixture
+async def wrapped_bridge(bridge):
+    """Production-style bridge with middleware pipeline."""
+    from unity_mcp.middleware import Middleware, wrap_send
+
+    mw = Middleware()
+    wrapped_send = wrap_send(bridge.send, mw)
+
+    class WrappedBridge:
+        def __init__(self):
+            self.send = wrapped_send
+            self.connected = bridge.connected
+            self._raw = bridge
+
+    return WrappedBridge()

@@ -1,0 +1,154 @@
+"""ui_intent — NL → UI DSL → create_ui/set_rect batch commands."""
+from typing import Optional
+from ..sampling import SamplingService
+from .intent_common import strip_fences, parse_indent_tree, parse_kv, build_batch_line
+from ._annotations import RW as _RW
+
+_send = None
+_sampling: SamplingService = SamplingService()
+
+_TEMPLATES = {
+    "hud": """\
+canvas Canvas
+  panel HUD anchor=stretch
+    image HealthBar anchor=top-left pos=20,-20 size=200,30 color=#c33
+    text Score anchor=top-right pos=-20,-20 size=120,40 text="0" fontSize=24""",
+    "menu": """\
+canvas Canvas
+  layout Menu anchor=center size=240,300 dir=vertical spacing=10
+    button Play text="Play"
+    button Settings text="Settings"
+    button Quit text="Quit" """,
+    "dialog": """\
+canvas Canvas
+  panel Dialog anchor=center size=400,200
+    text Message anchor=center pos=0,20 size=360,80 text="Message" fontSize=20
+    button OK anchor=bottom-center pos=0,20 size=120,40 text="OK" """,
+    "grid": """\
+canvas Canvas
+  layout Grid anchor=stretch dir=grid spacing=10
+    image Cell1 size=100,100
+    image Cell2 size=100,100
+    image Cell3 size=100,100""",
+}
+
+_LAYOUT_COMPONENTS = {"layout": "VerticalLayoutGroup", "hlayout": "HorizontalLayoutGroup", "grid": "GridLayoutGroup"}
+
+_PROMPT_TEMPLATE = """\
+Generate a Unity UI DSL. Use 2-space indent for parent/child. Types: canvas|panel|image|text|button|layout.
+Attrs: anchor=<preset> pos=x,y size=w,h color=#hex text="..." fontSize=N dir=vertical|horizontal spacing=N
+
+Anchor presets: top-left top-right bottom-left bottom-right center stretch top-center bottom-center
+
+Example:
+canvas Canvas
+  panel HUD anchor=stretch
+    image HP anchor=top-left pos=20,-20 size=200,30 color=#c33
+    text Score anchor=top-right pos=-20,-20 size=120,40 text="0" fontSize=24
+
+Parent path: {parent}
+Intent: {intent}
+
+Output ONLY the DSL, no explanation, no fences."""
+
+
+def get_template_dsl(name: str) -> Optional[str]:
+    return _TEMPLATES.get(name)
+
+
+def parse_ui_dsl(dsl: str) -> list[dict]:
+    tree = parse_indent_tree(dsl)
+    nodes = []
+    for item in tree:
+        parts = item["line"].split(None, 1)
+        elem_type = parts[0].lower()
+        rest = parts[1] if len(parts) > 1 else ""
+        # Name is first token, rest are attrs
+        rest_parts = rest.split(None, 1) if rest else []
+        name = rest_parts[0] if rest_parts else elem_type
+        attr_str = rest_parts[1] if len(rest_parts) > 1 else ""
+        attrs = parse_kv(attr_str) if attr_str else {}
+        parent_name = None
+        if item["parent"]:
+            pp = item["parent"]["line"].split(None, 2)
+            parent_name = pp[1] if len(pp) > 1 else (pp[0] if pp else None)
+        nodes.append({"type": elem_type, "name": name, "attrs": attrs, "parent": parent_name})
+    return nodes
+
+
+def build_ui_batch(nodes: list[dict], parent: Optional[str]) -> list[str]:
+    lines = []
+    for node in nodes:
+        elem_parent = node.get("parent") or parent
+        attrs = node["attrs"]
+        # create_ui call
+        create_args = dict(type=node["type"].capitalize(), name=node["name"])
+        if elem_parent:
+            create_args["parent"] = elem_parent
+        if "color" in attrs:
+            create_args["color"] = attrs["color"]
+        if "text" in attrs:
+            create_args["text"] = attrs["text"]
+        if "fontSize" in attrs:
+            create_args["fontSize"] = attrs["fontSize"]
+        lines.append(build_batch_line("create_ui", **create_args))
+
+        # set_rect for anchor/pos/size
+        rect_args: dict = {}
+        if "anchor" in attrs:
+            rect_args["anchor"] = attrs["anchor"]
+        if "pos" in attrs:
+            rect_args["pos"] = attrs["pos"]
+        if "size" in attrs:
+            rect_args["size"] = attrs["size"]
+        if rect_args:
+            lines.append(build_batch_line("set_rect", path=f"/{node['name']}", **rect_args))
+
+        # Layout component
+        layout_comp = _LAYOUT_COMPONENTS.get(node["type"])
+        if layout_comp:
+            comp_line = f"manage_component action=add path=/{node['name']} component={layout_comp}"
+            if "spacing" in attrs:
+                comp_line += f" spacing={attrs['spacing']}"
+            lines.append(comp_line)
+
+    return lines
+
+
+async def ui_intent(intent: str, parent: Optional[str] = None, template: Optional[str] = None, dry_run: bool = False) -> str:
+    """Convert NL intent to Unity UI hierarchy. Templates bypass Haiku.
+
+    template: hud|menu|dialog|grid. dry_run=True skips execution.
+    """
+    # Template bypass
+    if template:
+        dsl = get_template_dsl(template)
+        if dsl is None:
+            return f"ERROR: Unknown template '{template}'. Valid: {', '.join(_TEMPLATES)}"
+    else:
+        from .intent_common import sanitize_intent
+        prompt = _PROMPT_TEMPLATE.format(parent=sanitize_intent(parent or "root"), intent=sanitize_intent(intent))
+        dsl_raw = await _sampling.generate(prompt, max_tokens=600)
+        if not dsl_raw:
+            return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
+        dsl = strip_fences(dsl_raw)
+
+    nodes = parse_ui_dsl(dsl)
+    if not nodes:
+        return "ERROR: DSL produced no nodes"
+
+    batch_lines = build_ui_batch(nodes, parent=parent)
+    if not batch_lines:
+        return "ERROR: Builder produced no commands"
+
+    if dry_run:
+        return "\n".join(batch_lines)
+
+    result = await _send("batch", {"commands": "\n".join(batch_lines)})
+    return f"ui_intent: {len(batch_lines)} ops\n{result}"
+
+
+def register(mcp, send, args):
+    global _send
+    _send = send
+    mcp.tool(annotations=_RW)(ui_intent)

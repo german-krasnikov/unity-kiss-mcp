@@ -1,0 +1,43 @@
+# === find_references ===
+
+# Success — single symbol, multiple refs
+SYMBOL Health class @ Assets/Scripts/Health.cs:5
+Assets/Scripts/Player.cs:42:13 fieldRef
+Assets/Scripts/Enemy.cs:11:5 typeRef [attribute]
+Assets/Scripts/UI/HpBar.cs:23:9 typeRef
+3 refs in 3 files
+
+# Ambiguous — multiple symbols match name
+AMBIGUOUS Health
+  class @ Assets/Scripts/Health.cs:5
+  field @ Assets/Scripts/Player.cs:12
+specify kind=class|field|method|property|param|local|namespace
+
+# Not found — empty result
+NOT FOUND Health
+candidates: HealthBar (class), HealthSystem (class)
+
+# === compile_preflight ===
+
+# Success — clean compile
+OK preflight Assets/Scripts/Player.cs (3 asms recompiled, 142ms)
+
+# Errors — diagnostics
+ERR preflight Assets/Scripts/Player.cs (2 errors, 89ms)
+Player.cs(42,13): CS0103 The name 'helath' does not exist in the current context
+Player.cs(58,5): CS1002 ; expected
+
+# === semantic_at ===
+
+# Symbol info
+Health class
+decl: Assets/Scripts/Health.cs:5:14
+namespace: Game.Combat
+members: int currentHp, void TakeDamage(int), event Action OnDeath
+
+# No symbol at position
+NO SYMBOL at Assets/Scripts/Player.cs:42:13 (whitespace or syntax error)
+
+# === Roslyn unavailable (any tool) ===
+
+[ROSLYN UNAVAILABLE: Microsoft.CodeAnalysis.dll not found in Mono path] fallback: use grep/Find In Files

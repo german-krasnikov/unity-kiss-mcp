@@ -1,0 +1,70 @@
+from ._annotations import RW as _RW
+
+_send = None
+_args = None
+
+
+async def animation(action: str, path: str, clip: str | None = None, clip_name: str | None = None,
+                    property: str | None = None, keys: str | None = None,
+                    time: float | None = None) -> str:
+    """Animate GameObject properties via AnimationClip. Use when you need to read or author keyframe animation on a specific object (not an Animator state machine — use `animator` for that, not this).
+    action: get (list clips/keys) | create (new AnimationClip on object) | edit (add/replace keyframes) | preview (scrub to time).
+    clip=clip name, keys='t:0 v:(0,0,0); t:1 v:(0,2,0)', property=e.g. localPosition.x."""
+    return await _send("animation", _args(action=action, path=path, clip=clip, clip_name=clip_name,
+                                          property=property, keys=keys, time=time))
+
+
+async def timeline(path: str, action: str, track: str | None = None, track_type: str | None = None,
+                   clip: str | None = None, binding: str | None = None,
+                   start: float | None = None, duration: float | None = None,
+                   blend_in: float | None = None, blend_out: float | None = None,
+                   asset_path: str | None = None, director_path: str | None = None,
+                   tracks: str | None = None, time: float | None = None) -> str:
+    """Unity Timeline (PlayableDirector / TimelineAsset). Use for multi-track cinematic sequences mixing animation, audio, activation, and custom tracks — not for per-object keyframes (use `animation` for that).
+    action: get (inspect tracks/clips) | create (new TimelineAsset) | add_track (Animation|Audio|Activation|Signal|Control) | remove_track | add_clip | remove_clip | set_binding (bind track to scene object) | set_timing (start/duration/blends) | mute | unmute | lock | unlock | preview (scrub to time).
+    track=track name when targeting a specific track's clips."""
+    return await _send("timeline", _args(path=path, action=action, track=track, track_type=track_type,
+                                         clip=clip, binding=binding, start=start, duration=duration,
+                                         blend_in=blend_in, blend_out=blend_out, asset_path=asset_path,
+                                         director_path=director_path, tracks=tracks, time=time))
+
+
+async def animator(action: str, path: str,
+                   state: str | None = None, states: str | None = None,
+                   params: str | None = None,
+                   source: str | None = None, target: str | None = None,
+                   conditions: str | None = None,
+                   duration: float | None = None,
+                   exit_time: float | None = None,
+                   has_exit_time: bool | None = None,
+                   type: str | None = None, name: str | None = None) -> str:
+    """Animator Controller. action: get|add_param|add_state|add_transition|set_default|remove.
+    params='Speed:float:0; Jump:trigger'. states='Idle:Idle.anim; Walk'.
+    conditions='Speed>0.1; IsGrounded'. source/target=state names (*=AnyState)."""
+    return await _send("animator", _args(
+        action=action, path=path, state=state, states=states, params=params,
+        source=source, target=target, conditions=conditions,
+        duration=duration, exit_time=exit_time, has_exit_time=has_exit_time,
+        type=type, name=name))
+
+
+async def particle(action: str, path: str,
+                   name: str | None = None,
+                   module: str | None = None,
+                   prop: str | None = None,
+                   value: str | None = None,
+                   preset: str | None = None) -> str:
+    """Particle System. action: get|create|set|apply. module=main|emission|shape|colorOverLifetime|sizeOverLifetime|velocityOverLifetime|noise|renderer|trails|collision|rotationOverLifetime. preset: fire|smoke|sparks|rain|snow|explosion|magic|dust|blood|trail."""
+    return await _send("particle", _args(
+        action=action, path=path, name=name, module=module,
+        prop=prop, value=value, preset=preset))
+
+
+def register(mcp, send, args):
+    global _send, _args
+    _send = send
+    _args = args
+    mcp.tool(annotations=_RW)(animation)
+    mcp.tool(annotations=_RW)(timeline)
+    mcp.tool(annotations=_RW)(animator)
+    mcp.tool(annotations=_RW)(particle)
