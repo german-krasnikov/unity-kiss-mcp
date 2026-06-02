@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import time
 os.environ.setdefault("UNITY_MCP_DISTILL", "1")
@@ -11,7 +12,7 @@ from .lockfile import acquire_lock, release_lock
 from .plugins import load_plugins
 from .tools import register_all
 from mcp.server.fastmcp import Context
-from .tools.gating import filter_by_tier, discover_tools as _discover_tools_impl, TIER1, is_visible
+from .tools.gating import filter_by_tier, discover_tools as _discover_tools_impl, TIER1, is_visible, FORCE_VISIBLE, get_catalog
 
 # Re-export tool functions for test imports
 from .tools.scene import (
@@ -47,7 +48,7 @@ from .middleware import wrap_send, Middleware
 
 from typing import Optional
 
-_enabled_tools_cache: Optional[set] = None
+_disabled_tools_cache: Optional[set] = None
 _refresh_tools_lock: Optional[asyncio.Lock] = None
 
 COMMAND_TIMEOUTS: dict[str, float] = {
@@ -99,8 +100,6 @@ async def _send_raw(cmd: str, args: dict, timeout: float = 0) -> str:
     if not result["ok"]:
         raise ToolError(result["err"])
     data = result.get("data", "")
-    if cmd == "get_enabled_tools" and data:
-        _update_tools_cache(data)
     if "file" in result:
         file_msg = f"Data saved to: {result['file']}"
         return f"{data}\n{file_msg}" if data else file_msg
@@ -222,6 +221,7 @@ async def lifespan(app):
         if active is not None:
             if active.connected:
                 await _refresh_tools_cache(active)
+                await _push_catalog(active)
             _last_refresh_ts: float = 0.0
 
             def _on_reconnect():
@@ -231,6 +231,7 @@ async def lifespan(app):
                     return
                 _last_refresh_ts = now
                 asyncio.ensure_future(_refresh_tools_cache(slot.bridge))
+                asyncio.ensure_future(_push_catalog(slot.bridge))
             slot.add_reconnect_callback(_on_reconnect)
             if _middleware is not None:
                 slot.add_reconnect_callback(_middleware.reset_session)
@@ -281,24 +282,27 @@ def _apply_gating(tools: list) -> list:
     return filter_by_tier(tools)
 
 
-def _update_tools_cache(data: str) -> None:
-    """Update tools cache from comma-separated string (called from _send_raw)."""
-    global _enabled_tools_cache
+async def _push_catalog(bridge_) -> None:
+    """Push the Python-authoritative tool catalog to Unity on connect/reconnect.
+
+    Silent on failure — Unity can still operate with stale/no catalog.
+    """
     try:
-        enabled = set(data.split(","))
-        enabled.add("get_enabled_tools")
-        _enabled_tools_cache = enabled
+        if bridge_ is None or not bridge_.connected:
+            return
+        catalog_str = json.dumps(get_catalog())
+        await bridge_.send("set_tool_catalog", {"catalog": catalog_str}, timeout=5.0)
     except Exception:
         pass
 
 
 async def _refresh_tools_cache(bridge_) -> None:
-    """Fetch enabled tools from Unity and populate cache. Called on connect/reconnect.
+    """Fetch disabled tools from Unity and populate cache. Called on connect/reconnect.
 
     Idempotent: if already refreshing, skip. Failures are silent — stale cache
     is acceptable until next successful reconnect.
     """
-    global _enabled_tools_cache, _refresh_tools_lock
+    global _disabled_tools_cache, _refresh_tools_lock
     if _refresh_tools_lock is None:
         _refresh_tools_lock = asyncio.Lock()
     if _refresh_tools_lock.locked():
@@ -307,24 +311,22 @@ async def _refresh_tools_cache(bridge_) -> None:
         return
     async with _refresh_tools_lock:
         try:
-            result = await bridge_.send("get_enabled_tools", {}, timeout=5.0)
+            result = await bridge_.send("get_disabled_tools", {}, timeout=5.0)
             if result.get("ok"):
-                enabled = set(result["data"].split(","))
-                enabled.add("get_enabled_tools")
-                _enabled_tools_cache = enabled
+                data = result.get("data", "").strip()
+                _disabled_tools_cache = set(data.split(",")) if data else set()
         except Exception:
             pass
 
 
 async def _filter_tools(tools: list, bridge_) -> list:
-    """Filter tools list by Unity MCPSettings + optional capability gating.
-    Uses module-level cache — no TCP call on every ListTools request."""
-    global _enabled_tools_cache
-    if _enabled_tools_cache is not None:
-        enabled = _enabled_tools_cache
-        return _apply_gating([t for t in tools if t.name in enabled or is_visible(t.name)])
-    # Cache miss: fall back to gating only (no TCP)
-    return _apply_gating(tools)
+    """Filter tools by gating then subtract disabled set (from Unity MCPSettings).
+    Cache is None → gating-only fallback (no TCP call)."""
+    result = _apply_gating(tools)
+    disabled = _disabled_tools_cache
+    if disabled:
+        result = [t for t in result if t.name not in disabled or t.name in FORCE_VISIBLE]
+    return result
 
 
 _original_handler = mcp._mcp_server.request_handlers[mcp_types.ListToolsRequest]

@@ -97,6 +97,25 @@ namespace UnityMCP.Editor
             return sb.ToString();
         }
 
+        private static string ExecGetDisabledTools()
+        {
+            var sb = new StringBuilder();
+            bool first = true;
+            var allTools = new System.Collections.Generic.HashSet<string>(MCPSettings.GetToolNames());
+            foreach (var cmd in CommandRegistry.GetAllCommands())
+                allTools.Add(cmd);
+            foreach (var tool in allTools)
+            {
+                if (!MCPSettings.IsToolEnabled(tool))
+                {
+                    if (!first) sb.Append(",");
+                    sb.Append(tool);
+                    first = false;
+                }
+            }
+            return sb.ToString();
+        }
+
         private static string ExecGetHierarchy(string args)
         {
             var summary = JsonHelper.ExtractString(args, "summary") == "true";

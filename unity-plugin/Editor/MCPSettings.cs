@@ -1,51 +1,19 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor
 {
     [InitializeOnLoad]
     public class MCPSettings : EditorWindow
     {
-        private static readonly string[] CoreToolNames =
-        {
-            "get_hierarchy", "get_component", "get_components_list",
-            "get_object_detail", "find_objects", "set_property",
-            "create_object", "delete_object", "manage_component",
-            "get_console", "screenshot", "run_tests", "recompile",
-            "search_scene", "set_material", "batch",
-            "create_ui", "set_rect",
-            "scene", "animation", "timeline", "references", "editor", "animator",
-            "particle",
-            "shader",
-            "inspect",
-            "menu",
-            "checkpoint",
-            "validate_references",
-            "set_active",
-            "wire_event",
-            "asset",
-            "project_settings",
-            "material",
-            "prefab",
-            "scriptable_object",
-            "execute_code"
-        };
-
-        public static string[] GetToolNames()
-        {
-            var pluginTools = PluginRegistry.GetAllPluginToolNames();
-            if (pluginTools.Length == 0) return CoreToolNames;
-            var all = new string[CoreToolNames.Length + pluginTools.Length];
-            CoreToolNames.CopyTo(all, 0);
-            pluginTools.CopyTo(all, CoreToolNames.Length);
-            return all;
-        }
-
-        private const string KeyPrefix = "UnityMCP_Tool_";
-        private const string KeyAutoDiscard = "UnityMCP_AutoDiscardScene";
-        private Vector2 _scroll;
+        // ── EditorPrefs API (P0 — must stay intact) ──────────────────────────
+        internal const string KeyPrefix      = "UnityMCP_Tool_";
+        internal const string KeyAutoDiscard = "UnityMCP_AutoDiscardScene";
+        private const string KeyCatalog     = "UnityMCP_Catalog";
 
         public static bool IsToolEnabled(string toolName) =>
             EditorPrefs.GetBool(KeyPrefix + toolName, true);
@@ -53,6 +21,57 @@ namespace UnityMCP.Editor
         public static bool AutoDiscardScene =>
             EditorPrefs.GetBool(KeyAutoDiscard, true);
 
+        // ── Catalog persistence (P1) ─────────────────────────────────────────
+        public static void SetCatalog(string json) =>
+            EditorPrefs.SetString(KeyCatalog, json);
+
+        public static string GetCatalog() =>
+            EditorPrefs.GetString(KeyCatalog, null);
+
+        // Minimal built-in default — used when no Python catalog received yet.
+        private static readonly Dictionary<string, string[]> _defaultCatalog =
+            new Dictionary<string, string[]>
+            {
+                { "CORE",       new[] { "get_hierarchy","get_component","inspect","batch","set_property","create_object","delete_object","manage_component","scene","search_scene","set_parent","get_console","get_compile_errors","get_enabled_tools","discover_tools","editor","do","ask","reconnect_unity","list_connections" } },
+                { "SCENE_EDIT", new[] { "find_objects","get_object_detail","get_components_list","set_active","set_material","set_property_delta" } },
+                { "COMPONENTS", new[] { "wire_event","unwire_event" } },
+                { "ANIMATION",  new[] { "animation","timeline","animator","particle" } },
+                { "SHADERS_MATERIAL", new[] { "shader","material","references" } },
+                { "VFX",        new[] { "vfx_intent" } },
+                { "UI",         new[] { "create_ui","set_rect","validate_layout","get_spatial_context","ui_intent" } },
+                { "SCREENSHOTS",new[] { "screenshot","screenshot_baseline","screenshot_compare" } },
+                { "UNIT_TESTS", new[] { "run_tests","get_test_results","run_playtest","fuzz_playtest","test_step" } },
+                { "RUNTIME",    new[] { "invoke_method","set_runtime_property","wait_until","move_to","query_state" } },
+                { "ASSETS",     new[] { "asset","prefab","scriptable_object","project_settings" } },
+                { "ADVANCED_CODE", new[] { "execute_code","recompile","find_references","semantic_at","compile_preflight","get_schema","auto_fix","smart_build","checkpoint","validate_references","menu" } },
+                { "SESSION_SKILLS", new[] { "save_skill","use_skill","list_skills","apply_template","save_template","list_templates","fingerprint","scene_diff","get_changes","save_session","load_session" } },
+                { "META",       new[] { "animator_intent","get_metrics","setup_objects","set_properties","configure_objects","scan_scene","check_colliders","spatial_query" } },
+            };
+
+        // Returns catalog categories (from EditorPrefs JSON or built-in default).
+        public static Dictionary<string, string[]> GetCatalogCategories()
+        {
+            var raw = GetCatalog();
+            if (!string.IsNullOrEmpty(raw))
+            {
+                try { return CatalogParser.Parse(raw); }
+                catch { /* fall through */ }
+            }
+            return _defaultCatalog;
+        }
+
+        // ── Tool name list (P0 backward-compat) ──────────────────────────────
+        public static string[] GetToolNames()
+        {
+            var all = new List<string>();
+            foreach (var kv in GetCatalogCategories())
+                all.AddRange(kv.Value);
+            var pluginTools = PluginRegistry.GetAllPluginToolNames();
+            all.AddRange(pluginTools);
+            return all.ToArray();
+        }
+
+        // ── Init / lifecycle ─────────────────────────────────────────────────
         static MCPSettings()
         {
             EditorApplication.wantsToQuit += OnWantsToQuit;
@@ -61,7 +80,6 @@ namespace UnityMCP.Editor
         private static bool OnWantsToQuit()
         {
             if (!AutoDiscardScene) return true;
-
             var scene = SceneManager.GetActiveScene();
             if (scene.isDirty)
             {
@@ -75,47 +93,13 @@ namespace UnityMCP.Editor
         public static void ShowWindow()
         {
             var window = GetWindow<MCPSettings>("MCP Settings");
-            window.minSize = new Vector2(250, 300);
+            window.minSize = new Vector2(320, 480);
         }
 
-        private void OnGUI()
+        // ── UIToolkit entry point ─────────────────────────────────────────────
+        public void CreateGUI()
         {
-            GUILayout.Label("MCP Tool Settings", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Disabled tools will return an error when called.", MessageType.Info);
-            EditorGUILayout.Space();
-
-            // Auto-discard toggle
-            var autoDiscard = EditorGUILayout.Toggle("Auto-discard scene on quit", AutoDiscardScene);
-            if (autoDiscard != AutoDiscardScene)
-                EditorPrefs.SetBool(KeyAutoDiscard, autoDiscard);
-
-            EditorGUILayout.Space();
-            GUILayout.Label("Tool Toggles", EditorStyles.boldLabel);
-
-            _scroll = EditorGUILayout.BeginScrollView(_scroll);
-            foreach (var tool in GetToolNames())
-            {
-                var key = KeyPrefix + tool;
-                var enabled = EditorPrefs.GetBool(key, true);
-                var newVal = EditorGUILayout.Toggle(tool, enabled);
-                if (newVal != enabled)
-                    EditorPrefs.SetBool(key, newVal);
-            }
-            EditorGUILayout.EndScrollView();
-
-            EditorGUILayout.Space();
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Enable All"))
-                SetAll(true);
-            if (GUILayout.Button("Disable All"))
-                SetAll(false);
-            EditorGUILayout.EndHorizontal();
-        }
-
-        private static void SetAll(bool enabled)
-        {
-            foreach (var tool in GetToolNames())
-                EditorPrefs.SetBool(KeyPrefix + tool, enabled);
+            MCPSettingsUI.Build(rootVisualElement);
         }
     }
 }

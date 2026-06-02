@@ -231,6 +231,13 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("ping", _ => "pong");
             CommandRegistry.Register("get_version", _ => VersionTracker.Version.ToString());
             CommandRegistry.Register("get_enabled_tools", _ => ExecGetEnabledTools());
+            CommandRegistry.Register("get_disabled_tools", _ => ExecGetDisabledTools());
+            CommandRegistry.Register("set_tool_catalog", args =>
+            {
+                var json = JsonHelper.ExtractString(args, "catalog");
+                if (!string.IsNullOrEmpty(json)) MCPSettings.SetCatalog(json);
+                return "ok";
+            });
 
             // Read (non-mutating)
             CommandRegistry.Register("get_hierarchy", ExecGetHierarchy);
@@ -386,11 +393,13 @@ namespace UnityMCP.Editor
 
         // Commands that bypass MCPSettings.IsToolEnabled check
         internal static bool IsAlwaysAllowed(string cmd) =>
-            cmd == "ping" || cmd == "get_version" || cmd == "get_enabled_tools";
+            cmd == "ping" || cmd == "get_version" || cmd == "get_enabled_tools" ||
+            cmd == "get_disabled_tools" || cmd == "set_tool_catalog";
 
         internal static bool IsAllowedDuringCompile(string cmd) =>
             cmd == "ping" || cmd == "get_version" || cmd == "get_console" ||
-            cmd == "screenshot" || cmd == "get_enabled_tools" || cmd == "compile_status";
+            cmd == "screenshot" || cmd == "get_enabled_tools" || cmd == "compile_status" ||
+            cmd == "get_disabled_tools" || cmd == "set_tool_catalog";
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {

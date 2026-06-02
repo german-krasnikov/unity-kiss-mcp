@@ -998,7 +998,7 @@ async def test_set_property_bool_python_native(mock_bridge):
 
 @pytest.mark.asyncio
 async def test_filter_tools_uses_cache_when_available(mock_bridge):
-    """With cache populated, _filter_tools must NOT call bridge.send."""
+    """With disabled cache populated, _filter_tools must NOT call bridge.send."""
     from unittest.mock import Mock
     import unity_mcp.server as srv
 
@@ -1007,16 +1007,16 @@ async def test_filter_tools_uses_cache_when_available(mock_bridge):
     tool_b = Mock()
     tool_b.name = "set_property"
 
-    orig = srv._enabled_tools_cache
+    orig = srv._disabled_tools_cache
     try:
-        srv._enabled_tools_cache = {"get_hierarchy", "set_property", "get_enabled_tools"}
+        srv._disabled_tools_cache = set()  # empty disabled set = nothing hidden
         mock_bridge.send.reset_mock()
         result = await srv._filter_tools([tool_a, tool_b], mock_bridge)
         mock_bridge.send.assert_not_called()
         assert tool_a in result
         assert tool_b in result
     finally:
-        srv._enabled_tools_cache = orig
+        srv._disabled_tools_cache = orig
 
 
 @pytest.mark.asyncio
@@ -1028,52 +1028,56 @@ async def test_filter_tools_fallback_when_cache_empty(mock_bridge):
     tool_a = Mock()
     tool_a.name = "get_hierarchy"
 
-    orig = srv._enabled_tools_cache
+    orig = srv._disabled_tools_cache
     orig_connected = mock_bridge.connected
     try:
-        srv._enabled_tools_cache = None
+        srv._disabled_tools_cache = None
         mock_bridge.connected = False
         mock_bridge.send.reset_mock()
         result = await srv._filter_tools([tool_a], mock_bridge)
         mock_bridge.send.assert_not_called()
         assert len(result) >= 0  # _apply_gating may filter
     finally:
-        srv._enabled_tools_cache = orig
+        srv._disabled_tools_cache = orig
         mock_bridge.connected = orig_connected
 
 
 @pytest.mark.asyncio
-async def test_enabled_tools_cache_populated_on_reconnect(mock_bridge):
-    """Reconnect callback populates _enabled_tools_cache via bridge.send."""
-    from unittest.mock import Mock, AsyncMock
+async def test_disabled_tools_cache_populated_on_reconnect(mock_bridge):
+    """Reconnect populates _disabled_tools_cache via get_disabled_tools."""
+    from unittest.mock import AsyncMock
     import unity_mcp.server as srv
 
-    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "get_hierarchy,set_property"})
-    orig = srv._enabled_tools_cache
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "screenshot,shader"})
+    orig = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
     try:
-        srv._enabled_tools_cache = None
+        srv._disabled_tools_cache = None
+        srv._refresh_tools_lock = None
         await srv._refresh_tools_cache(mock_bridge)
-        assert srv._enabled_tools_cache is not None
-        assert "get_hierarchy" in srv._enabled_tools_cache
-        assert "get_enabled_tools" in srv._enabled_tools_cache  # always added
+        assert srv._disabled_tools_cache == {"screenshot", "shader"}
     finally:
-        srv._enabled_tools_cache = orig
+        srv._disabled_tools_cache = orig
+        srv._refresh_tools_lock = orig_lock
 
 
 @pytest.mark.asyncio
-async def test_enabled_tools_cache_refresh_explicit(mock_bridge, bridge_response):
-    """get_enabled_tools via _send_raw refreshes the cache."""
+async def test_disabled_tools_empty_csv_gives_empty_set(mock_bridge):
+    """Empty CSV from Unity must produce empty set, not {''}."""
+    from unittest.mock import AsyncMock
     import unity_mcp.server as srv
 
-    bridge_response(data="get_hierarchy,set_property,get_enabled_tools")
-    orig = srv._enabled_tools_cache
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+    orig = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
     try:
-        srv._enabled_tools_cache = None
-        result = await srv._send_raw("get_enabled_tools", {})
-        assert srv._enabled_tools_cache is not None
-        assert "get_hierarchy" in srv._enabled_tools_cache
+        srv._disabled_tools_cache = None
+        srv._refresh_tools_lock = None
+        await srv._refresh_tools_cache(mock_bridge)
+        assert srv._disabled_tools_cache == set()
     finally:
-        srv._enabled_tools_cache = orig
+        srv._disabled_tools_cache = orig
+        srv._refresh_tools_lock = orig_lock
 
 
 # --- unwire_event tests ---

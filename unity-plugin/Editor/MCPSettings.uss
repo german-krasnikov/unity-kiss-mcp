@@ -1,0 +1,138 @@
+/* Unity MCP Settings — UIToolkit stylesheet */
+
+/* ── Animated header banner ── */
+.mcp-header {
+    background-color: #1a1a2e;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin: 4px 4px 8px 4px;
+    overflow: hidden;
+    /* Accent bar via bottom-border animation */
+    border-bottom-width: 3px;
+    border-bottom-color: #0f3460;
+    transition-property: border-bottom-color;
+    transition-duration: 1.2s;
+}
+
+.mcp-header:hover {
+    border-bottom-color: #e94560;
+}
+
+.mcp-header-title {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: #e0e0ff;
+    -unity-text-align: upper-left;
+    opacity: 1;
+    /* transition for engines that support it (Unity 2022+), silently ignored in 2021 */
+    transition-property: opacity;
+    transition-duration: 0.4s;
+}
+
+/* ── Presets row ── */
+.preset-row {
+    flex-direction: row;
+    margin: 4px 4px;
+    justify-content: flex-start;
+}
+
+.preset-btn {
+    margin-right: 6px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background-color: #2a2a3e;
+    border-color: #444466;
+    color: #ccccff;
+    font-size: 11px;
+    transition-property: background-color;
+    transition-duration: 0.15s;
+}
+
+.preset-btn:hover {
+    background-color: #3a3a5e;
+    border-color: #6666aa;
+}
+
+/* ── Info label ── */
+.info-label {
+    color: #888899;
+    font-size: 10px;
+    margin: 2px 6px 4px 6px;
+    -unity-font-style: italic;
+}
+
+/* ── Search field ── */
+.search-field {
+    margin: 4px 4px 6px 4px;
+}
+
+.search-field > .unity-text-field__input {
+    background-color: #1e1e2e;
+    border-color: #444466;
+    border-radius: 4px;
+    color: #ddddee;
+}
+
+/* ── Scroll area ── */
+.tool-scroll {
+    flex-grow: 1;
+    margin: 0 2px;
+}
+
+/* ── Category foldout ── */
+.category-foldout {
+    margin: 2px 0;
+    border-left-width: 2px;
+    border-left-color: #333355;
+    padding-left: 4px;
+}
+
+.category-foldout:hover {
+    border-left-color: #6666aa;
+}
+
+/* ── Tool row ── */
+.tool-row {
+    flex-direction: row;
+    padding: 1px 4px 1px 20px;
+}
+
+.tool-toggle {
+    flex-grow: 1;
+    font-size: 11px;
+    color: #ccccdd;
+}
+
+/* ── Master toggle ── */
+.master-toggle {
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+/* Mixed/indeterminate state indicator */
+.toggle-mixed > .unity-toggle__checkmark {
+    background-color: #6666aa;
+    opacity: 0.6;
+}
+
+/* ── Option row (auto-discard) ── */
+.option-row {
+    margin: 4px 4px;
+    padding: 2px 4px;
+}
+
+/* ── Plugins section ── */
+.plugin-section {
+    margin-top: 12px;
+    border-top-width: 1px;
+    border-top-color: #333355;
+    padding-top: 6px;
+    padding-left: 12px;
+}
+
+.plugin-section-header {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: #aaaacc;
+    margin-bottom: 4px;
+}

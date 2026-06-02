@@ -38,12 +38,12 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:9500──→
    - **89 core MCP tools registered**. Gating: TIER1=38 core (hardcoded). External plugins can add more tools dynamically.
    - Transport: stdio (default) or streamable-http (`UNITY_MCP_TRANSPORT=http`)
    - FastMCP("UnityMCP", lifespan=lifespan)
-   - Lifespan: auto-discover Unity port from `~/.unity-mcp/ports/*.port`, acquire exclusive PID lockfile, create ConnectionSlot, connect bridge, fetch enabled tools cache, start heartbeat, register reconnect callbacks, load_plugins()
+   - Lifespan: auto-discover Unity port from `~/.unity-mcp/ports/*.port`, acquire exclusive PID lockfile, create ConnectionSlot, connect bridge, fetch disabled tools cache (`get_disabled_tools`), push Python-authoritative catalog (`_push_catalog`), start heartbeat, register reconnect callbacks, load_plugins()
    - Plugin system (3-source discovery: pkgutil built-in, entry_points, UNITY_MCP_PLUGIN_DIRS env): each plugin has `register(mcp, send_fn, args_fn)`. UNITY_MCP_SKIP_PLUGINS env (comma-separated prefixes) skips matching plugins.
    - _send() helper: sends to bridge via slot, raises ToolError on !ok
    - File-based output: checks `file` field in response → returns path string
    - Tool annotations: readOnlyHint, destructiveHint for MCP compliance
-   - Dynamic tool filtering: patches `mcp._mcp_server.request_handlers[ListToolsRequest]` with 4-level fallback
+   - Dynamic tool filtering: patches `mcp._mcp_server.request_handlers[ListToolsRequest]` with gating + disabled-set subtraction (hide-disabled-set model, not allowlist)
 
 2. **TCP Bridge** (Python: `bridge.py` + `connection_slot.py` + `lockfile.py` + `compile_state.py`)
    - **ConnectionSlot**: single UnityBridge connection (connect/reconnect/list)
@@ -114,7 +114,7 @@ fingerprint, scene_diff, get_changes, save_session, load_session, screenshot_bas
 ## C# Commands (CommandRouter)
 
 ### Meta (non-mutating)
-ping, get_version, get_enabled_tools
+ping, get_version, get_enabled_tools, get_disabled_tools, set_tool_catalog
 
 ### Read (non-mutating)
 get_hierarchy, get_component, get_components_list, get_object_detail, find_objects, inspect, get_console, get_compile_errors, compile_status, screenshot, search_scene, validate_references, validate_layout, get_spatial_context, fingerprint, scan_scene, check_colliders, get_schema, get_changes, scene_diff, run_tests, get_test_results, recompile, checkpoint
@@ -131,10 +131,13 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 ## Key Systems
 
 ### Capability Gating (Python: `tools/gating.py`)
-- TIER1: always visible (~38 core tools)
-- Categories: session-enabled via `discover_tools(category, enable)` (object, animation, asset, advanced, ui, runtime, connection, session)
-- Also filtered by Unity-side MCPSettings (tool cache from get_enabled_tools)
-- Plugin self-registration: `gating.register_tools("category", tools_set, tier1=tier1_subset)` lets plugins add to CATEGORIES + TIER1 without hardcoding
+- **CORE tools** (22): locked, always visible, can only be hidden via `FORCE_VISIBLE` escape hatches (discover_tools, get_enabled_tools, do, ask, editor, get_console, get_compile_errors, reconnect_unity, list_connections). Example: `is_core("get_hierarchy")` → True
+- **Themed catalog** (single source of truth): `get_catalog()` returns JSON with 14 categories + CORE list (public tools only, no NDA/plugin names). Categories: SCENE_EDIT, COMPONENTS, ANIMATION, SHADERS_MATERIAL, VFX, UI, SCREENSHOTS, UNIT_TESTS, RUNTIME, ASSETS, ADVANCED_CODE, SESSION_SKILLS, CONNECTION, META
+- **Filtering pipeline**: (1) apply TIER1+session gating via `_apply_gating()`, (2) subtract disabled set from Unity MCPSettings via `_filter_tools()` (cache=None → gating-only fallback). Approach is "hide-disabled-set" (NOT allowlist — Python-only tools not in Unity's CSV wouldn't be wrongly hidden)
+- **Sessions**: session-enabled via `discover_tools(category, enable)` (legacy CATEGORIES dict still works for back-compat)
+- **Plugin self-registration**: `gating.register_tools("category", tools_set, tier1=tier1_subset)` lets plugins add to CATEGORIES + TIER1 without hardcoding
+- **Push catalog**: `_push_catalog()` sends Python-authoritative catalog to Unity on connect/reconnect via `set_tool_catalog` command (TCP-only, silent on failure)
+- **Cache model**: `_disabled_tools_cache` (refreshed on connect/reconnect); None ⇒ gating-only mode
 
 ### Plugin System
 
@@ -208,6 +211,10 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - Parameters: path, cellSize, supersample (1-4), custom angles, zoom, offset, fixed_size, highlight, show_colliders
 - Returns file path + optional manifest (for highlight markers)
 
+### Editor UI Windows (C#: UIToolkit)
+- **MCPSettings Window** (MCPSettings.cs): Tool visibility toggles, organized by theme categories (CORE locked, others toggle/tri-state group masters), search bar, presets (Minimal/Full/No-visuals), dynamic Plugins section from PluginRegistry. Stylesheet: `MCPSettings.uss`.
+- **Stylesheet Helper** (MCPEditorUtils.LoadStyleSheet): Shared two-path loader for `.uss` files, called by the MCPSettings window (DRY; handles package-relative asset lookup).
+
 ### Code Execution (C#: CodeExecutor)
 - Roslyn C# execution via `execute_code` command
 - Sandboxed with blocklist
@@ -234,6 +241,24 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - Max message size: 10MB
 - Default timeout: 25s (C# side)
 
+### Wave 3: Tool-Gating Fix + Settings UI
+
+**P0 — Hide-Disabled-Set Model (server.py + gating.py):**
+- **Problem**: Unity MCPSettings form checkboxes saved zero tokens because `_filter_tools` kept any tool where `is_visible(name)` (true for all TIER1 ≈ every tool).
+- **Solution**: Switched from "allow list" to "hide-disabled-set" approach:
+  1. Unity reports disabled tools via `get_disabled_tools` CSV (per MCPSettings form state)
+  2. Python `_filter_tools` applies gating (TIER1 + session-enabled), then subtracts disabled set
+  3. Escape hatches: `FORCE_VISIBLE` set preserves connectivity tools (discover_tools, get_enabled_tools, reconnect_unity, list_connections, do, ask, editor, get_console, get_compile_errors)
+  4. Cache model: `_disabled_tools_cache` refreshes on connect/reconnect; None → gating-only fallback (no TCP)
+- **Why not allowlist**: Python-only tools aren't in Unity's CSV; allowlist would wrongly hide them
+
+**P1 — Python-Authoritative Catalog + UIToolkit Settings (gating.py + MCPSettings.cs + 3 new files):**
+- **Single Source of Truth**: `gating.get_catalog()` returns themed JSON with 14 categories (CORE, SCENE_EDIT, COMPONENTS, ANIMATION, SHADERS_MATERIAL, VFX, UI, SCREENSHOTS, UNIT_TESTS, RUNTIME, ASSETS, ADVANCED_CODE, SESSION_SKILLS, META) + public tools only
+- **Push Mechanism**: `_push_catalog()` sends catalog to Unity via `set_tool_catalog` on connect/reconnect (TCP-only, silent on failure)
+- **Persistence**: Unity saves to EditorPref `UnityMCP_Catalog`; MCPSettings queries via `GetCatalog()` / `SetCatalog(json)`
+- **UIToolkit Rewrite**: `MCPSettings.cs` now uses UIToolkit (foldout groups, tri-state group masters, search, presets Minimal/Full/No-visuals, CORE locked, separate Plugins section)
+- **New C# Files**: `CatalogParser.cs` (JSON→dict), `MCPSettingsUI.cs` (foldout builder), `MCPSettingsCategoryGroup.cs` (tri-state logic), `MCPSettings.uss` (styling)
+
 ### Wave 1 Hardening Fixes (Middleware Error-Dedup & Path Caching)
 
 **F16 — Error-Dedup Gate (middleware.py):**
@@ -251,8 +276,8 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 ## Test Infrastructure
 
-### Python Tests: 1548 unit tests + 52 live tests
-- Default: `pytest -m "not live"` — unit tests, $0 cost (1548 tests)
+### Python Tests: 1588 unit tests + 52 live tests
+- Default: `pytest -m "not live"` — unit tests, $0 cost (1588 tests, includes test_catalog.py = 19)
 - With Unity: `pytest -m "live"` — adds 52 live integration tests, $0 cost (sampling disabled)
 - Real Haiku: `pytest -m "live and live_haiku"` — ~$0.001/run (visual regression, opt-in)
 - Test order: unit → C# → live (live always last, occupies TCP)
@@ -305,7 +330,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - `server/src/unity_mcp/visual_diff.py` — visual regression testing
 - `server/src/unity_mcp/sampling_postproc.py` — Haiku output normalizer
 
-**C#** (72+ files):
+**C#** (76+ files):
 - `unity-plugin/Editor/MCPServer.cs` — TCP listener, state file, domain reload
 - `unity-plugin/Editor/CommandRouter.cs` — core command dispatch (partial class)
 - `unity-plugin/Editor/CommandRouter.ObjectHandlers.cs` — object mutation handlers (partial class)
@@ -342,7 +367,11 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - `unity-plugin/Editor/MaterialHelper.cs` — material operations
 - `unity-plugin/Editor/PrefabHelper.cs` — prefab operations
 - `unity-plugin/Editor/ScriptableObjectHelper.cs` — SO CRUD
-- `unity-plugin/Editor/MCPSettings.cs` — per-tool toggles
+- `unity-plugin/Editor/MCPSettings.cs` — UIToolkit settings (categories, tri-state toggles, presets)
+- `unity-plugin/Editor/MCPSettingsUI.cs` — foldout group builder for settings
+- `unity-plugin/Editor/MCPSettingsCategoryGroup.cs` — tri-state group toggle logic
+- `unity-plugin/Editor/CatalogParser.cs` — deserialize Python catalog JSON
+- `unity-plugin/Editor/MCPSettings.uss` — UIToolkit styling
 - `unity-plugin/Editor/MCPStatusWindow.cs` — status UI
 
 ## TDD Scenarios (для Developer)

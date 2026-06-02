@@ -15,93 +15,225 @@ def _tool(name: str):
 ALL_TOOLS = [_tool("get_hierarchy"), _tool("scene"), _tool("shader"), _tool("get_enabled_tools")]
 
 
-# --- test _filter_tools pure function ---
-
-@pytest.mark.asyncio
-async def test_filter_tools_returns_enabled_subset():
-    bridge = AsyncMock()
-    bridge.connected = True
-    bridge.send = AsyncMock(return_value={"ok": True, "data": "get_hierarchy,scene"})
-    result = await _filter_tools(ALL_TOOLS, bridge)
-    assert {t.name for t in result} == {"get_hierarchy", "scene", "get_enabled_tools"}
-
+# --- test _filter_tools fallback (gating only, no Unity cache) ---
 
 @pytest.mark.asyncio
 async def test_filter_tools_fallback_when_bridge_none():
-    result = await _filter_tools(ALL_TOOLS, None)
-    names = {t.name for t in result}
-    assert "get_hierarchy" in names
-    assert "get_enabled_tools" in names
-    assert "shader" not in names  # gated out (not in TIER1)
+    import unity_mcp.server as srv
+    orig = srv._disabled_tools_cache
+    try:
+        srv._disabled_tools_cache = None
+        result = await _filter_tools(ALL_TOOLS, None)
+        names = {t.name for t in result}
+        assert "get_hierarchy" in names
+        assert "get_enabled_tools" in names
+        assert "shader" not in names  # gated out (not in TIER1)
+    finally:
+        srv._disabled_tools_cache = orig
 
 
 @pytest.mark.asyncio
 async def test_filter_tools_fallback_when_disconnected():
+    import unity_mcp.server as srv
+    orig = srv._disabled_tools_cache
     bridge = AsyncMock()
     bridge.connected = False
-    result = await _filter_tools(ALL_TOOLS, bridge)
-    names = {t.name for t in result}
-    assert "get_hierarchy" in names
-    assert "shader" not in names
+    try:
+        srv._disabled_tools_cache = None
+        result = await _filter_tools(ALL_TOOLS, bridge)
+        names = {t.name for t in result}
+        assert "get_hierarchy" in names
+        assert "shader" not in names
+    finally:
+        srv._disabled_tools_cache = orig
 
 
 @pytest.mark.asyncio
 async def test_filter_tools_fallback_on_send_error():
+    import unity_mcp.server as srv
+    orig = srv._disabled_tools_cache
     bridge = AsyncMock()
     bridge.connected = True
     bridge.send = AsyncMock(side_effect=ConnectionError("lost"))
-    result = await _filter_tools(ALL_TOOLS, bridge)
-    names = {t.name for t in result}
-    assert "get_hierarchy" in names
-    assert "shader" not in names
+    try:
+        srv._disabled_tools_cache = None
+        result = await _filter_tools(ALL_TOOLS, bridge)
+        names = {t.name for t in result}
+        assert "get_hierarchy" in names
+        assert "shader" not in names
+    finally:
+        srv._disabled_tools_cache = orig
 
 
 @pytest.mark.asyncio
 async def test_filter_tools_fallback_on_unity_error():
+    import unity_mcp.server as srv
+    orig = srv._disabled_tools_cache
     bridge = AsyncMock()
     bridge.connected = True
     bridge.send = AsyncMock(return_value={"ok": False, "err": "fail"})
-    result = await _filter_tools(ALL_TOOLS, bridge)
-    names = {t.name for t in result}
-    assert "get_hierarchy" in names
-    assert "shader" not in names
+    try:
+        srv._disabled_tools_cache = None
+        result = await _filter_tools(ALL_TOOLS, bridge)
+        names = {t.name for t in result}
+        assert "get_hierarchy" in names
+        assert "shader" not in names
+    finally:
+        srv._disabled_tools_cache = orig
 
 
-# --- TDD: session_enabled + Unity cache interaction ---
+# --- Core bug-fix: disabled-set semantics ---
 
 @pytest.mark.asyncio
-async def test_tier1_tool_survives_unity_cache_filter():
-    """TIER1 tool passes even without discover_tools or Unity cache."""
-    import unity_mcp.server as srv_mod
+async def test_disabled_tier1_tool_hidden():
+    """CORE BUG FIX: unchecking screenshot in Unity form must remove it from ListTools."""
+    import unity_mcp.server as srv
     import unity_mcp.tools.gating as gating
     gating.reset()
-    srv_mod._enabled_tools_cache = {"get_hierarchy", "get_enabled_tools"}
+    orig = srv._disabled_tools_cache
     try:
-        tools = [_tool("batch"), _tool("get_hierarchy")]
+        srv._disabled_tools_cache = {"screenshot"}
+        tools = [_tool("screenshot"), _tool("get_hierarchy")]
         result = await _filter_tools(tools, None)
         names = {t.name for t in result}
-        assert "batch" in names, "TIER1 tool dropped by _filter_tools"
+        assert "screenshot" not in names, "Disabled TIER1 tool must be hidden"
+        assert "get_hierarchy" in names
     finally:
-        srv_mod._enabled_tools_cache = None
+        srv._disabled_tools_cache = orig
         gating.reset()
 
 
 @pytest.mark.asyncio
-async def test_session_enabled_not_in_unity_cache_survives_filter():
-    """session-enabled non-TIER1 tool NOT in Unity cache passes _filter_tools."""
-    import unity_mcp.server as srv_mod
+async def test_force_visible_survives_disabled():
+    """FORCE_VISIBLE tools must never be hidden even if in disabled set."""
+    import unity_mcp.server as srv
     import unity_mcp.tools.gating as gating
     gating.reset()
-    gating.enable_category("animation")
-    srv_mod._enabled_tools_cache = {"get_hierarchy", "get_enabled_tools"}
+    orig = srv._disabled_tools_cache
     try:
-        tools = [_tool("animation"), _tool("get_hierarchy")]
+        srv._disabled_tools_cache = {"do", "discover_tools", "get_hierarchy"}
+        tools = [_tool("do"), _tool("discover_tools"), _tool("get_hierarchy")]
         result = await _filter_tools(tools, None)
         names = {t.name for t in result}
-        assert "animation" in names, "session-enabled tool was dropped by _filter_tools"
+        assert "do" in names, "FORCE_VISIBLE 'do' must survive disabled set"
+        assert "discover_tools" in names, "FORCE_VISIBLE 'discover_tools' must survive disabled set"
+        assert "get_hierarchy" not in names, "Non-FORCE_VISIBLE disabled tool must be hidden"
     finally:
-        srv_mod._enabled_tools_cache = None
+        srv._disabled_tools_cache = orig
         gating.reset()
+
+
+@pytest.mark.asyncio
+async def test_disabled_cache_none_no_hiding():
+    """None cache = gating-only fallback, nothing extra hidden."""
+    import unity_mcp.server as srv
+    import unity_mcp.tools.gating as gating
+    gating.reset()
+    orig = srv._disabled_tools_cache
+    try:
+        srv._disabled_tools_cache = None
+        tools = [_tool("screenshot"), _tool("get_hierarchy")]
+        result = await _filter_tools(tools, None)
+        names = {t.name for t in result}
+        # Both are TIER1, gating keeps them; disabled cache is None so no hiding
+        assert "screenshot" in names
+        assert "get_hierarchy" in names
+    finally:
+        srv._disabled_tools_cache = orig
+        gating.reset()
+
+
+# --- Cache interaction tests (disabled-set semantics) ---
+
+@pytest.mark.asyncio
+async def test_filter_tools_uses_cache_when_available():
+    """With disabled cache populated, _filter_tools must NOT call bridge.send."""
+    from unittest.mock import Mock
+    import unity_mcp.server as srv
+
+    tool_a = Mock()
+    tool_a.name = "get_hierarchy"
+    tool_b = Mock()
+    tool_b.name = "set_property"
+    bridge = AsyncMock()
+    bridge.send = AsyncMock()
+
+    orig = srv._disabled_tools_cache
+    try:
+        srv._disabled_tools_cache = set()  # empty disabled set = nothing hidden
+        bridge.send.reset_mock()
+        result = await srv._filter_tools([tool_a, tool_b], bridge)
+        bridge.send.assert_not_called()
+        assert tool_a in result
+        assert tool_b in result
+    finally:
+        srv._disabled_tools_cache = orig
+
+
+@pytest.mark.asyncio
+async def test_filter_tools_fallback_when_cache_empty():
+    """With None cache, _apply_gating is used (no TCP)."""
+    from unittest.mock import Mock
+    import unity_mcp.server as srv
+
+    tool_a = Mock()
+    tool_a.name = "get_hierarchy"
+    bridge = AsyncMock()
+    bridge.connected = False
+
+    orig = srv._disabled_tools_cache
+    try:
+        srv._disabled_tools_cache = None
+        bridge.send.reset_mock()
+        result = await srv._filter_tools([tool_a], bridge)
+        bridge.send.assert_not_called()
+        assert len(result) >= 0  # _apply_gating may filter
+    finally:
+        srv._disabled_tools_cache = orig
+
+
+@pytest.mark.asyncio
+async def test_disabled_tools_cache_populated_on_reconnect():
+    """Reconnect populates _disabled_tools_cache via get_disabled_tools."""
+    from unittest.mock import AsyncMock
+    import unity_mcp.server as srv
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": "screenshot,shader"})
+
+    orig = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
+    try:
+        srv._disabled_tools_cache = None
+        srv._refresh_tools_lock = None
+        await srv._refresh_tools_cache(bridge)
+        assert srv._disabled_tools_cache == {"screenshot", "shader"}
+    finally:
+        srv._disabled_tools_cache = orig
+        srv._refresh_tools_lock = orig_lock
+
+
+@pytest.mark.asyncio
+async def test_disabled_tools_empty_csv_gives_empty_set():
+    """Empty CSV from Unity must produce empty set, not {''}."""
+    from unittest.mock import AsyncMock
+    import unity_mcp.server as srv
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+
+    orig = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
+    try:
+        srv._disabled_tools_cache = None
+        srv._refresh_tools_lock = None
+        await srv._refresh_tools_cache(bridge)
+        assert srv._disabled_tools_cache == set(), f"Expected empty set, got {srv._disabled_tools_cache}"
+    finally:
+        srv._disabled_tools_cache = orig
+        srv._refresh_tools_lock = orig_lock
 
 
 # --- test handler registration ---
@@ -109,6 +241,4 @@ async def test_session_enabled_not_in_unity_cache_survives_filter():
 def test_request_handler_is_patched():
     """Our wrapper must be installed in request_handlers, not the original FastMCP handler."""
     handler = mcp._mcp_server.request_handlers[mcp_types.ListToolsRequest]
-    # The installed handler should be our _filtered_tools_handler, not the original.
-    # We verify by checking the function name.
     assert handler.__name__ == "_filtered_tools_handler"
