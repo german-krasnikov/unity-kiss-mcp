@@ -25,6 +25,7 @@ namespace UnityMCP.Editor
         private static CancellationTokenSource _clientCts;
         private static long _clientGeneration;
         private static volatile bool _shuttingDown;
+        private static volatile bool _starting;
         private static readonly int Port = GetPort();
         private static DateTime _compileStartTime;
         private static int GetPort()
@@ -100,7 +101,11 @@ namespace UnityMCP.Editor
 
         public static async void StartAsync()
         {
-            if (IsRunning) return;
+            // _starting closes the re-entrancy gap: during the bind-retry await window
+            // IsRunning is false, so WatchdogTick could otherwise launch a 2nd StartAsync
+            // → duplicate _cts/accept-loop churn.
+            if (IsRunning || _starting) return;
+            _starting = true;
             _shuttingDown = false;
             // Tier 0: re-register idempotently so restart after Stop() works
             EditorApplication.update -= ProcessMainThreadQueue;
@@ -140,13 +145,23 @@ namespace UnityMCP.Editor
                 while (!token.IsCancellationRequested)
                 {
                     var client = await AcceptClientAsync(token);
+                    if (client == null)
+                    {
+                        // Listener disposed/superseded or a transient accept error.
+                        // Break if shut down or this loop was orphaned by a newer
+                        // StartAsync (_cts replaced); otherwise back off so we never
+                        // tight-spin on a dead listener → silent 100% CPU, no console.
+                        if (token.IsCancellationRequested || _cts != cts || !IsRunning) break;
+                        await Task.Delay(100, token);
+                        continue;
+                    }
                     if (client != null)
                     {
                         // Cancel old handler BEFORE closing socket — triggers clean
                         // OperationCanceledException instead of ObjectDisposedException
                         if (_clientConnected && _currentClient != null)
                         {
-                            Debug.LogWarning("[MCP] New client — disconnecting previous");
+                            Debug.Log("[MCP] New client — disconnecting previous");
                             try { _clientCts?.Cancel(); } catch { }
                             try { _currentClient.Close(); } catch { }
                         }
@@ -174,6 +189,7 @@ namespace UnityMCP.Editor
                     _listener = null;
                 }
             }
+            finally { _starting = false; }
         }
 
         private static void ApplyKeepAlive(Socket socket)
@@ -290,7 +306,10 @@ namespace UnityMCP.Editor
                             clientToken, cmdTimeout.Token);
                         _mainThreadQueue.Enqueue(() =>
                         {
-                            if (_shuttingDown) { tcs.TrySetCanceled(); return; }
+                            // Skip if Python already gave up (per-command timeout fired and
+                            // sent retry:2000) — prevents the queued action running a 2nd time
+                            // after Python re-sent it → duplicate mutations.
+                            if (_shuttingDown || tcs.Task.IsCompleted) { tcs.TrySetCanceled(); return; }
                             try
                             {
                                 CommandRouter.ProcessAsync(json, tcs);
