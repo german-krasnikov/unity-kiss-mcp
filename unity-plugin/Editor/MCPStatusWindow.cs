@@ -1,94 +1,133 @@
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor
 {
     public class MCPStatusWindow : EditorWindow
     {
-        private double _lastRepaintTime;
-        private const double RepaintInterval = 1.0;
+        private VisualElement _orb, _halo;
+        private Label _word, _sub;
 
         [MenuItem("Tools/Unity MCP/Status")]
         public static void ShowWindow()
         {
             var window = GetWindow<MCPStatusWindow>("MCP Status");
-            window.minSize = new Vector2(220, 120);
+            window.minSize = new Vector2(240, 220);
         }
 
-        private void OnEnable()
+        private void CreateGUI()
         {
-            EditorApplication.update += ThrottledRepaint;
+            var root = rootVisualElement;
+            var ss = MCPEditorUtils.LoadStyleSheet("MCPStatus.uss");
+            if (ss != null) root.styleSheets.Add(ss);
+            root.AddToClassList("mcp-root");
+
+            var brand = new Label("UNITY MCP");
+            brand.AddToClassList("brand");
+
+            var stage = new VisualElement();
+            stage.AddToClassList("orb-stage");
+            _halo = new VisualElement(); _halo.AddToClassList("orb-halo");
+            _orb  = new VisualElement(); _orb.AddToClassList("orb");
+            stage.Add(_halo);
+            stage.Add(_orb);
+
+            _word = new Label(); _word.AddToClassList("status-word");
+            _sub  = new Label(); _sub.AddToClassList("status-sub");
+
+            var spacerTop = new VisualElement(); spacerTop.style.flexGrow = 1;
+            var spacerBot = new VisualElement(); spacerBot.style.flexGrow = 1;
+
+            var row = new VisualElement(); row.AddToClassList("btn-row");
+            row.Add(MakeBtn("Restart",  () => { MCPServer.Stop(); MCPServer.StartAsync(); }));
+            row.Add(MakeBtn("Kill MCP", KillProcs));
+            row.Add(MakeBtn("Reimport", ReimportPlugin));
+
+            root.Add(brand);
+            root.Add(spacerTop);
+            root.Add(stage);
+            root.Add(_word);
+            root.Add(_sub);
+            root.Add(spacerBot);
+            root.Add(row);
+
+            RefreshState();
+            root.schedule.Execute(RefreshState).Every(700);
+            root.schedule.Execute(BeatFast).Every(900);
+            root.schedule.Execute(BeatSoft).Every(1500);
         }
 
-        private void OnDisable()
+        private Button MakeBtn(string t, System.Action a)
         {
-            EditorApplication.update -= ThrottledRepaint;
+            var b = new Button(a) { text = t };
+            b.AddToClassList("mcp-btn");
+            return b;
         }
 
-        private void ThrottledRepaint()
+        private void BeatFast()
         {
-            if (EditorApplication.timeSinceStartup - _lastRepaintTime > RepaintInterval)
+            if (MCPServer.IsRunning && MCPServer.IsClientConnected)
             {
-                _lastRepaintTime = EditorApplication.timeSinceStartup;
-                Repaint();
+                _halo.ToggleInClassList("beat");
+                _orb.ToggleInClassList("beat");
+            }
+            else
+            {
+                _halo.RemoveFromClassList("beat");
+                _orb.RemoveFromClassList("beat");
             }
         }
 
-        private void OnGUI()
+        private void BeatSoft()
         {
-            GUILayout.Label("MCP Server Status", EditorStyles.boldLabel);
-            EditorGUILayout.Space();
+            if (MCPServer.IsRunning && !MCPServer.IsClientConnected)
+                _halo.ToggleInClassList("beat-soft");
+            else
+                _halo.RemoveFromClassList("beat-soft");
+        }
 
-            var running = MCPServer.IsRunning;
-            DrawStatusLine("Server", running, running ? $"Running :{MCPServer.ServerPort}" : "Stopped");
+        private void RefreshState()
+        {
+            bool run = MCPServer.IsRunning, cli = MCPServer.IsClientConnected;
+            string s = !run ? "down" : cli ? "up" : "listen";
 
-            var connected = MCPServer.IsClientConnected;
-            DrawStatusLine("Client", connected, connected ? "Connected" : "Disconnected");
-
-            EditorGUILayout.Space();
-
-            if (GUILayout.Button("Restart Server"))
+            foreach (var k in new[] { "up", "listen", "down" })
             {
-                MCPServer.Stop();
-                MCPServer.StartAsync();
+                _orb.RemoveFromClassList("orb--" + k);
+                _halo.RemoveFromClassList("halo--" + k);
+                _word.RemoveFromClassList("status-word--" + k);
             }
 
-            if (GUILayout.Button("Kill MCP Processes"))
-            {
-                try { System.Diagnostics.Process.Start("pkill", "-f unity_mcp.server"); }
-                catch (System.Exception e) { Debug.LogWarning($"[MCP] pkill failed: {e.Message}"); }
-            }
+            _orb.AddToClassList("orb--" + s);
+            _halo.AddToClassList("halo--" + s);
+            _word.AddToClassList("status-word--" + s);
 
-            EditorGUILayout.Space();
-            if (GUILayout.Button("Reimport Plugin"))
+            _word.text = !run ? "OFFLINE" : cli ? $"ONLINE  :{MCPServer.ServerPort}" : "LISTENING";
+            _sub.text  = !run ? "server stopped" : cli ? "client connected" : "no client";
+        }
+
+        private static void KillProcs()
+        {
+            try { System.Diagnostics.Process.Start("pkill", "-f unity_mcp.server"); }
+            catch (System.Exception e) { Debug.LogWarning($"[MCP] pkill failed: {e.Message}"); }
+        }
+
+        private static void ReimportPlugin()
+        {
+            var guids = AssetDatabase.FindAssets("t:asmdef", new[] { "Packages/com.unity-mcp.editor" });
+            if (guids.Length > 0)
             {
-                var guids = AssetDatabase.FindAssets("t:asmdef", new[] { "Packages/com.unity-mcp.editor" });
-                if (guids.Length > 0)
-                {
-                    var path = AssetDatabase.GUIDToAssetPath(guids[0]);
-                    AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-                    Debug.Log("[MCP] Plugin reimported — recompiling...");
-                }
-                else
-                {
-                    AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-                    Debug.Log("[MCP] AssetDatabase.Refresh forced");
-                }
+                var path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+                Debug.Log("[MCP] Plugin reimported — recompiling...");
+            }
+            else
+            {
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                Debug.Log("[MCP] AssetDatabase.Refresh forced");
             }
         }
 
-        private static void DrawStatusLine(string label, bool ok, string text)
-        {
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Label($"{label}:", GUILayout.Width(50));
-
-            var prevColor = GUI.color;
-            GUI.color = ok ? Color.green : Color.red;
-            GUILayout.Label("\u25CF", GUILayout.Width(16));
-            GUI.color = prevColor;
-
-            GUILayout.Label(text);
-            EditorGUILayout.EndHorizontal();
-        }
     }
 }

@@ -1,0 +1,112 @@
+.mcp-root {
+    flex-direction: column;
+    background-color: #1a1a2e;
+    padding: 18px;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.brand {
+    font-size: 10px;
+    color: #888899;
+    -unity-font-style: bold;
+    margin-bottom: 14px;
+    -unity-text-align: upper-center;
+}
+
+.orb-stage {
+    width: 80px;
+    height: 80px;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+}
+
+.orb-halo {
+    position: absolute;
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 1px;
+    opacity: 0.15;
+    transition-property: border-top-width, border-right-width, border-bottom-width, border-left-width, opacity;
+    transition-duration: 0.45s;
+    transition-timing-function: ease-in-out;
+}
+
+.orb {
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    transition-property: background-color;
+    transition-duration: 0.45s;
+    transition-timing-function: ease-in-out;
+}
+
+/* State fills — orb */
+.orb--up      { background-color: #1f7a5c; }
+.orb--up.beat { background-color: #3ad29f; }
+
+.orb--listen      { background-color: #8a6512; }
+.orb--listen.beat { background-color: #e8a23a; }
+
+.orb--down { background-color: #6e2b3a; }
+
+/* Halo colors per state */
+.halo--up     { border-color: #3ad29f; }
+.halo--listen { border-color: #e8a23a; }
+.halo--down   { border-color: #6e2b3a; }
+
+/* Beat classes */
+.orb-halo.beat {
+    border-width: 6px;
+    opacity: 0.6;
+}
+
+.orb-halo.beat-soft {
+    border-width: 3px;
+    opacity: 0.35;
+}
+
+/* Status text */
+.status-word {
+    font-size: 14px;
+    -unity-font-style: bold;
+    margin-top: 12px;
+}
+
+.status-word--up     { color: #3ad29f; }
+.status-word--listen { color: #e8a23a; }
+.status-word--down   { color: #e94560; }
+
+.status-sub {
+    font-size: 11px;
+    -unity-font-style: italic;
+    color: #888899;
+    margin-top: 2px;
+}
+
+/* Button row */
+.btn-row {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.mcp-btn {
+    margin: 3px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background-color: #2a2a3e;
+    border-color: #444466;
+    color: #ccccff;
+    font-size: 11px;
+    transition-property: background-color;
+    transition-duration: 0.15s;
+}
+
+.mcp-btn:hover {
+    background-color: #3a3a5e;
+    border-color: #6666aa;
+}

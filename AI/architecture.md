@@ -213,7 +213,8 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 
 ### Editor UI Windows (C#: UIToolkit)
 - **MCPSettings Window** (MCPSettings.cs): Tool visibility toggles, organized by theme categories (CORE locked, others toggle/tri-state group masters), search bar, presets (Minimal/Full/No-visuals), dynamic Plugins section from PluginRegistry. Stylesheet: `MCPSettings.uss`.
-- **Stylesheet Helper** (MCPEditorUtils.LoadStyleSheet): Shared two-path loader for `.uss` files, called by the MCPSettings window (DRY; handles package-relative asset lookup).
+- **MCPStatus Window** (MCPStatusWindow.cs): Connection status monitor. UIToolkit-based with breathing heartbeat pulsation (ECG beat when connected, gentle beat when listening, flatline when stopped). Centered orb (`.orb`) + halo ring (`.orb-halo`) with state-driven colors & USS class-triggered pulsation (border-width + opacity + background-color transitions, 2021.3-safe). Polling every 700ms for state. Buttons: Restart MCP / Kill MCP / Reimport. Stylesheet: `MCPStatus.uss`.
+- **Stylesheet Helper** (MCPEditorUtils.LoadStyleSheet): Shared two-path loader for `.uss` files, called by both MCPSettings & MCPStatus windows (DRY; handles package-relative asset lookup).
 
 ### Code Execution (C#: CodeExecutor)
 - Roslyn C# execution via `execute_code` command
