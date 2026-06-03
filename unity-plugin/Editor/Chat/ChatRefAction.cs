@@ -73,6 +73,14 @@ namespace UnityMCP.Editor.Chat
                 if (ms == null) { Debug.LogWarning("[MCP Chat] Script not found: " + assetPath); return; }
                 AssetDatabase.OpenAsset(ms);
             }
+            else if (linkId.StartsWith("asset:"))
+            {
+                var assetPath = linkId.Substring(6);
+                var obj       = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+                if (obj == null) { Debug.LogWarning("[MCP Chat] Asset not found: " + assetPath); return; }
+                EditorGUIUtility.PingObject(obj);
+                Selection.activeObject = obj;
+            }
         }
 
         private static void AddToContext(string linkId, Action<string> addToContext)
@@ -81,6 +89,7 @@ namespace UnityMCP.Editor.Chat
             string payload;
             if (linkId.StartsWith("obj:"))         payload = linkId.Substring(4);
             else if (linkId.StartsWith("script:")) payload = linkId.Substring(7);
+            else if (linkId.StartsWith("asset:"))  payload = linkId.Substring(6);
             else                                   payload = linkId;
             addToContext(payload);
         }

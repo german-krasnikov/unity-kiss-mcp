@@ -18,16 +18,38 @@ namespace UnityMCP.Editor.Chat
         {
             DragAndDrop.AcceptDrag();
             foreach (var obj in DragAndDrop.objectReferences)
-                if (obj is GameObject go) AddObjChip(go);
+            {
+                if (obj == null) continue;
+
+                // Scene GameObject (not an asset).
+                if (obj is GameObject go && !AssetDatabase.Contains(go))
+                {
+                    AddChip(go, ComponentSerializer.GetPath(go), go.name);
+                    continue;
+                }
+
+                // Asset — check type allowlist first.
+                if (AssetDatabase.Contains(obj) && ChatChipPolicy.IsAllowedAssetType(obj.GetType()))
+                {
+                    var assetPath = AssetDatabase.GetAssetPath(obj);
+                    if (!string.IsNullOrEmpty(assetPath))
+                        AddChip(obj, assetPath, obj.name);
+                }
+                else if (!(obj is GameObject)) // not a scene GO, not an allowlisted asset
+                    Debug.LogWarning($"[MCP Chat] {obj.GetType().Name} not supported as a context chip");
+            }
         }
 
-        private void AddObjChip(GameObject go)
+        // Kept for call-sites that pass a scene GameObject directly.
+        private void AddObjChip(GameObject go) =>
+            AddChip(go, ComponentSerializer.GetPath(go), go.name);
+
+        private void AddChip(Object cap, string payload, string displayName)
         {
             var chip = new VisualElement(); chip.AddToClassList("obj-chip");
-            chip.userData = ComponentSerializer.GetPath(go);
+            chip.userData = payload;
 
-            var lbl = new Label(go.name); lbl.AddToClassList("obj-chip-label");
-            var cap = go;
+            var lbl = new Label(displayName); lbl.AddToClassList("obj-chip-label");
             lbl.RegisterCallback<ClickEvent>(_ => { EditorGUIUtility.PingObject(cap); Selection.activeObject = cap; });
 
             var removeBtn = new Button(() =>

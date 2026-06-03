@@ -23,9 +23,11 @@ namespace UnityMCP.Editor.Chat
         /// <summary>
         /// Scans richText for inline-code color spans and wraps resolved ones in
         /// &lt;link&gt; tags with underline. Unresolved spans pass through unchanged.
-        /// Object resolver takes priority over script resolver.
+        /// Priority: object > script > asset.
+        /// Asset resolver should be path-based (span must start with "Assets/") to avoid
+        /// false-positive links on bare names.
         /// </summary>
-        internal static string Apply(string richText, Resolver resolveObject, Resolver resolveScript)
+        internal static string Apply(string richText, Resolver resolveObject, Resolver resolveScript, Resolver resolveAsset)
         {
             if (richText == null) return null;
             if (richText == "") return "";
@@ -48,6 +50,10 @@ namespace UnityMCP.Editor.Chat
                 payload = resolveScript?.Invoke(name);
                 if (payload != null)
                     return WrapLink("script:" + payload, m.Value);
+
+                payload = resolveAsset?.Invoke(name);
+                if (payload != null)
+                    return WrapLink("asset:" + payload, m.Value);
 
                 return m.Value; // unresolved — pass through unchanged
             });

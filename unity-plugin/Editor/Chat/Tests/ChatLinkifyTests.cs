@@ -15,6 +15,10 @@ namespace UnityMCP.Editor.Chat.Tests
         private static string ResolveScript(string name) =>
             name.EndsWith(".cs") ? "Assets/Scripts/" + name : null;
 
+        // Resolver that matches only valid "Assets/..." paths
+        private static string ResolveAsset(string name) =>
+            name != null && name.StartsWith("Assets/") ? name : null;
+
         private const string CodeOpen  = "<color=#9aa5ce>";
         private const string CodeClose = "</color>";
 
@@ -25,14 +29,14 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void NullInput_ReturnsNull()
         {
-            var result = ChatLinkify.Apply(null, ResolveObj, ResolveScript);
+            var result = ChatLinkify.Apply(null, ResolveObj, ResolveScript, null);
             Assert.IsNull(result);
         }
 
         [Test]
         public void EmptyInput_ReturnsEmpty()
         {
-            var result = ChatLinkify.Apply("", ResolveObj, ResolveScript);
+            var result = ChatLinkify.Apply("", ResolveObj, ResolveScript, null);
             Assert.AreEqual("", result);
         }
 
@@ -42,7 +46,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void NoCodeSpans_Unchanged()
         {
             var input = "Hello <b>world</b> foo";
-            Assert.AreEqual(input, ChatLinkify.Apply(input, ResolveObj, ResolveScript));
+            Assert.AreEqual(input, ChatLinkify.Apply(input, ResolveObj, ResolveScript, null));
         }
 
         // ── object resolved ──────────────────────────────────────────────────
@@ -51,7 +55,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void CodeSpan_ObjectResolved_WrapsLink()
         {
             var input  = "See " + Span("GO_Player") + " here";
-            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript);
+            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript, null);
 
             Assert.IsTrue(result.Contains("<link=\"obj:/GO_Player\">"), $"Got: {result}");
             Assert.IsTrue(result.Contains("</link>"),                  $"Got: {result}");
@@ -65,7 +69,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void CodeSpan_ScriptResolved_WrapsLink()
         {
             var input  = "Edit " + Span("Player.cs") + " now";
-            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript);
+            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript, null);
 
             Assert.IsTrue(result.Contains("<link=\"script:Assets/Scripts/Player.cs\">"), $"Got: {result}");
             Assert.IsTrue(result.Contains("</link>"), $"Got: {result}");
@@ -77,7 +81,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void CodeSpan_Unresolved_Unchanged()
         {
             var input  = "Use " + Span("SomeUnknown") + " here";
-            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript);
+            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript, null);
 
             Assert.AreEqual(input, result);
         }
@@ -92,7 +96,7 @@ namespace UnityMCP.Editor.Chat.Tests
             string BothResolveScript(string n) => "Assets/" + n; // also resolves
 
             var input  = Span("Foo");
-            var result = ChatLinkify.Apply(input, BothResolveObj, BothResolveScript);
+            var result = ChatLinkify.Apply(input, BothResolveObj, BothResolveScript, null);
 
             Assert.IsTrue(result.Contains("<link=\"obj:/Foo\">"), $"Got: {result}");
             Assert.IsFalse(result.Contains("script:"),            $"Got: {result}");
@@ -104,7 +108,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void MultipleCodeSpans_EachResolvedIndependently()
         {
             var input  = Span("GO_A") + " and " + Span("Unknown") + " and " + Span("B.cs");
-            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript);
+            var result = ChatLinkify.Apply(input, ResolveObj, ResolveScript, null);
 
             Assert.IsTrue(result.Contains("<link=\"obj:/GO_A\">"),              $"Got: {result}");
             Assert.IsTrue(result.Contains(Span("Unknown")),                    $"Got: {result}");
@@ -123,7 +127,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var input        = Span(escapedInner);
 
             string ObjResolver(string n) => n == "GO_<A>" ? "/GO_<A>" : null;
-            var result = ChatLinkify.Apply(input, ObjResolver, _ => null);
+            var result = ChatLinkify.Apply(input, ObjResolver, _ => null, null);
 
             Assert.IsTrue(result.Contains("<link=\"obj:/GO_<A>\">"), $"Got: {result}");
         }
@@ -134,7 +138,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void ExistingLinkTag_NotDoubleWrapped()
         {
             var input  = "<link=\"obj:/Already\">" + Span("AlreadyLinked") + "</link>";
-            var result = ChatLinkify.Apply(input, _ => "/AlreadyLinked", _ => null);
+            var result = ChatLinkify.Apply(input, _ => "/AlreadyLinked", _ => null, null);
 
             // Should NOT gain another <link> around the already-linked span
             var linkCount = System.Text.RegularExpressions.Regex.Matches(result, "<link=").Count;
@@ -161,6 +165,51 @@ namespace UnityMCP.Editor.Chat.Tests
         public void StripNoparse_NoNoparse_Unchanged()
         {
             Assert.AreEqual("hello", ChatLinkify.StripNoparse("hello"));
+        }
+
+        // ── asset resolver ───────────────────────────────────────────────────
+
+        [Test]
+        public void CodeSpan_AssetPathResolved_WrapsAssetLink()
+        {
+            var assetPath = "Assets/Materials/Sky.mat";
+            var input     = "Use " + Span(assetPath) + " here";
+            var result    = ChatLinkify.Apply(input, _ => null, _ => null, ResolveAsset);
+
+            Assert.IsTrue(result.Contains("<link=\"asset:Assets/Materials/Sky.mat\">"), $"Got: {result}");
+            Assert.IsTrue(result.Contains("</link>"), $"Got: {result}");
+        }
+
+        [Test]
+        public void CodeSpan_BareName_AssetResolverReturnsNull_Unchanged()
+        {
+            // "Player" does NOT start with "Assets/" — no false-positive link.
+            var input  = "Edit " + Span("Player") + " now";
+            var result = ChatLinkify.Apply(input, _ => null, _ => null, ResolveAsset);
+
+            Assert.AreEqual(input, result);
+        }
+
+        [Test]
+        public void CodeSpan_ObjectPriority_OverAsset()
+        {
+            // If obj resolver matches, asset resolver must NOT run.
+            var input  = Span("Assets/Foo.prefab");
+            var result = ChatLinkify.Apply(input, _ => "/SceneObj", _ => null, ResolveAsset);
+
+            Assert.IsTrue(result.Contains("<link=\"obj:/SceneObj\">"), $"Got: {result}");
+            Assert.IsFalse(result.Contains("asset:"), $"Got: {result}");
+        }
+
+        [Test]
+        public void CodeSpan_ScriptPriority_OverAsset()
+        {
+            // If script resolver matches, asset resolver must NOT run.
+            var input  = Span("Assets/Scripts/Foo.cs");
+            var result = ChatLinkify.Apply(input, _ => null, _ => "Assets/Scripts/Foo.cs", ResolveAsset);
+
+            Assert.IsTrue(result.Contains("<link=\"script:Assets/Scripts/Foo.cs\">"), $"Got: {result}");
+            Assert.IsFalse(result.Contains("asset:"), $"Got: {result}");
         }
     }
 }

@@ -58,7 +58,7 @@ namespace UnityMCP.Editor.Chat
         {
             if (root is Label lbl && lbl.enableRichText && !string.IsNullOrEmpty(lbl.text))
             {
-                var linkified = ChatLinkify.Apply(lbl.text, _resolver.ResolveObject, _resolver.ResolveScript);
+                var linkified = ChatLinkify.Apply(lbl.text, _resolver.ResolveObject, _resolver.ResolveScript, ResolveAssetPath);
                 if (linkified != lbl.text)
                 {
                     lbl.text = linkified;
@@ -78,6 +78,15 @@ namespace UnityMCP.Editor.Chat
             }
             foreach (var child in root.Children())
                 PostProcessLinks(child);
+        }
+
+        // Path-based asset resolver: only linkifies spans whose content is an existing asset path
+        // (must start with "Assets/"). Bare names like "Player" never match — no false positives.
+        private static string ResolveAssetPath(string name)
+        {
+            if (name == null || !name.StartsWith("Assets/")) return null;
+            var obj = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(name);
+            return obj != null ? name : null;
         }
     }
 }
