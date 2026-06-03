@@ -2,6 +2,7 @@
     "name": "UnityMCP.Editor.Chat.Tests",
     "rootNamespace": "UnityMCP.Editor.Chat.Tests",
     "references": [
+        "UnityMCP.Editor",
         "UnityMCP.Editor.Chat",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

@@ -92,8 +92,6 @@ namespace UnityMCP.Editor.Chat
             seg.Add(_askBtn); seg.Add(_agentBtn);
             bar.Add(seg);
 
-            bar.Add(BuildPermissionsButton());
-
             var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
             bar.Add(spacer);
 

@@ -1,11 +1,11 @@
-// UIToolkit tri-state foldout group for PermissionsPopup.
+// UIToolkit tri-state foldout group for MCPSettingsPermUI and Chat permission views.
 // Mirrors MCPSettingsCategoryGroup visual structure via the same USS classes from MCPSettings.uss.
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine.UIElements;
 
-namespace UnityMCP.Editor.Chat
+namespace UnityMCP.Editor
 {
     /// <summary>
     /// Foldout with per-tool toggles and a tri-state master toggle.

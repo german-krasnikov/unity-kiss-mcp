@@ -4,9 +4,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
-using UnityMCP.Editor;
 
-namespace UnityMCP.Editor.Chat
+namespace UnityMCP.Editor
 {
     public class PermissionConfig
     {
@@ -15,12 +14,16 @@ namespace UnityMCP.Editor.Chat
         public const string MCP_BLANKET    = "mcp__unity";
         public const string MCP_TOOL_PREFIX = MCP_BLANKET + "__";
 
+        // EditorPrefs key prefix shared by all PermissionConfig instances using the default ctor.
+        // MUST equal the value previously hardcoded in the default ctor — changing it orphans saved prefs.
+        public const string DEFAULT_PREFIX = "UnityMCP_ChatPerm_";
+
         private readonly string _prefix;
         private readonly System.Func<Dictionary<string, string[]>> _getCatalog;
 
         // Production ctor: live catalog that includes plugin tools.
         public PermissionConfig()
-            : this("UnityMCP_ChatPerm_", LiveCatalog) { }
+            : this(DEFAULT_PREFIX, LiveCatalog) { }
 
         // Testable ctor: inject key prefix + catalog delegate.
         public PermissionConfig(string prefix, System.Func<Dictionary<string, string[]>> getCatalog)
