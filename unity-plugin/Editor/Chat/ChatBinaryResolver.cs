@@ -30,15 +30,10 @@ namespace UnityMCP.Editor.Chat
         {
             try
             {
-                var psi = new ProcessStartInfo("/bin/zsh", $"-lc 'command -v {binary}'")
-                {
-                    UseShellExecute        = false,
-                    RedirectStandardOutput = true,
-                    CreateNoWindow         = true,
-                };
+                var psi = LoginShellCommand.Create("command -v \"$1\"", binary);
                 using var p = Process.Start(psi);
                 var result = p?.StandardOutput.ReadToEnd().Trim();
-                p?.WaitForExit(3000);
+                if (p != null && !p.WaitForExit(3000)) { try { p.Kill(); } catch { } }
                 return string.IsNullOrEmpty(result) ? null : result;
             }
             catch

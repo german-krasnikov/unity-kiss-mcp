@@ -78,19 +78,20 @@ namespace UnityMCP.Editor.Chat
                 bool ok = false;
                 try
                 {
-                    var psi = new ProcessStartInfo("/bin/zsh", $"-lc '{binary} auth status'")
-                        { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+                    var psi = LoginShellCommand.Create("\"$1\" auth status", binary);
                     using var p = Process.Start(psi);
                     p?.StandardOutput.ReadToEnd();
-                    p?.WaitForExit(2000);
-                    ok = p != null && p.ExitCode == 0;
+                    if (p != null && !p.WaitForExit(2000)) { try { p.Kill(); } catch { } }
+                    ok = p != null && p.HasExited && p.ExitCode == 0;
                 }
                 catch { }
-                label.schedule.Execute(() =>
+                // Marshal to main thread; guard against label destroyed (Settings window closed).
+                EditorApplication.delayCall += () =>
                 {
+                    if (label?.panel == null) return;
                     label.text = ok ? "Auth: logged in" : "Auth: not logged in";
                     label.style.color = new StyleColor(ok ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
-                });
+                };
             });
         }
     }
