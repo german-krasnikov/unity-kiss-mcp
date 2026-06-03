@@ -6,29 +6,32 @@ namespace UnityMCP.Editor.Chat
 {
     public static class ToolVerbMap
     {
+        // Single source of truth: derives from PermissionConfig so prefix can never drift.
+        private const string P = PermissionConfig.MCP_TOOL_PREFIX;
+
         private static readonly Dictionary<string, string> _map =
             new Dictionary<string, string>
             {
-                { "mcp__unity-mcp__get_hierarchy",        "Reading scene" },
-                { "mcp__unity-mcp__set_property",         "Editing" },
-                { "mcp__unity-mcp__create_object",        "Creating" },
-                { "mcp__unity-mcp__screenshot",           "Capturing screenshot" },
-                { "mcp__unity-mcp__batch",                "Running batch" },
-                { "mcp__unity-mcp__manage_component",     "Editing components" },
-                { "mcp__unity-mcp__run_playtest",         "Playtesting" },
-                { "mcp__unity-mcp__validate_references",  "Checking refs" },
-                { "mcp__unity-mcp__inspect",              "Reading" },
-                { "mcp__unity-mcp__search_scene",         "Searching" },
-                { "mcp__unity-mcp__find_references",      "Searching" },
-                { "mcp__unity-mcp__wire_event",           "Wiring" },
-                { "mcp__unity-mcp__delete_object",        "Deleting" },
-                { "mcp__unity-mcp__get_component",        "Reading component" },
-                { "mcp__unity-mcp__set_parent",           "Re-parenting" },
-                { "mcp__unity-mcp__move_to",              "Moving" },
-                { "mcp__unity-mcp__get_console",          "Reading console" },
-                { "mcp__unity-mcp__get_compile_errors",   "Checking errors" },
-                { "mcp__unity-mcp__run_tests",            "Running tests" },
-                { "mcp__unity-mcp__scene",                "Managing scene" },
+                { P + "get_hierarchy",        "Reading scene" },
+                { P + "set_property",         "Editing" },
+                { P + "create_object",        "Creating" },
+                { P + "screenshot",           "Capturing screenshot" },
+                { P + "batch",                "Running batch" },
+                { P + "manage_component",     "Editing components" },
+                { P + "run_playtest",         "Playtesting" },
+                { P + "validate_references",  "Checking refs" },
+                { P + "inspect",              "Reading" },
+                { P + "search_scene",         "Searching" },
+                { P + "find_references",      "Searching" },
+                { P + "wire_event",           "Wiring" },
+                { P + "delete_object",        "Deleting" },
+                { P + "get_component",        "Reading component" },
+                { P + "set_parent",           "Re-parenting" },
+                { P + "move_to",              "Moving" },
+                { P + "get_console",          "Reading console" },
+                { P + "get_compile_errors",   "Checking errors" },
+                { P + "run_tests",            "Running tests" },
+                { P + "scene",                "Managing scene" },
             };
 
         /// <summary>

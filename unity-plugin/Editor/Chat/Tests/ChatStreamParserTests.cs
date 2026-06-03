@@ -34,11 +34,11 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ParseLine_ContentBlockStartToolUse_ReturnsToolStart()
         {
-            const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"name\":\"mcp__unity-mcp__get_hierarchy\"}}}";
+            const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"name\":\"mcp__unity__get_hierarchy\"}}}";
             var result = ChatStreamParser.ParseLine(line);
             Assert.IsNotNull(result);
             Assert.AreEqual(ChatEventKind.ToolStart, result.Value.Kind);
-            Assert.AreEqual("mcp__unity-mcp__get_hierarchy", result.Value.Text);
+            Assert.AreEqual("mcp__unity__get_hierarchy", result.Value.Text);
             Assert.AreEqual("", result.Value.ArgsJson);
         }
 
