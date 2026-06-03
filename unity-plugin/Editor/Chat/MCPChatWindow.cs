@@ -11,6 +11,7 @@ namespace UnityMCP.Editor.Chat
         private IChatBackend   _backend;
         private ChatTranscript _transcript;
         private bool           _agentMode;
+        private PermissionConfig _permConfig = new PermissionConfig();
         private int            _inputTokens, _outputTokens;
         private readonly List<ChatEvent>       _evBuf   = new List<ChatEvent>(16);
         private readonly List<ToolCallRecord>  _toolBuf = new List<ToolCallRecord>(8);
@@ -91,6 +92,8 @@ namespace UnityMCP.Editor.Chat
             seg.Add(_askBtn); seg.Add(_agentBtn);
             bar.Add(seg);
 
+            bar.Add(BuildPermissionsButton());
+
             var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
             bar.Add(spacer);
 
@@ -127,7 +130,7 @@ namespace UnityMCP.Editor.Chat
             var cfg = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
                 ".claude", "mcp.json");
-            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan", _selectedAgent);
+            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan", _selectedAgent, _permConfig);
         }
 
         private void OnSend()

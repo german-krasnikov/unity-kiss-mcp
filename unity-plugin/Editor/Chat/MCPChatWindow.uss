@@ -234,6 +234,14 @@
     background-color: var(--unity-colors-button-background-pressed, var(--unity-colors-button-background-hover));
 }
 
+.chat-btn--screenshot {
+    /* intentionally uses default .chat-btn styling */
+}
+
+.chat-btn--perms {
+    /* intentionally uses default .chat-btn styling */
+}
+
 .chat-btn--send {
     background-color: var(--unity-colors-highlight-background);
     border-color: var(--unity-colors-button-border-focus);

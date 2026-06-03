@@ -7,9 +7,10 @@ namespace UnityMCP.Editor.Chat
 {
     internal sealed class ClaudeBackend : IChatBackend, IDisposable
     {
-        private readonly string _mcpConfigPath;
-        private readonly string _permissionMode; // "plan" | "acceptEdits"
-        private readonly string _agentName;      // null = default Claude; non-null → --agent <name>
+        private readonly string           _mcpConfigPath;
+        private readonly string           _permissionMode; // "plan" | "acceptEdits"
+        private readonly string           _agentName;      // null = default Claude; non-null → --agent <name>
+        private readonly PermissionConfig _permConfig;     // null → blanket allow-all
 
         private ChatProcess _proc;
         private readonly List<string>           _drainBuf    = new List<string>(32);
@@ -18,11 +19,13 @@ namespace UnityMCP.Editor.Chat
         public bool   IsRunning => _proc?.IsRunning ?? false;
         public string SessionId { get; private set; }
 
-        internal ClaudeBackend(string mcpConfigPath, string permissionMode, string agentName = null)
+        internal ClaudeBackend(string mcpConfigPath, string permissionMode,
+            string agentName = null, PermissionConfig permConfig = null)
         {
             _mcpConfigPath  = mcpConfigPath;
             _permissionMode = permissionMode;
             _agentName      = agentName;
+            _permConfig     = permConfig;
         }
 
         public void Start()
@@ -34,7 +37,8 @@ namespace UnityMCP.Editor.Chat
                 Debug.LogError("[MCP Chat] claude binary not found — check Settings > Agent Chat > Binary Path.");
                 return;
             }
-            var (args, strip) = ClaudeArgBuilder.Build(binary, _mcpConfigPath, _permissionMode, SessionId, _agentName);
+            var allowed = _permConfig?.GetAllowedToolIds();
+            var (args, strip) = ClaudeArgBuilder.Build(binary, _mcpConfigPath, _permissionMode, SessionId, _agentName, allowed);
             _proc = new ChatProcess();
             _proc.Spawn(binary, args, strip);
         }

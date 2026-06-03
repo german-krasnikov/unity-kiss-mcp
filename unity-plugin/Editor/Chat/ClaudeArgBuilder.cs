@@ -1,5 +1,6 @@
 // Pure arg-construction logic — no process spawning, fully NUnit-testable.
 using System.Collections.Generic;
+using System.Linq;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -12,13 +13,18 @@ namespace UnityMCP.Editor.Chat
         /// <param name="mcpConfigPath">Path to mcp.json passed via --mcp-config.</param>
         /// <param name="permissionMode">"plan" (Ask/read-only) or "acceptEdits" (Agent).</param>
         /// <param name="resumeSessionId">Non-null → append --resume &lt;id&gt;.</param>
-        /// <param name="agentName">Non-null → append --agent &lt;name&gt;. Shared seam: F4 will later parametrize --allowedTools/--disallowedTools here.</param>
+        /// <param name="agentName">Non-null → append --agent &lt;name&gt;.</param>
+        /// <param name="allowedMcpTools">
+        ///   null  → blanket "mcp__unity" prefix (all tools allowed).
+        ///   array → enumerate only these tool names prefixed with MCP_TOOL_PREFIX; empty = deny all.
+        /// </param>
         public static (string[] args, string[] stripEnvKeys) Build(
             string binaryPath,
             string mcpConfigPath,
             string permissionMode,
             string resumeSessionId,
-            string agentName = null)
+            string agentName = null,
+            string[] allowedMcpTools = null)
         {
             var args = new List<string>
             {
@@ -29,15 +35,26 @@ namespace UnityMCP.Editor.Chat
                 "--input-format",  "stream-json",
                 "--mcp-config",    mcpConfigPath,
                 "--permission-mode", permissionMode,
-                // Pre-approve the Unity MCP server. Headless `claude -p` has no interactive
-                // permission prompt, so any un-allowlisted tool call silently blocks (built-in
-                // tools like ToolSearch are auto-allowed, MCP ones are not). ASK stays read-only
-                // because plan mode still blocks mutations on top of this allowlist.
-                // Must match the server key in mcp.json ("unity").
-                "--allowedTools", "mcp__unity",
-                // built-in AskUserQuestion auto-fails in headless stream-json (~500ms, no stdin wait) -> force prose questions
-                "--disallowedTools", "AskUserQuestion",
             };
+
+            // Tool allowlist: null → blanket prefix; non-null → enumerate explicitly.
+            if (allowedMcpTools == null)
+            {
+                // Pre-approve all Unity MCP tools via server-key prefix (must match mcp.json key).
+                args.Add("--allowedTools");
+                args.Add(PermissionConfig.MCP_BLANKET);
+            }
+            else if (allowedMcpTools.Length > 0)
+            {
+                args.Add("--allowedTools");
+                args.Add(string.Join(",",
+                    allowedMcpTools.Select(t => PermissionConfig.MCP_TOOL_PREFIX + t)));
+            }
+            // empty array → omit --allowedTools entirely (all MCP tools denied)
+
+            // AskUserQuestion auto-fails in headless stream-json (~500ms, no stdin wait) → force prose questions.
+            args.Add("--disallowedTools");
+            args.Add("AskUserQuestion");
 
             if (!string.IsNullOrEmpty(resumeSessionId))
             {

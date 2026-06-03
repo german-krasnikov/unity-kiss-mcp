@@ -156,5 +156,107 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsFalse(System.Array.IndexOf(args, "--agent") >= 0,
                 "--agent must not appear when agentName is empty");
         }
+
+        // ── F4: allowedMcpTools param ─────────────────────────────────────────
+
+        [Test]
+        public void Build_NullAllowedTools_KeepsBlanketPrefix()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null, null, null);
+
+            var idx = System.Array.IndexOf(args, "--allowedTools");
+            Assert.Greater(idx, -1);
+            Assert.AreEqual("mcp__unity", args[idx + 1]);
+        }
+
+        [Test]
+        public void Build_WithAllowedTools_ReplacesBlanketWithEnumeration()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null, null,
+                new[] { "get_hierarchy", "batch" });
+
+            var idx = System.Array.IndexOf(args, "--allowedTools");
+            Assert.Greater(idx, -1);
+            Assert.AreNotEqual("mcp__unity", args[idx + 1],
+                "blanket must not appear when allowedMcpTools is provided");
+        }
+
+        [Test]
+        public void Build_WithAllowedTools_CommaSeparatedFormat()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null, null,
+                new[] { "get_hierarchy", "batch" });
+
+            var idx = System.Array.IndexOf(args, "--allowedTools");
+            var val = args[idx + 1];
+            Assert.IsTrue(val.Contains(","), "multiple tools must be comma-separated");
+        }
+
+        [Test]
+        public void Build_WithAllowedTools_EachToolHasMcpPrefix()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null, null,
+                new[] { "get_hierarchy", "batch" });
+
+            var idx = System.Array.IndexOf(args, "--allowedTools");
+            var parts = args[idx + 1].Split(',');
+            foreach (var part in parts)
+                StringAssert.StartsWith(PermissionConfig.MCP_TOOL_PREFIX, part.Trim());
+        }
+
+        // ── FIX 1: per-tool prefix must be mcp__unity__ (matches server key "unity") ──
+
+        [Test]
+        public void Build_WithAllowedTools_PrefixMatchesLiveServerKey()
+        {
+            // The mcp.json server key is "unity", so Claude names tools mcp__unity__<tool>.
+            // Enumerated ids must use mcp__unity__ NOT mcp__unity-mcp__.
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null, null,
+                new[] { "get_hierarchy" });
+
+            var idx = System.Array.IndexOf(args, "--allowedTools");
+            Assert.Greater(idx, -1);
+            Assert.AreEqual("mcp__unity__get_hierarchy", args[idx + 1],
+                "Tool id must match live server key 'unity' from mcp.json");
+        }
+
+        [Test]
+        public void MCP_TOOL_PREFIX_StartsWithBlanketPlusDblUnderscore()
+        {
+            // Per-tool prefix must be derived from the blanket (mcp__unity) + "__"
+            // so the two can never drift relative to each other.
+            const string blanket = "mcp__unity";
+            StringAssert.StartsWith(blanket + "__", PermissionConfig.MCP_TOOL_PREFIX,
+                "MCP_TOOL_PREFIX must equal the blanket server name + '__'");
+        }
+
+        [Test]
+        public void Build_EmptyAllowedTools_NoBlanketNoEnumeration()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null, null,
+                new string[0]);
+
+            // --allowedTools should not appear at all (nothing to allow)
+            Assert.IsFalse(args.Contains("--allowedTools"),
+                "--allowedTools must be absent when allowedMcpTools is empty");
+        }
+
+        [Test]
+        public void Build_WithAllowedTools_AskUserQuestionStillDisallowed()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null, null,
+                new[] { "get_hierarchy" });
+
+            var idx = System.Array.IndexOf(args, "--disallowedTools");
+            Assert.Greater(idx, -1, "--disallowedTools must still be present");
+            Assert.AreEqual("AskUserQuestion", args[idx + 1]);
+        }
     }
 }
