@@ -311,3 +311,160 @@
     border-color: #3a6a8a;
     color: #88bbdd;
 }
+
+/* ── Markdown rendered blocks ── */
+.md-bubble {
+    flex-direction: column;
+    padding: 6px 10px;
+    background-color: #1e1e2e;
+    border-radius: 8px;
+    border-bottom-left-radius: 2px;
+    max-width: 85%;
+}
+
+.md-para {
+    color: #c0caf5;
+    white-space: normal;
+    margin-bottom: 4px;
+    -unity-rich-text-enabled: true;
+}
+
+.md-h1 { font-size: 18px; -unity-font-style: bold; color: #d0d8ff; margin-top: 8px; }
+.md-h2 { font-size: 16px; -unity-font-style: bold; color: #d0d8ff; margin-top: 6px; }
+.md-h3 { font-size: 14px; -unity-font-style: bold; color: #d0d8ff; margin-top: 5px; }
+.md-h4 { font-size: 13px; -unity-font-style: bold; color: #d0d8ff; margin-top: 4px; }
+.md-h5 { font-size: 12px; -unity-font-style: bold; color: #d0d8ff; margin-top: 3px; }
+.md-h6 { font-size: 11px; -unity-font-style: bold; color: #d0d8ff; margin-top: 2px; }
+
+.md-codebox {
+    background-color: #16161e;
+    border-width: 1px;
+    border-color: #2a2a44;
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+}
+
+.md-code-lang {
+    font-size: 9px;
+    color: #7aa2f7;
+    -unity-font-style: bold;
+    margin-bottom: 3px;
+}
+
+.md-code {
+    color: #c0caf5;
+    white-space: pre-wrap;
+    font-size: 11px;
+}
+
+.md-quote {
+    border-left-width: 3px;
+    border-left-color: #3a6aaa;
+    padding-left: 8px;
+    color: #888899;
+    -unity-font-style: italic;
+    margin-bottom: 4px;
+}
+
+.md-hr {
+    height: 1px;
+    background-color: #2a2a44;
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+/* ── Table ── */
+.md-table  { flex-direction: column; margin-bottom: 4px; }
+.md-table-row { flex-direction: row; }
+.md-th {
+    -unity-font-style: bold;
+    background-color: #1e1e2e;
+    padding: 3px 6px;
+    border-width: 1px;
+    border-color: #2a2a44;
+    color: #d0d8ff;
+    flex: 1;
+}
+.md-td {
+    padding: 3px 6px;
+    border-width: 1px;
+    border-color: #2a2a44;
+    color: #c0caf5;
+    flex: 1;
+}
+
+/* ── Lists ── */
+.md-list { flex-direction: column; margin-bottom: 4px; }
+.md-list-row { flex-direction: row; }
+.md-list-marker { min-width: 18px; color: #7aa2f7; }
+.md-list-content { flex: 1; color: #c0caf5; white-space: normal; }
+
+/* ── Mermaid ── */
+.mermaid {
+    background-color: #16161e;
+    border-width: 1px;
+    border-color: #2a2a44;
+    border-radius: 4px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.mermaid-node {
+    background-color: #1e1e2e;
+    border-width: 1px;
+    border-color: #3a6aaa;
+    border-radius: 4px;
+    -unity-text-align: middle-center;
+    color: #d0d8ff;
+    font-size: 11px;
+}
+
+.mermaid-node--round { border-radius: 18px; }
+
+/* Diamond uses a distinct border color instead of rotate (keeps label readable). */
+.mermaid-node--diamond { border-color: #7aa2f7; border-width: 2px; }
+
+.mermaid-edge-layer { position: absolute; }
+
+.mermaid-edge-label {
+    position: absolute;
+    font-size: 9px;
+    background-color: #16161e;
+    color: #7aa2f7;
+    padding: 1px 3px;
+}
+
+/* ── Image ── */
+.md-image {
+    max-width: 360px;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.md-image-alt {
+    font-size: 10px;
+    color: #7aa2f7;
+    -unity-font-style: italic;
+}
+
+/* ── User bubble text ── */
+.msg-text {
+    color: #d0d8ff;
+    white-space: normal;
+}
+
+/* ── Obj-chip remove button ── */
+.obj-chip-remove {
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    color: #7aa2f7;
+    margin-left: 4px;
+    padding: 0 4px;
+    font-size: 10px;
+    -unity-text-align: middle-center;
+}
+
+.obj-chip-remove:hover {
+    color: #c0caf5;
+}

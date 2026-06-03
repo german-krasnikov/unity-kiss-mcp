@@ -157,12 +157,37 @@ unity-kiss-mcp/
 │       │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS /bin/zsh -lc)
 │       │   ├── ChatProcess.cs             # Process lifecycle manager
 │       │   ├── ClaudeBackend.cs           # Implementation: spawns claude CLI
-│       │   ├── ChatTranscript.cs          # In-memory message history
+│       │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
 │       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction
+│       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons
+│       │   ├── MCPChatWindow.Resize.cs    # Window resize logic
+│       │   ├── EnterKeySend.cs            # Enter-to-send + Alt+Enter newline logic (pure testable)
 │       │   ├── ChatSettingsSection.cs     # Settings foldout in MCPSettings
-│       │   ├── MCPChatWindow.uss          # UIToolkit styling
+│       │   ├── MCPChatWindow.uss          # UIToolkit styling (+156 lines for render subsystem)
+│       │   ├── Markdown/                  # Content rendering: registry seam + renderers
+│       │   │   ├── MdBlock.cs             # Block model (enum + metadata)
+│       │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)
+│       │   │   ├── MarkdownParser.Blocks.cs # Block parsing helpers
+│       │   │   ├── MarkdownInline.cs      # Inline spans → Unity rich-text (escape <> first)
+│       │   │   ├── IChatBlockRenderer.cs  # Extension interface (can-render + render)
+│       │   │   ├── ChatBlockRendererRegistry.cs # Ordered first-match-wins
+│       │   │   ├── ChatBlockRendererFactory.cs # Default wiring (Mermaid first, Markdown catch-all)
+│       │   │   ├── MarkdownBlockRenderer.cs # 8-kind dispatcher
+│       │   │   ├── MarkdownBlockRenderer.Table.cs # Table grid layout (partial)
+│       │   │   ├── MarkdownBlockRenderer.List.cs # Bullet/ordered list (partial)
+│       │   │   ├── ImageBlockRenderer.cs  # PNG/JPG → Texture2D + click-to-open, texture lifecycle
+│       │   │   ├── Mermaid/               # Native Mermaid flowchart (no lib, pure parse+layout)
+│       │   │   │   ├── MermaidGraph.cs    # POCO: nodes, edges, direction
+│       │   │   │   ├── MermaidParser.cs   # lines → graph or null
+│       │   │   │   ├── MermaidLayout.cs   # Kahn topo + longest-path layering
+│       │   │   │   ├── MermaidLayout.Layers.cs # Layer building + cycle guard
+│       │   │   │   ├── MermaidBlockRenderer.cs # CanRender Mermaid, fallback to code-box
+│       │   │   │   ├── MermaidView.cs     # Absolute nodes + edge overlay + geom-change callback
+│       │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
 │       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated
-│       │   └── Tests/                     # 4 NUnit suites (ChatStreamParserTests, ClaudeArgBuilderTests, UserTurnBuilderTests, ToolVerbMapTests)
+│       │   └── Tests/                     # 10 NUnit suites = 98 tests total (62 render subsystem + 36 backend)
+│       │       │   # Render subsystem (62): MdBlockTests(5), MarkdownParserTests(15), MarkdownInlineTests(10), MermaidParserTests(14), MermaidLayoutTests(11), EnterKeySendTests(7)
+│       │       │   # Backend infrastructure (36): ChatStreamParserTests(15), ClaudeArgBuilderTests(7), UserTurnBuilderTests(9), ToolVerbMapTests(5)
 │       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
 │       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs

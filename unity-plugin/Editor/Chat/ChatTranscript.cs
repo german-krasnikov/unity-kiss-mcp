@@ -1,4 +1,5 @@
 // Transcript rendering helpers — extracted to keep MCPChatWindow under 200 lines.
+using System.Text;
 using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
@@ -6,24 +7,38 @@ namespace UnityMCP.Editor.Chat
     /// <summary>Manages the scroll + transcript VisualElement tree.</summary>
     internal sealed class ChatTranscript
     {
-        private readonly VisualElement _container;
-        private Label _lastAssistantLabel;
-        private int _msgCount;
+        private readonly VisualElement           _container;
+        private readonly ChatBlockRendererRegistry _registry;
+        private readonly StringBuilder           _assistantRaw = new StringBuilder();
+        private Label         _lastAssistantLabel;
+        private VisualElement _lastAssistantRow;
+        private int           _msgCount;
         private const int MaxMessages = 200;
 
-        internal ChatTranscript(VisualElement container)
+        internal ChatTranscript(VisualElement container, ChatBlockRendererRegistry registry)
         {
             _container = container;
+            _registry  = registry;
         }
 
-        internal void AppendUserBubble(string text)
+        internal void AppendUserBubble(string text, string imagePath = null)
         {
-            _lastAssistantLabel = null;
-            var row = Row("msg-user");
-            var lbl = new Label(text);
-            lbl.AddToClassList("msg-bubble");
-            lbl.AddToClassList("msg-bubble--user");
-            row.Add(lbl);
+            FinalizeAssistant();
+            var row    = Row("msg-user");
+            var bubble = new VisualElement();
+            bubble.AddToClassList("msg-bubble");
+            bubble.AddToClassList("msg-bubble--user");
+            if (!string.IsNullOrEmpty(text))
+            {
+                var lbl = new Label(text); lbl.AddToClassList("msg-text");
+                bubble.Add(lbl);
+            }
+            if (!string.IsNullOrEmpty(imagePath))
+            {
+                var img = MdBlock.Image(imagePath, "");
+                bubble.Add(_registry.RenderBlock(in img));
+            }
+            row.Add(bubble);
             Append(row);
         }
 
@@ -31,7 +46,8 @@ namespace UnityMCP.Editor.Chat
         {
             if (_lastAssistantLabel == null)
             {
-                var row = Row(null);
+                _assistantRaw.Clear();                 // raw is cleared exactly when a new live label begins
+                var row = Row(null); _lastAssistantRow = row;
                 _lastAssistantLabel = new Label(token);
                 _lastAssistantLabel.AddToClassList("msg-bubble");
                 _lastAssistantLabel.AddToClassList("msg-bubble--assistant");
@@ -42,11 +58,12 @@ namespace UnityMCP.Editor.Chat
             {
                 _lastAssistantLabel.text += token;
             }
+            _assistantRaw.Append(token);               // BOTH branches
         }
 
         internal void AppendToolChip(string toolName, bool ok)
         {
-            _lastAssistantLabel = null;
+            FinalizeAssistant();
             var chip = new VisualElement(); chip.AddToClassList("tool-chip");
             if (!ok) chip.AddToClassList("tool-chip--error");
             var verb = ToolVerbMap.Humanize(toolName);
@@ -54,6 +71,20 @@ namespace UnityMCP.Editor.Chat
             lbl.AddToClassList("tool-chip-label");
             chip.Add(lbl);
             Append(chip);
+        }
+
+        internal void FinalizeAssistant()
+        {
+            if (_lastAssistantLabel == null) return;
+            var raw = _assistantRaw.ToString();
+            _lastAssistantRow.Clear();
+            var bubble = new VisualElement();
+            bubble.AddToClassList("msg-bubble");
+            bubble.AddToClassList("msg-bubble--assistant");
+            bubble.AddToClassList("md-bubble");
+            foreach (var b in MarkdownParser.Parse(raw)) { var blk = b; bubble.Add(_registry.RenderBlock(in blk)); }
+            _lastAssistantRow.Add(bubble);
+            _lastAssistantLabel = null; _lastAssistantRow = null;
         }
 
         private static VisualElement Row(string extraClass)

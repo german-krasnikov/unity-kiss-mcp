@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -13,8 +12,7 @@ namespace UnityMCP.Editor.Chat
         private bool           _agentMode, _waitingReply;
         private int            _dotCount, _inputTokens, _outputTokens;
         private float          _totalCostUsd;
-        private readonly List<ChatEvent> _evBuf  = new List<ChatEvent>(16);
-        private readonly List<string>    _pending = new List<string>();
+        private readonly System.Collections.Generic.List<ChatEvent> _evBuf = new System.Collections.Generic.List<ChatEvent>(16);
         private TextField     _input;
         private Label         _modePill, _costBadge, _typingDots;
         private VisualElement _objChipStrip;
@@ -41,13 +39,13 @@ namespace UnityMCP.Editor.Chat
             _scroll = new ScrollView(); _scroll.AddToClassList("chat-scroll");
             var inner = new VisualElement();
             _scroll.Add(inner);
-            _transcript = new ChatTranscript(inner);
+            _transcript = new ChatTranscript(inner, ChatBlockRendererFactory.CreateDefault());
             root.Add(_scroll);
             _typingDots = new Label("..."); _typingDots.AddToClassList("typing-dots");
             _typingDots.style.display = DisplayStyle.None;
             root.Add(_typingDots);
             var inputArea = BuildInputArea();
-            inputArea.style.height = 96;                  // compact default; resizable via the handle above it
+            inputArea.style.height = 96;
             root.Add(BuildResizeHandle(inputArea));
             root.Add(inputArea);
             root.schedule.Execute(DrainAndRender).Every(33);
@@ -69,31 +67,23 @@ namespace UnityMCP.Editor.Chat
         private VisualElement BuildInputArea()
         {
             var area = new VisualElement(); area.AddToClassList("input-area");
-
-            // Drag-dropped object chips sit just above the editor (only visible when populated).
             _objChipStrip = new VisualElement(); _objChipStrip.AddToClassList("obj-chip-strip");
             area.Add(_objChipStrip);
-
-            // The text editor fills all the vertical room the resizable panel gives it.
             _input = new TextField { multiline = true }; _input.AddToClassList("chat-input");
             area.Add(_input);
+            EnterKeySend.Attach(_input, OnSend);
 
-            // Bottom action bar (toolbar-style): mode toggle on the left, SS + Send on the right.
             var actionBar = new VisualElement(); actionBar.AddToClassList("input-actionbar");
-
             var modeGroup = new VisualElement(); modeGroup.AddToClassList("mode-toggle-row");
             modeGroup.Add(MakeModeBtn("Ask", false)); modeGroup.Add(MakeModeBtn("Agent", true));
             actionBar.Add(modeGroup);
-
             var spacer = new VisualElement(); spacer.AddToClassList("actionbar-spacer");
             actionBar.Add(spacer);
-
             var ssBtn = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
             ssBtn.AddToClassList("chat-btn"); ssBtn.AddToClassList("chat-btn--screenshot");
             var sendBtn = new Button(OnSend) { text = "Send" };
             sendBtn.AddToClassList("chat-btn"); sendBtn.AddToClassList("chat-btn--send");
             actionBar.Add(ssBtn); actionBar.Add(sendBtn);
-
             area.Add(actionBar);
             return area;
         }
@@ -125,12 +115,30 @@ namespace UnityMCP.Editor.Chat
 
         private void OnSend()
         {
-            var text = _input.value?.Trim() ?? "";
-            if (_pending.Count > 0) { text += "\n" + string.Join("\n", _pending); _pending.Clear(); _objChipStrip.Clear(); }
+            var text  = _input.value?.Trim() ?? "";
+            var chips = CollectChipPaths();
+            if (chips.Count > 0) text += "\n" + string.Join("\n", chips);
             if (string.IsNullOrEmpty(text)) return;
             _transcript.AppendUserBubble(text);
             _backend.SendTurn(UserTurnBuilder.Build(text));
-            _input.value = ""; _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
+            _input.value = ""; _objChipStrip.Clear();
+            _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
+        }
+
+        private void AttachScreenshot()
+        {
+            var target = Selection.activeGameObject;
+            if (target == null) { Debug.LogWarning("[MCP Chat] Select a GameObject first"); return; }
+            var path = MultiViewCapture.CaptureToFile(target);
+            if (string.IsNullOrEmpty(path)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
+            var bytes = File.ReadAllBytes(path);
+            var text  = _input.value?.Trim() ?? "";
+            var chips = CollectChipPaths();
+            if (chips.Count > 0) text += "\n" + string.Join("\n", chips);
+            _transcript.AppendUserBubble(text, path);
+            _backend.SendTurn(UserTurnBuilder.Build(text, bytes));
+            _input.value = ""; _objChipStrip.Clear();
+            _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
         }
 
         private void DrainAndRender()
@@ -151,6 +159,7 @@ namespace UnityMCP.Editor.Chat
                 case ChatEventKind.ToolStart when ev.Text != null:
                     _transcript.AppendToolChip(ev.Text, ok: true); break;
                 case ChatEventKind.TurnDone:
+                    _transcript.FinalizeAssistant();
                     if (ev.CostUsd > 0f)
                     {
                         _totalCostUsd += ev.CostUsd; _inputTokens += ev.InputTokens; _outputTokens += ev.OutputTokens;
@@ -168,43 +177,6 @@ namespace UnityMCP.Editor.Chat
             if (!_waitingReply) return;
             _dotCount = (_dotCount + 1) % 4;
             _typingDots.text = new string('.', _dotCount + 1);
-        }
-
-        private static void OnDragUpdated(DragUpdatedEvent e)
-        {
-            if (DragAndDrop.objectReferences.Length > 0) DragAndDrop.visualMode = DragAndDropVisualMode.Link;
-        }
-
-        private void OnDragPerform(DragPerformEvent e)
-        {
-            DragAndDrop.AcceptDrag();
-            foreach (var obj in DragAndDrop.objectReferences)
-                if (obj is GameObject go) AddObjChip(go);
-        }
-
-        private void AddObjChip(GameObject go)
-        {
-            _pending.Add(ComponentSerializer.GetPath(go));
-            var chip = new VisualElement(); chip.AddToClassList("obj-chip");
-            var lbl  = new Label(go.name);  lbl.AddToClassList("obj-chip-label");
-            chip.Add(lbl);
-            var cap = go;
-            chip.RegisterCallback<ClickEvent>(_ => { EditorGUIUtility.PingObject(cap); Selection.activeObject = cap; });
-            _objChipStrip.Add(chip);
-        }
-
-        private void AttachScreenshot()
-        {
-            var target = Selection.activeGameObject;
-            if (target == null) { Debug.LogWarning("[MCP Chat] Select a GameObject first"); return; }
-            var path = MultiViewCapture.CaptureToFile(target);
-            if (string.IsNullOrEmpty(path)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
-            var bytes = File.ReadAllBytes(path);
-            var text  = _input.value?.Trim() ?? "";
-            if (_pending.Count > 0) { text += "\n" + string.Join("\n", _pending); _pending.Clear(); _objChipStrip.Clear(); }
-            _transcript.AppendUserBubble($"[screenshot] {text}");
-            _backend.SendTurn(UserTurnBuilder.Build(text, bytes));
-            _input.value = ""; _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
         }
     }
 }
