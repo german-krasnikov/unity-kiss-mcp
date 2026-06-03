@@ -85,13 +85,40 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── system/init ───────────────────────────────────────────────────────
 
         [Test]
-        public void ParseLine_SystemInit_ReturnsTurnDoneWithSessionId()
+        public void ParseLine_SystemInit_ReturnsSessionInitNotTurnDone()
         {
-            const string line = "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"sess-xyz\",\"model\":\"claude-opus-4\"}";
+            // system/init must NOT produce TurnDone — that would stop the activity animation
+            // before any real work has happened. It maps to SessionInit instead.
+            const string line = "{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"abc-123\",\"model\":\"claude\",\"tools\":[],\"cwd\":\"/x\"}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ChatEventKind.SessionInit, result.Value.Kind);
+            Assert.AreEqual("abc-123", result.Value.SessionId);
+            Assert.IsTrue(result.Value.IsOk);
+        }
+
+        [Test]
+        public void ParseLine_ResultSuccess_StillReturnsTurnDone_WithCostAndTokens()
+        {
+            // The genuine terminal event — must remain TurnDone.
+            const string line = "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"session_id\":\"abc-123\",\"total_cost_usd\":0.012,\"usage\":{\"input_tokens\":100,\"output_tokens\":50}}";
             var result = ChatStreamParser.ParseLine(line);
             Assert.IsNotNull(result);
             Assert.AreEqual(ChatEventKind.TurnDone, result.Value.Kind);
-            Assert.AreEqual("sess-xyz", result.Value.SessionId);
+            Assert.AreEqual("abc-123", result.Value.SessionId);
+            Assert.AreEqual(100, result.Value.InputTokens);
+            Assert.AreEqual(50,  result.Value.OutputTokens);
+            Assert.IsTrue(result.Value.CostUsd > 0f);
+            Assert.IsTrue(result.Value.IsOk);
+        }
+
+        [Test]
+        public void ChatEvent_SessionInit_Factory_SetsKindAndSessionId()
+        {
+            var ev = ChatEvent.SessionInit("abc-123");
+            Assert.AreEqual(ChatEventKind.SessionInit, ev.Kind);
+            Assert.AreEqual("abc-123", ev.SessionId);
+            Assert.IsTrue(ev.IsOk);
         }
 
         // ── system/api_retry ──────────────────────────────────────────────────

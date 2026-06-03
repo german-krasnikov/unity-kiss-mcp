@@ -13,7 +13,20 @@ namespace UnityMCP.Editor.Chat
         {
             _evBuf.Clear(); _toolBuf.Clear();
             _backend?.DrainEvents(_evBuf, _toolBuf);
-            if (_evBuf.Count == 0 && _toolBuf.Count == 0) return;
+
+            if (_evBuf.Count == 0 && _toolBuf.Count == 0)
+            {
+                // Dead-process guard: buffer is empty, so no result line is coming.
+                // Only fires if the process truly died (crash/kill) without emitting a result.
+                // Phase-first: cheap field read before the nullable backend deref.
+                if (_activity.Phase != ActivityPhase.Idle && _backend != null && !_backend.IsRunning)
+                {
+                    if (_activity.Fail()) OnActivityChanged();
+                    _waitingReply = false;
+                    _typingDots.style.display = DisplayStyle.None;
+                }
+                return;
+            }
             // Refresh the ref cache at most ~1/sec while streaming so objects Claude just
             // created become clickable without reopening the window. Idle frames early-return
             // above, so this never spins when nothing is streaming.
@@ -45,6 +58,8 @@ namespace UnityMCP.Editor.Chat
                         _costBadge.text = $"${_totalCostUsd:F4}  {_inputTokens}↑{_outputTokens}↓";
                     }
                     _waitingReply = false; _typingDots.style.display = DisplayStyle.None; break;
+                case ChatEventKind.SessionInit:
+                    break; // non-terminal: session established, keep animation running
                 case ChatEventKind.Error:
                     if (_activity.Fail()) OnActivityChanged();
                     _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);

@@ -12,6 +12,8 @@ namespace UnityMCP.Editor.Chat
         ToolArgsComplete,
         /// <summary>Turn fully complete — carries cost + usage.</summary>
         TurnDone,
+        /// <summary>Session established (system/init). Non-terminal: activity animation must keep running.</summary>
+        SessionInit,
         /// <summary>Error from parser, process, or API.</summary>
         Error,
     }
@@ -62,6 +64,9 @@ namespace UnityMCP.Editor.Chat
         public static ChatEvent TurnDone(string sessionId, float costUsd, int inputTokens, int outputTokens) =>
             new ChatEvent(ChatEventKind.TurnDone, sessionId: sessionId, isOk: true,
                 costUsd: costUsd, inputTokens: inputTokens, outputTokens: outputTokens);
+
+        public static ChatEvent SessionInit(string sessionId) =>
+            new ChatEvent(ChatEventKind.SessionInit, sessionId: sessionId, isOk: true);
 
         public static ChatEvent Error(string message) =>
             new ChatEvent(ChatEventKind.Error, text: message, isOk: false);

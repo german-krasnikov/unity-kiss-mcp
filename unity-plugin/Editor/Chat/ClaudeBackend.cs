@@ -58,7 +58,8 @@ namespace UnityMCP.Editor.Chat
 
                 foreach (var ev in _parseBuf)
                 {
-                    if (ev.Kind == ChatEventKind.TurnDone && !string.IsNullOrEmpty(ev.SessionId))
+                    if ((ev.Kind == ChatEventKind.TurnDone || ev.Kind == ChatEventKind.SessionInit)
+                        && !string.IsNullOrEmpty(ev.SessionId))
                         SessionId = ev.SessionId;
 
                     var rec = _accumulator.Feed(ev);
@@ -70,6 +71,7 @@ namespace UnityMCP.Editor.Chat
                     {
                         case ChatEventKind.TextDelta:
                         case ChatEventKind.TurnDone:
+                        case ChatEventKind.SessionInit:
                         case ChatEventKind.Error:
                             output.Add(ev);
                             break;

@@ -83,7 +83,7 @@ namespace UnityMCP.Editor.Chat
             {
                 case "init":
                     var sid = JsonHelper.ExtractString(line, "session_id");
-                    return ChatEvent.TurnDone(sid, 0f, 0, 0);
+                    return ChatEvent.SessionInit(sid);
                 case "api_retry":
                     var err = JsonHelper.ExtractString(line, "error") ?? "API retry";
                     return ChatEvent.Error(err);
