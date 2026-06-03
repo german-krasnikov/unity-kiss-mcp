@@ -141,7 +141,8 @@ namespace UnityMCP.Editor.Chat
             if (string.IsNullOrEmpty(text)) return;
             _transcript.AppendUserBubble(text);
             _backend.SendTurn(UserTurnBuilder.Build(text));
-            _input.value = ""; _objChipStrip.Clear();
+            _input.value = ""; _input.cursorIndex = _input.selectIndex = 0;
+            _objChipStrip.Clear();
             _heightCalc.Reset();
             ResetInputAreaHeight();
             if (_activity.Send()) OnActivityChanged();
@@ -159,7 +160,8 @@ namespace UnityMCP.Editor.Chat
             if (chips.Count > 0) text += "\n" + string.Join("\n", chips);
             _transcript.AppendUserBubble(text, path);
             _backend.SendTurn(UserTurnBuilder.Build(text, bytes));
-            _input.value = ""; _objChipStrip.Clear();
+            _input.value = ""; _input.cursorIndex = _input.selectIndex = 0;
+            _objChipStrip.Clear();
             _heightCalc.Reset();
             ResetInputAreaHeight();
             if (_activity.Send()) OnActivityChanged();
@@ -167,8 +169,10 @@ namespace UnityMCP.Editor.Chat
 
         private void ResetInputAreaHeight()
         {
-            _inputArea.style.height    = StyleKeyword.Null;
-            _inputArea.style.minHeight = InputHeightCalc.CompactH;
+            // Definite height (not minHeight) is required so flex-grow on .chat-input
+            // has a parent size to grow into — minHeight is a floor and leaves a dead gap.
+            _inputArea.style.height    = InputHeightCalc.CompactH;
+            _inputArea.style.minHeight = StyleKeyword.Null;
             _inputArea.style.maxHeight = _heightCalc.ComputeMax(position.height);
         }
 

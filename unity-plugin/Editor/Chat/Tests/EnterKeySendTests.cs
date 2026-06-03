@@ -56,5 +56,67 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("\n", text);
             Assert.AreEqual(1, caret);
         }
+
+        // ── DecideEnter dedup (Bug 2) ─────────────────────────────────────────
+
+        [Test]
+        public void DecideEnter_NotHandled_NoAlt_ReturnsSendAndSuppress()
+        {
+            var (action, suppress) = EnterKeyLogic.DecideEnter(altHeld: false, alreadyHandled: false);
+            Assert.AreEqual(EnterAction.Send, action);
+            Assert.IsTrue(suppress);
+        }
+
+        [Test]
+        public void DecideEnter_NotHandled_Alt_ReturnsNewlineAndSuppress()
+        {
+            var (action, suppress) = EnterKeyLogic.DecideEnter(altHeld: true, alreadyHandled: false);
+            Assert.AreEqual(EnterAction.Newline, action);
+            Assert.IsTrue(suppress);
+        }
+
+        [Test]
+        public void DecideEnter_AlreadyHandled_NoAlt_ReturnsIgnoreAndSuppress()
+        {
+            // Second keyDown (char echo '\n') must be suppressed, not re-acted on.
+            var (action, suppress) = EnterKeyLogic.DecideEnter(altHeld: false, alreadyHandled: true);
+            Assert.AreEqual(EnterAction.Ignore, action);
+            Assert.IsTrue(suppress);
+        }
+
+        [Test]
+        public void DecideEnter_AlreadyHandled_Alt_ReturnsIgnoreAndSuppress()
+        {
+            // Alt+Enter echo also suppressed — no double newline.
+            var (action, suppress) = EnterKeyLogic.DecideEnter(altHeld: true, alreadyHandled: true);
+            Assert.AreEqual(EnterAction.Ignore, action);
+            Assert.IsTrue(suppress);
+        }
+
+        // ── IsEnterChar (Bug 2) ───────────────────────────────────────────────
+
+        [Test]
+        public void IsEnterChar_Newline_ReturnsTrue()
+        {
+            Assert.IsTrue(EnterKeyLogic.IsEnterChar('\n'));
+        }
+
+        [Test]
+        public void IsEnterChar_CarriageReturn_ReturnsTrue()
+        {
+            Assert.IsTrue(EnterKeyLogic.IsEnterChar('\r'));
+        }
+
+        [Test]
+        public void IsEnterChar_RegularChar_ReturnsFalse()
+        {
+            Assert.IsFalse(EnterKeyLogic.IsEnterChar('a'));
+        }
+
+        [Test]
+        public void IsEnterChar_NullChar_ReturnsFalse()
+        {
+            Assert.IsFalse(EnterKeyLogic.IsEnterChar('\0'));
+        }
     }
 }

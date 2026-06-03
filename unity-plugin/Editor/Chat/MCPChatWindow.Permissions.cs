@@ -1,8 +1,10 @@
 // Permissions popup UI for MCPChatWindow — pure UI, all logic in PermissionConfig.
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityMCP.Editor;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -26,6 +28,7 @@ namespace UnityMCP.Editor.Chat
     {
         private PermissionConfig _config;
         private VisualElement    _root;
+        private readonly List<PermCategoryGroup> _groups = new List<PermCategoryGroup>();
 
         public static void Show(PermissionConfig config)
         {
@@ -44,6 +47,9 @@ namespace UnityMCP.Editor.Chat
         private void CreateGUI()
         {
             _root = rootVisualElement;
+            // Load the same stylesheet as MCP Settings so classes match exactly.
+            var ss = MCPEditorUtils.LoadStyleSheet("MCPSettings.uss");
+            if (ss != null) _root.styleSheets.Add(ss);
             _root.style.paddingTop    = 6;
             _root.style.paddingBottom = 6;
             _root.style.paddingLeft   = 8;
@@ -54,56 +60,49 @@ namespace UnityMCP.Editor.Chat
         private void Rebuild()
         {
             _root.Clear();
+            _groups.Clear();
 
-            // Header row: [Allow All] [Deny All]
+            // Header row: [Allow All] [Deny All] — styled with preset-row / preset-btn
             var header = new VisualElement();
-            header.style.flexDirection  = FlexDirection.Row;
-            header.style.marginBottom   = 8;
-            MakeHeaderBtn(header, "Allow All", () => { _config.AllowAll(); Rebuild(); });
-            MakeHeaderBtn(header, "Deny All",  () => { _config.DenyAll();  Rebuild(); });
+            header.AddToClassList("preset-row");
+            MakePresetBtn(header, "Allow All", () => { _config.AllowAll(); Rebuild(); });
+            MakePresetBtn(header, "Deny All",  () => { _config.DenyAll();  Rebuild(); });
             _root.Add(header);
 
+            // Search field — same class as Settings window
+            var search = new TextField { tooltip = "Filter tools by name" };
+            search.AddToClassList("search-field");
+            _root.Add(search);
+
+            // Scroll area — same class as Settings window
             var scroll = new ScrollView(ScrollViewMode.Vertical);
-            scroll.style.flexGrow = 1;
+            scroll.AddToClassList("tool-scroll");
 
-            var states = _config.GetToolStates();
-            var byCategory = states.GroupBy(s => s.category);
+            var byCategory = _config.GetToolStates()
+                .GroupBy(s => s.category)
+                .ToDictionary(g => g.Key, g => g.Select(s => s.toolName).ToArray());
 
-            foreach (var group in byCategory)
+            foreach (var kv in byCategory)
             {
-                var cat     = group.Key;
-                var tools   = group.ToList();
-                var enabled = tools.Count(t => t.allowed);
-
-                var foldout = new Foldout { text = $"{cat}  ({enabled}/{tools.Count})" };
-                foldout.value = true;
-
-                foreach (var (toolName, _, allowed) in tools)
-                {
-                    var name = toolName; // capture for lambda
-                    var row  = new Toggle(name) { value = allowed };
-                    row.style.marginLeft = 12;
-                    row.RegisterValueChangedCallback(e =>
-                    {
-                        _config.SetToolAllowed(name, e.newValue);
-                        // Update foldout header count live
-                        var newEnabled = _config.GetToolStates()
-                            .Count(s => s.category == cat && s.allowed);
-                        foldout.text = $"{cat}  ({newEnabled}/{tools.Count})";
-                    });
-                    foldout.Add(row);
-                }
-
-                scroll.Add(foldout);
+                var group = new PermCategoryGroup(kv.Key, kv.Value, _config);
+                scroll.Add(group.Element);
+                _groups.Add(group);
             }
 
             _root.Add(scroll);
+
+            // Wire search
+            search.RegisterValueChangedCallback(evt =>
+            {
+                var q = evt.newValue.Trim();
+                foreach (var g in _groups) g.Filter(q);
+            });
         }
 
-        private static void MakeHeaderBtn(VisualElement parent, string label, System.Action onClick)
+        private static void MakePresetBtn(VisualElement parent, string label, System.Action onClick)
         {
             var btn = new Button(onClick) { text = label };
-            btn.style.marginRight = 4;
+            btn.AddToClassList("preset-btn");
             parent.Add(btn);
         }
     }
