@@ -27,6 +27,9 @@ namespace UnityMCP.Editor
             // Auto-discard toggle
             root.Add(BuildAutoDiscard());
 
+            // Agent Chat enable (core toggle — visible even when the Chat module is OFF)
+            root.Add(BuildChatEnable());
+
             // Info label
             var info = new Label("Changes apply on next MCP reconnect.");
             info.AddToClassList("info-label");
@@ -65,6 +68,9 @@ namespace UnityMCP.Editor
                 var q = evt.newValue.ToLowerInvariant().Trim();
                 foreach (var g in allGroups) g.Filter(q);
             });
+
+            // Let optional modules (Chat, etc.) inject their own settings section
+            ChatSettingsHook.Invoke(root);
         }
 
         // ── Header ───────────────────────────────────────────────────────────
@@ -136,6 +142,18 @@ namespace UnityMCP.Editor
                 { value = MCPSettings.AutoDiscardScene };
             toggle.RegisterValueChangedCallback(e =>
                 EditorPrefs.SetBool(MCPSettings.KeyAutoDiscard, e.newValue));
+            row.Add(toggle);
+            return row;
+        }
+
+        // ── Agent Chat enable ─────────────────────────────────────────────────
+        private static VisualElement BuildChatEnable()
+        {
+            var row = new VisualElement();
+            row.AddToClassList("option-row");
+            var toggle = new Toggle("Enable Agent Chat (Beta)") { value = ChatSettingsHook.IsChatEnabled() };
+            toggle.tooltip = "Adds the UNITY_MCP_CHAT define and compiles the in-Editor chat window. Unity recompiles on change.";
+            toggle.RegisterValueChangedCallback(e => ChatSettingsHook.SetChatEnabled(e.newValue));
             row.Add(toggle);
             return row;
         }

@@ -147,6 +147,24 @@ unity-kiss-mcp/
 │       ├── FingerprintHelper.cs + ScanHelper.cs + SceneDiffHelper.cs
 │       ├── ChangeWatcher.cs + ColliderChecker.cs + SchemaHelper.cs
 │       ├── MCPSettings.cs + MCPStatusWindow.cs
+│       ├── Chat/                          # Optional in-Unity Agent Chat (isolated, UNITY_MCP_CHAT define)
+│       │   ├── ChatEvent.cs               # Normalized event struct
+│       │   ├── ChatStreamParser.cs        # Parse stream-json from claude CLI stdout
+│       │   ├── ClaudeArgBuilder.cs        # Build --mcp-config file + CLI args
+│       │   ├── UserTurnBuilder.cs         # Encode user messages → stdin JSON
+│       │   ├── ToolVerbMap.cs             # Tool name → humanized action text
+│       │   ├── IChatBackend.cs            # Backend interface (future plugin seams)
+│       │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS /bin/zsh -lc)
+│       │   ├── ChatProcess.cs             # Process lifecycle manager
+│       │   ├── ClaudeBackend.cs           # Implementation: spawns claude CLI
+│       │   ├── ChatTranscript.cs          # In-memory message history
+│       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction
+│       │   ├── ChatSettingsSection.cs     # Settings foldout in MCPSettings
+│       │   ├── MCPChatWindow.uss          # UIToolkit styling
+│       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated
+│       │   └── Tests/                     # 4 NUnit suites (ChatStreamParserTests, ClaudeArgBuilderTests, UserTurnBuilderTests, ToolVerbMapTests)
+│       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
+│       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs
 │       ├── JsonHelper.cs + StringDistance.cs + UndoGroupHelper.cs
 │       ├── FileOutputHelper.cs + VersionTracker.cs

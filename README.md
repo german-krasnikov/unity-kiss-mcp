@@ -9,6 +9,7 @@ MCP server for controlling Unity Editor from Claude Code (or any MCP client).
 - **Run tests** — trigger Unity Test Runner and get results
 - **Take screenshots** — capture scene views, multi-view, or camera perspectives
 - **AI-powered intents** — high-level commands like `ui_intent`, `animator_intent`, `vfx_intent` that build complex setups from natural language
+- **Optional: In-Unity Agent Chat** — EditorWindow for agentic chat directly in Unity (OFF by default, enable via `UNITY_MCP_CHAT` scripting define)
 
 ## Requirements
 
@@ -84,6 +85,10 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 **"Connection refused" in MCP server** — Unity must be running with the plugin installed. The server will retry automatically on reconnect.
 
 **Changes not reflected** — After C# code edits, Unity needs focus to recompile. Run `osascript -e 'tell application "Unity" to activate'` to trigger it.
+
+## Billing Note (Optional Agent Chat)
+
+If you enable the optional in-Unity Agent Chat window (via `UNITY_MCP_CHAT` scripting define), it spawns your locally-installed `claude` CLI using your own logged-in Claude subscription. Usage, credits, and Anthropic Terms of Service are between you and Anthropic. This feature does not proxy, cache, or share your login credentials — each user drives their own CLI instance independently.
 
 ## License
 
