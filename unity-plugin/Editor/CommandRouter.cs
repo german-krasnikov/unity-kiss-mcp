@@ -117,6 +117,7 @@ namespace UnityMCP.Editor
                     var argsJson = JsonHelper.ExtractObject(json, "args");
                     UndoGroupHelper.SetCommandFallback(cmd);
                     var mode = JsonHelper.ExtractString(argsJson, "mode");
+                    var group = JsonHelper.ExtractString(argsJson, "group");
                     TestRunner.Execute(mode, result =>
                     {
                         UndoGroupHelper.EndGroup();
@@ -124,7 +125,7 @@ namespace UnityMCP.Editor
                             tcs.TrySetResult(JsonHelper.FormatResponse(id, false, null, result.Substring(7)));
                         else
                             tcs.TrySetResult(BuildResponse(id, result));
-                    });
+                    }, group);
                     return;
                 }
 
