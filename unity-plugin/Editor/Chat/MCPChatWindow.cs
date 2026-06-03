@@ -125,9 +125,10 @@ namespace UnityMCP.Editor.Chat
 
         private void CreateBackend()
         {
-            var cfg = Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                ".claude", "mcp.json");
+            var cfg = ChatMcpConfigWriter.GetOrCreateConfigPath()
+                ?? Path.Combine(
+                    System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+                    ".claude", "mcp.json");
             _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan", _selectedAgent, _permConfig);
         }
 
