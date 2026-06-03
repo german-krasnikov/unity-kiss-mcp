@@ -132,10 +132,7 @@ namespace UnityMCP.Editor.Chat
         {
             var result = new string[args.Length];
             for (var i = 0; i < args.Length; i++)
-            {
-                var a = args[i];
-                result[i] = a.Contains(" ") ? $"\"{a}\"" : a;
-            }
+                result[i] = ArgQuoting.Quote(args[i]);
             return result;
         }
     }

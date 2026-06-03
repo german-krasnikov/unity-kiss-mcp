@@ -12,11 +12,13 @@ namespace UnityMCP.Editor.Chat
         /// <param name="mcpConfigPath">Path to mcp.json passed via --mcp-config.</param>
         /// <param name="permissionMode">"plan" (Ask/read-only) or "acceptEdits" (Agent).</param>
         /// <param name="resumeSessionId">Non-null → append --resume &lt;id&gt;.</param>
+        /// <param name="agentName">Non-null → append --agent &lt;name&gt;. Shared seam: F4 will later parametrize --allowedTools/--disallowedTools here.</param>
         public static (string[] args, string[] stripEnvKeys) Build(
             string binaryPath,
             string mcpConfigPath,
             string permissionMode,
-            string resumeSessionId)
+            string resumeSessionId,
+            string agentName = null)
         {
             var args = new List<string>
             {
@@ -41,6 +43,12 @@ namespace UnityMCP.Editor.Chat
             {
                 args.Add("--resume");
                 args.Add(resumeSessionId);
+            }
+
+            if (!string.IsNullOrEmpty(agentName))
+            {
+                args.Add("--agent");
+                args.Add(agentName);
             }
 
             return (args.ToArray(), new[] { "ANTHROPIC_API_KEY" });

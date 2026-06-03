@@ -74,7 +74,7 @@ namespace UnityMCP.Editor.Chat
             var title = new Label("MCP Chat"); title.AddToClassList("chat-title");
             _modePill  = new Label("ASK"); _modePill.AddToClassList("mode-pill"); _modePill.AddToClassList("mode-pill--ask");
             _costBadge = new Label("");    _costBadge.AddToClassList("cost-badge");
-            bar.Add(title); bar.Add(_modePill); bar.Add(_costBadge);
+            bar.Add(title); bar.Add(_modePill); bar.Add(_costBadge); bar.Add(BuildAgentSelector());
             return bar;
         }
 
@@ -125,7 +125,7 @@ namespace UnityMCP.Editor.Chat
             var cfg = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
                 ".claude", "mcp.json");
-            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan");
+            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan", _selectedAgent);
         }
 
         private void OnSend()

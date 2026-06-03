@@ -113,5 +113,48 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.Greater(idx, -1, "--disallowedTools flag must be present");
             Assert.AreEqual("AskUserQuestion", args[idx + 1]);
         }
+
+        // ── F1: agent flag ─────────────────────────────────────────────────────
+
+        [Test]
+        public void Build_WithAgent_ContainsAgentFlag()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "acceptEdits", null, "code-reviewer");
+
+            var idx = System.Array.IndexOf(args, "--agent");
+            Assert.Greater(idx, -1, "--agent flag must be present");
+            Assert.AreEqual("code-reviewer", args[idx + 1]);
+        }
+
+        [Test]
+        public void Build_WithAgent_AgentImmediatelyAfterFlag()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "acceptEdits", null, "doc-keeper");
+
+            var idx = System.Array.IndexOf(args, "--agent");
+            Assert.AreEqual("doc-keeper", args[idx + 1]);
+        }
+
+        [Test]
+        public void Build_NullAgent_NoAgentFlag()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "plan", null, null);
+
+            Assert.IsFalse(System.Array.IndexOf(args, "--agent") >= 0,
+                "--agent must not appear when agentName is null");
+        }
+
+        [Test]
+        public void Build_EmptyAgent_NoAgentFlag()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "plan", null, "");
+
+            Assert.IsFalse(System.Array.IndexOf(args, "--agent") >= 0,
+                "--agent must not appear when agentName is empty");
+        }
     }
 }
