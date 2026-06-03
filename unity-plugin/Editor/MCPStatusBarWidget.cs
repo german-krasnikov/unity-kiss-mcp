@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
@@ -8,22 +7,23 @@ using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor
 {
-    // Injects a MCP status pill into Unity's AppStatusBar via reflection. Fully defensive.
     [InitializeOnLoad]
     internal static class MCPStatusBarWidget
     {
-        private static Label _pill;
+        private static Label   _pill;
         private static VisualElement _pillContainer;
-        private static bool _injected;
-        private static bool _pulseHigh;
+        private static VisualElement _halo;
+        private static VisualElement _dot;
+        private static bool    _injected;
+        private static bool    _pulseHigh;
         private static IVisualElementScheduledItem _pulseItem;
-        private static double _lastHealCheck;
-        private static bool _loggedLayout;
+        private static double  _lastHealCheck;
+        private static MCPStatusModel.State _lastTickState = (MCPStatusModel.State)(-1);
 
         static MCPStatusBarWidget()
         {
             AssemblyReloadEvents.beforeAssemblyReload += Cleanup;
-            EditorApplication.delayCall += TryInject; // AppStatusBar may not exist yet
+            EditorApplication.delayCall += TryInject;
             EditorApplication.update    += SelfHeal;
         }
 
@@ -31,131 +31,135 @@ namespace UnityMCP.Editor
         {
             AssemblyReloadEvents.beforeAssemblyReload -= Cleanup;
             EditorApplication.update -= SelfHeal;
-            try { _pulseItem?.Pause(); } catch { /* ignore — item may be disposed */ }
-            try { _pillContainer?.RemoveFromHierarchy(); } catch { /* ignore — tree may be torn down */ }
-            _pill          = null;
-            _pillContainer = null;
-            _pulseItem     = null;
-            _injected      = false;
+            try { _pulseItem?.Pause(); } catch { }
+            try { _pillContainer?.RemoveFromHierarchy(); } catch { }
+            _pill = null; _pillContainer = null; _halo = null; _dot = null;
+            _pulseItem = null; _injected = false; _lastHealCheck = 0;
+            _lastTickState = (MCPStatusModel.State)(-1);
         }
 
-        // Self-heal: tree rebuilds on dock/maximize/play-mode detach the pill.
-        // The container's schedule stops when detached, so we use a global ticker (~1/sec).
         private static void SelfHeal()
         {
             var now = EditorApplication.timeSinceStartup;
             if (now - _lastHealCheck < 1.0) return;
             _lastHealCheck = now;
-            if (_pillContainer == null || _pillContainer.panel == null)
-                TryInject();
+            if (_pillContainer == null || _pillContainer.panel == null) TryInject();
         }
 
         private static void TryInject()
         {
-            // Allow re-inject if container has been detached from the panel
             if (_injected && _pillContainer?.panel != null) return;
             _injected = false;
-            try { _pulseItem?.Pause(); } catch { /* detached — already dead */ }
+            try { _pulseItem?.Pause(); } catch { }
             _pulseItem = null;
             try
             {
                 var root = GetStatusBarRoot();
                 if (root == null) { EditorApplication.delayCall += TryInject; return; }
-
                 root.Q("mcp-status-pill")?.RemoveFromHierarchy();
                 _pillContainer = BuildPill();
-                root.Insert(0, _pillContainer); // leftmost — pushes Unity widgets right, no overlap
+                root.Add(_pillContainer);
                 _injected = true;
-                if (!_loggedLayout) { _loggedLayout = true; Debug.Log($"[MCP] StatusBar children ({root.childCount}): {string.Join(", ", root.Children().Select(c => c.name ?? c.GetType().Name))}"); }
-                PulseTick(); // initial label + colour; the schedule drives the rest
+                PulseTick();
                 _pulseItem = _pillContainer.schedule.Execute(PulseTick).Every(900);
             }
             catch (Exception e) { Debug.LogWarning($"[MCP] StatusBar injection failed: {e.Message}"); }
         }
 
-        // Pulse semantics: Up=steady 1.0 / Listen=calm breathe 0.85↔0.6 / Down=steady dim 0.5
         private static void PulseTick()
         {
             if (_pill == null) return;
             var state = MCPStatusModel.GetState(MCPServer.IsRunning, MCPServer.IsClientConnected);
             RefreshLabel(state);
-            if (state == MCPStatusModel.State.Up)
+
+            if (state != _lastTickState)
             {
-                _pill.style.opacity = 1.0f;
-                return;
+                _dot.style.scale = new Scale(Vector2.one);
+                _pulseHigh = false;
+                _pillContainer.style.opacity = state == MCPStatusModel.State.Down ? 0.85f : 1.0f;
+                var pal = MCPStatusBarPalette.Get(state, EditorGUIUtility.isProSkin);
+                _halo.style.scale = new Scale(Vector2.one);
+                _halo.style.opacity = state == MCPStatusModel.State.Down ? 0f : 0.18f;
+                _halo.style.backgroundColor = new Color(pal.HaloRgb.r, pal.HaloRgb.g, pal.HaloRgb.b, 1f);
+                _lastTickState = state;
             }
+
             if (state == MCPStatusModel.State.Down)
             {
-                _pill.style.opacity = 0.5f;
-                return;
+                _halo.style.opacity = 0f; _halo.style.scale = new Scale(Vector2.one);
+                _dot.style.scale = new Scale(Vector2.one); return;
             }
-            // Listen: gentle breathe between 0.85 and 0.60
+
             _pulseHigh = !_pulseHigh;
-            _pill.style.opacity = _pulseHigh ? 0.85f : 0.60f;
+            if (state == MCPStatusModel.State.Up)
+            {
+                _halo.style.scale   = _pulseHigh ? new Scale(new Vector2(2.4f, 2.4f)) : new Scale(Vector2.one);
+                _halo.style.opacity = _pulseHigh ? 0f : 0.45f;
+                _dot.style.scale    = _pulseHigh ? new Scale(Vector2.one * 1.15f) : new Scale(Vector2.one);
+            }
+            else // Listen
+            {
+                _halo.style.scale   = _pulseHigh ? new Scale(Vector2.one * 1.6f) : new Scale(Vector2.one);
+                _halo.style.opacity = _pulseHigh ? 0.50f : 0.18f;
+            }
         }
 
         private static void RefreshLabel(MCPStatusModel.State state)
         {
             var text = MCPStatusModel.GetPill(state, MCPServer.ServerPort);
-            if (_pill.text == text) return; // nothing changed — skip repaint
+            if (_pill.text == text && state == _lastTickState) return;
             _pill.text = text;
-            ApplyPillColor(_pill, state);
+            ApplyColors(state);
         }
-
-        // ── Build the pill VisualElement ──────────────────────────────────
 
         private static VisualElement BuildPill()
         {
-            var container = new VisualElement();
-            container.name                  = "mcp-status-pill";
-            container.style.flexDirection   = FlexDirection.Row;
-            container.style.alignItems      = Align.Center;
-            container.style.alignSelf       = Align.Center;
-            container.style.flexShrink      = 0;
-            container.style.marginLeft      = 4;
-            container.style.marginRight     = 6;
-
-            _pill = new Label("MCP");
-            _pill.style.fontSize      = 10;
-            _pill.style.paddingLeft   = 4;
-            _pill.style.paddingRight  = 4;
-            _pill.style.paddingTop    = 1;
-            _pill.style.paddingBottom = 1;
-            _pill.style.borderTopLeftRadius     = 3;
-            _pill.style.borderTopRightRadius    = 3;
-            _pill.style.borderBottomLeftRadius  = 3;
-            _pill.style.borderBottomRightRadius = 3;
-            _pill.style.unityFontStyleAndWeight = FontStyle.Bold;
-
-            // Eased opacity transition for the Listen breathe
-            _pill.style.transitionProperty = new List<StylePropertyName> { new StylePropertyName("opacity") };
-            _pill.style.transitionDuration  = new List<TimeValue> { new TimeValue(0.6f, TimeUnit.Second) };
-
-            _pill.RegisterCallback<ClickEvent>(OnPillClick);
-            ApplyPillColor(_pill, MCPStatusModel.State.Down);
-
-            container.Add(_pill);
-            return container;
+            var c = new VisualElement { name = "mcp-status-pill" };
+            c.style.position = Position.Absolute; c.style.right = 90; c.style.top = 2;
+            c.style.height = 16; c.style.flexDirection = FlexDirection.Row;
+            c.style.alignItems = Align.Center; c.style.paddingLeft = 6; c.style.paddingRight = 7;
+            Radius(c, 8); c.style.borderTopWidth = c.style.borderBottomWidth = c.style.borderLeftWidth = c.style.borderRightWidth = 1;
+            var beacon = new VisualElement { name = "mcp-beacon" };
+            beacon.style.width = 12; beacon.style.height = 14; beacon.style.position = Position.Relative;
+            beacon.style.alignItems = Align.Center; beacon.style.justifyContent = Justify.Center;
+            beacon.style.marginRight = 5; beacon.style.overflow = Overflow.Visible;
+            _halo = new VisualElement { name = "mcp-halo" };
+            _halo.style.position = Position.Absolute; _halo.style.left = 2; _halo.style.top = 3;
+            _halo.style.width = 8; _halo.style.height = 8; Radius(_halo, 4);
+            _halo.style.transformOrigin = new TransformOrigin(Length.Percent(50), Length.Percent(50), 0);
+            _halo.style.opacity = 0f;
+            _halo.style.transitionProperty = new List<StylePropertyName> { new("scale"), new("opacity") };
+            _halo.style.transitionDuration = new List<TimeValue> { new(0.85f, TimeUnit.Second), new(0.85f, TimeUnit.Second) };
+            _halo.style.transitionTimingFunction = new List<EasingFunction> { new(EasingMode.EaseOut), new(EasingMode.EaseOut) };
+            _dot = new VisualElement { name = "mcp-dot" };
+            _dot.style.position = Position.Absolute; _dot.style.left = 4; _dot.style.top = 5;
+            _dot.style.width = 4; _dot.style.height = 4; Radius(_dot, 2);
+            _dot.style.transformOrigin = new TransformOrigin(Length.Percent(50), Length.Percent(50), 0);
+            _dot.style.opacity = 1f;
+            _dot.style.transitionProperty = new List<StylePropertyName> { new("scale") };
+            _dot.style.transitionDuration = new List<TimeValue> { new(0.45f, TimeUnit.Second) };
+            _dot.style.transitionTimingFunction = new List<EasingFunction> { new(EasingMode.EaseInOut) };
+            beacon.Add(_halo); beacon.Add(_dot);
+            _pill = new Label("MCP") { name = "mcp-label" };
+            _pill.style.fontSize = 10; _pill.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _pill.style.unityTextAlign = TextAnchor.MiddleLeft; _pill.style.marginTop = -1;
+            _pill.style.backgroundColor = Color.clear; _pill.style.opacity = 1f;
+            c.Add(beacon); c.Add(_pill);
+            c.RegisterCallback<ClickEvent>(OnPillClick); // on the whole chip — clicks bubble up from label/beacon
+            _pillContainer = c;            // ApplyColors writes _pillContainer.style — set before the call
+            ApplyColors(MCPStatusModel.State.Down);
+            return c;
         }
 
-        private static void ApplyPillColor(Label label, MCPStatusModel.State state)
+        private static void ApplyColors(MCPStatusModel.State state)
         {
-            bool pro = EditorGUIUtility.isProSkin;
-            switch (state)
-            {
-                case MCPStatusModel.State.Up:
-                    label.style.color           = pro ? new Color(0.27f, 0.85f, 0.62f) : new Color(0.10f, 0.50f, 0.34f);
-                    label.style.backgroundColor = pro ? new Color(0.27f, 0.85f, 0.62f, 0.16f) : new Color(0.10f, 0.50f, 0.34f, 0.14f);
-                    break;
-                case MCPStatusModel.State.Listen:
-                    label.style.color           = pro ? new Color(0.93f, 0.66f, 0.24f) : new Color(0.60f, 0.42f, 0.05f);
-                    label.style.backgroundColor = pro ? new Color(0.93f, 0.66f, 0.24f, 0.16f) : new Color(0.60f, 0.42f, 0.05f, 0.14f);
-                    break;
-                default:
-                    label.style.color           = pro ? new Color(0.93f, 0.30f, 0.40f) : new Color(0.70f, 0.12f, 0.20f);
-                    label.style.backgroundColor = pro ? new Color(0.93f, 0.30f, 0.40f, 0.16f) : new Color(0.70f, 0.12f, 0.20f, 0.14f);
-                    break;
-            }
+            var pal = MCPStatusBarPalette.Get(state, EditorGUIUtility.isProSkin);
+            _pillContainer.style.backgroundColor = pal.ChipBg;
+            _pillContainer.style.borderTopColor = _pillContainer.style.borderBottomColor =
+            _pillContainer.style.borderLeftColor = _pillContainer.style.borderRightColor = pal.ChipBorder;
+            _dot.style.backgroundColor = pal.Dot;
+            _halo.style.backgroundColor = new Color(pal.HaloRgb.r, pal.HaloRgb.g, pal.HaloRgb.b, 1f); // visibility via style.opacity, not bg alpha
+            _pill.style.color = pal.Text;
         }
 
         private static void OnPillClick(ClickEvent _)
@@ -166,30 +170,29 @@ namespace UnityMCP.Editor
             m.AddItem(new GUIContent("Kill"),     false, MCPActions.Kill);
             m.AddSeparator("");
             m.AddItem(new GUIContent("Open Status"), false, MCPStatusWindow.ShowWindow);
-            m.DropDown(_pill.worldBound);
+            m.DropDown(_pillContainer.worldBound);
         }
-
-        // ── Reflection helpers ────────────────────────────────────────────
 
         private static VisualElement GetStatusBarRoot()
         {
-            var asm            = typeof(UnityEditor.Editor).Assembly;
-            var barType        = asm.GetType("UnityEditor.AppStatusBar");
-            var guiViewType    = asm.GetType("UnityEditor.GUIView");
-            var backendType    = asm.GetType("UnityEditor.IWindowBackend");
+            var asm = typeof(UnityEditor.Editor).Assembly;
+            var barType     = asm.GetType("UnityEditor.AppStatusBar");
+            var guiViewType = asm.GetType("UnityEditor.GUIView");
+            var backendType = asm.GetType("UnityEditor.IWindowBackend");
             if (barType == null || guiViewType == null || backendType == null) return null;
-
             var backendProp = guiViewType.GetProperty("windowBackend",
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             var treeProp = backendType.GetProperty("visualTree",
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             if (backendProp == null || treeProp == null) return null;
-
             var instances = Resources.FindObjectsOfTypeAll(barType);
             if (instances == null || instances.Length == 0) return null;
-
             var backend = backendProp.GetValue(instances[0]);
             return backend == null ? null : treeProp.GetValue(backend) as VisualElement;
         }
+
+        private static void Radius(VisualElement e, float r) =>
+            e.style.borderTopLeftRadius = e.style.borderTopRightRadius =
+            e.style.borderBottomLeftRadius = e.style.borderBottomRightRadius = r;
     }
 }
