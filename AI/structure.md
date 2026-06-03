@@ -221,6 +221,7 @@ unity-kiss-mcp/
 │   ├── Assets/Shaders/          # TestGraph.shadergraph
 │   ├── Assets/Scripts/          # Test helpers (GridPlayer, etc.)
 │   └── Packages/manifest.json   # References unity-plugin via file:
+├── scripts/                    # Tooling: changelog SVG generator (gen_changelog_svg.py)
 ├── AI/                         # Feature knowledge docs + changelog
 ├── .claude/
 │   ├── skills/                 # Technical references
