@@ -89,7 +89,7 @@ namespace UnityMCP.Editor
             return true;
         }
 
-        [MenuItem("Tools/Unity MCP/Settings")]
+        [MenuItem("MCP/Settings", priority = 2)]
         public static void ShowWindow()
         {
             var window = GetWindow<MCPSettings>("MCP Settings");

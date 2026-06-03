@@ -9,7 +9,7 @@ namespace UnityMCP.Editor
         private VisualElement _orb, _halo;
         private Label _word, _sub;
 
-        [MenuItem("Tools/Unity MCP/Status")]
+        [MenuItem("MCP/Status", priority = 1)]
         public static void ShowWindow()
         {
             var window = GetWindow<MCPStatusWindow>("MCP Status");
@@ -40,9 +40,9 @@ namespace UnityMCP.Editor
             var spacerBot = new VisualElement(); spacerBot.style.flexGrow = 1;
 
             var row = new VisualElement(); row.AddToClassList("btn-row");
-            row.Add(MakeBtn("Restart",  () => { MCPServer.Stop(); MCPServer.StartAsync(); }));
-            row.Add(MakeBtn("Kill MCP", KillProcs));
-            row.Add(MakeBtn("Reimport", ReimportPlugin));
+            row.Add(MakeBtn("Restart",  MCPActions.Restart));
+            row.Add(MakeBtn("Kill MCP", MCPActions.Kill));
+            row.Add(MakeBtn("Reimport", MCPActions.Reimport));
 
             root.Add(brand);
             root.Add(spacerTop);
@@ -90,7 +90,7 @@ namespace UnityMCP.Editor
         private void RefreshState()
         {
             bool run = MCPServer.IsRunning, cli = MCPServer.IsClientConnected;
-            string s = !run ? "down" : cli ? "up" : "listen";
+            var s = MCPStatusModel.GetCssKey(MCPStatusModel.GetState(run, cli));
 
             foreach (var k in new[] { "up", "listen", "down" })
             {
@@ -103,31 +103,8 @@ namespace UnityMCP.Editor
             _halo.AddToClassList("halo--" + s);
             _word.AddToClassList("status-word--" + s);
 
-            _word.text = !run ? "OFFLINE" : cli ? $"ONLINE  :{MCPServer.ServerPort}" : "LISTENING";
-            _sub.text  = !run ? "server stopped" : cli ? "client connected" : "no client";
+            _word.text = MCPStatusModel.GetLabel(run, cli, MCPServer.ServerPort);
+            _sub.text  = MCPStatusModel.GetSub(run, cli);
         }
-
-        private static void KillProcs()
-        {
-            try { System.Diagnostics.Process.Start("pkill", "-f unity_mcp.server"); }
-            catch (System.Exception e) { Debug.LogWarning($"[MCP] pkill failed: {e.Message}"); }
-        }
-
-        private static void ReimportPlugin()
-        {
-            var guids = AssetDatabase.FindAssets("t:asmdef", new[] { "Packages/com.unity-mcp.editor" });
-            if (guids.Length > 0)
-            {
-                var path = AssetDatabase.GUIDToAssetPath(guids[0]);
-                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-                Debug.Log("[MCP] Plugin reimported — recompiling...");
-            }
-            else
-            {
-                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-                Debug.Log("[MCP] AssetDatabase.Refresh forced");
-            }
-        }
-
     }
 }

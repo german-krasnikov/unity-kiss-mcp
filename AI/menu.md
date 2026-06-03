@@ -1,7 +1,10 @@
-# Menu Execution Feature (Phase 25)
+# Menu & Editor Chrome (Phase 25 + Pass 2)
 
 ## Overview
-MCP tool for executing and listing Unity Editor menu items (MenuItem).
+
+**Phase 25:** MCP tool for executing and listing Unity Editor menu items (MenuItem).
+
+**Pass 2 (2026-06-03):** Flattened the "Tools/Unity MCP" menu → top-level "MCP/" prefix (priority 0=Chat, 1=Status, 2=Settings). Added MCPStatusBarWidget injection into Editor AppStatusBar via reflection. Extracted MCPActions (Restart, Kill, Reimport) as shared utilities.
 
 ## Architecture
 
@@ -19,6 +22,28 @@ async def menu(action: str, path: str | None = None) -> str
 ### CommandRouter
 - `case "menu"` → `ExecMenu(args)` with action switch
 - Added to `IsMutatingCommand` (execute can modify scene)
+
+### Menu Structure (2026-06-03)
+
+```
+MCP/ [priority 0 → top of Window menu]
+├── Chat [priority 0] → MCPChatWindow.ShowWindow()
+├── Status [priority 1] → MCPStatusWindow.ShowWindow()
+└── Settings [priority 2] → MCPSettings.ShowWindow()
+
+MCP Status Bar Widget
+├── Injected into Editor AppStatusBar via reflection
+├── Displays state pill: "MCP :{port}" (UP), "MCP ..." (Listen), "MCP off" (Down)
+└── Breathing pulse animation (connected=bright, listening=subdued, down=dimmed)
+```
+
+### Status Bar Widget (MCPStatusBarWidget.cs)
+
+- **Reflection-based injection:** Finds `AppStatusBar` root VE at startup (delayed via `EditorApplication.delayCall` until panel exists)
+- **State polling:** 600ms scheduled tick reads `MCPServer.IsRunning` + `MCPServer.IsClientConnected`
+- **Dynamic label:** Maps state → pill text via MCPStatusModel.GetPill()
+- **Breathing animation:** Opacity toggled every 600ms (up=0.35↔1.0, listen=0.55↔0.85, down=steady 0.55)
+- **Fully defensive:** Try/catch at every reflection step; if AppStatusBar unavailable, retries; logs warnings but never crashes
 
 ## API
 
