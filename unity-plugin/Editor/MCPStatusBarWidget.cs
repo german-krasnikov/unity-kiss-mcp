@@ -18,7 +18,19 @@ namespace UnityMCP.Editor
 
         static MCPStatusBarWidget()
         {
+            AssemblyReloadEvents.beforeAssemblyReload += Cleanup;
             EditorApplication.delayCall += TryInject; // AppStatusBar may not exist yet
+        }
+
+        private static void Cleanup()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= Cleanup;
+            try { _pulseItem?.Pause(); } catch { /* ignore — item may be disposed */ }
+            try { _pillContainer?.RemoveFromHierarchy(); } catch { /* ignore — tree may be torn down */ }
+            _pill          = null;
+            _pillContainer = null;
+            _pulseItem     = null;
+            _injected      = false;
         }
 
         private static void TryInject()
@@ -29,6 +41,7 @@ namespace UnityMCP.Editor
                 var root = GetStatusBarRoot();
                 if (root == null) { EditorApplication.delayCall += TryInject; return; }
 
+                root.Q("mcp-status-pill")?.RemoveFromHierarchy();
                 _pillContainer = BuildPill();
                 root.Add(_pillContainer);
                 _injected = true;
@@ -65,6 +78,7 @@ namespace UnityMCP.Editor
         private static VisualElement BuildPill()
         {
             var container = new VisualElement();
+            container.name                 = "mcp-status-pill";
             container.style.flexDirection  = FlexDirection.Row;
             container.style.alignItems     = Align.Center;
             container.style.position       = Position.Absolute;
