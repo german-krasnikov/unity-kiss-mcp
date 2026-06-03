@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 340" width="1200" height="340" role="img" aria-label="Unity MCP — control Unity from Claude, live heartbeat status window">
+  <title>Unity MCP — the editor's heartbeat</title>
+
+  <defs>
+    <!-- HDRP bloom vignette -->
+    <radialGradient id="vignette" cx="42%" cy="50%" r="75%">
+      <stop offset="0%"  stop-color="#23234a"/>
+      <stop offset="55%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#121222"/>
+    </radialGradient>
+    <!-- orb bloom halo -->
+    <radialGradient id="orbBloom" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#3ad29f" stop-opacity="0.9"/>
+      <stop offset="35%"  stop-color="#3ad29f" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#3ad29f" stop-opacity="0"/>
+    </radialGradient>
+    <!-- orb core gradient -->
+    <radialGradient id="orbCore" cx="38%" cy="34%" r="72%">
+      <stop offset="0%"  stop-color="#9affd9"/>
+      <stop offset="55%" stop-color="#3ad29f"/>
+      <stop offset="100%" stop-color="#1f7a5c"/>
+    </radialGradient>
+    <linearGradient id="ecgFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#3ad29f" stop-opacity="0"/>
+      <stop offset="12%"  stop-color="#3ad29f" stop-opacity="0.55"/>
+      <stop offset="88%"  stop-color="#3ad29f" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#3ad29f" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- editor surface -->
+  <rect width="1200" height="340" fill="#1a1a2e"/>
+  <rect width="1200" height="340" fill="url(#vignette)"/>
+  <rect x="0.5" y="0.5" width="1199" height="339" fill="none" stroke="#2a2a4a" stroke-width="1"/>
+
+  <!-- faux editor titlebar -->
+  <rect x="0" y="0" width="1200" height="34" fill="#15152a"/>
+  <line x1="0" y1="34" x2="1200" y2="34" stroke="#2a2a4a" stroke-width="1"/>
+  <circle cx="26" cy="17" r="5.5" fill="#6e2b3a"/>
+  <circle cx="46" cy="17" r="5.5" fill="#e8a23a"/>
+  <circle cx="66" cy="17" r="5.5" fill="#3ad29f"/>
+  <text x="92" y="21" font-family="'SF Mono','Fira Code',ui-monospace,monospace" font-size="11" letter-spacing="1.5" fill="#888899">MCP STATUS — :9500</text>
+  <text x="1174" y="21" text-anchor="end" font-family="'SF Mono','Fira Code',ui-monospace,monospace" font-size="11" letter-spacing="1" fill="#3ad29f">● UP</text>
+
+  <!-- ===================================================== -->
+  <!-- connection-packet field: #ccccff packets drift toward orb -->
+  <!-- ===================================================== -->
+  <g fill="#ccccff">
+    <circle cx="120" cy="120" r="1.5"><animate attributeName="opacity" values="0;0.7;0" dur="3.1s" begin="0.2s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 9 4; 0 0" dur="3.1s" begin="0.2s" repeatCount="indefinite"/></circle>
+    <circle cx="200" cy="240" r="1.5"><animate attributeName="opacity" values="0;0.6;0" dur="2.7s" begin="0.9s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 10 -5; 0 0" dur="2.7s" begin="0.9s" repeatCount="indefinite"/></circle>
+    <circle cx="300" cy="90" r="1.5"><animate attributeName="opacity" values="0;0.7;0" dur="3.6s" begin="1.4s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 8 7; 0 0" dur="3.6s" begin="1.4s" repeatCount="indefinite"/></circle>
+    <circle cx="170" cy="180" r="1.5"><animate attributeName="opacity" values="0;0.65;0" dur="2.4s" begin="0.5s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 12 0; 0 0" dur="2.4s" begin="0.5s" repeatCount="indefinite"/></circle>
+    <circle cx="380" cy="280" r="1.5"><animate attributeName="opacity" values="0;0.6;0" dur="3.3s" begin="2.0s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 9 -8; 0 0" dur="3.3s" begin="2.0s" repeatCount="indefinite"/></circle>
+    <circle cx="440" cy="140" r="1.5"><animate attributeName="opacity" values="0;0.7;0" dur="2.9s" begin="0.7s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 7 6; 0 0" dur="2.9s" begin="0.7s" repeatCount="indefinite"/></circle>
+    <circle cx="80" cy="200" r="1.5"><animate attributeName="opacity" values="0;0.55;0" dur="3.8s" begin="1.1s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 11 2; 0 0" dur="3.8s" begin="1.1s" repeatCount="indefinite"/></circle>
+    <circle cx="520" cy="230" r="1.5"><animate attributeName="opacity" values="0;0.65;0" dur="2.6s" begin="1.8s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; -8 -4; 0 0" dur="2.6s" begin="1.8s" repeatCount="indefinite"/></circle>
+    <circle cx="240" cy="60" r="1.5"><animate attributeName="opacity" values="0;0.6;0" dur="3.4s" begin="0.3s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 10 9; 0 0" dur="3.4s" begin="0.3s" repeatCount="indefinite"/></circle>
+    <circle cx="150" cy="290" r="1.5"><animate attributeName="opacity" values="0;0.55;0" dur="3.0s" begin="2.4s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 12 -9; 0 0" dur="3.0s" begin="2.4s" repeatCount="indefinite"/></circle>
+    <circle cx="470" cy="70" r="1.5"><animate attributeName="opacity" values="0;0.7;0" dur="2.8s" begin="1.5s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 6 8; 0 0" dur="2.8s" begin="1.5s" repeatCount="indefinite"/></circle>
+    <circle cx="330" cy="200" r="1.5"><animate attributeName="opacity" values="0;0.65;0" dur="3.5s" begin="0.6s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 10 -3; 0 0" dur="3.5s" begin="0.6s" repeatCount="indefinite"/></circle>
+    <circle cx="560" cy="160" r="1.5"><animate attributeName="opacity" values="0;0.6;0" dur="2.5s" begin="2.1s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; -10 2; 0 0" dur="2.5s" begin="2.1s" repeatCount="indefinite"/></circle>
+    <circle cx="110" cy="270" r="1.5"><animate attributeName="opacity" values="0;0.55;0" dur="3.7s" begin="0.4s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 11 -7; 0 0" dur="3.7s" begin="0.4s" repeatCount="indefinite"/></circle>
+    <circle cx="410" cy="220" r="1.5"><animate attributeName="opacity" values="0;0.7;0" dur="2.9s" begin="1.9s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 8 -6; 0 0" dur="2.9s" begin="1.9s" repeatCount="indefinite"/></circle>
+    <circle cx="270" cy="160" r="1.5"><animate attributeName="opacity" values="0;0.65;0" dur="3.2s" begin="1.2s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 13 2; 0 0" dur="3.2s" begin="1.2s" repeatCount="indefinite"/></circle>
+    <circle cx="500" cy="110" r="1.5"><animate attributeName="opacity" values="0;0.6;0" dur="2.7s" begin="0.8s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 6 7; 0 0" dur="2.7s" begin="0.8s" repeatCount="indefinite"/></circle>
+    <circle cx="190" cy="100" r="1.5"><animate attributeName="opacity" values="0;0.55;0" dur="3.9s" begin="2.3s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 10 6; 0 0" dur="3.9s" begin="2.3s" repeatCount="indefinite"/></circle>
+    <circle cx="360" cy="120" r="1.5"><animate attributeName="opacity" values="0;0.7;0" dur="2.6s" begin="1.0s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 9 4; 0 0" dur="2.6s" begin="1.0s" repeatCount="indefinite"/></circle>
+    <circle cx="230" cy="300" r="1.5"><animate attributeName="opacity" values="0;0.6;0" dur="3.3s" begin="0.1s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 11 -10; 0 0" dur="3.3s" begin="0.1s" repeatCount="indefinite"/></circle>
+    <circle cx="540" cy="280" r="1.5"><animate attributeName="opacity" values="0;0.65;0" dur="2.8s" begin="1.6s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; -9 -8; 0 0" dur="2.8s" begin="1.6s" repeatCount="indefinite"/></circle>
+    <circle cx="60" cy="140" r="1.5"><animate attributeName="opacity" values="0;0.55;0" dur="3.6s" begin="2.2s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 12 4; 0 0" dur="3.6s" begin="2.2s" repeatCount="indefinite"/></circle>
+    <circle cx="430" cy="300" r="1.5"><animate attributeName="opacity" values="0;0.6;0" dur="2.5s" begin="0.6s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 8 -9; 0 0" dur="2.5s" begin="0.6s" repeatCount="indefinite"/></circle>
+    <circle cx="310" cy="260" r="1.5"><animate attributeName="opacity" values="0;0.65;0" dur="3.1s" begin="1.7s" repeatCount="indefinite"/><animateTransform attributeName="transform" type="translate" values="0 0; 10 -7; 0 0" dur="3.1s" begin="1.7s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <!-- ===================================================== -->
+  <!-- THE ORB — exact USS replica: 36r core, 64 halo, 900ms beat -->
+  <!-- center at (300,170) -->
+  <!-- ===================================================== -->
+  <g transform="translate(300,170)">
+    <!-- bloom -->
+    <circle r="78" fill="url(#orbBloom)">
+      <animate attributeName="r" values="70;82;70" dur="0.9s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.55;0.95;0.55" dur="0.9s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- three staggered halo rings: stroke-width 1->6->1, opacity 0.15->0.6->0.15 -->
+    <circle r="44" fill="none" stroke="#3ad29f">
+      <animate attributeName="stroke-width" values="1;6;1" dur="0.9s" begin="0s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.15;0.6;0.15" dur="0.9s" begin="0s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="40;52;40" dur="0.9s" begin="0s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="44" fill="none" stroke="#3ad29f">
+      <animate attributeName="stroke-width" values="1;6;1" dur="0.9s" begin="0.18s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.12;0.45;0.12" dur="0.9s" begin="0.18s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="46;60;46" dur="0.9s" begin="0.18s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="44" fill="none" stroke="#3ad29f">
+      <animate attributeName="stroke-width" values="1;5;1" dur="0.9s" begin="0.36s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.08;0.30;0.08" dur="0.9s" begin="0.36s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="52;68;52" dur="0.9s" begin="0.36s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- core orb: 36r, fill animates up -> up.beat (#1f7a5c -> #3ad29f) -->
+    <circle r="36" fill="url(#orbCore)">
+      <animate attributeName="opacity" values="0.82;1;0.82" dur="0.9s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="36" fill="none" stroke="#9affd9" stroke-width="1" opacity="0.5">
+      <animate attributeName="opacity" values="0.2;0.7;0.2" dur="0.9s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- ===================================================== -->
+  <!-- ECG trace (SIGNAL graft): flat line + one QRS spike, -->
+  <!-- a bright #e94560 dot rides it via animateMotion, 0.9s loop -->
+  <!-- lower third, y ~ 300 -->
+  <!-- ===================================================== -->
+  <path id="ecg" d="M 100 302 L 250 302 L 268 302 L 276 280 L 284 322 L 292 296 L 300 302 L 560 302"
+        fill="none" stroke="url(#ecgFade)" stroke-width="1.5"/>
+  <circle r="3" fill="#e94560">
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="0.9s" repeatCount="indefinite"/>
+    <animateMotion dur="0.9s" repeatCount="indefinite" rotate="0">
+      <mpath xlink:href="#ecg"/>
+    </animateMotion>
+  </circle>
+
+  <!-- bridge sparks (CREW graft): 3 brighter #e94560 sparks arc Unity-side -> Claude-side -->
+  <g>
+    <path id="bridge" d="M 360 170 C 560 90, 760 250, 960 170" fill="none" stroke="none"/>
+    <circle r="2.2" fill="#e94560">
+      <animate attributeName="opacity" values="0;0.9;0" dur="2.4s" begin="0s" repeatCount="indefinite"/>
+      <animateMotion dur="2.4s" begin="0s" repeatCount="indefinite"><mpath xlink:href="#bridge"/></animateMotion>
+    </circle>
+    <circle r="2.2" fill="#e94560">
+      <animate attributeName="opacity" values="0;0.9;0" dur="2.4s" begin="0.8s" repeatCount="indefinite"/>
+      <animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite"><mpath xlink:href="#bridge"/></animateMotion>
+    </circle>
+    <circle r="2.2" fill="#e94560">
+      <animate attributeName="opacity" values="0;0.9;0" dur="2.4s" begin="1.6s" repeatCount="indefinite"/>
+      <animateMotion dur="2.4s" begin="1.6s" repeatCount="indefinite"><mpath xlink:href="#bridge"/></animateMotion>
+    </circle>
+  </g>
+
+  <!-- ===================================================== -->
+  <!-- RIGHT PANEL: brand + tagline + live transcript (phosphor graft) -->
+  <!-- ===================================================== -->
+  <g font-family="'SF Mono','Fira Code',ui-monospace,monospace">
+    <text x="620" y="92" font-size="46" font-weight="700" letter-spacing="6" fill="#ccccff">UNITY MCP</text>
+    <text x="622" y="120" font-size="14" letter-spacing="3.5" fill="#3ad29f">CONTROL UNITY FROM CLAUDE — ONE HEARTBEAT</text>
+    <line x1="622" y1="134" x2="1090" y2="134" stroke="#2a2a4a" stroke-width="1"/>
+
+    <!-- live transcript, staggered reveal -->
+    <g font-size="13.5">
+      <text x="622" y="172" fill="#888899">claude<tspan fill="#3ad29f"> ❯ </tspan><tspan fill="#ccccff">batch "create cube; set transform.position 0 1 0"</tspan>
+        <animate attributeName="opacity" values="0;0;1" keyTimes="0;0.12;0.2" dur="6s" repeatCount="indefinite"/>
+      </text>
+      <text x="622" y="198" fill="#3ad29f">  [unity] ok · 1 obj created<tspan fill="#888899"> · 92% tokens saved</tspan>
+        <animate attributeName="opacity" values="0;0;1" keyTimes="0;0.30;0.38" dur="6s" repeatCount="indefinite"/>
+      </text>
+      <text x="622" y="224" fill="#888899">claude<tspan fill="#3ad29f"> ❯ </tspan><tspan fill="#ccccff">run_playtest "ASSERT_CONSOLE_CLEAN"</tspan>
+        <animate attributeName="opacity" values="0;0;1" keyTimes="0;0.48;0.56" dur="6s" repeatCount="indefinite"/>
+      </text>
+      <text x="622" y="250" fill="#3ad29f">  [unity] ok · console clean · 0 errors<tspan fill="#888899"> · 21-cmd DSL</tspan>
+        <animate attributeName="opacity" values="0;0;1" keyTimes="0;0.66;0.74" dur="6s" repeatCount="indefinite"/>
+      </text>
+      <text x="622" y="276" fill="#888899">claude<tspan fill="#3ad29f"> ❯ </tspan><tspan fill="#ccccff">screenshot --multi_view</tspan>
+        <animate attributeName="opacity" values="0;0;1" keyTimes="0;0.84;0.92" dur="6s" repeatCount="indefinite"/>
+      </text>
+    </g>
+
+    <text x="622" y="312" font-size="11" letter-spacing="2" fill="#888899">89 TOOLS · 1640 TESTS · 80–95% BATCH SAVINGS · TCP&#160;:9500</text>
+  </g>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 28" width="1200" height="28" role="img" aria-label="section divider — heartbeat line">
+  <defs>
+    <linearGradient id="dline" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#3ad29f" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#3ad29f" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#3ad29f" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path id="dpath" d="M 0 14 L 520 14 L 540 14 L 552 4 L 564 24 L 576 14 L 1200 14"
+        fill="none" stroke="url(#dline)" stroke-width="1.4"/>
+  <circle r="2.6" fill="#e94560">
+    <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.04;0.96;1" dur="3.6s" repeatCount="indefinite"/>
+    <animateMotion dur="3.6s" repeatCount="indefinite"><mpath xlink:href="#dpath"/></animateMotion>
+  </circle>
+</svg>
