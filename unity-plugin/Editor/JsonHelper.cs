@@ -184,5 +184,24 @@ namespace UnityMCP.Editor
         {
             return $"{{\"id\":\"{EscapeJson(id)}\",\"ok\":false,\"err\":\"{EscapeJson(message)}\",\"retry\":{retryMs}}}";
         }
+
+        /// <summary>Extract the first balanced JSON object from an array string like [{"a":1},{"b":2}].</summary>
+        internal static string ExtractFirstArrayObject(string arrayJson)
+        {
+            if (string.IsNullOrEmpty(arrayJson)) return null;
+            var start = arrayJson.IndexOf('{');
+            if (start == -1) return null;
+            int depth = 0; bool inStr = false, esc = false;
+            for (int i = start; i < arrayJson.Length; i++)
+            {
+                char c = arrayJson[i];
+                if (esc) { esc = false; continue; }
+                if (inStr) { if (c == '\\') esc = true; else if (c == '"') inStr = false; continue; }
+                if (c == '"')  { inStr = true; continue; }
+                if (c == '{')  { depth++; continue; }
+                if (c == '}') { depth--; if (depth == 0) return arrayJson.Substring(start, i - start + 1); }
+            }
+            return null;
+        }
     }
 }

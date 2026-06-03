@@ -60,7 +60,7 @@ namespace UnityMCP.Editor.Chat
 
             if (!string.IsNullOrEmpty(alt))
             {
-                var caption = new Label(alt);
+                var caption = ChatLabel.Selectable(alt);
                 caption.AddToClassList("md-image-alt");
                 container.Add(caption);
             }

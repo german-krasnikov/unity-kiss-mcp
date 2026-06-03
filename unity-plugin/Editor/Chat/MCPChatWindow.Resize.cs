@@ -6,7 +6,7 @@ namespace UnityMCP.Editor.Chat
 {
     public partial class MCPChatWindow
     {
-        private const float InputMinH = 70f, InputMaxH = 500f;
+        private const float InputMinH = InputHeightCalc.CompactH, InputMaxH = 500f;
 
         private VisualElement BuildResizeHandle(VisualElement target)
         {
@@ -28,7 +28,9 @@ namespace UnityMCP.Editor.Chat
             handle.RegisterCallback<PointerMoveEvent>(e =>
             {
                 if (!drag) return;
-                target.style.height = Mathf.Clamp(startH + (startY - e.position.y), InputMinH, InputMaxH);
+                var h = Mathf.Clamp(startH + (startY - e.position.y), InputMinH, InputMaxH);
+                target.style.height = h;
+                _heightCalc.SetManual(h);
                 e.StopPropagation();
             });
             handle.RegisterCallback<PointerUpEvent>(e =>

@@ -55,6 +55,15 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
+        public void UnclosedMermaidFence_RendersAsCode()
+        {
+            // While streaming the closing ``` hasn't arrived → must be Code, not a broken diagram.
+            var result = MarkdownParser.Parse("```mermaid\ngraph TD\nA-->B");
+            Assert.AreEqual(1, result.Count);
+            Assert.AreEqual(MdBlockKind.CodeFence, result[0].Kind);
+        }
+
+        [Test]
         public void HashInsideFence_NotHeading()
         {
             var md = "```\n# not a heading\n```";

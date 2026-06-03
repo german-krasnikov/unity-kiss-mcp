@@ -15,8 +15,7 @@ namespace UnityMCP.Editor.Chat
             var headerRow = new VisualElement(); headerRow.AddToClassList("md-table-row");
             foreach (var cell in b.TableRows[0])
             {
-                var lbl = new Label(MarkdownInline.ToRichText(cell));
-                lbl.enableRichText = true;
+                var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(cell), richText: true);
                 lbl.AddToClassList("md-th");
                 headerRow.Add(lbl);
             }
@@ -28,8 +27,7 @@ namespace UnityMCP.Editor.Chat
                 var row = new VisualElement(); row.AddToClassList("md-table-row");
                 foreach (var cell in b.TableRows[i])
                 {
-                    var lbl = new Label(MarkdownInline.ToRichText(cell));
-                    lbl.enableRichText = true;
+                    var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(cell), richText: true);
                     lbl.AddToClassList("md-td");
                     row.Add(lbl);
                 }

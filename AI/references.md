@@ -98,7 +98,26 @@ set_property enhancement:
 - [ ] Undo/Redo: All mutations recordable via Edit→Undo
 - [ ] Type safety: ObjectReference deserialization correct (null/id/path)
 
+## Chat Interactive References (2026-06-03)
+
+In-Unity Chat messages can embed reference links with special syntax:
+- **Scene objects:** `obj:/Path/To/Gameobject` → renders as `<link="obj:/Path/To/Gameobject">...</link>`
+- **Scripts:** `script:Assets/Path/To/Script.cs` → renders as `<link="script:Assets/Path/To/Script.cs">...</link>`
+
+**ChatRefResolver** (startup + cached):
+- Scans loaded scenes, maps hierarchy paths
+- Resolves script assets via AssetDatabase
+
+**ChatRefAction** (interaction handlers):
+- **Click:** Navigates — calls `EditorGUIUtility.PingObject()` + `Selection.activeObject = obj`
+- **Alt+Click:** "Add to Context" → injects ref payload into input field
+- **Right-Click:** Context menu with "Navigate" + "Add to context" options
+- **Hover:** Shows tooltip "Alt+Click to add to context"
+
+**Token savings:** No new MCP tools — reuses get_component/set_property. Chat just makes refs clickable.
+
 ## Related
 - Skill: `.claude/skills/csharp-unity.md` (SerializedProperty API)
 - Knowledge: `AI/architecture.md` (CommandRouter routing)
 - Knowledge: `AI/batch.md` (batch remapping pattern)
+- Knowledge: `AI/agent-chat.md` (Chat interactive refs implementation)

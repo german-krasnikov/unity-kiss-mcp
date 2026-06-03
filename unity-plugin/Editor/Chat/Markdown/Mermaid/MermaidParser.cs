@@ -21,11 +21,6 @@ namespace UnityMCP.Editor.Chat
         private static readonly Regex _pipeLabel = new Regex(
             @"^\|(.+?)\|(.+)$", RegexOptions.Compiled);
 
-        // Inline text label:  -- text --> e.g. from "-- text -->B" after splitting on "-->"
-        // We handle this by detecting if a segment starts with "-- " or ends with " --"
-        // Actually simpler: after splitting on --> or ---, a segment may be "| label |nextnode"
-        // or just a plain id.
-
         /// <summary>
         /// Parses mermaid flowchart lines. Returns null for non-flowchart diagrams or empty input.
         /// </summary>
@@ -108,19 +103,13 @@ namespace UnityMCP.Editor.Chat
             else if (bracket.StartsWith("(")) { shape = NodeShape.Round;   label = m.Groups[4].Value; }
             else                              { shape = NodeShape.Diamond; label = m.Groups[5].Value; }
 
-            graph.GetOrAdd(id, label, shape);
+            graph.GetOrAdd(id, NormalizeBr(label), shape);
         }
 
         private static void ParseEdgeLine(string line, MermaidGraph graph)
         {
-            // Handle "A-- text -->B" style by normalising to "A-->B" with label
-            // We tokenise by splitting on --> and --- while keeping the delimiters
-            // Strategy: walk through chained segments
-            // Split the line into: [segment (-->|---) segment (-->|---) segment ...]
-            // Use regex split keeping delimiters
-
+            // Tokenise by splitting on --> / --- (delimiters kept), then walk chained segments.
             var parts = _edgeSplit.Split(line);
-            // parts[0]=from, parts[1]=operator, parts[2]=rest-or-to, parts[3]=op, parts[4]=to, ...
             if (parts.Length < 3) return;
 
             // Normalise first segment (trim inline -- text from end)
@@ -140,7 +129,7 @@ namespace UnityMCP.Editor.Chat
                 var pipeMatch = _pipeLabel.Match(seg);
                 if (pipeMatch.Success)
                 {
-                    label = pipeMatch.Groups[1].Value;
+                    label = NormalizeBr(pipeMatch.Groups[1].Value);
                     toId  = ExtractNodeId(pipeMatch.Groups[2].Value.Trim(), graph);
                 }
                 else
@@ -191,5 +180,12 @@ namespace UnityMCP.Editor.Chat
 
         private static bool IsValidId(string s) =>
             !string.IsNullOrEmpty(s) && Regex.IsMatch(s, @"^[A-Za-z0-9_]+$");
+
+        // Case-insensitive: <br>, <br/>, <br />, <BR/>, etc.
+        private static readonly Regex _br = new Regex(
+            @"<br\s*/?>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        internal static string NormalizeBr(string label) =>
+            string.IsNullOrEmpty(label) ? label : _br.Replace(label, "\n");
     }
 }

@@ -11,7 +11,8 @@ namespace UnityMCP.Editor.Chat
         private readonly string _permissionMode; // "plan" | "acceptEdits"
 
         private ChatProcess _proc;
-        private readonly List<string> _drainBuf = new List<string>(32);
+        private readonly List<string>           _drainBuf    = new List<string>(32);
+        private readonly ToolCallAccumulator    _accumulator = new ToolCallAccumulator();
 
         public bool   IsRunning => _proc?.IsRunning ?? false;
         public string SessionId { get; private set; }
@@ -25,14 +26,12 @@ namespace UnityMCP.Editor.Chat
         public void Start()
         {
             if (IsRunning) return;
-
             var binary = ChatBinaryResolver.Resolve();
             if (binary == null)
             {
                 Debug.LogError("[MCP Chat] claude binary not found — check Settings > Agent Chat > Binary Path.");
                 return;
             }
-
             var (args, strip) = ClaudeArgBuilder.Build(binary, _mcpConfigPath, _permissionMode, SessionId);
             _proc = new ChatProcess();
             _proc.Spawn(binary, args, strip);
@@ -44,7 +43,9 @@ namespace UnityMCP.Editor.Chat
             _proc?.WriteLine(turnJson);
         }
 
-        public void DrainEvents(List<ChatEvent> output)
+        private readonly List<ChatEvent> _parseBuf = new List<ChatEvent>(4);
+
+        public void DrainEvents(List<ChatEvent> output, List<ToolCallRecord> toolOutput = null)
         {
             if (_proc == null) return;
             _drainBuf.Clear();
@@ -52,14 +53,28 @@ namespace UnityMCP.Editor.Chat
 
             foreach (var line in _drainBuf)
             {
-                var ev = ChatStreamParser.ParseLine(line);
-                if (ev == null) continue;
+                _parseBuf.Clear();
+                ChatStreamParser.ParseInto(line, _parseBuf);
 
-                // Capture session ID from init or turn-done
-                if (ev.Value.Kind == ChatEventKind.TurnDone && !string.IsNullOrEmpty(ev.Value.SessionId))
-                    SessionId = ev.Value.SessionId;
+                foreach (var ev in _parseBuf)
+                {
+                    if (ev.Kind == ChatEventKind.TurnDone && !string.IsNullOrEmpty(ev.SessionId))
+                        SessionId = ev.SessionId;
 
-                output.Add(ev.Value);
+                    var rec = _accumulator.Feed(ev);
+                    if (rec.HasValue && toolOutput != null)
+                        toolOutput.Add(rec.Value);
+
+                    // Only forward non-tool events to the UI event buffer
+                    switch (ev.Kind)
+                    {
+                        case ChatEventKind.TextDelta:
+                        case ChatEventKind.TurnDone:
+                        case ChatEventKind.Error:
+                            output.Add(ev);
+                            break;
+                    }
+                }
             }
         }
 
@@ -67,6 +82,7 @@ namespace UnityMCP.Editor.Chat
         {
             _proc?.Dispose();
             _proc = null;
+            _accumulator.Reset();
         }
 
         public void Dispose() => Stop();

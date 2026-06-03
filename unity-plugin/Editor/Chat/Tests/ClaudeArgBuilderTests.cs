@@ -100,5 +100,18 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.Greater(idx, -1);
             Assert.AreEqual("acceptEdits", args[idx + 1]);
         }
+
+        [Test]
+        public void Build_DisallowsAskUserQuestion_ImmediatelyAfterFlag()
+        {
+            // AskUserQuestion auto-fails in headless stream-json (~500ms, no stdin wait)
+            // so the model must be forced to ask via prose instead.
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "plan", null);
+
+            var idx = System.Array.IndexOf(args, "--disallowedTools");
+            Assert.Greater(idx, -1, "--disallowedTools flag must be present");
+            Assert.AreEqual("AskUserQuestion", args[idx + 1]);
+        }
     }
 }

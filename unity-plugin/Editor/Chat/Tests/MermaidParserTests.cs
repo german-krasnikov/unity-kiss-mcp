@@ -125,5 +125,29 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(1, g.Nodes.Count);
             Assert.AreEqual("First", g.Nodes[0].Label);
         }
+
+        // ── BUG 1: <br/> normalization ──────────────────────────────────────
+
+        [Test]
+        public void BrTag_NormalizedToNewline()
+        {
+            Assert.AreEqual("Line1\nLine2", MermaidParser.NormalizeBr("Line1<br/>Line2"));
+            Assert.AreEqual("A\nB",         MermaidParser.NormalizeBr("A<BR>B"));
+            Assert.AreEqual("A\nB",         MermaidParser.NormalizeBr("A<br />B"));
+        }
+
+        [Test]
+        public void NodeLabel_BrBecomesNewline()
+        {
+            var g = MermaidParser.TryParse(new[] { "graph TD", "A[Hello<br/>World]" });
+            Assert.AreEqual("Hello\nWorld", g.Nodes[0].Label);
+        }
+
+        [Test]
+        public void EdgeLabel_BrBecomesNewline()
+        {
+            var g = MermaidParser.TryParse(new[] { "graph TD", "A-->|Hello<br/>World|B" });
+            Assert.AreEqual("Hello\nWorld", g.Edges[0].Label);
+        }
     }
 }

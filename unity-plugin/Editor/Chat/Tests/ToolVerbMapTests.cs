@@ -46,5 +46,6 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(result);
             Assert.IsNotEmpty(result);
         }
+
     }
 }

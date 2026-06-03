@@ -72,7 +72,8 @@ namespace UnityMCP.Editor.Chat
             foreach (var edge in layout.Edges)
             {
                 if (string.IsNullOrEmpty(edge.Label)) continue;
-                var edgeLbl = new Label(edge.Label);
+                var edgeLbl = new Label(MarkdownInline.ToRichText(edge.Label));
+                edgeLbl.enableRichText = true;
                 edgeLbl.AddToClassList("mermaid-edge-label");
                 edgeLbl.style.position = Position.Absolute;
                 edgeLbl.style.left     = edge.LabelX;

@@ -35,8 +35,7 @@ namespace UnityMCP.Editor.Chat
         private static VisualElement RenderParagraph(in MdBlock b)
         {
             var text = b.Lines != null ? string.Join("\n", b.Lines) : "";
-            var lbl  = new Label(MarkdownInline.ToRichText(text));
-            lbl.enableRichText = true;
+            var lbl  = ChatLabel.Selectable(MarkdownInline.ToRichText(text), richText: true);
             lbl.AddToClassList("md-para");
             return lbl;
         }
@@ -45,8 +44,7 @@ namespace UnityMCP.Editor.Chat
         {
             var text  = b.Lines != null && b.Lines.Count > 0 ? b.Lines[0] : "";
             var level = Mathf.Clamp(b.Level, 1, 6);
-            var lbl   = new Label(MarkdownInline.ToRichText(text));
-            lbl.enableRichText = true;
+            var lbl   = ChatLabel.Selectable(MarkdownInline.ToRichText(text), richText: true);
             lbl.AddToClassList($"md-h{level}");
             return lbl;
         }
@@ -62,9 +60,8 @@ namespace UnityMCP.Editor.Chat
             }
 
             var body = b.Lines != null ? string.Join("\n", b.Lines) : "";
-            var code = new Label(body);
-            // Raw code — no rich-text, so <> show literally.
-            code.enableRichText = false;
+            // Raw code — no rich-text, so <> show literally. Selectable so users can copy it.
+            var code = ChatLabel.Selectable(body, richText: false);
             code.AddToClassList("md-code");
             box.Add(code);
             return box;
@@ -74,8 +71,7 @@ namespace UnityMCP.Editor.Chat
         {
             var text = b.Lines != null ? string.Join("\n", b.Lines) : "";
             var ve   = new VisualElement(); ve.AddToClassList("md-quote");
-            var lbl  = new Label(MarkdownInline.ToRichText(text));
-            lbl.enableRichText = true;
+            var lbl  = ChatLabel.Selectable(MarkdownInline.ToRichText(text), richText: true);
             ve.Add(lbl);
             return ve;
         }

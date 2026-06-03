@@ -15,8 +15,12 @@ namespace UnityMCP.Editor.Chat
             if (graph == null)
                 return CodeBoxFallback(block);
 
-            var layout = MermaidLayout.Compute(graph);
-            return new MermaidView(graph, layout);
+            var layout  = MermaidLayout.Compute(graph);
+            var view    = new MermaidView(graph, layout);
+            var scroller = new ScrollView(ScrollViewMode.Horizontal);
+            scroller.AddToClassList("mermaid-scroll");
+            scroller.Add(view);
+            return scroller;
         }
 
         private static VisualElement CodeBoxFallback(in MdBlock block)

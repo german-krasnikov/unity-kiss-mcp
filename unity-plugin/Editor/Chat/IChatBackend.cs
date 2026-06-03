@@ -22,8 +22,9 @@ namespace UnityMCP.Editor.Chat
         /// <summary>
         /// Drain buffered events produced since last call.
         /// Called every ~33 ms from the UI schedule.
+        /// toolOutput receives assembled ToolCallRecords (chip-create, args-update, result-update).
         /// </summary>
-        void DrainEvents(List<ChatEvent> output);
+        void DrainEvents(List<ChatEvent> output, List<ToolCallRecord> toolOutput = null);
 
         /// <summary>Kill the child process.</summary>
         void Stop();

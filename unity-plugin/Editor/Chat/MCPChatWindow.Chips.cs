@@ -30,12 +30,17 @@ namespace UnityMCP.Editor.Chat
             var cap = go;
             lbl.RegisterCallback<ClickEvent>(_ => { EditorGUIUtility.PingObject(cap); Selection.activeObject = cap; });
 
-            var removeBtn = new Button(() => _objChipStrip.Remove(chip)) { text = "✕" };
+            var removeBtn = new Button(() =>
+            {
+                _objChipStrip.Remove(chip);
+                UpdateAutoHeight();
+            }) { text = "✕" };
             removeBtn.AddToClassList("obj-chip-remove");
 
             chip.Add(lbl);
             chip.Add(removeBtn);
             _objChipStrip.Add(chip);
+            UpdateAutoHeight();
         }
 
         private List<string> CollectChipPaths()

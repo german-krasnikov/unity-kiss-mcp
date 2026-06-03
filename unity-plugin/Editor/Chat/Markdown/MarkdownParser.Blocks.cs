@@ -10,9 +10,11 @@ namespace UnityMCP.Editor.Chat
             var lang = lines[i].Length > 3 ? lines[i].Substring(3).Trim() : "";
             var body = new List<string>();
             i++;
+            bool closed = false;
             while (i < lines.Length && !lines[i].StartsWith("```")) { body.Add(lines[i]); i++; }
-            if (i < lines.Length) i++; // consume closing ```
-            result.Add(string.Equals(lang, "mermaid", System.StringComparison.OrdinalIgnoreCase)
+            if (i < lines.Length) { i++; closed = true; } // consume closing ```
+            // Unclosed fence (still streaming) → Code, never a half-parsed Mermaid diagram.
+            result.Add(closed && string.Equals(lang, "mermaid", System.StringComparison.OrdinalIgnoreCase)
                 ? MdBlock.Mermaid(body)
                 : MdBlock.Code(lang, body));
             return i;

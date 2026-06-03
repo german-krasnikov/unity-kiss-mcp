@@ -46,10 +46,11 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void EscapesAngleBrackets_BeforeTags()
         {
-            // <b>hi</b> must NOT become bold — angle brackets must be escaped
+            // <b>hi</b> must NOT become bold. UIToolkit decodes no HTML entities, so we
+            // neutralize '<' with a noparse scope (NOT &lt;, which would render verbatim).
             var result = MarkdownInline.ToRichText("<b>hi</b>");
-            Assert.IsTrue(result.Contains("&lt;b&gt;"), $"Got: {result}");
-            // must NOT contain a raw <b> tag from the input
+            Assert.IsTrue(result.Contains("<noparse><</noparse>"), $"Bracket not neutralized: {result}");
+            Assert.IsFalse(result.Contains("&lt;"), $"Must not emit HTML entities: {result}");
             Assert.IsFalse(result.Contains("<b>hi</b>"), $"Raw tag leaked: {result}");
         }
 
@@ -85,6 +86,32 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var result = MarkdownInline.ToRichText("**_nested_**");
             Assert.IsTrue(result.Contains("<b>"), $"Got: {result}");
+        }
+
+        [Test]
+        public void AngleBracketMidWord_Neutralized()
+        {
+            var result = MarkdownInline.ToRichText("vector<int>");
+            Assert.IsTrue(result.Contains("<noparse><</noparse>"), $"Got: {result}");
+            Assert.IsFalse(result.Contains("&lt;"), $"Got: {result}");
+            Assert.IsTrue(result.Contains("int>"), $"Got: {result}");
+        }
+
+        [Test]
+        public void BoldWithAngleBracket_BoldStaysRealBracketNeutralized()
+        {
+            var result = MarkdownInline.ToRichText("**vector<int>**");
+            Assert.IsTrue(result.Contains("<b>"), $"Bold tag missing: {result}");
+            Assert.IsTrue(result.Contains("<noparse><</noparse>"), $"Bracket not neutralized: {result}");
+            Assert.IsFalse(result.Contains("&lt;"), $"Got: {result}");
+        }
+
+        [Test]
+        public void LiteralNoparseInput_NotTreatedAsTag()
+        {
+            var result = MarkdownInline.ToRichText("<noparse>hi");
+            Assert.IsTrue(result.StartsWith("<noparse><</noparse>noparse>"), $"Got: {result}");
+            Assert.IsFalse(result.Contains("&lt;"), $"Got: {result}");
         }
     }
 }

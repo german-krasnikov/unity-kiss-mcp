@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -12,13 +13,16 @@ namespace UnityMCP.Editor.Chat
         private bool           _agentMode, _waitingReply;
         private int            _dotCount, _inputTokens, _outputTokens;
         private float          _totalCostUsd;
-        private readonly System.Collections.Generic.List<ChatEvent> _evBuf = new System.Collections.Generic.List<ChatEvent>(16);
+        private readonly List<ChatEvent>       _evBuf   = new List<ChatEvent>(16);
+        private readonly List<ToolCallRecord>  _toolBuf = new List<ToolCallRecord>(8);
         private TextField     _input;
         private Label         _modePill, _costBadge, _typingDots;
         private VisualElement _objChipStrip;
+        private VisualElement _inputArea;
         private ScrollView    _scroll;
+        private InputHeightCalc _heightCalc = new InputHeightCalc();
 
-        [MenuItem("Tools/Unity MCP/Chat")]
+        [MenuItem("MCP/Chat", priority = 0)]
         public static void ShowWindow()
         {
             var w = GetWindow<MCPChatWindow>("MCP Chat");
@@ -28,6 +32,8 @@ namespace UnityMCP.Editor.Chat
         private void OnEnable()  => CreateBackend();
         private void OnDisable() { _backend?.Stop(); _backend = null; }
 
+        private ChatRefResolver _resolver;
+
         private void CreateGUI()
         {
             var root = rootVisualElement;
@@ -36,27 +42,35 @@ namespace UnityMCP.Editor.Chat
             if (ss != null) root.styleSheets.Add(ss);
             root.AddToClassList("chat-root");
             root.Add(BuildToolbar());
-            _scroll = new ScrollView(); _scroll.AddToClassList("chat-scroll");
+            root.Add(BuildFlowBar());
+            _scroll = new ScrollView(ScrollViewMode.Vertical);
+            _scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            _scroll.AddToClassList("chat-scroll");
             var inner = new VisualElement();
             _scroll.Add(inner);
-            _transcript = new ChatTranscript(inner, ChatBlockRendererFactory.CreateDefault());
+            _resolver = new ChatRefResolver();
+            _resolver.Refresh();
+            var registry = ChatBlockRendererFactory.CreateDefault(_resolver, AddRefToContext);
+            _transcript = new ChatTranscript(inner, registry);
             root.Add(_scroll);
             _typingDots = new Label("..."); _typingDots.AddToClassList("typing-dots");
             _typingDots.style.display = DisplayStyle.None;
             root.Add(_typingDots);
-            var inputArea = BuildInputArea();
-            inputArea.style.height = 96;
-            root.Add(BuildResizeHandle(inputArea));
-            root.Add(inputArea);
+            _inputArea = BuildInputArea();
+            ResetInputAreaHeight();
+            root.Add(BuildResizeHandle(_inputArea));
+            root.Add(_inputArea);
+            SetupAutoHeight();
             root.schedule.Execute(DrainAndRender).Every(33);
             root.schedule.Execute(TickDots).Every(400);
+            root.schedule.Execute(TickFlowBarSweep).Every(800);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
             root.RegisterCallback<DragPerformEvent>(OnDragPerform);
         }
 
         private VisualElement BuildToolbar()
         {
-            var bar = new VisualElement(); bar.AddToClassList("chat-toolbar");
+            var bar   = new VisualElement(); bar.AddToClassList("chat-toolbar");
             var title = new Label("MCP Chat"); title.AddToClassList("chat-title");
             _modePill  = new Label("ASK"); _modePill.AddToClassList("mode-pill"); _modePill.AddToClassList("mode-pill--ask");
             _costBadge = new Label("");    _costBadge.AddToClassList("cost-badge");
@@ -73,13 +87,13 @@ namespace UnityMCP.Editor.Chat
             area.Add(_input);
             EnterKeySend.Attach(_input, OnSend);
 
-            var actionBar = new VisualElement(); actionBar.AddToClassList("input-actionbar");
-            var modeGroup = new VisualElement(); modeGroup.AddToClassList("mode-toggle-row");
+            var actionBar  = new VisualElement(); actionBar.AddToClassList("input-actionbar");
+            var modeGroup  = new VisualElement(); modeGroup.AddToClassList("mode-toggle-row");
             modeGroup.Add(MakeModeBtn("Ask", false)); modeGroup.Add(MakeModeBtn("Agent", true));
             actionBar.Add(modeGroup);
             var spacer = new VisualElement(); spacer.AddToClassList("actionbar-spacer");
             actionBar.Add(spacer);
-            var ssBtn = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
+            var ssBtn   = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
             ssBtn.AddToClassList("chat-btn"); ssBtn.AddToClassList("chat-btn--screenshot");
             var sendBtn = new Button(OnSend) { text = "Send" };
             sendBtn.AddToClassList("chat-btn"); sendBtn.AddToClassList("chat-btn--send");
@@ -99,7 +113,8 @@ namespace UnityMCP.Editor.Chat
         private void SetMode(bool agentMode)
         {
             if (_agentMode == agentMode) return;
-            _agentMode = agentMode; _backend?.Stop(); CreateBackend();
+            _agentMode = agentMode;
+            _backend?.Stop(); CreateBackend();
             _modePill.text = agentMode ? "AGENT" : "ASK";
             _modePill.RemoveFromClassList("mode-pill--ask"); _modePill.RemoveFromClassList("mode-pill--agent");
             _modePill.AddToClassList(agentMode ? "mode-pill--agent" : "mode-pill--ask");
@@ -122,7 +137,10 @@ namespace UnityMCP.Editor.Chat
             _transcript.AppendUserBubble(text);
             _backend.SendTurn(UserTurnBuilder.Build(text));
             _input.value = ""; _objChipStrip.Clear();
+            _heightCalc.Reset();
+            ResetInputAreaHeight();
             _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
+            if (_activity.Send()) OnActivityChanged();
         }
 
         private void AttachScreenshot()
@@ -138,45 +156,31 @@ namespace UnityMCP.Editor.Chat
             _transcript.AppendUserBubble(text, path);
             _backend.SendTurn(UserTurnBuilder.Build(text, bytes));
             _input.value = ""; _objChipStrip.Clear();
+            _heightCalc.Reset();
+            ResetInputAreaHeight();
             _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
+            if (_activity.Send()) OnActivityChanged();
         }
 
-        private void DrainAndRender()
+        // Clears fixed height and restores min/max so flex layout sizes to content.
+        private void ResetInputAreaHeight()
         {
-            _evBuf.Clear(); _backend?.DrainEvents(_evBuf);
-            if (_evBuf.Count == 0) return;
-            foreach (var ev in _evBuf) HandleEvent(ev);
-            _scroll.scrollOffset = new Vector2(0, float.MaxValue);
+            _inputArea.style.height    = StyleKeyword.Null;
+            _inputArea.style.minHeight = InputHeightCalc.CompactH;
+            _inputArea.style.maxHeight = _heightCalc.ComputeMax(position.height);
         }
 
-        private void HandleEvent(ChatEvent ev)
+        // Appends a reference path to the input field and focuses it.
+        private void AddRefToContext(string refPath)
         {
-            switch (ev.Kind)
-            {
-                case ChatEventKind.TextDelta:
-                    _transcript.AppendOrExtendAssistant(ev.Text);
-                    _waitingReply = false; _typingDots.style.display = DisplayStyle.None; break;
-                case ChatEventKind.ToolStart when ev.Text != null:
-                    _transcript.AppendToolChip(ev.Text, ok: true); break;
-                case ChatEventKind.TurnDone:
-                    _transcript.FinalizeAssistant();
-                    if (ev.CostUsd > 0f)
-                    {
-                        _totalCostUsd += ev.CostUsd; _inputTokens += ev.InputTokens; _outputTokens += ev.OutputTokens;
-                        _costBadge.text = $"${_totalCostUsd:F4}  {_inputTokens}↑{_outputTokens}↓";
-                    }
-                    _waitingReply = false; _typingDots.style.display = DisplayStyle.None; break;
-                case ChatEventKind.Error:
-                    _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
-                    _waitingReply = false; _typingDots.style.display = DisplayStyle.None; break;
-            }
+            if (string.IsNullOrEmpty(refPath)) return;
+            var current = _input.value ?? "";
+            var sep     = current.Length > 0 && !current.EndsWith(" ") ? " " : "";
+            _input.value = current + sep + refPath + " ";
+            _input.Focus();
+            _input.SelectRange(_input.value.Length, _input.value.Length);
+            UpdateAutoHeight();
         }
 
-        private void TickDots()
-        {
-            if (!_waitingReply) return;
-            _dotCount = (_dotCount + 1) % 4;
-            _typingDots.text = new string('.', _dotCount + 1);
-        }
     }
 }

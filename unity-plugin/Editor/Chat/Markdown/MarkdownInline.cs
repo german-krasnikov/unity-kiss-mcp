@@ -8,8 +8,13 @@ namespace UnityMCP.Editor.Chat
 {
     public static class MarkdownInline
     {
-        private const string CodeColor = "#9aa5ce";
+        internal const string CodeColor = "#9aa5ce"; // single source; ChatLinkify matches this
         private const string LinkColor = "#566677";
+
+        // U+FDD0/U+FDD1 are permanent Unicode non-characters — they can never appear in
+        // real text, so they are collision-proof placeholders for extracted code spans.
+        private const string SlotOpen  = "﷐";
+        private const string SlotClose = "﷑";
 
         private static readonly Regex _code  = new Regex(@"`([^`]+)`",         RegexOptions.Compiled);
         private static readonly Regex _bold  = new Regex(@"\*\*(.+?)\*\*",     RegexOptions.Compiled);
@@ -17,16 +22,18 @@ namespace UnityMCP.Editor.Chat
         private static readonly Regex _ital  = new Regex(@"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", RegexOptions.Compiled);
         private static readonly Regex _link  = new Regex(@"\[([^\]]+)\]\(([^)]+)\)", RegexOptions.Compiled);
 
-        /// <summary>Escapes &amp; &lt; &gt; — always escape &amp; FIRST.</summary>
+        /// <summary>Neutralizes a literal '&lt;' with a noparse scope so UIToolkit rich-text
+        /// won't treat it as a tag. UIToolkit decodes NO HTML entities, so emitting '&amp;lt;'
+        /// renders verbatim (the bug). '&amp;' and '&gt;' are harmless and pass through.</summary>
         public static string Escape(string s)
         {
             if (string.IsNullOrEmpty(s)) return s;
-            return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+            return s.Replace("<", "<noparse><</noparse>");
         }
 
         /// <summary>
-        /// Converts inline markdown to Unity rich-text. Escapes angle brackets FIRST
-        /// so raw HTML from input never becomes real tags. Code spans protect inner stars.
+        /// Converts inline markdown to Unity rich-text. Neutralizes literal '&lt;' FIRST
+        /// (via noparse) so raw HTML from input never becomes real tags. Code spans protect inner stars.
         /// </summary>
         public static string ToRichText(string span)
         {
@@ -38,7 +45,7 @@ namespace UnityMCP.Editor.Chat
             var withPlaceholders = _code.Replace(span, m =>
             {
                 codeSlots.Add(m.Groups[1].Value); // raw inner text
-                return "\x00CODE" + (codeSlots.Count - 1) + "\x00";
+                return SlotOpen + (codeSlots.Count - 1) + SlotClose;
             });
 
             // Step 2: escape HTML in the non-code text.
@@ -58,7 +65,7 @@ namespace UnityMCP.Editor.Chat
                 var inner = Escape(codeSlots[i]); // escape HTML in code content
                 var rendered = "<color=" + CodeColor + ">" + inner + "</color>";
                 withPlaceholders = withPlaceholders.Replace(
-                    "\x00CODE" + i + "\x00", rendered);
+                    SlotOpen + i + SlotClose, rendered);
             }
 
             return withPlaceholders;

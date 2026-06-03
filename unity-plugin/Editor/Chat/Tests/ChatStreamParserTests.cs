@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
 
@@ -114,18 +115,82 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void ParseLine_UserType_ReturnsNull()
+        public void ParseLine_UserType_EmptyContent_ReturnsNull()
         {
-            var result = ChatStreamParser.ParseLine("{\"type\":\"user\",\"message\":{}}");
+            var result = ChatStreamParser.ParseLine("{\"type\":\"user\",\"message\":{\"content\":[]}}");
             Assert.IsNull(result);
         }
 
         [Test]
-        public void ParseLine_ContentBlockStop_ReturnsNull()
+        public void ParseLine_ContentBlockStop_ReturnsToolArgsComplete()
         {
             const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_stop\"}}";
             var result = ChatStreamParser.ParseLine(line);
-            Assert.IsNull(result);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ChatEventKind.ToolArgsComplete, result.Value.Kind);
+        }
+
+        // ── ToolId extraction ─────────────────────────────────────────────────
+
+        [Test]
+        public void ParseLine_ContentBlockStartToolUse_ExtractsId()
+        {
+            const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_abc\",\"name\":\"get_hierarchy\"}}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual("toolu_abc", result.Value.ToolId);
+        }
+
+        // ── tool_result (user message) ────────────────────────────────────────
+
+        [Test]
+        public void ParseLine_UserToolResult_ReturnsToolResult()
+        {
+            const string line = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_xyz\",\"content\":\"Root/Cube\"}]}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ChatEventKind.ToolResult, result.Value.Kind);
+            Assert.AreEqual("toolu_xyz", result.Value.ToolId);
+            Assert.AreEqual("Root/Cube", result.Value.Text);
+            Assert.IsTrue(result.Value.IsOk);
+        }
+
+        [Test]
+        public void ParseLine_UserToolResult_Error_SetsIsOkFalse()
+        {
+            const string line = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_err\",\"is_error\":true,\"content\":\"boom\"}]}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ChatEventKind.ToolResult, result.Value.Kind);
+            Assert.IsFalse(result.Value.IsOk);
+        }
+
+        [Test]
+        public void ParseLine_UserToolResult_NestedContentArray_ExtractsText()
+        {
+            const string line = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_n\",\"content\":[{\"type\":\"text\",\"text\":\"hello nested\"}]}]}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual("hello nested", result.Value.Text);
+        }
+
+        [Test]
+        public void ParseLine_UserToolResult_StringContent_ExtractsDirectly()
+        {
+            const string line = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_s\",\"content\":\"Main Camera [Camera]\"}]}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual("Main Camera [Camera]", result.Value.Text);
+        }
+
+        [Test]
+        public void ParseLine_InputJsonDelta_CarriesNullName()
+        {
+            const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"path\\\"\"}}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ChatEventKind.ToolStart, result.Value.Kind);
+            Assert.IsNull(result.Value.Text);  // name is null for delta events
         }
 
         [Test]
@@ -159,6 +224,54 @@ namespace UnityMCP.Editor.Chat.Tests
             var result = ChatStreamParser.ParseLine("{broken json{{{");
             Assert.IsNotNull(result);
             Assert.AreEqual(ChatEventKind.Error, result.Value.Kind);
+        }
+
+        // ── ParseInto: multi tool_result (FIX 1) ──────────────────────────────
+
+        [Test]
+        public void ParseInto_UserWithTwoToolResults_EmitsTwoEvents()
+        {
+            // A "user" NDJSON line with two tool_result entries in the content array.
+            const string line =
+                "{\"type\":\"user\",\"message\":{\"content\":[" +
+                "{\"type\":\"tool_result\",\"tool_use_id\":\"id_a\",\"content\":\"result_a\"}," +
+                "{\"type\":\"tool_result\",\"tool_use_id\":\"id_b\",\"is_error\":true,\"content\":\"result_b\"}" +
+                "]}}";
+
+            var sink = new List<ChatEvent>();
+            ChatStreamParser.ParseInto(line, sink);
+
+            Assert.AreEqual(2, sink.Count, "Must emit one event per tool_result entry");
+
+            Assert.AreEqual(ChatEventKind.ToolResult, sink[0].Kind);
+            Assert.AreEqual("id_a",     sink[0].ToolId);
+            Assert.AreEqual("result_a", sink[0].Text);
+            Assert.IsTrue(sink[0].IsOk);
+
+            Assert.AreEqual(ChatEventKind.ToolResult, sink[1].Kind);
+            Assert.AreEqual("id_b",     sink[1].ToolId);
+            Assert.AreEqual("result_b", sink[1].Text);
+            Assert.IsFalse(sink[1].IsOk);
+        }
+
+        [Test]
+        public void ParseInto_NonUserLine_EmitsSingleEventLikeParseLine()
+        {
+            const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_stop\"}}";
+            var sink = new List<ChatEvent>();
+            ChatStreamParser.ParseInto(line, sink);
+            Assert.AreEqual(1, sink.Count);
+            Assert.AreEqual(ChatEventKind.ToolArgsComplete, sink[0].Kind);
+        }
+
+        [Test]
+        public void ParseInto_UserSingleToolResult_EmitsOneEvent()
+        {
+            const string line = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_xyz\",\"content\":\"Root/Cube\"}]}}";
+            var sink = new List<ChatEvent>();
+            ChatStreamParser.ParseInto(line, sink);
+            Assert.AreEqual(1, sink.Count);
+            Assert.AreEqual("toolu_xyz", sink[0].ToolId);
         }
     }
 }

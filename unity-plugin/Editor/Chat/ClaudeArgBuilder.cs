@@ -33,6 +33,8 @@ namespace UnityMCP.Editor.Chat
                 // because plan mode still blocks mutations on top of this allowlist.
                 // Must match the server key in mcp.json ("unity").
                 "--allowedTools", "mcp__unity",
+                // built-in AskUserQuestion auto-fails in headless stream-json (~500ms, no stdin wait) -> force prose questions
+                "--disallowedTools", "AskUserQuestion",
             };
 
             if (!string.IsNullOrEmpty(resumeSessionId))

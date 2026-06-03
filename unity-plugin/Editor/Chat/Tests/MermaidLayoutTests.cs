@@ -148,6 +148,52 @@ namespace UnityMCP.Editor.Chat.Tests
             }
         }
 
+        // ── BUG 2: per-node sizing ───────────────────────────────────────────
+
+        [Test]
+        public void MeasureNode_SingleLine_WidthProportionalToLength()
+        {
+            var (w1, _) = MermaidLayout.MeasureNode("Hi");
+            var (w2, _) = MermaidLayout.MeasureNode("A much longer label text");
+            Assert.Greater(w2, w1);
+        }
+
+        [Test]
+        public void MeasureNode_MultiLine_HeightGrows()
+        {
+            var (_, h1) = MermaidLayout.MeasureNode("One");
+            var (_, h2) = MermaidLayout.MeasureNode("One\nTwo\nThree");
+            Assert.Greater(h2, h1);
+        }
+
+        [Test]
+        public void MeasureNode_ClampedToMax()
+        {
+            var (w, h) = MermaidLayout.MeasureNode(
+                new string('X', 200) + "\n" + new string('Y', 200) +
+                "\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10");
+            Assert.LessOrEqual(w, 280f);
+            Assert.LessOrEqual(h, 120f);
+        }
+
+        [Test]
+        public void VariableWidth_NodesDoNotOverlap()
+        {
+            var g = new MermaidGraph { Dir = MermaidDir.TD };
+            g.GetOrAdd("A", "Root", NodeShape.Rect);
+            g.GetOrAdd("B", "Short", NodeShape.Rect);
+            g.GetOrAdd("C", "This is a very long label that should be wider", NodeShape.Rect);
+            g.Edges.Add(new MermaidEdge { From = "A", To = "B", Arrow = true });
+            g.Edges.Add(new MermaidEdge { From = "A", To = "C", Arrow = true });
+            var r = MermaidLayout.Compute(g);
+            var rB = FindRect(r, "B");
+            var rC = FindRect(r, "C");
+            // B and C are in the same layer (siblings) — must not overlap
+            bool overlaps = rB.X < rC.X + rC.W && rC.X < rB.X + rB.W
+                         && rB.Y < rC.Y + rC.H && rC.Y < rB.Y + rB.H;
+            Assert.IsFalse(overlaps, $"B={rB} and C={rC} overlap");
+        }
+
         // ── helpers ─────────────────────────────────────────────────────────
 
         private static float NodeLayer(LayoutResult r, string id)
