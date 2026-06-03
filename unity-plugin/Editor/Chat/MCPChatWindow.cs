@@ -10,13 +10,13 @@ namespace UnityMCP.Editor.Chat
     {
         private IChatBackend   _backend;
         private ChatTranscript _transcript;
-        private bool           _agentMode, _waitingReply;
-        private int            _dotCount, _inputTokens, _outputTokens;
-        private float          _totalCostUsd;
+        private bool           _agentMode;
+        private int            _inputTokens, _outputTokens;
         private readonly List<ChatEvent>       _evBuf   = new List<ChatEvent>(16);
         private readonly List<ToolCallRecord>  _toolBuf = new List<ToolCallRecord>(8);
         private TextField     _input;
-        private Label         _modePill, _costBadge, _typingDots;
+        private Label         _tokenReadout;
+        private Button        _askBtn, _agentBtn;
         private VisualElement _objChipStrip;
         private VisualElement _inputArea;
         private ScrollView    _scroll;
@@ -41,8 +41,6 @@ namespace UnityMCP.Editor.Chat
                 "Packages/com.unity-mcp.editor/Editor/Chat/MCPChatWindow.uss");
             if (ss != null) root.styleSheets.Add(ss);
             root.AddToClassList("chat-root");
-            root.Add(BuildToolbar());
-            root.Add(BuildFlowBar());
             _scroll = new ScrollView(ScrollViewMode.Vertical);
             _scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             _scroll.AddToClassList("chat-scroll");
@@ -53,53 +51,58 @@ namespace UnityMCP.Editor.Chat
             var registry = ChatBlockRendererFactory.CreateDefault(_resolver, AddRefToContext);
             _transcript = new ChatTranscript(inner, registry);
             root.Add(_scroll);
-            _typingDots = new Label("..."); _typingDots.AddToClassList("typing-dots");
-            _typingDots.style.display = DisplayStyle.None;
-            root.Add(_typingDots);
             _inputArea = BuildInputArea();
             ResetInputAreaHeight();
             root.Add(BuildResizeHandle(_inputArea));
             root.Add(_inputArea);
             SetupAutoHeight();
             root.schedule.Execute(DrainAndRender).Every(33);
-            root.schedule.Execute(TickDots).Every(400);
-            root.schedule.Execute(TickFlowBarSweep).Every(800);
+            root.schedule.Execute(TickFlowBarSweep).Every(950);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
             root.RegisterCallback<DragPerformEvent>(OnDragPerform);
-        }
-
-        private VisualElement BuildToolbar()
-        {
-            var bar   = new VisualElement(); bar.AddToClassList("chat-toolbar");
-            var title = new Label("MCP Chat"); title.AddToClassList("chat-title");
-            _modePill  = new Label("ASK"); _modePill.AddToClassList("mode-pill"); _modePill.AddToClassList("mode-pill--ask");
-            _costBadge = new Label("");    _costBadge.AddToClassList("cost-badge");
-            bar.Add(title); bar.Add(_modePill); bar.Add(_costBadge); bar.Add(BuildAgentSelector());
-            return bar;
         }
 
         private VisualElement BuildInputArea()
         {
             var area = new VisualElement(); area.AddToClassList("input-area");
+            area.Add(BuildFlowBar());
             _objChipStrip = new VisualElement(); _objChipStrip.AddToClassList("obj-chip-strip");
             area.Add(_objChipStrip);
             _input = new TextField { multiline = true }; _input.AddToClassList("chat-input");
             area.Add(_input);
             EnterKeySend.Attach(_input, OnSend);
+            area.Add(BuildFooterBar());
+            return area;
+        }
 
-            var actionBar  = new VisualElement(); actionBar.AddToClassList("input-actionbar");
-            var modeGroup  = new VisualElement(); modeGroup.AddToClassList("mode-toggle-row");
-            modeGroup.Add(MakeModeBtn("Ask", false)); modeGroup.Add(MakeModeBtn("Agent", true));
-            actionBar.Add(modeGroup);
-            var spacer = new VisualElement(); spacer.AddToClassList("actionbar-spacer");
-            actionBar.Add(spacer);
+        private VisualElement BuildFooterBar()
+        {
+            var bar = new VisualElement(); bar.AddToClassList("footer-bar");
+
+            // Agent selector (left, shrinkable)
+            var sel = BuildAgentSelector();
+            sel.AddToClassList("footer-selector");
+            bar.Add(sel);
+
+            // Segmented mode toggle
+            var seg = new VisualElement(); seg.AddToClassList("mode-segment");
+            _askBtn   = MakeModeBtn("Ask",   false);
+            _agentBtn = MakeModeBtn("Agent", true);
+            seg.Add(_askBtn); seg.Add(_agentBtn);
+            bar.Add(seg);
+
+            var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
+            bar.Add(spacer);
+
+            _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
+            bar.Add(_tokenReadout);
+
             var ssBtn   = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
             ssBtn.AddToClassList("chat-btn"); ssBtn.AddToClassList("chat-btn--screenshot");
             var sendBtn = new Button(OnSend) { text = "Send" };
             sendBtn.AddToClassList("chat-btn"); sendBtn.AddToClassList("chat-btn--send");
-            actionBar.Add(ssBtn); actionBar.Add(sendBtn);
-            area.Add(actionBar);
-            return area;
+            bar.Add(ssBtn); bar.Add(sendBtn);
+            return bar;
         }
 
         private Button MakeModeBtn(string label, bool isAgent)
@@ -115,9 +118,8 @@ namespace UnityMCP.Editor.Chat
             if (_agentMode == agentMode) return;
             _agentMode = agentMode;
             _backend?.Stop(); CreateBackend();
-            _modePill.text = agentMode ? "AGENT" : "ASK";
-            _modePill.RemoveFromClassList("mode-pill--ask"); _modePill.RemoveFromClassList("mode-pill--agent");
-            _modePill.AddToClassList(agentMode ? "mode-pill--agent" : "mode-pill--ask");
+            _askBtn?.EnableInClassList("mode-toggle-btn--active",   !agentMode);
+            _agentBtn?.EnableInClassList("mode-toggle-btn--active", agentMode);
         }
 
         private void CreateBackend()
@@ -139,7 +141,6 @@ namespace UnityMCP.Editor.Chat
             _input.value = ""; _objChipStrip.Clear();
             _heightCalc.Reset();
             ResetInputAreaHeight();
-            _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
             if (_activity.Send()) OnActivityChanged();
         }
 
@@ -158,11 +159,9 @@ namespace UnityMCP.Editor.Chat
             _input.value = ""; _objChipStrip.Clear();
             _heightCalc.Reset();
             ResetInputAreaHeight();
-            _waitingReply = true; _typingDots.style.display = DisplayStyle.Flex;
             if (_activity.Send()) OnActivityChanged();
         }
 
-        // Clears fixed height and restores min/max so flex layout sizes to content.
         private void ResetInputAreaHeight()
         {
             _inputArea.style.height    = StyleKeyword.Null;
@@ -170,7 +169,6 @@ namespace UnityMCP.Editor.Chat
             _inputArea.style.maxHeight = _heightCalc.ComputeMax(position.height);
         }
 
-        // Appends a reference path to the input field and focuses it.
         private void AddRefToContext(string refPath)
         {
             if (string.IsNullOrEmpty(refPath)) return;
@@ -181,6 +179,5 @@ namespace UnityMCP.Editor.Chat
             _input.SelectRange(_input.value.Length, _input.value.Length);
             UpdateAutoHeight();
         }
-
     }
 }

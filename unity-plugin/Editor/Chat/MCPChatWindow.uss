@@ -7,50 +7,12 @@
     background-color: var(--unity-colors-window-background);
 }
 
-/* ── Header / toolbar ── */
-.chat-toolbar {
-    flex-direction: row;
-    align-items: center;
-    background-color: var(--unity-colors-toolbar-background);
-    border-bottom-width: 1px;
-    border-bottom-color: var(--unity-colors-toolbar-border);
-    padding: 4px 8px;
-}
-
-.chat-title {
-    font-size: 13px;
-    -unity-font-style: bold;
-    color: var(--unity-colors-default-text);
-    flex-grow: 1;
-}
-
-.mode-pill {
+/* ── Token readout (bottom footer) ── */
+.token-readout {
     font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background-color: var(--unity-colors-button-background);
-    color: var(--unity-colors-label-text);
-    margin-left: 6px;
-    border-width: 1px;
-    border-color: var(--unity-colors-button-border);
-}
-
-.mode-pill--ask {
-    background-color: rgba(76, 175, 80, 0.15);
-    color: #4CAF50;
-    border-color: rgba(76, 175, 80, 0.3);
-}
-
-.mode-pill--agent {
-    background-color: rgba(244, 67, 54, 0.15);
-    color: var(--unity-colors-error-text);
-    border-color: rgba(244, 67, 54, 0.3);
-}
-
-.cost-badge {
-    font-size: 9px;
     color: var(--unity-colors-label-text);
     margin-left: 8px;
+    flex-shrink: 0;
 }
 
 /* ── Transcript scroll area ── */
@@ -143,13 +105,6 @@
     flex-wrap: wrap;
 }
 
-/* ── Typing indicator ── */
-.typing-dots {
-    font-size: 12px;
-    color: var(--unity-colors-label-text);
-    padding: 4px 10px;
-}
-
 /* ── Resize splitter (drag to grow the input panel) ──
    A slim bar with a centered grip pill that brightens on hover, so it reads
    clearly as draggable. Drag logic + 70..500px clamp live in C# (untouched). */
@@ -160,9 +115,11 @@
     align-items: center;
     justify-content: center;
     background-color: var(--unity-colors-window-background);
-    border-top-width: 1px;
-    border-top-color: var(--unity-colors-default-border);
     cursor: resize-vertical;
+}
+
+.resize-handle:hover {
+    background-color: var(--unity-colors-toolbar_button-background-hover);
 }
 
 .resize-handle-grip {
@@ -179,17 +136,15 @@
 }
 
 /* ── Input area (composer) ──
-   Vertical stack: [obj-chips] → [text editor grows] → [bottom action bar].
-   The panel height is driven by the drag-handle above; the editor flex-grows
-   to fill whatever room is left, so it is compact by default and only gets
-   taller when the user drags the splitter up. Never a fixed tall empty box. */
+   Vertical stack: [flowbar] → [obj-chips] → [text editor grows] → [footer-bar].
+   Single top divider separates composer from transcript. Flush bg with window. */
 .input-area {
     flex-direction: column;
     flex-shrink: 0;
     border-top-width: 1px;
-    border-top-color: var(--unity-colors-toolbar-border);
-    background-color: var(--unity-colors-toolbar-background);
-    padding: 6px 6px 5px 6px;
+    border-top-color: var(--unity-colors-default-border);
+    background-color: var(--unity-colors-window-background);
+    padding: 0 6px 5px 6px;
 }
 
 /* The multiline editor. flex-grow:1 makes it absorb the panel's free height;
@@ -223,22 +178,36 @@
     border-color: var(--unity-colors-input_field-border-focus);
 }
 
-/* ── Bottom action bar (toolbar-style footer) ──
-   Mode toggle on the left, SS + Send pushed right by a flex-grow spacer.
-   A thin top divider reads it as a deliberate footer, not floating buttons. */
-.input-actionbar {
+/* ── Footer bar ──
+   agent-selector | mode-segment | spacer | token-readout | SS | Send */
+.footer-bar {
     flex-direction: row;
     flex-shrink: 0;
     align-items: center;
-    height: 26px;
-    border-top-width: 1px;
-    border-top-color: var(--unity-colors-default-border);
-    padding-top: 4px;
+    height: 28px;
+    padding-top: 3px;
 }
 
-/* Pushes the SS/Send cluster to the right, mode toggle stays left. */
-.actionbar-spacer {
+.footer-spacer {
     flex-grow: 1;
+}
+
+/* Agent selector in footer — must shrink or Send gets pushed off at 320px */
+.footer-selector {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 140px;
+}
+
+/* Segmented mode toggle — Ask | Agent in a single outlined group */
+.mode-segment {
+    flex-direction: row;
+    flex-shrink: 0;
+    border-width: 1px;
+    border-color: var(--unity-colors-button-border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-left: 4px;
 }
 
 .chat-btn {
@@ -246,13 +215,12 @@
     height: 22px;
     padding: 0 12px;
     margin-left: 4px;
-    border-radius: 5px;
+    border-radius: 3px;
     border-width: 1px;
     background-color: var(--unity-colors-button-background);
     border-color: var(--unity-colors-button-border);
     color: var(--unity-colors-button-text);
     font-size: 11px;
-    -unity-font-style: bold;
     -unity-text-align: middle-center;
     transition-property: background-color;
     transition-duration: 0.12s;
@@ -262,45 +230,44 @@
     background-color: var(--unity-colors-button-background-hover);
 }
 
+.chat-btn:active {
+    background-color: var(--unity-colors-button-background-pressed, var(--unity-colors-button-background-hover));
+}
+
 .chat-btn--send {
     background-color: var(--unity-colors-highlight-background);
     border-color: var(--unity-colors-button-border-focus);
+    color: var(--unity-colors-highlight-text);
 }
 
 .chat-btn--send:hover {
-    background-color: var(--unity-colors-highlight-background-hover);
+    background-color: var(--unity-colors-highlight-background-hover, var(--unity-colors-highlight-background));
 }
 
-.chat-btn--screenshot {
-    background-color: var(--unity-colors-button-background);
-    border-color: var(--unity-colors-button-border);
-    color: var(--unity-colors-button-text);
-    -unity-font-style: normal;
+.chat-btn--send:active {
+    background-color: var(--unity-colors-highlight-background);
+    opacity: 0.75;
 }
 
-.chat-btn--screenshot:hover {
-    background-color: var(--unity-colors-button-background-hover);
-}
-
-/* Mode toggle (Ask / Agent) — left side of the action bar, no bottom margin now. */
-.mode-toggle-row {
-    flex-direction: row;
-    align-items: center;
-}
-
+/* Mode toggle (Ask / Agent) — inside .mode-segment, no individual border-radius */
 .mode-toggle-btn {
-    height: 22px;
+    height: 20px;
     font-size: 10px;
     padding: 0 9px;
-    border-radius: 4px;
-    border-width: 1px;
+    border-radius: 0;
+    border-width: 0;
+    border-right-width: 1px;
+    border-right-color: var(--unity-colors-button-border);
     background-color: var(--unity-colors-toolbar_button-background);
-    border-color: var(--unity-colors-button-border);
     color: var(--unity-colors-toolbar_button-text);
-    margin-right: 4px;
     -unity-text-align: middle-center;
     transition-property: background-color;
     transition-duration: 0.1s;
+}
+
+/* Last button in segment — no right divider */
+.mode-toggle-btn:last-child {
+    border-right-width: 0;
 }
 
 .mode-toggle-btn:hover {
@@ -309,7 +276,6 @@
 
 .mode-toggle-btn--active {
     background-color: var(--unity-colors-toolbar_button-background-checked);
-    border-color: var(--unity-colors-button-border-focus);
     color: var(--unity-colors-highlight-text);
 }
 
@@ -590,40 +556,37 @@
     background-color: rgba(244, 67, 54, 0.06);
 }
 
-/* -- FlowBar: 2px top-edge activity indicator below the toolbar -- */
+/* -- FlowBar: fixed 2px track with inner sweeping chip --
+   Track fades in/out; chip pings left↔right inside overflow:hidden container. */
 .flowbar {
     height: 2px;
     flex-shrink: 0;
-    transition-property: opacity, background-color;
-    transition-duration: 0.4s;
+    overflow: hidden;
     opacity: 0;
+    transition-property: opacity;
+    transition-duration: 0.3s;
 }
 
-.flowbar--idle {
-    opacity: 0;
-}
-
-.flowbar--sending {
+.flowbar--active {
     opacity: 1;
-    background-color: var(--unity-colors-highlight-background);
 }
 
-.flowbar--receiving {
-    opacity: 1;
-    background-color: #e0a050;
-}
-
-/* Ping-pong sweep toggled every 800ms by schedule.Execute(TickFlowBarSweep) */
-.flowbar--sweep-a {
-    translate: -100% 0;
-    transition-property: translate;
-    transition-duration: 0.8s;
+/* Inner chip — 33% wide, sweeps between two anchor positions */
+.flowbar__fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 33%;
+    border-radius: 1px;
+    transition-property: translate, background-color;
+    transition-duration: 0.9s;
     transition-timing-function: ease-in-out;
+    translate: -120% 0;
 }
 
-.flowbar--sweep-b {
-    translate: 100% 0;
-    transition-property: translate;
-    transition-duration: 0.8s;
-    transition-timing-function: ease-in-out;
-}
+.flowbar__fill--sending   { background-color: var(--unity-colors-highlight-background); }
+.flowbar__fill--receiving { background-color: #e0a050; }
+
+/* Ping-pong anchors toggled every 950ms (>900ms transition = each leg completes) */
+.flowbar__fill--a { translate: -40% 0; }
+.flowbar__fill--b { translate: 220% 0; }

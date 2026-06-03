@@ -164,9 +164,12 @@ unity-kiss-mcp/
 │       │   ├── ChatProcess.cs             # Process lifecycle manager
 │       │   ├── ClaudeBackend.cs           # Implementation: spawns claude CLI
 │       │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
-│       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction
+│       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
+│       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates (partial class)
+│       │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (partial class)
 │       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons
 │       │   ├── MCPChatWindow.Resize.cs    # Window resize logic
+│       │   ├── TokenFormat.cs             # Pure Abbr(n) helper — "1.2k" / "840" token display
 │       │   ├── EnterKeySend.cs            # Enter-to-send + Alt+Enter newline logic (pure testable)
 │       │   ├── ChatSettingsSection.cs     # Settings foldout in MCPSettings
 │       │   ├── ChatActivityState.cs       # Activity state tracking for grouping
@@ -177,7 +180,7 @@ unity-kiss-mcp/
 │       │   ├── CopyTextBuilder.cs         # Multi-line copy block assembly
 │       │   ├── InputHeightCalc.cs         # Input field auto-height calculation
 │       │   ├── JsonArrayScan.cs           # Scan JSON arrays for streaming results
-│       │   ├── MCPChatWindow.uss          # UIToolkit styling (+156 lines for render subsystem)
+│       │   ├── MCPChatWindow.uss          # UIToolkit styling (redesigned header removal + bottom footer)
 │       │   ├── Markdown/                  # Content rendering: registry seam + renderers
 │       │   │   ├── MdBlock.cs             # Block model (enum + metadata)
 │       │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)
@@ -200,10 +203,11 @@ unity-kiss-mcp/
 │       │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
 │       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated
 │       │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators
-│       │   └── Tests/                     # 17 NUnit suites = ~196 test cases (render + backend + interactivity)
+│       │   └── Tests/                     # 18 NUnit suites = ~202 test cases (render + backend + interactivity + pure)
 │       │       │   # Render (66): MdBlockTests(5), MarkdownParserTests(16), MarkdownInlineTests(13), MermaidParserTests(17), MermaidLayoutTests(15)
 │       │       │   # Backend/parse (87): ChatStreamParserTests(24), ClaudeArgBuilderTests(8), ToolVerbMapTests(5), ToolCallAccumulatorTests(13), ToolGroupStateTests(8), ToolGroupSummaryTests(7), UserTurnBuilderTests(9), ChatLinkifyTests(13)
 │       │       │   # Interactivity/input (43): EnterKeySendTests(7), InputHeightCalcTests(14), ChatActivityStateTests(13), CopyTextBuilderTests(9)
+│       │       │   # Pure (6): TokenFormatTests(6)
 │       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
 │       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs

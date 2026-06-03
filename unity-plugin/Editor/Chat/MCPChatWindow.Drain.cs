@@ -22,14 +22,11 @@ namespace UnityMCP.Editor.Chat
                 if (_activity.Phase != ActivityPhase.Idle && _backend != null && !_backend.IsRunning)
                 {
                     if (_activity.Fail()) OnActivityChanged();
-                    _waitingReply = false;
-                    _typingDots.style.display = DisplayStyle.None;
                 }
                 return;
             }
             // Refresh the ref cache at most ~1/sec while streaming so objects Claude just
-            // created become clickable without reopening the window. Idle frames early-return
-            // above, so this never spins when nothing is streaming.
+            // created become clickable without reopening the window.
             if (EditorApplication.timeSinceStartup - _lastRefresh > 1.0)
             {
                 _resolver?.Refresh();
@@ -48,22 +45,24 @@ namespace UnityMCP.Editor.Chat
                 case ChatEventKind.TextDelta:
                     if (_activity.FirstToken()) OnActivityChanged();
                     _transcript.AppendOrExtendAssistant(ev.Text);
-                    _waitingReply = false; _typingDots.style.display = DisplayStyle.None; break;
+                    break;
                 case ChatEventKind.TurnDone:
                     if (_activity.Done()) OnActivityChanged();
                     _transcript.FinalizeAssistant();
-                    if (ev.CostUsd > 0f)
+                    if (ev.InputTokens > 0 || ev.OutputTokens > 0)
                     {
-                        _totalCostUsd += ev.CostUsd; _inputTokens += ev.InputTokens; _outputTokens += ev.OutputTokens;
-                        _costBadge.text = $"${_totalCostUsd:F4}  {_inputTokens}↑{_outputTokens}↓";
+                        _inputTokens  += ev.InputTokens;
+                        _outputTokens += ev.OutputTokens;
+                        _tokenReadout.text =
+                            $"↑ {TokenFormat.Abbr(_inputTokens)}  ↓ {TokenFormat.Abbr(_outputTokens)}";
                     }
-                    _waitingReply = false; _typingDots.style.display = DisplayStyle.None; break;
+                    break;
                 case ChatEventKind.SessionInit:
                     break; // non-terminal: session established, keep animation running
                 case ChatEventKind.Error:
                     if (_activity.Fail()) OnActivityChanged();
                     _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
-                    _waitingReply = false; _typingDots.style.display = DisplayStyle.None; break;
+                    break;
             }
         }
 
@@ -74,20 +73,12 @@ namespace UnityMCP.Editor.Chat
                 // null ArgsJson = chip-creation record (ToolStart moment)
                 if (_activity.FirstToken()) OnActivityChanged();
                 _transcript.AppendToolChip(rec.Name, ok: true, toolId: rec.Id);
-                _waitingReply = false; _typingDots.style.display = DisplayStyle.None;
             }
             else
             {
                 // ArgsJson or HasResult = detail update
                 _transcript.UpdateToolDetail(rec.Id, rec);
             }
-        }
-
-        private void TickDots()
-        {
-            if (!_waitingReply) return;
-            _dotCount = (_dotCount + 1) % 4;
-            _typingDots.text = new string('.', _dotCount + 1);
         }
     }
 }

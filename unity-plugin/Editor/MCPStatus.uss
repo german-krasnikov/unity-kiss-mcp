@@ -1,6 +1,6 @@
 .mcp-root {
     flex-direction: column;
-    background-color: #1a1a2e;
+    background-color: var(--unity-colors-window-background);
     padding: 18px;
     align-items: center;
     justify-content: flex-start;
@@ -8,7 +8,7 @@
 
 .brand {
     font-size: 10px;
-    color: #888899;
+    color: var(--unity-colors-label-text);
     -unity-font-style: bold;
     margin-bottom: 14px;
     -unity-text-align: upper-center;
@@ -78,12 +78,12 @@
 
 .status-word--up     { color: #3ad29f; }
 .status-word--listen { color: #e8a23a; }
-.status-word--down   { color: #e94560; }
+.status-word--down   { color: var(--unity-colors-error-text); }
 
 .status-sub {
     font-size: 11px;
     -unity-font-style: italic;
-    color: #888899;
+    color: var(--unity-colors-label-text);
     margin-top: 2px;
 }
 
@@ -94,19 +94,7 @@
     flex-wrap: wrap;
 }
 
+/* Strip custom paint — let native Unity button handle bg/border/color/hover */
 .mcp-btn {
     margin: 3px;
-    padding: 3px 10px;
-    border-radius: 4px;
-    background-color: #2a2a3e;
-    border-color: #444466;
-    color: #ccccff;
-    font-size: 11px;
-    transition-property: background-color;
-    transition-duration: 0.15s;
-}
-
-.mcp-btn:hover {
-    background-color: #3a3a5e;
-    border-color: #6666aa;
 }
