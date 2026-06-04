@@ -168,24 +168,64 @@ unity-kiss-mcp/
 │       │   ├── CodexStreamParser.cs       # Codex: NDJSON → ChatEvent parser
 │       │   ├── CodexBackend.cs            # Codex: CliBackendBase subclass (spawn-per-turn)
 │       │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum
+│       │   ├── BackendConfig.cs           # [Serializable] Claude/Codex configs + persistence (F9)
+│       │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (F9, project-local Library/)
+│       │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (F9)
 │       │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
 │       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
 │       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates (partial class)
 │       │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (partial class)
 │       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons
+│       │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
+│       │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
 │       │   ├── MCPChatWindow.Resize.cs    # Window resize logic
 │       │   ├── TokenFormat.cs             # Pure Abbr(n) helper — "1.2k" / "840" token display
 │       │   ├── EnterKeySend.cs            # Enter-to-send + Alt+Enter newline logic (pure testable)
-│       │   ├── ChatSettingsSection.cs     # Settings foldout in MCPSettings
+│       │   ├── ChatSettingsSection.cs     # Settings foldout in MCPSettings (F8 Beta removed)
 │       │   ├── ChatActivityState.cs       # Activity state tracking for grouping
 │       │   ├── ChatLabel.cs               # Label customization + UI behavior
 │       │   ├── ChatRefAction.cs           # Click-navigate + context-menu for interactive refs
-│       │   ├── ChatRefResolver.cs         # Scan hierarchy, resolve scene/script refs
+│       │   ├── ChatRefResolver.cs         # Scan hierarchy, resolve scene/script refs (F4 #ID)
 │       │   ├── CopyableText.cs            # Selectable text wrapper
 │       │   ├── CopyTextBuilder.cs         # Multi-line copy block assembly
 │       │   ├── InputHeightCalc.cs         # Input field auto-height calculation
 │       │   ├── JsonArrayScan.cs           # Scan JSON arrays for streaming results
-│       │   ├── MCPChatWindow.uss          # UIToolkit styling (redesigned header removal + bottom footer)
+│       │   ├── ArgTokenizer.cs            # Shell-style quote-aware split (F9, review-hardening)
+│       │   ├── ArgQuoting.cs              # Quote escaping helpers
+│       │   ├── InlineChipData.cs          # ChipData + InlineChipTracker (F5)
+│       │   ├── InlineChipOverlay.cs       # Pill row UI (F5)
+│       │   ├── InlineChipKeyHandler.cs    # TextField event routing (F5)
+│       │   ├── ChipKindDetector.cs        # Pure Detect() → ChipKind (F10)
+│       │   ├── ResponseTagInliner.cs      # [kind:ref] parser + renderer (F10)
+│       │   ├── RestoreButton.cs           # Undo per-turn + cascade restore (F2)
+│       │   ├── TurnUndoTracker.cs         # Group lifecycle + RestoreFromIndex (F2)
+│       │   ├── SelectionSummary.cs        # Auto-Selection context (F4 hierarchy #ID)
+│       │   ├── CompileAutoFix.cs          # Auto-retry on compile
+│       │   ├── EditorStateSnapshot.cs     # Context block injection
+│       │   ├── ToolPing.cs                # Flash object on tool-call
+│       │   ├── ChipContextResolver.cs     # Resolve chips + emit typed (F10)
+│       │   ├── MCPChatWindow.Approve.cs   # Event handler (F3 gate)
+│       │   ├── ApproveHelper.cs           # Session management
+│       │   ├── ApproveButtonFactory.cs    # Button builder
+│       │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS)
+│       │   ├── ChatMcpConfigWriter.cs     # --mcp-config generation
+│       │   ├── SlashTemplate.cs           # Template model
+│       │   ├── SlashRegistry.cs           # Template registry
+│       │   ├── SlashPopup.cs              # UIToolkit popup
+│       │   ├── MCPChatWindow.Slash.cs     # Slash setup
+│       │   ├── ReloadGuard.cs             # Domain-reload lock
+│       │   ├── PendingTurnState.cs        # Persist in-flight state (v3: BackendKind)
+│       │   ├── SentTextCache.cs           # Domain-reload dedup
+│       │   ├── StderrRingBuffer.cs        # Stderr capture
+│       │   ├── ToolCallAccumulator.cs     # Accumulate tool calls
+│       │   ├── ToolCallRecord.cs          # Tool call record struct
+│       │   ├── ToolChipGrouper.cs         # Group tool calls by ID
+│       │   ├── ToolDetailBuilder.cs       # Tool card humanization
+│       │   ├── ToolGroupState.cs          # Tool grouping state
+│       │   ├── ToolGroupSummary.cs        # Summary of grouped tool calls
+│       │   ├── UserTurnBuilder.cs         # Encode user messages
+│       │   ├── UserToolResultParser.cs    # Parse tool results
+│       │   ├── MCPChatWindow.uss          # UIToolkit styling (header removal + bottom footer)
 │       │   ├── Markdown/                  # Content rendering: registry seam + renderers
 │       │   │   ├── MdBlock.cs             # Block model (enum + metadata)
 │       │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)

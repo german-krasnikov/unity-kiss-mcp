@@ -275,6 +275,128 @@ Tracks recently sent text (last 10 messages) to dedup against accumulated text d
 - On assembly reload (domain reload), cleanup task kills the PID via `Process.Kill()`
 - Prevents zombie processes on recompilation or script reload
 
+## UX Sprint Features (v0.15.0)
+
+### Feature F1 — Token Counter Reset on Backend/Model Switch
+
+`TokenResetTests.cs` ensures token counters reset when user switches backend (Claude → Codex) or selects a different model. Implemented in `MCPChatWindow.Selector.cs`:
+
+```csharp
+void SelectModelDropdown_OnChange(ChangeEvent<string> evt) {
+    ResetTokenCounters();
+    CreateBackendWithSession();
+}
+```
+
+Result: No stale token carry-over across model changes.
+
+### Feature F2 — Cascade Restore (Undo Earlier Turns)
+
+`RestoreButton.cs` + `TurnUndoTracker.RestoreFromIndex()`: User can restore any earlier turn (not just the last one). Clicking Restore on turn 3 reverts turns 3, 4, 5 in reverse order (cascade rollback via sequential `UndoGroupHelper.RevertToBeforeGroup()`).
+
+**New method:** `RestoreFromIndex(int turnIndex)` iterates from tail backward, reverting each turn's Undo group. Verified in TurnUndoTrackerTests (9/9 green).
+
+### Feature F3 — Approve Button Shows Only for Real Tool Calls
+
+`MCPChatWindow.Drain.cs` + `ApproveButtonFactory.cs`: The "Approve & Execute" button is injected only when a turn has real tool calls (`_turnHasToolCalls = true`). Turns with pure prose responses never show the button, eliminating UI clutter.
+
+**Verification:** ApproveFlowTests check flag gating.
+
+### Feature F4 — Hierarchy Refs Carry #instanceID for Disambiguation
+
+`SelectionSummary.Summarize()` + `ChipContextResolver.ResolveOne()`: When a scene has duplicate object names (e.g., two "Enemy" GameObjects), the chip path now includes the Unity instance ID: `/Enemy #12345`. Enables Claude to distinguish them.
+
+**Format:** `path #<instanceID>` (appended by ChipContextResolver at send-time). Verified in SelectionSummaryTests (path-only scene objects gain #ID markers).
+
+### Feature F5 — Inline Removable Chips + Drag-Drop + Context Menu
+
+`InlineChipData.cs` + `InlineChipTracker.cs` + `InlineChipOverlay.cs` + `InlineChipKeyHandler.cs`: Type objects directly into the composer via drag-drop. Chips appear as removable pills (✕) at cursor (fallback: top-left row if char-rect API unavailable in 2021).
+
+**Drag-drop routing** (`Chips.cs` OnDragPerform): hit-test vs `_input.worldBound` chooses inline vs strip chip.
+
+**Context menu** (`MCPChatWindow.cs` OnContextualMenuPopulate): "Add Selection to Context" inserts chip at cursor.
+
+**Tracker logic** (`InlineChipTracker.SyncToText()`): Common-prefix/suffix diff detects which U+FFFC marker was deleted → drops matching chip (handles backspace, selection-delete, paste).
+
+Verified: InlineChipTrackerTests 13/13 green, visual/interactive paths compile clean.
+
+### Feature F6 — Auto-Scroll Toggle
+
+`MCPChatWindow.Drain.cs`: EditorPref gate for auto-scroll behavior. Default ON. When OFF, streaming messages do not auto-scroll; user can read top of transcript while turn completes.
+
+**Wired in:** `Drain()` loop checks `EditorPrefs.GetBool(PrefKey.AutoScroll, true)` before calling `ScrollViewMode.Scroll()`.
+
+### Feature F7 — Status Panel Distinguishes CLI-Listening vs Chat-Active
+
+`ChatBackendProbe.cs` (reflection-based, domain-reload safe): Detects if chat backend is running via reflection on `MCPChatWindow.s_instance`. `MCPStatusModel.GetState()` now returns 3-state enum:
+- Down (no server)
+- Listen (TCP running, no chat)
+- ChatActive (Chat window running)
+
+**Reflection:** `Type.GetProperty("IsRunning")` on Chat assembly (if loaded). Domain-reload safe: re-queried per call, no static cache.
+
+Verified: MCPStatusModelTests include ChatActive state transitions.
+
+### Feature F8 — Remove "(Beta)" Labels
+
+`MCPSettingsUI.cs` + `ChatSettingsSection.cs`: Removed "(Beta)" from:
+- Chat toggle button in MCPSettings
+- Chat settings foldout header
+
+Result: UI looks shipping-ready.
+
+### Feature F9 — Per-Backend Settings Form → Own JSON → CLI Args
+
+`BackendConfig.cs` + `BackendConfigStore.cs` + `BackendSettingsForm.cs`:
+
+**Settings form** (UIToolkit dropdowns per backend):
+- Claude: model (Opus, Sonnet, Haiku), permission mode (plan, acceptEdits), timeout, extra args
+- Codex: same axes
+
+**Persistence:** Writes to `Library/MCP_ChatBackendConfig.json` (project-local, NOT ~/.codex/config.toml or ~/.mcp.json). Format:
+```json
+{
+  "claude": { "model": "opus-4-1", "permission_mode": "acceptEdits", "extra_args": "--verbose" },
+  "codex": { "model": "default", "permission_mode": "plan" }
+}
+```
+
+**Arg wiring:** `ClaudeArgBuilder.BuildArgs()` + `CodexArgBuilder.BuildArgs()` read from config and inject into argv (e.g., `--model=<model>`, extra args split on whitespace).
+
+**DRY:** `ArgTokenizer.cs` (new, shell-style quote-aware split) centralizes whitespace+quote parsing for both builders. +11 tests.
+
+Verified: BackendConfigStoreTests 10/10, BackendSettingsFormTests integration passes.
+
+### Feature F10 — Typed Context Tags (Kind-Aware Chips)
+
+`ChipKindDetector.cs` + `ChipData.Kind` + `ChipConfig.cs` + `ResponseTagInliner.cs`:
+
+**Send-side (input):**
+- Each chip carries a `ChipKind` (Hierarchy, Scene, Script, Prefab, Material, Texture, ScriptableObject, Asset)
+- AI-facing format: `[hierarchy:/Player #123]`, `[script:PlayerController]`, `[scene:.../Main.unity]`
+- Depth configurable per kind (none|path|summary|full, stored in BackendConfigStore.ChipConfig)
+- Chips display left-side color-coded kind prefix (visual feedback)
+
+**Receive-side (response):**
+- `ResponseTagInliner.Apply()` parses ONLY `[kind:ref]` format (conservative regex, no false positives on markdown/code/bare brackets)
+- Renders compact colored pills with `<link>` click-nav (symmetric with input chips)
+- Wired into `MarkdownInline` between escape and bold/italic
+
+**Classes:**
+- `ChipKindDetector.Detect()` → ChipKind (pure, reflection-based hierarchy vs scene discrimination)
+- `ChipContextResolver.EmitTyped()` + `ResolveAllTyped()` — send-time API
+- `ResponseTagInliner` — response-time parser + renderer
+
+Verified: ChipKindDetector 13/13, ResponseTagInliner 17/17 (false-positive guards), EmitTyped 7/7, ChipConfig 3/3.
+
+### Review-Hardening Pass (v0.14.6)
+
+**ArgTokenizer Quote-Awareness:** Fixes silent corruption of quoted multi-word ExtraArgs values (e.g., `--append-system-prompt "be terse"`). Shell-style: double+single quotes, unbalanced trailing tolerated. DRY across both Claude/CodexArgBuilder. +11 tests.
+
+**ChatBackendProbe Reload-Safety:** Drops stale static MethodInfo cache; resolved per-call so status stays correct across domain reloads (was wrongly showing Listen when Chat was active).
+
+**Dedup BackendConfigStore.Load():** MCPChatWindow.OnSend/AttachScreenshot now load store once and thread into AppendChipContext (lazy ??= fallback), avoiding double file-read+parse per turn.
+
 ### Binary Resolution on macOS
 
 **Problem:** Finder-launched Unity has a minimal PATH; `claude` binary may not be found.

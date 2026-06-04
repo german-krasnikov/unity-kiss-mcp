@@ -220,6 +220,33 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **BackendRegistry** & **BackendKind** enum: Factory dispatch. User selects Claude or Codex from dropdown.
 - **PendingTurnState v3**: Now persists `BackendKind` for domain-reload survival (back-compatible with v1/v2).
 
+### Per-Backend Settings (C#: BackendConfig + BackendSettingsForm, v0.15.0 F9)
+- **BackendConfig.cs** — [Serializable] per-backend configs (model, permission_mode, timeout, extra_args)
+- **BackendConfigStore.cs** — Loads/saves to `Library/MCP_ChatBackendConfig.json` (project-local, NOT global ~/.codex/config.toml)
+- **BackendSettingsForm.cs** — UIToolkit foldout per backend with model/permission/timeout/extra-args dropdowns
+- **Wiring:** `ClaudeArgBuilder` + `CodexArgBuilder` read from store, inject into argv construction
+- **ArgTokenizer.cs** — Shell-style quote-aware split (double+single quotes, unbalanced trailing tolerated); centralizes whitespace+quote parsing for both builders; fixes silent corruption of quoted multi-word ExtraArgs values (e.g., `--append-system-prompt "be terse"`); +11 tests
+
+### Typed Context Tags (C#: ChipKind + ResponseTagInliner, v0.15.0 F10)
+- **ChipKindDetector.cs** — Pure `Detect()` method categorizes chips: Hierarchy, Scene, Script, Prefab, Material, Texture, ScriptableObject, Asset
+- **ChipData.Kind** — Each chip carries a `ChipKind` enum
+- **ChipConfig.cs** — Per-kind depth config (none|path|summary|full), persisted in BackendConfigStore
+- **Send-side (input):** ChipContextResolver.EmitTyped() formats as `[hierarchy:/Player #123]`, `[script:PlayerController]`, `[scene:.../Main.unity]` for AI consumption; visual chips show left-side kind-prefix (color-coded)
+- **Receive-side (response):** ResponseTagInliner.Apply() parses ONLY exact `[kind:ref]` format (conservative regex, no false positives on markdown/code/bare brackets); renders compact colored pills with `<link>` click-nav (symmetric with input)
+- **Tests:** ChipKindDetector 13/13, ResponseTagInliner 17/17 (false-positive guards), EmitTyped 7/7, DepthFor 10/10, ChipConfig 3/3
+
+### UX Features (v0.15.0 F1–F10)
+- **F1 (Token Reset):** TokenResetTests ensure counters reset on backend/model switch
+- **F2 (Cascade Restore):** TurnUndoTracker.RestoreFromIndex() reverts any earlier turn + all later turns (reverse order)
+- **F3 (Approve Gate):** Button shows only when turn has real tool calls (_turnHasToolCalls flag)
+- **F4 (Hierarchy #ID):** ChipContextResolver appends `#<instanceID>` to scene object refs (SelectionSummary.Summarize disambiguation)
+- **F5 (Inline Chips):** InlineChipTracker + InlineChipOverlay (drag-drop, removable ✕, context menu "Add Selection")
+- **F6 (Auto-Scroll Toggle):** EditorPref gate (default ON) for scroll behavior during streaming
+- **F7 (Status Distinction):** ChatBackendProbe detects Chat-active vs CLI-listening (3-state: Down/Listen/ChatActive); domain-reload safe (per-call resolution)
+- **F8 (No Beta Labels):** Removed "(Beta)" from chat toggle + settings foldout
+- **F9 (Settings Form):** Per-backend config form → own JSON → CLI args (see BackendConfig above)
+- **F10 (Typed Tags):** Kind-aware input/output chips with configurable depth (see Typed Context Tags above)
+
 ### Editor UI Windows (C#: UIToolkit)
 - **MCPSettings Window** (MCPSettings.cs): Tool visibility toggles, organized by theme categories (CORE locked, others toggle/tri-state group masters), search bar, presets (Minimal/Full/No-visuals), dynamic Plugins section from PluginRegistry. Stylesheet: `MCPSettings.uss`.
 - **MCPStatus Window** (MCPStatusWindow.cs): Connection status monitor. UIToolkit-based with breathing heartbeat pulsation (ECG beat when connected, gentle beat when listening, flatline when stopped). Centered orb (`.orb`) + halo ring (`.orb-halo`) with state-driven colors & USS class-triggered pulsation (border-width + opacity + background-color transitions, 2021.3-safe). Polling every 700ms for state. Buttons: Restart MCP / Kill MCP / Reimport. Stylesheet: `MCPStatus.uss`.
@@ -345,49 +372,19 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - `server/src/unity_mcp/visual_diff.py` — visual regression testing
 - `server/src/unity_mcp/sampling_postproc.py` — Haiku output normalizer
 
-**C#** (76+ files):
-- `unity-plugin/Editor/MCPServer.cs` — TCP listener, state file, domain reload
-- `unity-plugin/Editor/CommandRouter.cs` — core command dispatch (partial class)
-- `unity-plugin/Editor/CommandRouter.ObjectHandlers.cs` — object mutation handlers (partial class)
-- `unity-plugin/Editor/CommandRouter.MediaHandlers.cs` — media/asset handlers (partial class)
-- `unity-plugin/Editor/CommandRegistry.cs` — command registration
-- `unity-plugin/Editor/CommandSchema.cs` — parameter validation
-- `unity-plugin/Editor/IMCPPlugin.cs` — plugin interface
-- `unity-plugin/Editor/PluginRegistry.cs` — plugin static registry
-- `unity-plugin/Editor/ObjectManager.cs` — CRUD + undo
-- `unity-plugin/Editor/ValueParser.cs` — type-aware value parsing
-- `unity-plugin/Editor/InputNormalizer.cs` — normalization
-- `unity-plugin/Editor/BatchHelper.cs` — batch text parser + executor
-- `unity-plugin/Editor/HierarchySerializer.cs` — scene tree serialization
-- `unity-plugin/Editor/ComponentSerializer.cs` — component serialization
-- `unity-plugin/Editor/RefManager.cs` — short reference manager
-- `unity-plugin/Editor/ErrorHelper.cs` — contextual errors
-- `unity-plugin/Editor/RuntimeHelper.cs` — Play Mode reflection tools
-- `unity-plugin/Editor/PlaytestRunner.cs` — DSL playtest executor (partial class, core)
-- `unity-plugin/Editor/PlaytestRunner.Steps.cs` — 21-case ExecuteStep switch (partial class)
-- `unity-plugin/Editor/PlaytestParser.cs` — DSL parser
-- `unity-plugin/Editor/MultiViewCapture.cs` — 4-panel screenshots
-- `unity-plugin/Editor/CodeExecutor.cs` — Roslyn C# execution
-- `unity-plugin/Editor/SearchHelper.cs` — scene search
-- `unity-plugin/Editor/SpatialHelper.cs` — spatial queries
-- `unity-plugin/Editor/AnimationHelper.cs` — animation CRUD
-- `unity-plugin/Editor/TimelineHelper.cs` — timeline CRUD
-- `unity-plugin/Editor/AnimatorControllerHelper.cs` — animator CRUD
-- `unity-plugin/Editor/ParticleHelper.cs` — particle system CRUD
-- `unity-plugin/Editor/ShaderHelper.cs` / `ShaderGraphHelper.cs` — shader management
-- `unity-plugin/Editor/UIHelper.cs` — UI element creation
-- `unity-plugin/Editor/ReferenceHelper.cs` — reference analysis
-- `unity-plugin/Editor/AssetDatabaseHelper.cs` — asset operations
-- `unity-plugin/Editor/ProjectSettingsHelper.cs` — project settings
-- `unity-plugin/Editor/MaterialHelper.cs` — material operations
-- `unity-plugin/Editor/PrefabHelper.cs` — prefab operations
-- `unity-plugin/Editor/ScriptableObjectHelper.cs` — SO CRUD
-- `unity-plugin/Editor/MCPSettings.cs` — UIToolkit settings (categories, tri-state toggles, presets)
-- `unity-plugin/Editor/MCPSettingsUI.cs` — foldout group builder for settings
-- `unity-plugin/Editor/MCPSettingsCategoryGroup.cs` — tri-state group toggle logic
-- `unity-plugin/Editor/CatalogParser.cs` — deserialize Python catalog JSON
-- `unity-plugin/Editor/MCPSettings.uss` — UIToolkit styling
-- `unity-plugin/Editor/MCPStatusWindow.cs` — status UI
+**C#** (130+ files, 13400+ LOC):
+- **Core** (50+ files): MCPServer, CommandRouter (3 partials), CommandRegistry/Schema, IMCPPlugin/PluginRegistry, ObjectManager, ValueParser, InputNormalizer, BatchHelper, HierarchySerializer, ComponentSerializer, RefManager, ErrorHelper, RuntimeHelper, PlaytestRunner (2 partials), PlaytestParser, MultiViewCapture, CodeExecutor, SearchHelper, SpatialHelper, AnimationHelper, TimelineHelper, AnimatorControllerHelper, ParticleHelper, ShaderHelper, ShaderGraphHelper, UIHelper, ReferenceHelper, AssetDatabaseHelper, ProjectSettingsHelper, MaterialHelper, PrefabHelper, ScriptableObjectHelper, MCPSettings, MCPSettingsUI, MCPSettingsCategoryGroup, CatalogParser, MCPStatusWindow, MCPStatusModel, MCPStatusBarWidget, MCPActions
+- **Chat Module** (80+ files, optional behind UNITY_MCP_CHAT define):
+  - **Backends:** CliBackendBase, ClaudeBackend, CodexBackend, CodexArgBuilder, CodexStreamParser, BackendRegistry, BackendConfig, BackendConfigStore, BackendSettingsForm
+  - **UX Features:** MCPChatWindow (7 partials: Drain, FlowBar, Chips, InlineChips, Selector, Approve, Slash, Resize), RestoreButton, TurnUndoTracker, SelectionSummary, CompileAutoFix, EditorStateSnapshot, ToolPing
+  - **Context & Tags:** ChipContextResolver, ChipKindDetector, ResponseTagInliner, InlineChipData, InlineChipOverlay, InlineChipKeyHandler
+  - **Infrastructure:** ChatStreamParser, ChatEvent, ChatTranscript, IChatBackend, ChatBinaryResolver, ChatProcess, ChatMcpConfigWriter, PendingTurnState, ReloadGuard, SentTextCache, StderrRingBuffer
+  - **Tools & Input:** ToolVerbMap, ToolCallAccumulator, ToolCallRecord, ToolChipGrouper, ToolDetailBuilder, ToolGroupState, ToolGroupSummary, UserTurnBuilder, UserToolResultParser
+  - **UX/Formatting:** TokenFormat, EnterKeySend, EnterKeyLogic, ChatActivityState, ChatLabel, ChatRefAction, ChatRefResolver, CopyableText, CopyTextBuilder, InputHeightCalc, JsonArrayScan, ArgTokenizer, ArgQuoting
+  - **Rendering:** Markdown/ (MdBlock, MarkdownParser, MarkdownParser.Blocks, MarkdownInline, IChatBlockRenderer, ChatBlockRendererRegistry, ChatBlockRendererFactory, MarkdownBlockRenderer, MarkdownBlockRenderer.Table, MarkdownBlockRenderer.List, ImageBlockRenderer, ChatLinkify), Mermaid/ (MermaidGraph, MermaidParser, MermaidLayout, MermaidLayout.Layers, MermaidBlockRenderer, MermaidView, MermaidEdgePainter)
+  - **Test Suites** (25+ NUnit files): ChatStreamParserTests, CliBackendBaseTests, CodexArgBuilderTests, CodexStreamParserTests, ClaudeArgBuilderTests, ToolVerbMapTests, EnterKeySendTests, PendingTurnStateTests, SelectionSummaryTests, SentTextCacheTests, ApproveFlowTests, SlashRegistryTests, SlashPopupTests, InlineChipTrackerTests, ArgTokenizerTests, ArgQuotingTests, BackendConfigStoreTests, BackendRegistryTests, ChatActivityStateTests, ChatLinkifyTests, ChatMcpConfigWriterTests, ChatProcessTests, ChatBinaryResolverTests, ChipContextResolverTests, ChipKindDetectorTests, ResponseTagInlinerTests, TokenResetTests, RestoreButtonTests, TurnUndoTrackerTests, and Markdown/Mermaid render tests (66 cases total)
+  - **Styling:** MCPChatWindow.uss
+  - **Assembly:** UnityMCP.Editor.Chat.asmdef (one-way ref to core)
 
 ## TDD Scenarios (для Developer)
 
