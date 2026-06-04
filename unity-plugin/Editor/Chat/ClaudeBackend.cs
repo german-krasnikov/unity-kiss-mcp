@@ -20,12 +20,14 @@ namespace UnityMCP.Editor.Chat
         public string SessionId { get; private set; }
 
         internal ClaudeBackend(string mcpConfigPath, string permissionMode,
-            string agentName = null, PermissionConfig permConfig = null)
+            string agentName = null, PermissionConfig permConfig = null,
+            string resumeSessionId = null)
         {
             _mcpConfigPath  = mcpConfigPath;
             _permissionMode = permissionMode;
             _agentName      = agentName;
             _permConfig     = permConfig;
+            SessionId       = resumeSessionId; // pre-seed for --resume on first Start()
         }
 
         public void Start()

@@ -13,6 +13,8 @@ namespace UnityMCP.Editor.Chat
         private bool           _agentMode;
         private PermissionConfig _permConfig = new PermissionConfig();
         private int            _inputTokens, _outputTokens;
+        // FIX A: cache the sent text so SaveStateBeforeReload reads it, not the cleared input.
+        private readonly SentTextCache _sentTextCache = new SentTextCache();
         private readonly List<ChatEvent>       _evBuf   = new List<ChatEvent>(16);
         private readonly List<ToolCallRecord>  _toolBuf = new List<ToolCallRecord>(8);
         private TextField     _input;
@@ -30,8 +32,25 @@ namespace UnityMCP.Editor.Chat
             w.minSize = new Vector2(320, 400);
         }
 
-        private void OnEnable()  => CreateBackend();
-        private void OnDisable() { _backend?.Stop(); _backend = null; }
+        private void OnEnable()
+        {
+            CreateBackend();
+            ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
+            AssemblyReloadEvents.beforeAssemblyReload += SaveStateBeforeReload;
+            // #1 fix: OnEnable fires AFTER afterAssemblyReload, so the event already fired.
+            // Call directly here — it's a no-op when no pending file exists.
+            TryResumePendingTurn();
+        }
+
+        private void OnDisable()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= SaveStateBeforeReload;
+            ChatProcess.OnAfterReloadResume -= TryResumePendingTurn;
+            // #3 fix: window closed mid-turn → release the reload lock so the next compile isn't blocked.
+            ReloadGuard.OnTurnFinished();
+            _backend?.Stop();
+            _backend = null;
+        }
 
         private ChatRefResolver _resolver;
 
@@ -76,44 +95,6 @@ namespace UnityMCP.Editor.Chat
             return area;
         }
 
-        private VisualElement BuildFooterBar()
-        {
-            var bar = new VisualElement(); bar.AddToClassList("footer-bar");
-
-            // Agent selector (left, shrinkable)
-            var sel = BuildAgentSelector();
-            sel.AddToClassList("footer-selector");
-            bar.Add(sel);
-
-            // Segmented mode toggle
-            var seg = new VisualElement(); seg.AddToClassList("mode-segment");
-            _askBtn   = MakeModeBtn("Ask",   false);
-            _agentBtn = MakeModeBtn("Agent", true);
-            seg.Add(_askBtn); seg.Add(_agentBtn);
-            bar.Add(seg);
-
-            var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
-            bar.Add(spacer);
-
-            _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
-            bar.Add(_tokenReadout);
-
-            var ssBtn   = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
-            ssBtn.AddToClassList("chat-btn"); ssBtn.AddToClassList("chat-btn--screenshot");
-            var sendBtn = new Button(OnSend) { text = "Send" };
-            sendBtn.AddToClassList("chat-btn"); sendBtn.AddToClassList("chat-btn--send");
-            bar.Add(ssBtn); bar.Add(sendBtn);
-            return bar;
-        }
-
-        private Button MakeModeBtn(string label, bool isAgent)
-        {
-            var btn = new Button(() => SetMode(isAgent)) { text = label };
-            btn.AddToClassList("mode-toggle-btn");
-            if (_agentMode == isAgent) btn.AddToClassList("mode-toggle-btn--active");
-            return btn;
-        }
-
         private void SetMode(bool agentMode)
         {
             if (_agentMode == agentMode) return;
@@ -123,28 +104,33 @@ namespace UnityMCP.Editor.Chat
             _agentBtn?.EnableInClassList("mode-toggle-btn--active", agentMode);
         }
 
-        private void CreateBackend()
+        private void CreateBackend() => CreateBackendWithSession(null);
+
+        private void CreateBackendWithSession(string resumeSessionId)
         {
             var cfg = ChatMcpConfigWriter.GetOrCreateConfigPath()
                 ?? Path.Combine(
                     System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
                     ".claude", "mcp.json");
-            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan", _selectedAgent, _permConfig);
+            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan",
+                _selectedAgent, _permConfig, resumeSessionId);
         }
 
         private void OnSend()
         {
             var text  = _input.value?.Trim() ?? "";
             var chips = CollectChipPaths();
+
+            // #3 Auto-include selection: prepend summary line if not already a chip.
+            var selGo  = Selection.activeGameObject;
+            var chipSet = new HashSet<string>(chips);
+            if (SelectionSummary.ShouldPrepend(selGo, chipSet))
+                text = SelectionSummary.Summarize(selGo) + "\n" + text;
+
             if (chips.Count > 0) text += "\n" + string.Join("\n", chips);
             if (string.IsNullOrEmpty(text)) return;
-            _transcript.AppendUserBubble(text);
-            _backend.SendTurn(UserTurnBuilder.Build(text));
-            _input.value = ""; _input.cursorIndex = _input.selectIndex = 0;
-            _objChipStrip.Clear();
-            _heightCalc.Reset();
-            ResetInputAreaHeight();
-            if (_activity.Send()) OnActivityChanged();
+
+            DispatchTurn(UserTurnBuilder.Build(text), text);
         }
 
         private void AttachScreenshot()
@@ -153,12 +139,22 @@ namespace UnityMCP.Editor.Chat
             if (target == null) { Debug.LogWarning("[MCP Chat] Select a GameObject first"); return; }
             var path = MultiViewCapture.CaptureToFile(target);
             if (string.IsNullOrEmpty(path)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
-            var bytes = File.ReadAllBytes(path);
-            var text  = _input.value?.Trim() ?? "";
-            var chips = CollectChipPaths();
+            var bytes  = File.ReadAllBytes(path);
+            var text   = _input.value?.Trim() ?? "";
+            var chips  = CollectChipPaths();
             if (chips.Count > 0) text += "\n" + string.Join("\n", chips);
-            _transcript.AppendUserBubble(text, path);
-            _backend.SendTurn(UserTurnBuilder.Build(text, bytes));
+            DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: path);
+        }
+
+        // Shared send sequence — OnSend and AttachScreenshot must not drift from each other.
+        private void DispatchTurn(string turnJson, string displayText, string screenshotPath = null)
+        {
+            // #1/#4 Lock reloads for the duration of this turn (symmetric for both send paths).
+            ReloadGuard.OnTurnStarted();
+            // FIX A: cache before clearing input so SaveStateBeforeReload can read the sent text.
+            _sentTextCache.Set(displayText);
+            _transcript.AppendUserBubble(displayText, screenshotPath);
+            _backend.SendTurn(turnJson);
             _input.value = ""; _input.cursorIndex = _input.selectIndex = 0;
             _objChipStrip.Clear();
             _heightCalc.Reset();

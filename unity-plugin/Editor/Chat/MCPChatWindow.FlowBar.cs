@@ -1,5 +1,6 @@
 // FlowBar partial: fixed track with inner chip sweep — fixes the ±100% glitch.
 // Animation: track fades in/out; chip sweeps left↔right via CSS translate classes.
+// Also owns BuildFooterBar / MakeModeBtn (footer is tightly coupled to mode-toggle state).
 using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
@@ -60,6 +61,44 @@ namespace UnityMCP.Editor.Chat
             _sweepPhase = !_sweepPhase;
             _flowFill.EnableInClassList("flowbar__fill--a", !_sweepPhase);
             _flowFill.EnableInClassList("flowbar__fill--b",  _sweepPhase);
+        }
+
+        // ── Footer bar (moved here from MCPChatWindow.cs to stay under 200 lines) ─
+
+        private VisualElement BuildFooterBar()
+        {
+            var bar = new VisualElement(); bar.AddToClassList("footer-bar");
+
+            var sel = BuildAgentSelector();
+            sel.AddToClassList("footer-selector");
+            bar.Add(sel);
+
+            var seg = new VisualElement(); seg.AddToClassList("mode-segment");
+            _askBtn   = MakeModeBtn("Ask",   false);
+            _agentBtn = MakeModeBtn("Agent", true);
+            seg.Add(_askBtn); seg.Add(_agentBtn);
+            bar.Add(seg);
+
+            var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
+            bar.Add(spacer);
+
+            _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
+            bar.Add(_tokenReadout);
+
+            var ssBtn   = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
+            ssBtn.AddToClassList("chat-btn"); ssBtn.AddToClassList("chat-btn--screenshot");
+            var sendBtn = new Button(OnSend) { text = "Send" };
+            sendBtn.AddToClassList("chat-btn"); sendBtn.AddToClassList("chat-btn--send");
+            bar.Add(ssBtn); bar.Add(sendBtn);
+            return bar;
+        }
+
+        private Button MakeModeBtn(string label, bool isAgent)
+        {
+            var btn = new Button(() => SetMode(isAgent)) { text = label };
+            btn.AddToClassList("mode-toggle-btn");
+            if (_agentMode == isAgent) btn.AddToClassList("mode-toggle-btn--active");
+            return btn;
         }
     }
 }

@@ -1,4 +1,5 @@
-// Drain loop + event handlers extracted to keep MCPChatWindow.cs under 200 lines.
+// Drain loop, event handlers, and post-reload resume logic — partial of MCPChatWindow.
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -8,6 +9,50 @@ namespace UnityMCP.Editor.Chat
     public partial class MCPChatWindow
     {
         private double _lastRefresh;
+
+        // #1 Save turn state before domain reload so it can be resumed after.
+        private void SaveStateBeforeReload()
+        {
+            if (_activity.Phase == ActivityPhase.Idle) return;
+            // FIX A: read from _sentTextCache (set by DispatchTurn before input was cleared),
+            // NOT from _input.value which is already "" at this point.
+            var text  = _sentTextCache.Get();
+            var chips = CollectChipPaths();
+            var state = new PendingTurnState(
+                _backend?.SessionId,
+                text,
+                chips.ToArray(),
+                _agentMode,
+                _selectedAgent,
+                _activity.Phase.ToString());
+            ReloadGuard.SavePendingState(state);
+        }
+
+        // #1 Called by ChatProcess.OnAfterReloadResume after assembly reload completes.
+        private void TryResumePendingTurn()
+        {
+            var pending = ReloadGuard.LoadPendingState();
+            if (pending == null) return;
+            ReloadGuard.ClearPendingState();
+
+            var p = pending.Value;
+            _agentMode     = p.AgentMode;
+            _selectedAgent = p.AgentName;
+            CreateBackendWithSession(p.SessionId);
+
+            var text = p.PendingText;
+            if (!string.IsNullOrEmpty(text))
+            {
+                // FIX B: lock reload for the resumed turn, symmetric with DispatchTurn.
+                // TurnDone/Error/dead-process paths already call OnTurnFinished via HandleEvent
+                // and the dead-process guard in DrainAndRender — this lock is balanced.
+                ReloadGuard.OnTurnStarted();
+                _sentTextCache.Set(text);
+                _transcript?.AppendUserBubble(text);
+                _backend.SendTurn(UserTurnBuilder.Build(text));
+                if (_activity.Send()) OnActivityChanged();
+            }
+        }
 
         private void DrainAndRender()
         {
@@ -21,6 +66,8 @@ namespace UnityMCP.Editor.Chat
                 // Phase-first: cheap field read before the nullable backend deref.
                 if (_activity.Phase != ActivityPhase.Idle && _backend != null && !_backend.IsRunning)
                 {
+                    // #2 fix: release the reload lock; without this the lock was held until the 120s watchdog.
+                    ReloadGuard.OnTurnFinished();
                     if (_activity.Fail()) OnActivityChanged();
                 }
                 return;
@@ -47,6 +94,7 @@ namespace UnityMCP.Editor.Chat
                     _transcript.AppendOrExtendAssistant(ev.Text);
                     break;
                 case ChatEventKind.TurnDone:
+                    ReloadGuard.OnTurnFinished(); // #1 unlock after turn complete
                     if (_activity.Done()) OnActivityChanged();
                     _transcript.FinalizeAssistant();
                     if (ev.InputTokens > 0 || ev.OutputTokens > 0)
@@ -60,6 +108,7 @@ namespace UnityMCP.Editor.Chat
                 case ChatEventKind.SessionInit:
                     break; // non-terminal: session established, keep animation running
                 case ChatEventKind.Error:
+                    ReloadGuard.OnTurnFinished(); // #1 unlock even on error
                     if (_activity.Fail()) OnActivityChanged();
                     _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
                     break;

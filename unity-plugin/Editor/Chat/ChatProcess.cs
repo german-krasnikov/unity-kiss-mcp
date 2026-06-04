@@ -16,9 +16,13 @@ namespace UnityMCP.Editor.Chat
         // ── Orphan-kill via SessionState ──────────────────────────────────────
         private const string PidKey = "UnityMCP_Chat_PID";
 
+        // Raised after assembly reload so MCPChatWindow can auto-resume.
+        internal static event System.Action OnAfterReloadResume;
+
         static ChatProcess()
         {
             AssemblyReloadEvents.beforeAssemblyReload += KillOrphan;
+            AssemblyReloadEvents.afterAssemblyReload  += TriggerResume;
         }
 
         private static void KillOrphan()
@@ -27,7 +31,11 @@ namespace UnityMCP.Editor.Chat
             if (!int.TryParse(pidStr, out var pid)) return;
             try { Process.GetProcessById(pid)?.Kill(); } catch { /* already gone */ }
             SessionState.EraseString(PidKey);
+            // ReloadGuard.OnTurnFinished() — unlock is handled by the guard itself on reload;
+            // the watchdog will also fire. No extra call needed here.
         }
+
+        private static void TriggerResume() => OnAfterReloadResume?.Invoke();
 
         // ── Instance ──────────────────────────────────────────────────────────
 
