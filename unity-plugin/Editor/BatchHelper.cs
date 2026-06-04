@@ -13,7 +13,7 @@ namespace UnityMCP.Editor
         private static int _batchDepth;
         internal static bool InBatch => _batchDepth > 0;
 
-        public static string Execute(string commandsText, string onError, int timeoutMs = 25000)
+        public static string Execute(string commandsText, string onError, int timeoutMs = 25000, bool atomic = false)
         {
             var commands = ParseLines(commandsText);
             var sb = new StringBuilder();
@@ -22,6 +22,26 @@ namespace UnityMCP.Editor
             int okCount = 0, errCount = 0, timeoutCount = 0;
 
             _batchDepth++;
+            // Only outermost atomic batch opens a named undo group.
+            bool isAtomicRoot = atomic && _batchDepth == 1;
+            int gid = -1;
+            if (isAtomicRoot)
+                gid = UndoGroupHelper.OpenNamedGroup("MCP Atomic Batch");
+
+            // Returns true when caller should break out of the op loop.
+            bool AtomicFail(int opIndex)
+            {
+                errCount++;
+                if (!atomic && onError != "stop") return false;
+                stopped = true;
+                if (isAtomicRoot && UndoGroupHelper.CanRevert(gid))
+                {
+                    UndoGroupHelper.RevertToBeforeGroup(gid);
+                    sb.AppendLine($"ATOMIC_ROLLBACK: reverted ops 0..{opIndex - 1}");
+                }
+                return atomic; // break only in atomic mode
+            }
+
             try
             {
 
@@ -48,25 +68,19 @@ namespace UnityMCP.Editor
                 if (cmd == "wait_until" || cmd == "move_to" || cmd == "run_tests" || cmd == "test_step" || cmd == "run_playtest")
                 {
                     sb.AppendLine($"[{i}] err: '{cmd}' requires async dispatch, not supported in batch");
-                    errCount++;
-                    if (onError == "stop") stopped = true;
-                    continue;
+                    if (AtomicFail(i)) break; else continue;
                 }
 
                 // Play Mode guards
                 if (EditorApplication.isPlaying && CommandRegistry.IsMutating(cmd))
                 {
                     sb.AppendLine($"[{i}] BLOCKED: '{cmd}' is mutating, skipped in Play Mode");
-                    errCount++;
-                    if (onError == "stop") stopped = true;
-                    continue;
+                    if (AtomicFail(i)) break; else continue;
                 }
                 if (!EditorApplication.isPlaying && CommandRegistry.IsRuntime(cmd))
                 {
                     sb.AppendLine($"[{i}] BLOCKED: '{cmd}' is runtime-only, skipped outside Play Mode");
-                    errCount++;
-                    if (onError == "stop") stopped = true;
-                    continue;
+                    if (AtomicFail(i)) break; else continue;
                 }
 
                 // Compile guard
@@ -74,18 +88,14 @@ namespace UnityMCP.Editor
                     && !CommandRouter.IsAllowedDuringCompile(cmd))
                 {
                     sb.AppendLine($"[{i}] BLOCKED: '{cmd}' skipped during compilation");
-                    errCount++;
-                    if (onError == "stop") stopped = true;
-                    continue;
+                    if (AtomicFail(i)) break; else continue;
                 }
 
                 // Tool enabled check
                 if (!CommandRouter.IsAlwaysAllowed(cmd) && !MCPSettings.IsToolEnabled(cmd))
                 {
                     sb.AppendLine($"[{i}] err: Tool '{cmd}' disabled");
-                    errCount++;
-                    if (onError == "stop") stopped = true;
-                    continue;
+                    if (AtomicFail(i)) break; else continue;
                 }
 
                 // Validate schema before execution
@@ -93,9 +103,7 @@ namespace UnityMCP.Editor
                 if (validationErr != null)
                 {
                     sb.AppendLine($"[{i}] err: {validationErr}");
-                    errCount++;
-                    if (onError == "stop") stopped = true;
-                    continue;
+                    if (AtomicFail(i)) break; else continue;
                 }
 
                 try
@@ -108,8 +116,7 @@ namespace UnityMCP.Editor
                 catch (Exception e)
                 {
                     sb.AppendLine($"[{i}] err: {e.Message}");
-                    errCount++;
-                    if (onError == "stop") stopped = true;
+                    if (AtomicFail(i)) break;
                 }
             }
 
@@ -122,6 +129,9 @@ namespace UnityMCP.Editor
             } // end try
             finally
             {
+                if (isAtomicRoot)
+                    UndoGroupHelper.CloseNamedGroup(gid);
+
                 // Only the outermost batch flushes physics — once, after all nested ops settle.
                 if (--_batchDepth == 0 && !EditorApplication.isPlaying)
                 {

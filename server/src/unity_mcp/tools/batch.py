@@ -9,14 +9,18 @@ _args = None
 _dsl_tools: set[str] = set()
 
 
-async def batch(commands: str, on_error: str = "continue", timeout: float = 30.0) -> str:
-    """Execute multiple commands in one call. Use for 2+ operations — reads AND writes. commands: one command per line (cmd key=value). on_error: continue|stop. timeout: seconds (default 30). Commands validated before execution; errors include 'Did you mean' suggestions. PREFER this over individual tool calls."""
+async def batch(commands: str, on_error: str = "continue", timeout: float = 30.0,
+                atomic: bool = False) -> str:
+    """Execute multiple commands in one call. Use for 2+ operations — reads AND writes. commands: one command per line (cmd key=value). on_error: continue|stop. timeout: seconds (default 30). atomic: when True, first failing op reverts ALL prior ops in this batch (uses Unity Undo). Note: file-system side-effects from execute_code are NOT reverted. Commands validated before execution; errors include 'Did you mean' suggestions. PREFER this over individual tool calls."""
     for line in commands.splitlines():
         cmd = line.strip().split()[0] if line.strip() else ""
         if cmd in _dsl_tools:
             raise ToolError(f"{cmd} requires typed MCP tool (Python DSL expansion), not batch")
     timeout_ms = int((timeout - 5) * 1000)
-    return await _send("batch", {"commands": commands, "on_error": on_error, "timeout_ms": timeout_ms}, timeout=timeout)
+    args = {"commands": commands, "on_error": on_error, "timeout_ms": timeout_ms}
+    if atomic:
+        args["atomic"] = "true"
+    return await _send("batch", args, timeout=timeout)
 
 
 async def references(action: str, path: str, children: bool = False, depth: int = 1,

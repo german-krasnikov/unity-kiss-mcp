@@ -51,7 +51,7 @@ namespace UnityMCP.Editor
             { "manage_component", P("path,type,action") },
             { "set_parent", P("path,parent", "world_position_stays") },
             { "set_material", P("path,color", "shader") },
-            { "batch", P("commands", "on_error", "timeout_ms") },
+            { "batch", P("commands", "on_error", "timeout_ms", "atomic") },
             { "recompile", P(null) },
             { "checkpoint", P(null, "label") },
             { "execute_code", P("code", "undo_label") },

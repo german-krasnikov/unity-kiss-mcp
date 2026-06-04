@@ -90,3 +90,33 @@ async def test_batch_rejects_dsl_tools_python_side(mock_bridge):
             await batch(commands="test_dsl_cmd path=/NPC")
     finally:
         _dsl_tools.discard("test_dsl_cmd")
+
+
+# F27: atomic mode tests
+
+@pytest.mark.asyncio
+async def test_batch_atomic_true_forwarded(mock_bridge, bridge_response):
+    """atomic=True is forwarded as 'true' string in command dict."""
+    bridge_response(data="ok:1")
+    await batch(commands="create_object name=A", atomic=True)
+    call_args = mock_bridge.send.call_args[0]
+    assert call_args[1].get("atomic") == "true"
+
+
+@pytest.mark.asyncio
+async def test_batch_atomic_false_not_sent(mock_bridge, bridge_response):
+    """atomic=False (default) means atomic key is absent from command dict."""
+    bridge_response(data="ok:1")
+    await batch(commands="create_object name=A")
+    call_args = mock_bridge.send.call_args[0]
+    assert "atomic" not in call_args[1]
+
+
+@pytest.mark.asyncio
+async def test_batch_atomic_with_on_error(mock_bridge, bridge_response):
+    """atomic=True with on_error set — both forwarded, C# decides precedence."""
+    bridge_response(data="ok:1")
+    await batch(commands="create_object name=A", atomic=True, on_error="continue")
+    call_args = mock_bridge.send.call_args[0]
+    assert call_args[1].get("atomic") == "true"
+    assert call_args[1].get("on_error") == "continue"

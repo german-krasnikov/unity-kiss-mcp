@@ -352,10 +352,11 @@ namespace UnityMCP.Editor
                 var timeoutStr = JsonHelper.ExtractString(args, "timeout_ms");
                 int timeoutMs = 25000;
                 if (timeoutStr != null) int.TryParse(timeoutStr, out timeoutMs);
+                bool atomic = JsonHelper.ExtractString(args, "atomic") == "true";
                 return BatchHelper.Execute(
                     JsonHelper.ExtractString(args, "commands"),
                     JsonHelper.ExtractString(args, "on_error") ?? "continue",
-                    timeoutMs);
+                    timeoutMs, atomic);
             }, mutating: false);
             CommandRegistry.Register("scene", ExecScene, mutating: true);
             CommandRegistry.Register("animation", ExecAnimationConsolidated, mutating: true);
