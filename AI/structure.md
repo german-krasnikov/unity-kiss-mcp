@@ -2,7 +2,7 @@
 
 ```
 unity-kiss-mcp/
-├── server/                     # Python MCP Server (~1095 unit tests)
+├── server/                     # Python MCP Server (~1726 unit tests)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
@@ -90,7 +90,7 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~1095 unit tests + conftest.py
+│   └── tests/                  # ~1726 unit tests + conftest.py
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
 │       ├── test_middleware*.py          # Middleware layers

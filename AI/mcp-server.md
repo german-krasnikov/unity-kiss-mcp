@@ -22,7 +22,11 @@ server/src/unity_mcp/
 │   ├── scene.py        # hierarchy, console, compile_errors, screenshot, recompile, run_tests, get_test_results, scene, search_scene, editor, checkpoint, fingerprint, scene_diff, save/load_session, screenshot_baseline/compare, get_changes
 │   ├── code_intel.py   # find_references, compile_preflight, semantic_at, await_compile
 │   ├── runtime.py      # invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
-│   ├── advanced.py     # batch, references, validate_references, shader, menu, create_ui, set_rect, validate_layout, get_spatial_context, scan_scene, execute_code, check_colliders, get_schema, auto_fix, smart_build, templates, skills, spatial_query
+│   ├── batch.py        # batch, references, validate_references + DRY serialization
+│   ├── spatial.py      # spatial_query, validate_layout, get_spatial_context, scan_scene, check_colliders
+│   ├── ui.py           # create_ui, set_rect, menu, shader
+│   ├── codegen.py      # execute_code, get_schema, auto_fix, smart_build
+│   ├── skills.py       # save_skill, use_skill, list_skills, apply_template, save_template, list_templates
 │   ├── animation.py    # animation, timeline, animator, particle
 │   ├── asset.py        # asset, material, prefab, scriptable_object, project_settings, get_enabled_tools
 │   ├── connection.py   # list_connections, reconnect_unity
@@ -36,7 +40,7 @@ server/src/unity_mcp/
 │   ├── intent_common.py         # Shared intent infrastructure
 │   ├── budget_tool.py           # budget_status tool (Haiku spend tracking)
 │   ├── metrics_tool.py          # Performance metrics
-│   └── code_intel.py            # find_references, compile_preflight, semantic_at
+│   └── schema_registry.py        # Tool schema lazy-loading
 └── plugins/
     └── __init__.py              # 3-source auto-discovery (pkgutil, entry_points, UNITY_MCP_PLUGIN_DIRS)
 ```

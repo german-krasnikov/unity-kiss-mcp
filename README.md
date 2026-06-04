@@ -13,15 +13,15 @@
 <div align="center">
 
 <sub>**STATUS**</sub><br>
-<img src="https://img.shields.io/badge/tests-1588_passing-3ad29f?style=for-the-badge&labelColor=1a1a2e&logo=pytest&logoColor=white" alt="1588 tests passing">
+<img src="https://img.shields.io/badge/tests-1726_passing-3ad29f?style=for-the-badge&labelColor=1a1a2e&logo=pytest&logoColor=white" alt="1726 tests passing">
 <img src="https://img.shields.io/badge/build-passing-3ad29f?style=for-the-badge&labelColor=1a1a2e&logo=githubactions&logoColor=white" alt="build passing">
 <img src="https://img.shields.io/badge/license-MIT-3ad29f?style=for-the-badge&labelColor=1a1a2e&logo=opensourceinitiative&logoColor=white" alt="MIT license">
 
 <sub>**SPEC**</sub><br>
 <img src="https://img.shields.io/badge/tools-90_MCP-e94560?style=for-the-badge&labelColor=1a1a2e" alt="90 MCP tools">
 <img src="https://img.shields.io/badge/MCP-1.0.0+-ccccff?style=for-the-badge&labelColor=1a1a2e&logo=anthropic&logoColor=white" alt="MCP 1.0.0+">
-<img src="https://img.shields.io/badge/server-v0.4.0-888899?style=for-the-badge&labelColor=1a1a2e" alt="server v0.4.0">
-<img src="https://img.shields.io/badge/plugin-v0.10.0-888899?style=for-the-badge&labelColor=1a1a2e" alt="plugin v0.10.0">
+<img src="https://img.shields.io/badge/server-v0.7.1-888899?style=for-the-badge&labelColor=1a1a2e" alt="server v0.7.1">
+<img src="https://img.shields.io/badge/plugin-v0.13.4-888899?style=for-the-badge&labelColor=1a1a2e" alt="plugin v0.13.4">
 
 <sub>**STACK**</sub><br>
 <img src="https://img.shields.io/badge/Unity-2021.3+-e8a23a?style=for-the-badge&labelColor=1a1a2e&logo=unity&logoColor=white" alt="Unity 2021.3+">
@@ -42,7 +42,7 @@
 <table>
 <tr>
 <td align="center" width="33%"><h2><code>89</code></h2><sub>REGISTERED MCP TOOLS</sub><br><sub>core + plugin extensibility</sub></td>
-<td align="center" width="33%"><h2><code>1640</code></h2><sub>TESTS COLLECTED</sub><br><sub>1588 unit · 52 live</sub></td>
+<td align="center" width="33%"><h2><code>1779</code></h2><sub>TESTS COLLECTED</sub><br><sub>1726 unit · 53 live</sub></td>
 <td align="center" width="33%"><h2><code>80–95%</code></h2><sub>BATCH TOKEN SAVINGS</sub><br><sub>vs. individual calls</sub></td>
 </tr>
 </table>
@@ -58,8 +58,8 @@ A grounded factual block — no invented benchmarks, every figure read from the 
 | Metric | Value |
 |--------|-------|
 | **Registered MCP Tools** | 89 core + plugin extensibility |
-| **Python Tests** | 1588 unit tests + 52 live integration tests (1640 collected) |
-| **C# Test Suite** | 754 / 756 NUnit tests passing (EditMode + PlayMode) |
+| **Python Tests** | 1726 unit tests + 53 live integration tests (1779 collected) |
+| **C# Test Suite** | 1331 / 1336 NUnit tests passing (EditMode, 5 pre-existing baseline) |
 | **Batch Token Savings** | 80–95% compression vs. individual calls |
 | **Python Modules** | 85 source files + 23-layer middleware pipeline |
 | **C# Code Files** | 76+ files including 7 specialized serializers |
@@ -250,12 +250,12 @@ cd /path/to/unity-kiss-mcp/server
 pytest tests/ -v
 ```
 
-This collects **1640** tests (1588 passing units; ~52 live tests require Unity). Expected:
+This collects **1779** tests (1726 passing units; 53 live tests require Unity). Expected:
 
 ```
 ...
-1640 tests collected in 0.80s
-======== 1588 passed in X.XXs ========
+1779 tests collected in 0.80s
+======== 1726 passed in X.XXs ========
 ```
 
 To run only tests that don't require Unity:
@@ -299,7 +299,7 @@ In Claude Code, call a simple tool like `get_hierarchy()` to confirm the connect
 **Verify checklist**
 
 - [ ] Run `lsof -i :9500` and confirm Unity is listening
-- [ ] Run `pytest tests/ -v` and confirm **1588+** tests pass
+- [ ] Run `pytest tests/ -v` and confirm **1726+** tests pass
 - [ ] Restart Claude Code and confirm `unity-mcp` appears in the tools panel
 - [ ] In Claude Code, call `get_hierarchy()` and verify it returns your scene structure
 - [ ] Check the Unity Console for `[MCP] Server started on port 9500`
