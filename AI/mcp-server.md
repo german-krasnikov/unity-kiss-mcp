@@ -154,6 +154,18 @@ Simplified detector for Unity C# compile/domain-reload:
 
 Each plugin implements `register(mcp, send_fn, args_fn)`. Plugin API facade (`plugin_api.py`) provides stable exports: `API_VERSION`, `RO`, `RW`, `RW_IDEM`, `DEL`, `SamplingService`, `strip_fences`, `sanitize_intent`, `register_dsl_tools()`, `register_read_cmds()`, `register_write_cmds()`, `register_tools()`, `register_features()`.
 
+### Deferred MCP Tool-Schema Loading (F4, server 0.3.0)
+
+Non-core tools return a **stub inputSchema** `{"type":"object"}` from `list_tools` instead of full schemas. Full schemas are served lazily via a new meta-tool:
+
+```
+resolve_tool_schema(tools: "comma,separated,names") -> plain text
+```
+
+Returns a plain-text schema block (no JSON), one tool per section. Backwards-compatible: MCP dispatch doesn't validate against inputSchema, so stubbed tools execute normally. Environment escape hatch: `UNITY_MCP_FULL_SCHEMAS=1` disables stripping (default off).
+
+**Token impact:** ~58-68% per-turn schema-token reduction. Enabled by default; discovery-gated tools show stub until explicitly enabled in session.
+
 ### Middleware (23 layers, `UNITY_MCP_MIDDLEWARE=1`)
 
 Retry Watchdog, Confidence Decay (gated <0.5), Taint Tracking, Periodic State Injection (staleness-gated), Path Cache, Dead Write Elimination, Starvation Monitor, Blast Radius Tags, Incremental Verification, Workflow Phase FSM, Visual Verification (Haiku), Play Mode Auto-Routing, find_objects Cache Bypass, Batch Conflict Scan, Post-mutation Snapshot, Component Cache, Console Error Categorization, PrefetchCache (TTL 12s), HierarchyDiff, Distiller, Disambiguator, SchemaGuard, Asymmetric Reflection
@@ -170,6 +182,7 @@ Retry Watchdog, Confidence Decay (gated <0.5), Taint Tracking, Periodic State In
 | `UNITY_MCP_WATCHDOG` | off | ProactiveWatchdog — background validate_references + console scan |
 | `UNITY_MCP_INFERENCE` | off | SessionContext/Inferrer — argument inference from session |
 | `UNITY_MCP_DISTILL` | `1` (on) | ResponseDistiller — heuristic response compression (set in server.py via setdefault); strip_defaults now always applies to {get_component, inspect, get_object_detail} regardless of this flag (use `_no_strip=1` arg to opt-out) |
+| `UNITY_MCP_FULL_SCHEMAS` | off | Deferred Schema Loading — set `=1` to disable schema stripping (return full inputSchema for all tools instead of stubs) |
 
 ## Implementation Notes (для Developer)
 
@@ -211,6 +224,7 @@ def register(mcp, send_fn, args_fn):
 - Lockfile: `server/src/unity_mcp/lockfile.py`
 - Compile probe: `server/src/unity_mcp/compile_state.py`
 - Middleware: `server/src/unity_mcp/middleware.py`
+- Schema Registry (deferred): `server/src/unity_mcp/tools/schema_registry.py`
 - Tools: `server/src/unity_mcp/tools/`
 - Plugins: `server/src/unity_mcp/plugins/`
 - Plugin API: `server/src/unity_mcp/plugin_api.py`

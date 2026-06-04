@@ -16,12 +16,12 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:9500──→
      │                        ├─ Capability Gating (TIER1+cat) ├─ PluginRegistry (IMCPPlugin)
      │                        ├─ Plugin system (auto-discovery) ├─ CommandRegistry + ValueParser
      │                        │  - opt-in disable: env UNITY_MCP_SKIP_PLUGINS=prefix ├─ CommandSchema (validation)
-     │                        ├─ 23-layer Middleware (opt-in)   ├─ 7 Serializers
-     │                        ├─ CompileStateProbe             ├─ RefManager ($a-$zz)
-     │                        ├─ PID Lockfile (exclusive)      ├─ PlaytestRunner + DSL
-     │                        └─ Heartbeat (15s, reconnect)    ├─ RuntimeHelper (Play Mode)
-     │                                                         ├─ MultiViewCapture (4-panel)
-     │                                                         ├─ CodeExecutor (Roslyn)
+     │                        ├─ Deferred Schema Loading       ├─ 7 Serializers
+     │                        │  (stub schemas + lazy resolve) ├─ RefManager ($a-$zz)
+     │                        ├─ 23-layer Middleware (opt-in)   ├─ PlaytestRunner + DSL
+     │                        ├─ CompileStateProbe             ├─ RuntimeHelper (Play Mode)
+     │                        ├─ PID Lockfile (exclusive)      ├─ MultiViewCapture (4-panel)
+     │                        └─ Heartbeat (15s, reconnect)    ├─ CodeExecutor (Roslyn)
      │                                                         └─ Guards (compile/play/runtime/tool)
 ```
 

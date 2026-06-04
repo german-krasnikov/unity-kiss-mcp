@@ -101,6 +101,18 @@ Mapping in `ToolVerbMap.cs` (tool name → human action).
 - Chip click: `PingObject(path)` + `SelectObject(path)` (Unity editor highlights the object)
 - On scene change, chips invalidated (path refs are scene-relative)
 
+### Auto-Include Selection Context (F4, plugin 0.7.0)
+
+**SelectionSummary.cs** prepends the active GameObject's context to user messages. Format:
+
+```
+[Selection: /Path/To/GameObject (Component1, Component2, Component3)]
+
+<user message>
+```
+
+Extracts top 3 non-Transform components; deduped against existing object-chip references. Result: Claude always knows what you're editing without explicit mention. Deferred rendering; chip paths persisted but not repainted after domain reload (UX-only; turn executes with correct context).
+
 ### Screenshot Attach
 
 - Capture button → `MultiViewCapture` (4-panel: Front, Left, Top, Isometric)
@@ -114,6 +126,34 @@ Two permission modes:
 - **Agent** (`--permission-mode acceptEdits`) — tool calls auto-execute with confirmation only on mutations
 
 User can toggle mid-conversation via settings dropdown.
+
+### Domain-Reload Safety & Turn Survival (F4, plugin 0.7.0)
+
+### Reload Guard (ReloadGuard.cs)
+
+When a turn is in-flight, prevents domain reload from interrupting by calling `EditorBuildSettingsScenes.LockReloadAssemblies()`. Lifecycle:
+
+1. **On turn start:** Acquire lock via `LockReloadAssemblies()` (blocks Unity domain reload)
+2. **Watchdog timer:** 120s countdown; if turn completes, unlock early. If timer fires, auto-unlock (fail-safe)
+3. **On turn done:** Release lock immediately via `UnlockReloadAssemblies()`
+
+Result: Domain reload queued during a turn waits until the turn finishes, so the chat session survives intact.
+
+### Pending Turn State (PendingTurnState.cs)
+
+Serializes in-flight turn state to `Library/MCP_ChatPendingTurn.txt` (plain-text pipe-delimited, base64-encoded payload). Format: `sessionId|turnId|requestJson_b64`. On `afterAssemblyReload`, the window's `OnEnable` reads the file and calls:
+
+```csharp
+ClaudeBackend.ResumeAsync(sessionId)  // via --resume <sessionId>
+```
+
+The CLI's `--resume` flag loads prior message history (via `load_session`) and continues the in-flight turn with the same context, picking up where it left off.
+
+**Persistence:** Plain-text, survives recompilation and process restart. Cleaned up after resume or on window close.
+
+### Sent Text Cache (SentTextCache.cs)
+
+Tracks recently sent text (last 10 messages) to dedup against accumulated text during resume. Prevents duplicate context on reconnect.
 
 ### Orphan Process Cleanup
 
@@ -158,14 +198,24 @@ unity-plugin/Editor/
 │   ├── ClaudeBackend.cs              # Implementation: spawns claude CLI
 │   ├── ChatTranscript.cs             # In-memory message history
 │   ├── MCPChatWindow.cs              # EditorWindow UI + interaction
+│   ├── MCPChatWindow.Drain.cs        # Partial: message accumulation
+│   ├── MCPChatWindow.FlowBar.cs      # Partial: activity indicator animation
 │   ├── MCPChatWindow.uss             # UIToolkit styling
 │   ├── ChatSettingsSection.cs        # Settings foldout in MCPSettings
+│   ├── ReloadGuard.cs                # Domain-reload: lock + unlock mechanism
+│   ├── PendingTurnState.cs           # Domain-reload: persist in-flight turn state
+│   ├── SelectionSummary.cs           # Auto-Selection: prepend active GameObject context
+│   ├── SentTextCache.cs              # Domain-reload: track sent text for dedup
 │   ├── UnityMCP.Editor.Chat.asmdef   # Assembly definition (references Core)
 │   └── Tests/
 │       ├── ChatStreamParserTests.cs
 │       ├── ClaudeArgBuilderTests.cs
 │       ├── UserTurnBuilderTests.cs
 │       ├── ToolVerbMapTests.cs
+│       ├── ReloadGuardTests.cs
+│       ├── PendingTurnStateTests.cs
+│       ├── SelectionSummaryTests.cs
+│       ├── SentTextCacheTests.cs
 │       └── UnityMCP.Editor.Chat.Tests.asmdef
 ├── ChatSettingsHook.cs               # Event hook for settings updates
 ├── MCPSettingsUI.cs                  # Modified: fires ChatSettingsHook.Invoke
@@ -327,9 +377,14 @@ With disallowedTools: "What color would you like for the particle system? (I wou
 4. Domain reload completes; Chat window re-initializes on next EditorApplication.update
 5. User can start a new chat session
 
+## Known Limitations
+
+- **ChipPath Repaint After Resume:** Object chips are persisted via `PendingTurnState` and restored after domain reload, but the chip strip UI is not repainted. The turn executes with correct context; the visual strip just shows stale paths until the next user message. This is a cosmetic UX issue; the actual turn data is correct.
+- **MCPChatWindow Line Count:** At 185 lines (approaching the 200-line ceiling), the file may need splitting into more partials if significant features are added.
+
 ## Related
 
 - **Core Architecture:** `AI/architecture.md` (CommandRouter, TCP bridge, tools catalog)
 - **TCP Bridge:** `AI/tcp-bridge.md` (4-byte framing, heartbeat, SO_KEEPALIVE)
-- **MCP Server:** `AI/mcp-server.md` (Python FastMCP, plugin system, tool gating)
+- **MCP Server:** `AI/mcp-server.md` (Python FastMCP, deferred schema loading, plugin system, tool gating)
 - **Changelog:** `AI/changelog.md` (feature timeline)
