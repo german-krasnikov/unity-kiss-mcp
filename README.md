@@ -21,7 +21,7 @@
 <img src="https://img.shields.io/badge/tools-89_MCP-e94560?style=for-the-badge&labelColor=1a1a2e" alt="89 MCP tools">
 <img src="https://img.shields.io/badge/MCP-1.0.0+-ccccff?style=for-the-badge&labelColor=1a1a2e&logo=anthropic&logoColor=white" alt="MCP 1.0.0+">
 <img src="https://img.shields.io/badge/server-v0.2.0-888899?style=for-the-badge&labelColor=1a1a2e" alt="server v0.2.0">
-<img src="https://img.shields.io/badge/plugin-v0.5.0-888899?style=for-the-badge&labelColor=1a1a2e" alt="plugin v0.5.0">
+<img src="https://img.shields.io/badge/plugin-v0.6.1-888899?style=for-the-badge&labelColor=1a1a2e" alt="plugin v0.6.1">
 
 <sub>**STACK**</sub><br>
 <img src="https://img.shields.io/badge/Unity-2021.3+-e8a23a?style=for-the-badge&labelColor=1a1a2e&logo=unity&logoColor=white" alt="Unity 2021.3+">

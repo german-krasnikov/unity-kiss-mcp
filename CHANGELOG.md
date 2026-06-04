@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.6.1] — 2026-06-04 <!-- svg: ChatMcpConfigWriter auto-generated config -->
+
+- **ChatMcpConfigWriter: Auto-Generated MCP Config** (2026-06-04) — New `ChatMcpConfigWriter` derives the MCP server path from the UPM package location, eliminating hardcoded `~/.claude/mcp.json` fallback in `MCPChatWindow.CreateBackend()`. Python command resolution chain: `server/.venv/bin/python` → resolved-absolute `uv` → `python3`. No port in config (server self-discovers via `~/.unity-mcp/ports/*.port`). 12 NUnit EditMode tests. Hardcoded `~/.claude/mcp.json` remains as fallback. No version bump (plugin already set to 0.6.1).
+
 ## [v0.6.0] — 2026-06-03 <!-- svg: Aura pill + native theme + perms gating -->
 
 - **Aura Status-Bar Pill with State-Driven Pulsation** (2026-06-03) — Redesign the AppStatusBar MCP pill as an opaque chip + colored border (fixes the low-contrast empty-box look) with a beacon dot and a faked halo. Pulsation by state: connected = radiating ring + dot heartbeat, waiting = in-place swell, stopped = static dimmed dot. Text pinned opaque for legibility; the whole chip opens the action menu. Palette extracted to a testable MCPStatusBarPalette class with NUnit EditMode tests.
