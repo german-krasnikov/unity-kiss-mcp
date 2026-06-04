@@ -211,6 +211,15 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - Parameters: path, cellSize, supersample (1-4), custom angles, zoom, offset, fixed_size, highlight, show_colliders
 - Returns file path + optional manifest (for highlight markers)
 
+### Agent Chat Backends (C#: CliBackendBase + subclasses, v0.14.0+)
+- **CliBackendBase** (abstract): Shared lifecycle host for CLI-based backends. 4 variation axes: (a) `BuildArgs` (spawn/resume argv + env-key-strip), (b) `ParseLine` (NDJSON line → ChatEvent[]), (c) `BinaryName` (CLI executable), (d) `IsPersistentProcess` (stdin loop vs spawn-per-turn). Owns spawn, drain, accumulate, SessionId, Stop, Dispose — subclasses override only the 4 axes.
+- **ClaudeBackend** (ported onto base): Zero behavior change (−65 lines net). Persistent stdin loop (IsPersistentProcess=true), Claude NDJSON parser, `--resume <sessionId>` argv builder.
+- **CodexBackend** (new): OpenAI Codex via spawn-per-turn model (IsPersistentProcess=false). Each turn disposes old process, spawns fresh with prompt baked into argv (`-c mcp_servers.*` flags). Stdin closed immediately.
+- **CodexArgBuilder**: Constructs `codex exec --json` argv. Re-passes three `-c mcp_servers.*` flags every turn.
+- **CodexStreamParser**: Codex NDJSON → ChatEvent (agent_message, mcp_tool_call, command_execution[aggregated_output/declined], file_change[changes], turn.completed usage; CostUsd=0).
+- **BackendRegistry** & **BackendKind** enum: Factory dispatch. User selects Claude or Codex from dropdown.
+- **PendingTurnState v3**: Now persists `BackendKind` for domain-reload survival (back-compatible with v1/v2).
+
 ### Editor UI Windows (C#: UIToolkit)
 - **MCPSettings Window** (MCPSettings.cs): Tool visibility toggles, organized by theme categories (CORE locked, others toggle/tri-state group masters), search bar, presets (Minimal/Full/No-visuals), dynamic Plugins section from PluginRegistry. Stylesheet: `MCPSettings.uss`.
 - **MCPStatus Window** (MCPStatusWindow.cs): Connection status monitor. UIToolkit-based with breathing heartbeat pulsation (ECG beat when connected, gentle beat when listening, flatline when stopped). Centered orb (`.orb`) + halo ring (`.orb-halo`) with state-driven colors & USS class-triggered pulsation (border-width + opacity + background-color transitions, 2021.3-safe). Polling every 700ms for state. Buttons: Restart MCP / Kill MCP / Reimport. Stylesheet: `MCPStatus.uss`.

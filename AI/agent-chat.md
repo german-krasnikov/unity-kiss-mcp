@@ -59,6 +59,31 @@ Key details:
 - Preserves one-way dependency: core does not know Chat exists
 - Removed the GUI code for Chat settings completely in core for clarity
 
+## Multi-Backend Architecture (v0.14.0+)
+
+Each CLI-based backend is a strategy over **4 variation axes:**
+
+1. **BuildArgs** — spawn/resume argv construction (e.g., Claude uses `--resume <sessionId>`, Codex uses `exec resume <id>`)
+2. **ParseLine** — NDJSON line → ChatEvent[] conversion (stream format differs per CLI)
+3. **BinaryName** — CLI executable name for ChatBinaryResolver (e.g., `"claude"`, `"codex"`)
+4. **IsPersistentProcess** — true = stdin loop (Claude), false = spawn-per-turn (Codex)
+
+**CliBackendBase** (127-line abstract host): Owns shared lifecycle (spawn, drain, accumulate, SessionId, Stop, Dispose). Subclasses override only the 4 axes; all other logic (turn dispatch, tool accumulation, session management) is inherited.
+
+**ClaudeBackend** (ported): Zero behavior change (−65 lines net). Now a thin wrapper over the base. Regression anchor proving the abstraction doesn't alter existing behavior.
+
+**CodexBackend** (new, v0.14.0): Implements the 4 axes for OpenAI Codex. Spawn-per-turn model: each turn disposes the old process and spawns a fresh one with the prompt baked into argv (via `-c mcp_servers.*` flags). Stdin closed immediately (spike fact #4: Codex hangs without this).
+
+**CodexArgBuilder** (new): Constructs `codex exec --json` argv. Three `-c mcp_servers.unity*` flags re-passed every turn, including on resume. Format: `-c mcp_servers.{unity,unity_auth,unity_plugins}=<value>`.
+
+**CodexStreamParser** (new): Codex NDJSON → ChatEvent. Emits agent_message, mcp_tool_call, command_execution (aggregated_output or declined), file_change (changes array), and turn.completed (usage stats; CostUsd=0). 26 NUnit test cases cover all paths.
+
+**BackendRegistry** & **BackendKind**: Central enum + factory. User selects Claude or Codex from dropdown; MCPChatWindow.CreateBackend dispatches to the right subclass.
+
+**PendingTurnState v3** (upgraded): Now persists `BackendKind` to survive domain reload. Back-compatible with v1/v2 state; header includes version marker.
+
+**Result:** Adding a new backend = 1 new CliBackendBase subclass + parser file. No changes to window, dispatcher, or lifecycle code.
+
 ## IChatBackend Abstraction
 
 Single interface for pluggable chat backends:
@@ -75,7 +100,7 @@ public interface IChatBackend
 }
 ```
 
-**MVP implementation:** `ClaudeBackend` (the only backend shipped). Cursor/Codex are future seams (not implemented). Future: add `IChatBackend` subclasses in separate plugins if needed.
+**Implementations:** `ClaudeBackend` (Claude, persistent stdin), `CodexBackend` (Codex, spawn-per-turn). Future: add more via `CliBackendBase` subclasses.
 
 **ChatEvent struct:**
 - Normalized event type (ToolCard, ToolResult, UserMessage, Error, Status, Done)
@@ -291,8 +316,13 @@ unity-plugin/Editor/
 │   ├── MCPChatWindow.FlowBar.cs      # Partial: activity indicator animation
 │   ├── MCPChatWindow.uss             # UIToolkit styling
 │   ├── ChatSettingsSection.cs        # Settings foldout in MCPSettings
+│   ├── CliBackendBase.cs             # Abstract host for CLI backends (4 axes)
+│   ├── CodexArgBuilder.cs            # Codex: argv + env-key-strip builder
+│   ├── CodexStreamParser.cs          # Codex: NDJSON → ChatEvent
+│   ├── CodexBackend.cs               # Codex: IChatBackend implementation (spawn-per-turn)
+│   ├── BackendRegistry.cs            # Backend factory + enum
 │   ├── ReloadGuard.cs                # Domain-reload: lock + unlock mechanism
-│   ├── PendingTurnState.cs           # Domain-reload: persist in-flight turn state
+│   ├── PendingTurnState.cs           # Domain-reload: persist in-flight turn state (v3: BackendKind)
 │   ├── SelectionSummary.cs           # Auto-Selection: prepend active GameObject context
 │   ├── SentTextCache.cs              # Domain-reload: track sent text for dedup
 │   ├── CompileAutoFix.cs             # Auto-retry on compile failures (MAX_RETRIES=3)
@@ -312,8 +342,11 @@ unity-plugin/Editor/
 │       ├── ClaudeArgBuilderTests.cs
 │       ├── UserTurnBuilderTests.cs
 │       ├── ToolVerbMapTests.cs
+│       ├── CliBackendBaseTests.cs              # Tests base lifecycle + 4-axis dispatch
+│       ├── CodexArgBuilderTests.cs             # Tests argv construction + env-key-strip
+│       ├── CodexStreamParserTests.cs           # Tests Codex NDJSON → ChatEvent (26 cases)
 │       ├── ReloadGuardTests.cs
-│       ├── PendingTurnStateTests.cs
+│       ├── PendingTurnStateTests.cs            # Tests v3 header + BackendKind persistence
 │       ├── SelectionSummaryTests.cs
 │       ├── SentTextCacheTests.cs
 │       ├── ApproveFlowTests.cs
