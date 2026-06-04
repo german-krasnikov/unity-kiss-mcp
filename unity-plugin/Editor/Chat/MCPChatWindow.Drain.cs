@@ -50,6 +50,13 @@ namespace UnityMCP.Editor.Chat
                     : snap + "\n" + displayText;
                 // FIX B: lock reload for the resumed turn, symmetric with DispatchTurn.
                 ReloadGuard.OnTurnStarted();
+#if UNITY_MCP_CHAT
+                // F6: resumed turns also need an undo group so OnTurnEnd/OnTurnFailed
+                // can commit them to the restore stack (MAJOR 1 fix).
+                _undoTracker.OnTurnStart(displayText.Length > 40
+                    ? displayText.Substring(0, 40)
+                    : displayText);
+#endif
                 // Cache the FULL sent text (with snapshot) so a re-reload can persist it.
                 _sentTextCache.Set(sentText);
                 // Show only the original user text in the bubble (no state dump).
@@ -127,9 +134,7 @@ namespace UnityMCP.Editor.Chat
 #if UNITY_MCP_CHAT
                     // F6: close the undo group and append a Restore button.
                     _undoTracker.OnTurnEnd();
-                    var btnContainer = new VisualElement();
-                    btnContainer.Add(RestoreButton.Create(_undoTracker));
-                    _transcript?.Append(btnContainer);
+                    _transcript?.Append(RestoreButton.Create(_undoTracker));
 #endif
                     // Ask mode + valid session → inject one-shot approve button.
                     if (!_agentMode && !string.IsNullOrEmpty(_backend?.SessionId))
@@ -151,9 +156,7 @@ namespace UnityMCP.Editor.Chat
 #if UNITY_MCP_CHAT
                     // F6: partial mutations still restorable on error.
                     _undoTracker.OnTurnFailed();
-                    var errBtnContainer = new VisualElement();
-                    errBtnContainer.Add(RestoreButton.Create(_undoTracker));
-                    _transcript?.Append(errBtnContainer);
+                    _transcript?.Append(RestoreButton.Create(_undoTracker));
 #endif
                     break;
             }

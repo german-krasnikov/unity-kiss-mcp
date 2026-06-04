@@ -1,6 +1,5 @@
 // Amber "Restore" button injected into transcript after each turn (F6).
-// Chat-only — behind UNITY_MCP_CHAT.
-#if UNITY_MCP_CHAT
+// Chat-only (Chat asmdef, defineConstraint UNITY_MCP_CHAT).
 using System;
 using UnityEngine.UIElements;
 
@@ -40,7 +39,12 @@ namespace UnityMCP.Editor.Chat
             return btn;
         }
 
-        private static void RefreshEnabled(Button btn, TurnUndoTracker tracker, int capturedGeneration)
+        /// <summary>
+        /// Recomputes and applies the button's enabled state.
+        /// Exposed as internal static so tests can assert the last-only disable rule
+        /// without requiring a live UIElements panel.
+        /// </summary>
+        internal static void RefreshEnabled(Button btn, TurnUndoTracker tracker, int capturedGeneration)
         {
             var shouldEnable =
                 tracker.HasRestorableGroup &&
@@ -49,4 +53,3 @@ namespace UnityMCP.Editor.Chat
         }
     }
 }
-#endif
