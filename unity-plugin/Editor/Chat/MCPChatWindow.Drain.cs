@@ -1,4 +1,5 @@
 // Drain loop, event handlers, and post-reload resume logic — partial of MCPChatWindow.
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -24,7 +25,9 @@ namespace UnityMCP.Editor.Chat
                 chips.ToArray(),
                 _agentMode,
                 _selectedAgent,
-                _activity.Phase.ToString());
+                _activity.Phase.ToString(),
+                undoGroupId: _undoTracker.InflightGroupId,
+                savedAtUtc:  DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             ReloadGuard.SavePendingState(state);
         }
 
@@ -36,6 +39,13 @@ namespace UnityMCP.Editor.Chat
             ReloadGuard.ClearPendingState();
 
             var p = pending.Value;
+
+            // #26 Staleness guard: discard state saved by a crash/restart older than threshold.
+            // SavedAtUtc == 0 means legacy file (no timestamp) — allowed through.
+            const long StalenessThresholdSec = 60;
+            if (p.SavedAtUtc > 0 && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - p.SavedAtUtc > StalenessThresholdSec)
+                return; // stale crash/restart artifact — file already cleared, silently discard
+
             _agentMode     = p.AgentMode;
             _selectedAgent = p.AgentName;
             CreateBackendWithSession(p.SessionId);
@@ -50,6 +60,10 @@ namespace UnityMCP.Editor.Chat
                     : snap + "\n" + displayText;
                 // FIX B: lock reload for the resumed turn, symmetric with DispatchTurn.
                 ReloadGuard.OnTurnStarted();
+                // #12: close pre-reload undo group BEFORE opening the resumed one;
+                // ordering is critical — CloseNamedGroup must precede OnTurnStart.
+                if (p.UndoGroupId >= 0)
+                    UndoGroupHelper.CloseNamedGroup(p.UndoGroupId);
                 // F6: resumed turns also need an undo group so OnTurnEnd/OnTurnFailed
                 // can commit them to the restore stack (MAJOR 1 fix).
                 _undoTracker.OnTurnStart(displayText.Length > 40

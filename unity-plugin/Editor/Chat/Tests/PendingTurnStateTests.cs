@@ -110,5 +110,51 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(rt, "must not discard state when activityPhase contains a pipe");
             Assert.AreEqual("some|phase", rt.Value.ActivityPhase);
         }
+
+        // ── v2 field tests (#12 / #26) ────────────────────────────────────────
+
+        [Test]
+        public void RoundTrip_V2Fields_UndoGroupIdAndTimestamp()
+        {
+            var orig = new PendingTurnState("s", "t", new string[0], false, null, "Idle",
+                undoGroupId: 42, savedAtUtc: 1717502400L);
+            var rt = PendingTurnState.Deserialize(orig.Serialize());
+            Assert.IsNotNull(rt);
+            Assert.AreEqual(42,          rt.Value.UndoGroupId);
+            Assert.AreEqual(1717502400L, rt.Value.SavedAtUtc);
+        }
+
+        [Test]
+        public void Deserialize_V1Header_DefaultsNewFields()
+        {
+            // Hand-crafted v1 header (6 fields): sess1|dA==|0||SWRsZQ==|0
+            // B64("t")="dA==", B64("")="", B64("Idle")="SWRsZQ=="
+            const string v1 = "sess1|dA==|0||SWRsZQ==|0";
+            var rt = PendingTurnState.Deserialize(v1);
+            Assert.IsNotNull(rt);
+            Assert.AreEqual(-1, rt.Value.UndoGroupId, "legacy file must default UndoGroupId to -1");
+            Assert.AreEqual(0L, rt.Value.SavedAtUtc,  "legacy file must default SavedAtUtc to 0");
+        }
+
+        [Test]
+        public void Deserialize_V2Header_ParsesNewFields()
+        {
+            // Hand-crafted v2 header (8 fields): appends |7|9999
+            const string v2 = "sess1|dA==|0||SWRsZQ==|0|7|9999";
+            var rt = PendingTurnState.Deserialize(v2);
+            Assert.IsNotNull(rt);
+            Assert.AreEqual(7,    rt.Value.UndoGroupId);
+            Assert.AreEqual(9999L, rt.Value.SavedAtUtc);
+        }
+
+        [Test]
+        public void RoundTrip_NegativeUndoGroupId_Preserved()
+        {
+            var orig = new PendingTurnState("s", "t", new string[0], false, null, "Idle",
+                undoGroupId: -1, savedAtUtc: 0L);
+            var rt = PendingTurnState.Deserialize(orig.Serialize());
+            Assert.IsNotNull(rt);
+            Assert.AreEqual(-1, rt.Value.UndoGroupId);
+        }
     }
 }

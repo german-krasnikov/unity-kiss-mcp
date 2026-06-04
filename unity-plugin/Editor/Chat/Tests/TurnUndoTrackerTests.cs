@@ -120,6 +120,17 @@ namespace UnityMCP.Editor.Chat.Tests
             Object.DestroyImmediate(go);
         }
 
+        // --- 16. InflightGroupId exposed for SaveStateBeforeReload (#12) --------
+        [Test]
+        public void InflightGroupId_DuringTurn_IsNonNegative()
+        {
+            Assert.AreEqual(-1, _tracker.InflightGroupId, "idle tracker must return -1");
+            _tracker.OnTurnStart("Test_16");
+            Assert.GreaterOrEqual(_tracker.InflightGroupId, 0, "in-flight group id must be >= 0");
+            _tracker.OnTurnEnd();
+            Assert.AreEqual(-1, _tracker.InflightGroupId, "after OnTurnEnd must be -1 again");
+        }
+
         // --- 15. Generation check: old turn's restore becomes disabled when new turn starts ---
         [Test]
         public void CurrentGeneration_AdvancesOnEachTurnStart()

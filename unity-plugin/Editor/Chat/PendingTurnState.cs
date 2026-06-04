@@ -13,9 +13,12 @@ namespace UnityMCP.Editor.Chat
         public bool     AgentMode;
         public string   AgentName;
         public string   ActivityPhase;
+        public int      UndoGroupId;   // -1 = none/legacy
+        public long     SavedAtUtc;    // 0  = legacy/no-timestamp
 
         internal PendingTurnState(string sessionId, string pendingText, string[] chipPaths,
-            bool agentMode, string agentName, string activityPhase)
+            bool agentMode, string agentName, string activityPhase,
+            int undoGroupId = -1, long savedAtUtc = 0)
         {
             SessionId     = sessionId     ?? "";
             PendingText   = pendingText   ?? "";
@@ -23,27 +26,32 @@ namespace UnityMCP.Editor.Chat
             AgentMode     = agentMode;
             AgentName     = agentName     ?? "";
             ActivityPhase = activityPhase ?? "";
+            UndoGroupId   = undoGroupId;
+            SavedAtUtc    = savedAtUtc;
         }
 
         // ── Serialization ─────────────────────────────────────────────────────
-        // Line format: SessionId|PendingTextB64|AgentMode|AgentNameB64|ActivityPhaseB64|ChipCount
-        //              ChipPath0B64
-        //              ChipPath1B64
-        //              ...
+        // v1 header: SessionId|PendingTextB64|AgentMode|AgentNameB64|ActivityPhaseB64|ChipCount
+        // v2 header: ...same...|UndoGroupId|SavedAtUtc   (appended; length-based version gate)
+        //            ChipPath0B64
+        //            ChipPath1B64
+        //            ...
         // ALL string fields are B64-encoded so pipes/newlines in values never corrupt the header.
 
         internal string Serialize()
         {
-            var textB64  = ToB64(PendingText);
+            var textB64   = ToB64(PendingText);
             var chipCount = ChipPaths.Length;
-            var lines    = new string[1 + chipCount];
+            var lines     = new string[1 + chipCount];
             lines[0] = string.Join("|",
                 SessionId,
                 textB64,
                 AgentMode ? "1" : "0",
                 ToB64(AgentName ?? ""),
                 ToB64(ActivityPhase ?? ""),
-                chipCount.ToString());
+                chipCount.ToString(),
+                UndoGroupId.ToString(),
+                SavedAtUtc.ToString());
             for (var i = 0; i < chipCount; i++)
                 lines[1 + i] = ToB64(ChipPaths[i] ?? "");
             return string.Join("\n", lines);
@@ -65,11 +73,16 @@ namespace UnityMCP.Editor.Chat
                 var activityPhase = FromB64(header[4]);
                 var chipCount     = int.Parse(header[5]);
 
+                // v2 fields — length-based gate preserves back-compat in both directions.
+                var undoGroupId = header.Length > 6 ? int.Parse(header[6])  : -1;
+                var savedAtUtc  = header.Length > 7 ? long.Parse(header[7]) : 0L;
+
                 var chips = new string[chipCount];
                 for (var i = 0; i < chipCount; i++)
                     chips[i] = (1 + i < lines.Length) ? FromB64(lines[1 + i]) : "";
 
-                return new PendingTurnState(sessionId, pendingText, chips, agentMode, agentName, activityPhase);
+                return new PendingTurnState(sessionId, pendingText, chips, agentMode, agentName,
+                    activityPhase, undoGroupId, savedAtUtc);
             }
             catch
             {

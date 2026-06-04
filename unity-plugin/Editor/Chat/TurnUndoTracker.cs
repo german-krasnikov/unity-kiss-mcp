@@ -23,6 +23,10 @@ namespace UnityMCP.Editor.Chat
 
         public bool HasRestorableGroup => _turns.Count > 0;
 
+        // Exposes the in-flight group id so SaveStateBeforeReload can persist it (#12).
+        // -1 when no turn is in flight.
+        public int InflightGroupId => _inflightGroupId;
+
         public void OnTurnStart(string label)
         {
             CurrentGeneration++;
