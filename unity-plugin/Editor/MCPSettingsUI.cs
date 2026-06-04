@@ -154,7 +154,7 @@ namespace UnityMCP.Editor
         {
             var row = new VisualElement();
             row.AddToClassList("option-row");
-            var toggle = new Toggle("Enable Agent Chat (Beta)") { value = ChatSettingsHook.IsChatEnabled() };
+            var toggle = new Toggle("Enable Agent Chat") { value = ChatSettingsHook.IsChatEnabled() };
             toggle.tooltip = "Adds the UNITY_MCP_CHAT define and compiles the in-Editor chat window. Unity recompiles on change.";
             toggle.RegisterValueChangedCallback(e => ChatSettingsHook.SetChatEnabled(e.newValue));
             row.Add(toggle);

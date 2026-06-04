@@ -186,5 +186,56 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains("BoxCollider", chip);
             StringAssert.Contains("BoxCollider", sel);
         }
+
+        // ── F4: instance ID tests ─────────────────────────────────────────────
+
+        [Test]
+        public void ResolveOne_PathOnly_SceneObject_IncludesInstanceID()
+        {
+            var go = MakeGo("SceneObj");
+            ChipContextResolver.FindObjectOverride = _ => go;
+
+            var result = ChipContextResolver.ResolveOne("/SceneObj", ChipDepth.PathOnly);
+
+            // Must match "/SceneObj #<digits>"
+            StringAssert.Contains("/SceneObj #", result);
+            var parts = result.Split('#');
+            Assert.AreEqual(2, parts.Length);
+            Assert.IsTrue(int.TryParse(parts[1].Trim(), out _), "suffix must be an integer instanceID");
+        }
+
+        [Test]
+        public void ResolveOne_PathOnly_AssetPath_NoInstanceID()
+        {
+            var result = ChipContextResolver.ResolveOne("Assets/Foo.prefab", ChipDepth.PathOnly);
+            Assert.AreEqual("Assets/Foo.prefab", result);
+            Assert.IsFalse(result.Contains("#"), "asset path must not contain instance ID");
+        }
+
+        [Test]
+        public void ResolveOne_Summary_IncludesInstanceID()
+        {
+            var go = MakeGo("SummaryObj");
+            ChipContextResolver.FindObjectOverride = _ => go;
+
+            var result = ChipContextResolver.ResolveOne("/SummaryObj", ChipDepth.Summary);
+
+            var idStr = go.GetInstanceID().ToString();
+            StringAssert.Contains($"#{idStr}", result);
+        }
+
+        [Test]
+        public void ResolveAll_MultiChip_EachHasInstanceID()
+        {
+            var go1 = MakeGo("Multi1");
+            var go2 = MakeGo("Multi2");
+            ChipContextResolver.FindObjectOverride = p => p.Contains("Multi1") ? go1 : go2;
+
+            // 2 chips → Summary depth → each summary contains its instanceID
+            var result = ChipContextResolver.ResolveAll(new List<string> { "/Multi1", "/Multi2" });
+
+            StringAssert.Contains($"#{go1.GetInstanceID()}", result);
+            StringAssert.Contains($"#{go2.GetInstanceID()}", result);
+        }
     }
 }

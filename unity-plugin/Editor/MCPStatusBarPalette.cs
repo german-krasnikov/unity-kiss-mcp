@@ -47,6 +47,21 @@ namespace UnityMCP.Editor
                             Dot        = new Color(0.80f, 0.55f, 0.05f, 1f),
                             HaloRgb    = new Color(0.80f, 0.55f, 0.05f, 1f) };
 
+                case MCPStatusModel.State.ChatActive:
+                    return pro
+                        ? new Entry {
+                            Text       = new Color(0.45f, 0.75f, 1.00f, 1f),
+                            ChipBg     = new Color(0.10f, 0.22f, 0.38f, 1f),
+                            ChipBorder = new Color(0.30f, 0.60f, 0.95f, 0.55f),
+                            Dot        = new Color(0.40f, 0.70f, 1.00f, 1f),
+                            HaloRgb    = new Color(0.40f, 0.70f, 1.00f, 1f) }
+                        : new Entry {
+                            Text       = new Color(0.04f, 0.32f, 0.65f, 1f),
+                            ChipBg     = new Color(0.85f, 0.92f, 1.00f, 1f),
+                            ChipBorder = new Color(0.15f, 0.50f, 0.90f, 0.55f),
+                            Dot        = new Color(0.10f, 0.45f, 0.85f, 1f),
+                            HaloRgb    = new Color(0.10f, 0.45f, 0.85f, 1f) };
+
                 default: // Down
                     return pro
                         ? new Entry {

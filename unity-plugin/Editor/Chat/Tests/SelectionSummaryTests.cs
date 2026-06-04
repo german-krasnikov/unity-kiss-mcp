@@ -166,5 +166,16 @@ namespace UnityMCP.Editor.Chat.Tests
             var result = SelectionSummary.Summarize(_go);
             StringAssert.StartsWith("[Selection:", result);
         }
+
+        // ── F4: instance ID in summary ───────────────────────────────────────
+
+        [Test]
+        public void SelectionSummary_Summarize_IncludesInstanceID()
+        {
+            _go = new GameObject("IdObj");
+            var id     = _go.GetInstanceID();
+            var result = SelectionSummary.Summarize(_go);
+            StringAssert.Contains($"#{id}", result);
+        }
     }
 }

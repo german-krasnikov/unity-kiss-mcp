@@ -69,7 +69,10 @@ namespace UnityMCP.Editor
         private static void PulseTick()
         {
             if (_pill == null) return;
-            var state = MCPStatusModel.GetState(MCPServer.IsRunning, MCPServer.IsClientConnected);
+            var state = MCPStatusModel.GetState(
+                MCPServer.IsRunning,
+                MCPServer.IsClientConnected,
+                ChatBackendProbe.IsChatBackendRunning());
             RefreshLabel(state);
 
             if (state != _lastTickState)

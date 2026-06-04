@@ -61,5 +61,31 @@ namespace UnityMCP.Editor.Tests
 
         [Test] public void GetPill_Up_ReturnsMcpWithPort()
             => Assert.AreEqual("MCP :9500", GetPill(State.Up, 9500));
+
+        // ── F7: ChatActive state ─────────────────────────────────────────────
+
+        [Test]
+        public void GetState_Running_NoClient_ChatRunning_ReturnsChatActive()
+            => Assert.AreEqual(State.ChatActive, GetState(true, false, true));
+
+        [Test]
+        public void GetState_Running_NoClient_NoChatRunning_ReturnsListen()
+            => Assert.AreEqual(State.Listen, GetState(true, false, false));
+
+        [Test]
+        public void GetState_Running_ClientConnected_ChatRunning_ReturnsUp()
+            => Assert.AreEqual(State.Up, GetState(true, true, true));
+
+        [Test]
+        public void GetLabel_ChatActive_ReturnsChatMode()
+            => Assert.AreEqual("CHAT MODE", MCPStatusModel.GetLabel(State.ChatActive, 9500));
+
+        [Test]
+        public void GetPill_ChatActive_ReturnsMcpChat()
+            => Assert.AreEqual("MCP Chat", GetPill(State.ChatActive, 9500));
+
+        [Test]
+        public void GetCssKey_ChatActive_ReturnsChat()
+            => Assert.AreEqual("chat", GetCssKey(State.ChatActive));
     }
 }

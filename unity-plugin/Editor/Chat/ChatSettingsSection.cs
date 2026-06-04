@@ -18,7 +18,7 @@ namespace UnityMCP.Editor.Chat
 
         private static void AppendSection(VisualElement root)
         {
-            var foldout = new Foldout { text = "Agent Chat (Beta)", value = false };
+            var foldout = new Foldout { text = "Agent Chat", value = false };
             foldout.style.marginTop = 8;
 
             // Binary path (auto + override)

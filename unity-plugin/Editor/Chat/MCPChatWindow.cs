@@ -37,6 +37,17 @@ namespace UnityMCP.Editor.Chat
             w.minSize = new Vector2(320, 400);
         }
 
+        /// <summary>
+        /// Called by ChatBackendProbe via reflection. Returns true when any open chat window
+        /// has a live backend process.
+        /// </summary>
+        public static bool IsChatBackendRunning()
+        {
+            foreach (var w in Resources.FindObjectsOfTypeAll<MCPChatWindow>())
+                if (w._backend?.IsRunning ?? false) return true;
+            return false;
+        }
+
         private void OnEnable()
         {
             CreateBackend();

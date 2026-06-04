@@ -39,7 +39,13 @@ namespace UnityMCP.Editor.Chat
         {
             // Asset paths never have scene context
             if (IsAssetPath(chipPath)) return chipPath;
-            if (depth == ChipDepth.PathOnly) return chipPath;
+            if (depth == ChipDepth.PathOnly)
+            {
+                var goForId = FindGo(chipPath);
+                if (goForId != null && goForId)
+                    return chipPath + " #" + goForId.GetInstanceID();
+                return chipPath;
+            }
 
             var go = FindGo(chipPath);
             if (go == null || !go) return chipPath; // destroyed or not found → PathOnly

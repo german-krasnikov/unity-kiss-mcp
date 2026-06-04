@@ -89,10 +89,13 @@ namespace UnityMCP.Editor
 
         private void RefreshState()
         {
-            bool run = MCPServer.IsRunning, cli = MCPServer.IsClientConnected;
-            var s = MCPStatusModel.GetCssKey(MCPStatusModel.GetState(run, cli));
+            bool run  = MCPServer.IsRunning;
+            bool cli  = MCPServer.IsClientConnected;
+            bool chat = ChatBackendProbe.IsChatBackendRunning();
+            var state = MCPStatusModel.GetState(run, cli, chat);
+            var s     = MCPStatusModel.GetCssKey(state);
 
-            foreach (var k in new[] { "up", "listen", "down" })
+            foreach (var k in new[] { "up", "listen", "down", "chat" })
             {
                 _orb.RemoveFromClassList("orb--" + k);
                 _halo.RemoveFromClassList("halo--" + k);
@@ -103,8 +106,8 @@ namespace UnityMCP.Editor
             _halo.AddToClassList("halo--" + s);
             _word.AddToClassList("status-word--" + s);
 
-            _word.text = MCPStatusModel.GetLabel(run, cli, MCPServer.ServerPort);
-            _sub.text  = MCPStatusModel.GetSub(run, cli);
+            _word.text = MCPStatusModel.GetLabel(state, MCPServer.ServerPort);
+            _sub.text  = MCPStatusModel.GetSub(state);
         }
     }
 }
