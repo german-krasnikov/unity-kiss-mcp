@@ -33,7 +33,7 @@
 
 > **MCP server bridging Claude Code to the Unity Editor over a binary protocol** — 10–15× token compression, capability gating, and a live status window whose heartbeat the banner above mirrors beat-for-beat.
 
-<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
+<img src="docs/assets/divider.svg" width="100%" alt="">
 
 ## Why Unity MCP?
 
@@ -49,26 +49,24 @@ create_object("Enemy")
 set_property("Enemy", "Transform", "position", "0,1,0")
 manage_component("Enemy", "add", "Health")
 set_property("Enemy", "Health", "maxHp", "100")
-create_object("Enemy2")
-# ... 4 more calls
+# ... 5 more calls
 ```
 
 ```python
 # After: 1 batch call (~120 tokens, 93% savings)
 batch([
-  {"cmd": "create_object",   "path": "Enemy",  "type": "Empty"},
-  {"cmd": "set_property",    "path": "Enemy",  "component": "Transform", "property": "position", "value": "0,1,0"},
-  {"cmd": "manage_component","path": "Enemy",  "action": "add", "component": "Health"},
-  {"cmd": "set_property",    "path": "Enemy",  "component": "Health",    "property": "maxHp",   "value": "100"},
-  {"cmd": "create_object",   "path": "Enemy2", "type": "Empty"},
+  {"cmd": "create_object",    "path": "Enemy", "type": "Empty"},
+  {"cmd": "set_property",     "path": "Enemy", "component": "Transform", "property": "position", "value": "0,1,0"},
+  {"cmd": "manage_component", "path": "Enemy", "action": "add", "component": "Health"},
+  {"cmd": "set_property",     "path": "Enemy", "component": "Health", "property": "maxHp", "value": "100"},
 ])
 ```
 
-<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
+<img src="docs/assets/divider.svg" width="100%" alt="">
 
 ## Quick Start
 
-**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 2021.3+</kbd> (2022.3+ recommended) · <kbd>Claude Code</kbd> or any stdio MCP client · TCP port <kbd>9500</kbd> free
+**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 2021.3+</kbd> · <kbd>Claude Code</kbd> · TCP port <kbd>9500</kbd> free
 
 **1. Install the Python server**
 
@@ -112,86 +110,37 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 <details>
 <summary><b>Troubleshooting</b></summary>
 
-| Symptom | Fix |
-|---|---|
-| Port 9500 not listening | Ensure plugin is in `manifest.json`. Click Unity window to recompile. Check Console. |
-| "Connection refused" | Unity must be open with the plugin. Server auto-retries on reconnect. |
-| Tools don't appear | Verify path in `mcp_settings.json`. Restart Claude Code. `pip show unity-mcp`. |
-| C# changes not reflected | Click Unity window or `open -a Unity` (macOS) to trigger recompile. |
+- **Port 9500 not listening** — Ensure plugin is in `manifest.json`. Click Unity window to recompile. Check Console.
+- **"Connection refused"** — Unity must be open with the plugin. Server auto-retries on reconnect.
+- **Tools don't appear** — Verify path in `mcp_settings.json`. Restart Claude Code. `pip show unity-mcp`.
+- **C# changes not reflected** — Click Unity window or `open -a Unity` (macOS) to trigger recompile.
 
 </details>
 
 <img src="docs/assets/stats.svg" width="100%" alt="Stats: MCP Tools, Tests Passing, Batch Savings">
 
-<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
+<img src="docs/assets/divider.svg" width="100%" alt="">
 
 ## Features
 
-<details>
-<summary>💸 <b>Tokens</b> — batch compression, analytics, deferred schemas</summary>
+- 💸 **Token Optimization** — `batch` ops compress 5–20 calls into one (80–95% savings), deferred schemas, per-session analytics
+- 🎬 **PlayTest DSL** — 21-command runtime testing language: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
+- 🏗️ **Scene Management** — full CRUD, hierarchy inspection, Unity query syntax, diff tracking, checkpoint/restore
+- 🎞️ **Animation & Timeline** — clips with key management, Timeline assets, Animator controllers with states/transitions
+- ✨ **VFX & Particles** — particle system CRUD with 11 module presets + shader graph integration
+- 🎨 **Multi-View Screenshots** — 4-panel grid (Front/Left/Top/Iso), bounding-box overlay, visual regression baseline
+- 🔍 **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at` — no disk writes
+- 🎯 **Capability Gating** — TIER1 core always visible; 8 category toggles per-session (`SCENE_EDIT`, `ANIMATION`, `VFX`, `UI`, `ASSETS`)
+- 💬 **In-Unity Agent Chat** — `MCPChatWindow` spawns Claude/Codex CLI directly — domain-reload safe, typed context chips, per-turn undo
+- 🔌 **Plugin Extensibility** — register your own tools in one file, no cross-imports
 
-| Capability | Detail |
-|---|---|
-| **Batch Operations** | `batch`, `setup_objects`, `set_properties`, `configure_objects` — 80–95% token savings vs individual calls |
-| **Token Analytics** | Per-command cost tracking, response-size metrics, batch compression ratios, daily Haiku spend caps |
-| **Deferred Schemas** | Non-core tools ship stub schemas; `resolve_tool_schema` loads full schemas on demand — 58–68% schema-token cut |
-
-</details>
-
-<details>
-<summary>🎬 <b>Runtime</b> — PlayTest DSL, play mode control, atomic rollback</summary>
-
-| Capability | Detail |
-|---|---|
-| **PlayTest DSL** | 21 commands: `MOVE`, `WAIT_UNTIL`, `ASSERT`, `ASSERT_CONSOLE_CLEAN`, `SNAPSHOT`, `INVOKE`, `SET`, `SIMULATE` |
-| **Play Mode Control** | Runtime property mutation, method invocation, state queries, teleportation, time-scale control |
-| **Atomic Batch Rollback** | `atomic=true` on `batch` reverts all scene mutations on first failure via Unity Undo |
-
-</details>
-
-<details>
-<summary>🏗️ <b>Scene</b> — management, animation, VFX, UI</summary>
-
-| Capability | Detail |
-|---|---|
-| **Scene Management** | Full CRUD, hierarchy inspection, Unity query syntax search, diff tracking, checkpoint/restore |
-| **Animation & Timeline** | Animation clips with key management, Timeline assets, Animator controllers with states/transitions |
-| **VFX & Particles** | Particle system CRUD with 11 module presets + shader graph integration |
-| **UI** | uGUI and UI Toolkit element management |
-
-</details>
-
-<details>
-<summary>🎨 <b>Visuals</b> — multi-view screenshots, visual regression</summary>
-
-| Capability | Detail |
-|---|---|
-| **Multi-View Screenshots** | 4-panel grid (Front / Left / Top / Isometric) with collision visualization, bounding-box overlay, set-of-mark |
-| **Visual Regression** | Snapshot baseline comparison for automated visual diff testing |
-
-</details>
-
-<details>
-<summary>🛠️ <b>Developer Experience</b> — tools, code intel, in-Unity chat</summary>
-
-| Capability | Detail |
-|---|---|
-| **MCP Tools** | Scene CRUD, animation, UI, shaders, particles, runtime, code intel, assets, spatial — with plugin extension |
-| **Code Intelligence** | Roslyn-powered `find_references`, `compile_preflight`, `semantic_at` — no disk writes |
-| **Capability Gating** | TIER1 always-visible core; 8 category toggles per-session (`SCENE_EDIT`, `ANIMATION`, `VFX`, `UI`, `ASSETS`) |
-| **In-Unity Agent Chat** | `MCPChatWindow` spawns Claude/Codex CLI directly — domain-reload safe, typed context chips, per-turn undo |
-| **Multi-Unity** | Switch between multiple running editors; transfer references between projects |
-| **NL Intent Tools** | `do`/`ask` meta-tools + `animator_intent`/`vfx_intent`/`ui_intent` — natural language → batch commands |
-
-</details>
-
-<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
+<img src="docs/assets/divider.svg" width="100%" alt="">
 
 ## Architecture
 
 <img src="docs/assets/architecture.svg" width="100%" alt="Architecture: Claude Code → Python MCP Server → TCP :9500 → Unity Editor Plugin">
 
-<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
+<img src="docs/assets/divider.svg" width="100%" alt="">
 
 ## Recent Changes
 
@@ -205,64 +154,20 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 <div align="center"><sub>Auto-updated by CI — see <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a> for full history</sub></div>
 
-<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
-
-## Meet the Crew
-
-| | Role | Model | Brief |
-|---|---|---|---|
-| 🏛 | Senior Architect | `opus` | Designs the evolution from TCP skeleton to multi-tool platform |
-| 🔧 | Senior Developer | `sonnet` | Ships tools, plugin registry, command routing, middleware |
-| 🔍 | Code Reviewer | `sonnet` | Catches protocol invariants, dedup edge cases, CircuitBreaker logic |
-| 🎮 | PlayMode Tester | `haiku` | Drives 53 live integration tests — animation, VFX, runtime |
-| 📚 | Doc Keeper | `haiku` | Maintains changelog, architecture docs, DSL grammar guards |
+<img src="docs/assets/divider.svg" width="100%" alt="">
 
 <div align="center">
-
-<sub>— AUTHORSHIP —</sub>
 
 <img src="https://github.com/german-krasnikov.png" width="80" alt="German Krasnikov">
 
 **German Krasnikov** — the human at the console.
 
-<a href="https://github.com/german-krasnikov">
-<img src="https://img.shields.io/github/followers/german-krasnikov?style=for-the-badge&labelColor=1a1a2e&color=e94560&logo=github&logoColor=white&label=Follow" alt="Follow">
-</a>
-
-</div>
-
-<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
-
 Released under the **MIT License** — see [`LICENSE`](LICENSE).
-
-<div align="center">
-
-<img src="https://img.shields.io/badge/mcp--server-3ad29f?style=flat-square&labelColor=1a1a2e" alt="mcp-server">
-<img src="https://img.shields.io/badge/unity--editor-3ad29f?style=flat-square&labelColor=1a1a2e" alt="unity-editor">
-<img src="https://img.shields.io/badge/claude--code-3ad29f?style=flat-square&labelColor=1a1a2e" alt="claude-code">
-<img src="https://img.shields.io/badge/token--optimization-e94560?style=flat-square&labelColor=1a1a2e" alt="token-optimization">
-<img src="https://img.shields.io/badge/batch--operations-e94560?style=flat-square&labelColor=1a1a2e" alt="batch-operations">
-<img src="https://img.shields.io/badge/playtest--dsl-ccccff?style=flat-square&labelColor=1a1a2e" alt="playtest-dsl">
-<img src="https://img.shields.io/badge/tcp--protocol-888899?style=flat-square&labelColor=1a1a2e" alt="tcp-protocol">
-
-</div>
-
-<br>
-
-<div align="center">
 
 **If the heartbeat resonates, give it a star**
 
 <a href="https://github.com/german-krasnikov/unity-kiss-mcp">
 <img src="https://img.shields.io/github/stars/german-krasnikov/unity-kiss-mcp?style=for-the-badge&labelColor=1a1a2e&color=3ad29f&logo=github&logoColor=white" alt="GitHub stars">
 </a>
-
-<br><br>
-
-[![Star History Chart](https://api.star-history.com/svg?repos=german-krasnikov/unity-kiss-mcp&type=Date)](https://star-history.com/#german-krasnikov/unity-kiss-mcp&Date)
-
-<br>
-
-<sub>Data flows <b>in</b>, pulse flows <b>out</b> — the binary protocol, made visible.</sub>
 
 </div>
