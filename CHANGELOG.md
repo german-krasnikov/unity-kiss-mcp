@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.10.0] — 2026-06-04 <!-- svg: chat plan/act approve & execute + slash templates -->
+
+- **Plan/Act "Approve & Execute" Bridge (Plugin 0.10.0, #11)** (2026-06-04) — After a Plan-mode (Ask) turn finishes, `MCPChatWindow.Drain.cs` injects a one-shot "Approve & Execute" button. Clicking it captures the backend `SessionId`, flips the window to Agent mode, recreates the backend with `--resume <sessionId>` (plan preserved), and auto-dispatches "Execute the plan above." Files: `MCPChatWindow.Approve.cs`, `ApproveHelper.cs`, `ApproveButtonFactory.cs`, +9 lines in `MCPChatWindow.Drain.cs`, `ChatTranscript.Append(VisualElement)` made internal. 10 NUnit EditMode tests green.
+- **Slash-Command Templates (Plugin 0.10.0, #12)** (2026-06-04) — Typing `/` in the composer opens a UIToolkit popup of 5 builtins: `/fix-compile`, `/add-component`, `/playtest`, `/inspect`, `/screenshot`. Selecting one resolves to plain text BEFORE send — pure input transform with NO MCP coupling. Optional context-gather (compile errors / selection / scene state / console) with graceful fallback on throw. KeyDown on parent at TrickleDown ensures Enter resolves template BEFORE `EnterKeySend` fires. Files: `SlashTemplate.cs`, `SlashRegistry.cs`, `SlashPopup.cs`, `MCPChatWindow.Slash.cs`, +44 lines MCPChatWindow.uss. 16 NUnit EditMode tests (SlashRegistryTests 16/16, SlashPopupTests 7/7). Compile-clean after recompile + domain reload.
+
 ## [v0.9.0] — 2026-06-04 <!-- svg: chat context resolution + compile gating tool -->
 
 - **Chat Context Resolution via Chips (Plugin 0.9.0, #2)** (2026-06-04) — `ChipContextResolver.cs` resolves object-path chips at send-time to plain text at three depths: PathOnly / Summary / Full. One chip → Full (all components), many chips → Summary (top 3), asset paths → PathOnly. 2000-char budget caps Full back to Summary. Wired into MCPChatWindow's send path (OnSend + AttachScreenshot). Reuses SelectionSummary + ComponentSerializer (DRY). Eliminates the 1–3 `get_component` round-trips the model used to spend discovering chipped objects. 12 NUnit EditMode tests green.

@@ -121,6 +121,28 @@ public interface IChatBackend
 
 **Graceful:** If path missing or unresolvable, no-op (no error shown). Fires exactly once per tool call. Immediate visual feedback for the user on which object was just mutated.
 
+### Plan/Act "Approve & Execute" Bridge (F11, plugin 0.10.0)
+
+After a Plan-mode (Ask) turn finishes, `MCPChatWindow.Drain.cs` injects a one-shot "Approve & Execute" button into the transcript via `ApproveButtonFactory`. Clicking it:
+1. Captures the current backend `SessionId`
+2. Flips the window to Agent mode
+3. Recreates the backend with `--resume <sessionId>` (preserves the just-produced plan)
+4. Auto-dispatches the prompt "Execute the plan above."
+
+Files: `MCPChatWindow.Approve.cs` (event handler), `ApproveHelper.cs` (session management), `ApproveButtonFactory.cs` (button builder), `ChatTranscript.Append(VisualElement)` made internal.
+
+**Result:** Seamless bridge from planning to execution in a single workflow, plan never lost. 10 NUnit EditMode tests green.
+
+### Slash-Command Templates (F12, plugin 0.10.0)
+
+Typing `/` in the composer opens a UIToolkit popup of 5 builtin templates: `/fix-compile`, `/add-component`, `/playtest`, `/inspect`, `/screenshot`. Selecting one resolves to plain composer text BEFORE send — a pure input transform with NO MCP coupling.
+
+Files: `SlashTemplate.cs` (`[Flags] ContextGather` enum + readonly struct), `SlashRegistry.cs` (Builtins/Match/Resolve), `SlashPopup.cs` (UIToolkit popup, MaxVisible=5), `MCPChatWindow.Slash.cs` (SetupSlash wires ChangeEvent + KeyDownEvent on parent `_inputArea` at TrickleDown).
+
+**Optional context-gather** (compile errors / selection / scene state / console) with graceful "(context unavailable)" fallback on throw. KeyDown handler on parent at TrickleDown ensures deterministic trickle-down order: Enter resolves template BEFORE `EnterKeySend` fires.
+
+**Result:** Speed up common workflows with one keystroke; templates provide context automatically. 16 NUnit EditMode tests green. +44 lines MCPChatWindow.uss.
+
 ### Chat Context Resolution via Chips (F2, plugin 0.9.0)
 
 `ChipContextResolver.cs` resolves object-path chips to plain text at send-time. Three depth levels:
@@ -265,6 +287,13 @@ unity-plugin/Editor/
 │   ├── EditorStateSnapshot.cs        # Inject context block (scene, compile, errors)
 │   ├── ToolPing.cs                   # Flash object on tool-call completion
 │   ├── ChipContextResolver.cs        # Resolve object chips to plain text at 3 depths
+│   ├── MCPChatWindow.Approve.cs      # Event handler: Approve & Execute button
+│   ├── ApproveHelper.cs              # Session management: resume, mode flip
+│   ├── ApproveButtonFactory.cs       # Button builder: humanized button UI
+│   ├── SlashTemplate.cs              # Template model: enum ContextGather + struct
+│   ├── SlashRegistry.cs              # Template registry: Builtins, Match, Resolve
+│   ├── SlashPopup.cs                 # UIToolkit popup: 5 visible, arrow nav
+│   ├── MCPChatWindow.Slash.cs        # Slash setup: KeyDown + ChangeEvent on parent
 │   ├── UnityMCP.Editor.Chat.asmdef   # Assembly definition (references Core)
 │   └── Tests/
 │       ├── ChatStreamParserTests.cs
@@ -275,6 +304,9 @@ unity-plugin/Editor/
 │       ├── PendingTurnStateTests.cs
 │       ├── SelectionSummaryTests.cs
 │       ├── SentTextCacheTests.cs
+│       ├── ApproveFlowTests.cs
+│       ├── SlashRegistryTests.cs
+│       ├── SlashPopupTests.cs
 │       └── UnityMCP.Editor.Chat.Tests.asmdef
 ├── ChatSettingsHook.cs               # Event hook for settings updates
 ├── MCPSettingsUI.cs                  # Modified: fires ChatSettingsHook.Invoke
