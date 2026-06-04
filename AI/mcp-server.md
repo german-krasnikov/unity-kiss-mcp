@@ -20,6 +20,7 @@ server/src/unity_mcp/
 │   ├── __init__.py     # Tool module registry
 │   ├── objects.py      # get_component/inspect/find/set_property/create/delete/manage_component/set_active/wire_event/unwire_event/set_material/set_parent/set_property_delta
 │   ├── scene.py        # hierarchy, console, compile_errors, screenshot, recompile, run_tests, get_test_results, scene, search_scene, editor, checkpoint, fingerprint, scene_diff, save/load_session, screenshot_baseline/compare, get_changes
+│   ├── code_intel.py   # find_references, compile_preflight, semantic_at, await_compile
 │   ├── runtime.py      # invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 │   ├── advanced.py     # batch, references, validate_references, shader, menu, create_ui, set_rect, validate_layout, get_spatial_context, scan_scene, execute_code, check_colliders, get_schema, auto_fix, smart_build, templates, skills, spatial_query
 │   ├── animation.py    # animation, timeline, animator, particle
@@ -40,15 +41,15 @@ server/src/unity_mcp/
     └── __init__.py              # 3-source auto-discovery (pkgutil, entry_points, UNITY_MCP_PLUGIN_DIRS)
 ```
 
-### Tools (89 core)
+### Tools (90 core)
 
-**TIER1 — always visible (38 core):**
+**TIER1 — always visible (39 core):**
 
 Core (24): get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, set_parent, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, do, ask, get_metrics
 
 Intent (3): animator_intent, vfx_intent, ui_intent
 
-Code Intel (3): find_references, compile_preflight, semantic_at
+Code Intel (4): find_references, compile_preflight, semantic_at, await_compile
 
 Runtime (8): invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 
@@ -63,7 +64,7 @@ get_test_results, budget_status
 | object | find_objects, get_object_detail, get_components_list, set_active, set_material, wire_event, unwire_event, set_property_delta |
 | animation | animation, timeline, animator, particle |
 | asset | asset, material, prefab, scriptable_object, project_settings |
-| advanced | shader, references, validate_references, menu, checkpoint, recompile, execute_code, check_colliders, get_schema, scan_scene, spatial_query, auto_fix, smart_build, apply_template, save_template, list_templates |
+| advanced | shader, references, validate_references, menu, checkpoint, recompile, execute_code, check_colliders, get_schema, scan_scene, spatial_query, auto_fix, smart_build, apply_template, save_template, list_templates, await_compile |
 | ui | create_ui, set_rect, validate_layout, get_spatial_context |
 | runtime | invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest |
 | connection | list_connections, reconnect_unity |
@@ -153,6 +154,14 @@ Simplified detector for Unity C# compile/domain-reload:
 3. **UNITY_MCP_PLUGIN_DIRS**: env var pointing to filesystem directories with plugin modules
 
 Each plugin implements `register(mcp, send_fn, args_fn)`. Plugin API facade (`plugin_api.py`) provides stable exports: `API_VERSION`, `RO`, `RW`, `RW_IDEM`, `DEL`, `SamplingService`, `strip_fences`, `sanitize_intent`, `register_dsl_tools()`, `register_read_cmds()`, `register_write_cmds()`, `register_tools()`, `register_features()`.
+
+### Code Intel Tools (server 0.4.0)
+
+**await_compile (NEW):** Read-only tool that blocks until Unity finishes C# compilation AND domain-reloading. Returns compile errors as plain text. Survives domain-reload disconnect via reconnect + re-query. `timeout=0` = instant snapshot. Replaces `sleep`-then-poll patterns.
+
+- `find_references` — semantic search for usages of a symbol (method, property, class)
+- `compile_preflight` — pre-compile validation + type inference for code edits
+- `semantic_at` — AST analysis at a line:col position (type info, references, quick-fix suggestions)
 
 ### Deferred MCP Tool-Schema Loading (F4, server 0.3.0)
 

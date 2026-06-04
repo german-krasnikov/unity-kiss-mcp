@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.9.0] — 2026-06-04 <!-- svg: chat context resolution + compile gating tool -->
+
+- **Chat Context Resolution via Chips (Plugin 0.9.0, #2)** (2026-06-04) — `ChipContextResolver.cs` resolves object-path chips at send-time to plain text at three depths: PathOnly / Summary / Full. One chip → Full (all components), many chips → Summary (top 3), asset paths → PathOnly. 2000-char budget caps Full back to Summary. Wired into MCPChatWindow's send path (OnSend + AttachScreenshot). Reuses SelectionSummary + ComponentSerializer (DRY). Eliminates the 1–3 `get_component` round-trips the model used to spend discovering chipped objects. 12 NUnit EditMode tests green.
+- **Await Compile Gating Tool (Server 0.4.0, #10)** (2026-06-04) — New read-only MCP tool `await_compile(timeout=60, retry_interval=0.5)` registered in `code_intel.py` (TIER1 + ADVANCED_CODE). Blocks until Unity finishes compiling AND domain-reloading, polls existing `compile_status` + `get_compile_errors`, survives domain-reload disconnect (reconnects, re-queries) up to timeout. `timeout=0` = instant snapshot. Returns compile errors as plain text — a deterministic replacement for `sleep`-then-poll after writing C#. 13 pytest tests green. This is a real new tool agents can call.
+
 ## [v0.8.0] — 2026-06-04 <!-- svg: compile auto-fix + editor-state injection + tool ping -->
 
 - **Compile Auto-Fix Retry Loop (Plugin 0.8.0, #5)** (2026-06-04) — `CompileAutoFix.cs` watches `EditorApplication.CompilationFinished` events and auto-retries up to 3 times when chat edits compile. Provenance-gated: only arms when the turn actually edited a `.cs` file (`_turnEditedCode` flag in MCPChatWindow.Drain.cs), preventing false-positive retries on manual IDE edits. Features a state machine (Armed/Disarmed) and graceful exhaustion (final compile absorbed silently; exhaustion shown via cap chip).

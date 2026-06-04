@@ -121,6 +121,24 @@ public interface IChatBackend
 
 **Graceful:** If path missing or unresolvable, no-op (no error shown). Fires exactly once per tool call. Immediate visual feedback for the user on which object was just mutated.
 
+### Chat Context Resolution via Chips (F2, plugin 0.9.0)
+
+`ChipContextResolver.cs` resolves object-path chips to plain text at send-time. Three depth levels:
+
+1. **PathOnly** — just the path (e.g., `/Enemies/Boss`)
+2. **Summary** — path + top 3 non-Transform components (e.g., `/Enemies/Boss (Health, Animator, Collider)`)
+3. **Full** — path + all components with serialized state
+
+**Resolution logic:**
+- **One chip** → Full depth (rich context for single object)
+- **Many chips** → Summary depth (token budget)
+- **Asset paths** → PathOnly (no components)
+- **Budget cap** (2000 chars) → if Full exceeds cap, fall back to Summary
+
+**Integration:** Wired into MCPChatWindow's send path via `OnSend` callback + `AttachScreenshot`. Before sending user message, `ChipContextResolver.ResolveAll()` translates each chip to plain text and inlines it. Reuses `SelectionSummary` + `ComponentSerializer` (DRY).
+
+**Result:** Eliminates 1–3 `get_component` round-trips agents used to make on first turn with chipped objects. 12 NUnit EditMode tests green.
+
 ### Humanized Tool Card Rendering
 
 Stream-json output from `claude -p` emits raw JSON tool cards. Chat parses and humanizes them to plain English:
@@ -246,6 +264,7 @@ unity-plugin/Editor/
 │   ├── CompileAutoFix.cs             # Auto-retry on compile failures (MAX_RETRIES=3)
 │   ├── EditorStateSnapshot.cs        # Inject context block (scene, compile, errors)
 │   ├── ToolPing.cs                   # Flash object on tool-call completion
+│   ├── ChipContextResolver.cs        # Resolve object chips to plain text at 3 depths
 │   ├── UnityMCP.Editor.Chat.asmdef   # Assembly definition (references Core)
 │   └── Tests/
 │       ├── ChatStreamParserTests.cs
