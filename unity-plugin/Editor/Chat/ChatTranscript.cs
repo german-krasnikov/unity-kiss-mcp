@@ -188,7 +188,7 @@ namespace UnityMCP.Editor.Chat
             return row;
         }
 
-        private void Append(VisualElement el)
+        internal void Append(VisualElement el)
         {
             _container.Add(el);
             _msgCount++;

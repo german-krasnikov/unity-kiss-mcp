@@ -83,6 +83,7 @@ namespace UnityMCP.Editor.Chat
             root.Add(BuildResizeHandle(_inputArea));
             root.Add(_inputArea);
             SetupAutoHeight();
+            SetupSlash();
             root.schedule.Execute(DrainAndRender).Every(33);
             root.schedule.Execute(TickFlowBarSweep).Every(950);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);

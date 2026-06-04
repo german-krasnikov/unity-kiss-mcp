@@ -120,6 +120,15 @@ namespace UnityMCP.Editor.Chat
                             _autoFix.Arm();
                     }
                     _turnEditedCode = false;
+                    // Ask mode + valid session → inject one-shot approve button.
+                    if (!_agentMode && !string.IsNullOrEmpty(_backend?.SessionId))
+                    {
+                        var approveContainer = new VisualElement();
+                        _transcript?.Append(approveContainer);
+                        ApproveButtonFactory.MaybeAppend(approveContainer,
+                            agentMode: false, sessionId: _backend.SessionId,
+                            onApprove: ApproveAndExecute);
+                    }
                     break;
                 case ChatEventKind.SessionInit:
                     break; // non-terminal: session established, keep animation running

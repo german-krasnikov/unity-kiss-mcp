@@ -598,3 +598,50 @@
 /* Ping-pong anchors toggled every 950ms (>900ms transition = each leg completes) */
 .flowbar__fill--a { translate: -40% 0; }
 .flowbar__fill--b { translate: 220% 0; }
+
+/* ── Approve & Execute button ── */
+.approve-btn {
+    align-self: center;
+    margin: 6px 0;
+    padding: 4px 16px;
+    border-radius: 4px;
+    border-width: 1px;
+    background-color: var(--unity-colors-highlight-background);
+    border-color: var(--unity-colors-button-border-focus);
+    color: var(--unity-colors-highlight-text);
+    font-size: 11px;
+    -unity-text-align: middle-center;
+    transition-property: background-color;
+    transition-duration: 0.12s;
+}
+
+.approve-btn:hover {
+    background-color: var(--unity-colors-highlight-background-hover,
+        var(--unity-colors-highlight-background));
+}
+
+/* ── Slash command popup ── */
+.slash-popup {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--unity-colors-window-background);
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 4px;
+    max-height: 140px;
+    overflow: hidden;
+}
+
+.slash-item {
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--unity-colors-default-text);
+    cursor: link;
+}
+
+.slash-item--selected {
+    background-color: var(--unity-colors-highlight-background);
+    color: var(--unity-colors-highlight-text);
+}
