@@ -4,29 +4,27 @@ Run with: pytest -m live
 """
 import uuid
 import pytest
-from unity_mcp.tools.scene import search_scene
+
+from tests.live.conftest import strip_markers, _destroy
 
 pytestmark = pytest.mark.live
 
 
 @pytest.mark.asyncio
-async def test_live_search_scene_scoped(mock_bridge):
-    """Create parent + children, search with root — only children returned, not siblings."""
-    parent_name = f"Live_F13_Parent_{uuid.uuid4().hex[:6]}"
-    child_name = f"Live_F13_Child_{uuid.uuid4().hex[:6]}"
-    sibling_name = f"Live_F13_Sibling_{uuid.uuid4().hex[:6]}"
+async def test_live_search_scene_scoped(bridge):
+    """Create parent + child + sibling; search with root — only child returned."""
+    parent = f"Live_F13_Parent_{uuid.uuid4().hex[:6]}"
+    child = f"Live_F13_Child_{uuid.uuid4().hex[:6]}"
+    sibling = f"Live_F13_Sibling_{uuid.uuid4().hex[:6]}"
 
-    from unity_mcp.tools.scene import _send, _args
-    # Create objects
-    await _send("create_object", _args(name=parent_name))
-    await _send("create_object", _args(name=child_name, parent="/" + parent_name))
-    await _send("create_object", _args(name=sibling_name))
-
+    await bridge.send("create_object", {"name": parent})
+    await bridge.send("create_object", {"name": child, "parent": "/" + parent})
+    await bridge.send("create_object", {"name": sibling})
     try:
-        result = await search_scene(query="Live_F13_", root="/" + parent_name)
-        assert child_name in result, f"Child not found in scoped result: {result}"
-        assert sibling_name not in result, f"Sibling leaked into scoped result: {result}"
+        result = await bridge.send("search_scene", {"query": "Live_F13_", "root": "/" + parent})
+        data = strip_markers(result.get("data", "") if isinstance(result, dict) else str(result))
+        assert child in data, f"Child not found in scoped result: {data}"
+        assert sibling not in data, f"Sibling leaked into scoped result: {data}"
     finally:
-        # Cleanup
-        await _send("delete_object", _args(path="/" + parent_name))
-        await _send("delete_object", _args(path="/" + sibling_name))
+        await _destroy(bridge, parent)
+        await _destroy(bridge, sibling)

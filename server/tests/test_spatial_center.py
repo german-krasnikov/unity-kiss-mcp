@@ -47,3 +47,13 @@ async def test_spatial_center_ignored_for_bounds_info(mock_bridge):
     await spatial_query(action="bounds_info", path="/Player")
     sent = mock_bridge.send.call_args[0][1]
     assert "center" not in sent
+
+
+# Scenario 11: path omitted — center-only call works, no 'path' key sent
+@pytest.mark.asyncio
+async def test_spatial_objects_in_radius_center_only_no_path(mock_bridge):
+    mock_bridge.send.return_value = {"ok": True, "data": "2 objects within 5m:"}
+    await spatial_query(action="objects_in_radius", center="0,0,0", radius=5.0)
+    sent = mock_bridge.send.call_args[0][1]
+    assert sent.get("center") == "0,0,0"
+    assert "path" not in sent

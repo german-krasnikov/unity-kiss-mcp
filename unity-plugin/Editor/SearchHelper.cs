@@ -20,7 +20,7 @@ namespace UnityMCP.Editor
                 return notFound;
 
             if (results.Count == 0)
-                return BuildEmptyHint(query);
+                return BuildEmptyHint(query, root);
 
             int overflow = 0;
             if (limit > 0 && results.Count >= limit)
@@ -165,7 +165,7 @@ namespace UnityMCP.Editor
             }
         }
 
-        private static string BuildEmptyHint(string query)
+        private static string BuildEmptyHint(string query, string rootPath = null)
         {
             var stage = PrefabStageUtility.GetCurrentPrefabStage();
             string ctxName; int total; var tops = new List<string>();
@@ -174,6 +174,13 @@ namespace UnityMCP.Editor
                 ctxName = stage.prefabContentsRoot.name;
                 total = stage.prefabContentsRoot.GetComponentsInChildren<Transform>(true).Length;
                 foreach (Transform c in stage.prefabContentsRoot.transform) tops.Add(c.name);
+            }
+            else if (!string.IsNullOrEmpty(rootPath) && rootPath != "/")
+            {
+                var rootGO = ComponentSerializer.FindObject(rootPath);
+                ctxName = rootGO != null ? rootGO.name : rootPath;
+                total = rootGO != null ? rootGO.GetComponentsInChildren<Transform>(true).Length : 0;
+                if (rootGO != null) foreach (Transform c in rootGO.transform) tops.Add(c.name);
             }
             else
             {

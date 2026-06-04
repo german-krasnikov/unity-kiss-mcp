@@ -25,7 +25,7 @@ async def check_colliders(path: str | None = None) -> str:
     return await _send("check_colliders", _args(path=path))
 
 
-async def spatial_query(action: str, path: str, target: str | None = None,
+async def spatial_query(action: str, path: str | None = None, target: str | None = None,
                         distance: float | None = None, radius: float | None = None,
                         component: str | None = None, cell_size: float | None = None,
                         layer_mask: str | None = None,
@@ -33,7 +33,7 @@ async def spatial_query(action: str, path: str, target: str | None = None,
     """Spatial queries. action: nearest|in_front_of|objects_in_radius|bounds_info|raycast|spatial_map.
     nearest: find closest object (optionally filtered by component name).
     in_front_of: position in front of object at distance.
-    objects_in_radius: list all objects within radius. center='x,y,z' as alternative origin to path.
+    objects_in_radius: list all objects within radius. path is optional when center='x,y,z' is given.
     bounds_info: detailed bounds/dimensions of object.
     raycast: cast ray from path/pos to target, returns hits sorted by distance.
     spatial_map: ASCII grid map of objects in XZ plane. cell_size in meters."""

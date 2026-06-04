@@ -144,5 +144,16 @@ namespace UnityMCP.Editor.Tests
             StringAssert.Contains("no matches", result);
             Object.DestroyImmediate(emptyRoot);
         }
+
+        // Scenario 20: scoped empty hint names the root, not the scene
+        [Test]
+        public void Search_ScopedEmptyHint_MentionsRootNotScene()
+        {
+            // _root has children Child1, Child2 — but no Camera
+            var result = SearchHelper.Search("t:Camera", root: "/" + _root.name);
+            StringAssert.Contains(_root.name, result);
+            StringAssert.DoesNotContain(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name, result);
+        }
     }
 }
