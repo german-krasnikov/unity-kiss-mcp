@@ -65,6 +65,37 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNull(result);
         }
 
+        // ── 3b. ResolveServerDir server/ + pyproject.toml present ────────────
+
+        [Test]
+        public void ResolveServerDir_PyprojectPresent_ReturnsAbsoluteServerDir()
+        {
+            var fakeRoot  = Path.Combine(_tmpDir, "pkg");
+            var serverDir = Path.GetFullPath(Path.Combine(fakeRoot, "..", "server"));
+            Directory.CreateDirectory(serverDir);
+            File.WriteAllText(Path.Combine(serverDir, "pyproject.toml"), "[project]");
+            Assert.AreEqual(serverDir, ChatMcpConfigWriter.ResolveServerDir(fakeRoot));
+        }
+
+        // ── 3c. BuildClaudeConfigJson JSON-escaping round-trip ────────────────
+
+        [Test]
+        public void BuildClaudeConfigJson_BackslashAndQuoteInArgs_RoundTripSurvives()
+        {
+            const string winPath = "C:\\Users\\dev\\server\\python.exe";
+            const string argWithQuote = "say \"hello\"";
+            var json = ChatMcpConfigWriter.BuildClaudeConfigJson(
+                winPath, new[] { argWithQuote });
+
+            var mcpServers = JsonHelper.ExtractObject(json, "mcpServers");
+            var unity      = JsonHelper.ExtractObject(mcpServers, "unity");
+            var command    = JsonHelper.ExtractString(unity, "command");
+
+            Assert.AreEqual(winPath, command, "backslashes must survive the JSON round-trip");
+            StringAssert.Contains("say", JsonHelper.ExtractArray(unity, "args"),
+                "arg value must be present in serialized array");
+        }
+
         // ── 4. BuildClaudeConfigJson valid JSON ───────────────────────────────
 
         [Test]
@@ -80,8 +111,8 @@ namespace UnityMCP.Editor.Chat.Tests
             var argsRaw    = JsonHelper.ExtractArray(unity, "args");
 
             Assert.AreEqual("/usr/local/bin/uv", command);
-            StringAssert.Contains("run", argsRaw);
-            StringAssert.Contains("unity-mcp", argsRaw);
+            StringAssert.Contains("\"run\"", argsRaw);
+            StringAssert.Contains("\"unity-mcp\"", argsRaw);
         }
 
         // ── 5. BuildClaudeConfigJson args with spaces → valid JSON ────────────
