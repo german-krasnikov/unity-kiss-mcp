@@ -20,8 +20,8 @@ namespace UnityMCP.Editor.Chat.Tests
         public void Add_ThenPaths_ReturnsPathsInOrder()
         {
             var t = Make();
-            t.Add(new ChipData("/World/Player", "Player", 1));
-            t.Add(new ChipData("/World/Enemy",  "Enemy",  2));
+            t.Add(new ChipData(ChipKind.Hierarchy, "/World/Player", "Player", 1));
+            t.Add(new ChipData(ChipKind.Hierarchy, "/World/Enemy",  "Enemy",  2));
 
             var paths = t.Paths.ToList();
             Assert.AreEqual(2, paths.Count);
@@ -35,9 +35,9 @@ namespace UnityMCP.Editor.Chat.Tests
         public void SyncToText_RemoveMiddleMarker_DropsMiddleChip()
         {
             var t = Make();
-            t.Add(new ChipData("/A", "A", 1));
-            t.Add(new ChipData("/B", "B", 2));
-            t.Add(new ChipData("/C", "C", 3));
+            t.Add(new ChipData(ChipKind.Asset, "/A", "A", 1));
+            t.Add(new ChipData(ChipKind.Asset, "/B", "B", 2));
+            t.Add(new ChipData(ChipKind.Asset, "/C", "C", 3));
 
             // old: "a￼b￼c￼d"  (3 markers, matching 3 chips)
             var old = $"a{M}b{M}c{M}d";
@@ -60,8 +60,8 @@ namespace UnityMCP.Editor.Chat.Tests
         public void SyncToText_BackspaceLastMarker_DropsLastChip()
         {
             var t = Make();
-            t.Add(new ChipData("/X", "X", 10));
-            t.Add(new ChipData("/Y", "Y", 11));
+            t.Add(new ChipData(ChipKind.Asset, "/X", "X", 10));
+            t.Add(new ChipData(ChipKind.Asset, "/Y", "Y", 11));
 
             var old  = $"hello{M}world{M}";
             var next = $"hello{M}world";   // trailing marker deleted
@@ -80,8 +80,8 @@ namespace UnityMCP.Editor.Chat.Tests
         public void SyncToText_NoMarkerChange_KeepsAllChips()
         {
             var t = Make();
-            t.Add(new ChipData("/P", "P", 5));
-            t.Add(new ChipData("/Q", "Q", 6));
+            t.Add(new ChipData(ChipKind.Asset, "/P", "P", 5));
+            t.Add(new ChipData(ChipKind.Asset, "/Q", "Q", 6));
 
             // edit plain text between the two markers
             var old  = $"foo{M}bar{M}";
@@ -99,9 +99,9 @@ namespace UnityMCP.Editor.Chat.Tests
         public void SyncToText_SelectionDeleteSpanningTwoMarkers_DropsBoth()
         {
             var t = Make();
-            t.Add(new ChipData("/A", "A", 1));
-            t.Add(new ChipData("/B", "B", 2));
-            t.Add(new ChipData("/C", "C", 3));
+            t.Add(new ChipData(ChipKind.Asset, "/A", "A", 1));
+            t.Add(new ChipData(ChipKind.Asset, "/B", "B", 2));
+            t.Add(new ChipData(ChipKind.Asset, "/C", "C", 3));
 
             // "x￼y￼z￼w"  → select and delete "￼y￼" → "xz￼w"
             var old  = $"x{M}y{M}z{M}w";
@@ -123,8 +123,8 @@ namespace UnityMCP.Editor.Chat.Tests
         public void Clear_EmptiesTrackerAndPaths()
         {
             var t = Make();
-            t.Add(new ChipData("/A", "A", 1));
-            t.Add(new ChipData("/B", "B", 2));
+            t.Add(new ChipData(ChipKind.Asset, "/A", "A", 1));
+            t.Add(new ChipData(ChipKind.Asset, "/B", "B", 2));
 
             t.Clear();
 
@@ -175,6 +175,28 @@ namespace UnityMCP.Editor.Chat.Tests
             int s = InlineChipTracker.CommonSuffix("abcd", "axcd", p, p);
             Assert.AreEqual(1, p);
             Assert.AreEqual(2, s);
+        }
+
+        // ── F10: Kind field roundtrip ─────────────────────────────────────────
+
+        [Test]
+        public void ChipData_CarriesKind()
+        {
+            var chip = new ChipData(ChipKind.Script, "Assets/Foo.cs", "Foo", 42);
+            Assert.AreEqual(ChipKind.Script, chip.Kind);
+            Assert.AreEqual("Assets/Foo.cs", chip.Path);
+            Assert.AreEqual("Foo",           chip.DisplayName);
+            Assert.AreEqual(42,              chip.InstanceID);
+        }
+
+        [Test]
+        public void Add_WithKind_KindPreserved()
+        {
+            var t = Make();
+            t.Add(new ChipData(ChipKind.Material, "Assets/Mat.mat", "Lava", 99));
+
+            Assert.AreEqual(ChipKind.Material, t[0].Kind);
+            Assert.AreEqual("Assets/Mat.mat",  t[0].Path);
         }
     }
 }

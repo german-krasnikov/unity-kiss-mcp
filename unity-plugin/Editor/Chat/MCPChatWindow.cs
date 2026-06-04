@@ -31,8 +31,6 @@ namespace UnityMCP.Editor.Chat
         private VisualElement      _inputArea;
         private ScrollView         _scroll;
         private InputHeightCalc    _heightCalc = new InputHeightCalc();
-        private InlineChipTracker  _chipTracker;
-        private InlineChipOverlay  _chipOverlay;
 
         [MenuItem("MCP/Chat", priority = 0)]
         public static void ShowWindow()
@@ -154,58 +152,6 @@ namespace UnityMCP.Editor.Chat
             return area;
         }
 
-        /// <summary>Insert a chip marker at the cursor in _input and record ChipData.</summary>
-        internal void InsertInlineChip(UnityEngine.GameObject go)
-        {
-            if (go == null) return;
-            var path = ComponentSerializer.GetPath(go);
-            InsertInlineChip(go, path, go.name);
-        }
-
-        internal void InsertInlineChip(UnityEngine.Object cap, string path, string displayName)
-        {
-            if (string.IsNullOrEmpty(path)) return;
-            var cur   = _input.value ?? "";
-            var caret = Mathf.Clamp(_input.cursorIndex, 0, cur.Length);
-            // Insert marker char at caret position
-            _input.value = cur.Substring(0, caret)
-                         + InlineChipTracker.Marker
-                         + cur.Substring(caret);
-            // Move caret past the inserted marker
-            _input.SelectRange(caret + 1, caret + 1);
-
-            var instanceID = cap != null ? cap.GetInstanceID() : 0;
-            _chipTracker.Add(new ChipData(path, displayName, instanceID));
-            _chipOverlay.Refresh();
-            _input.Focus();
-            UpdateAutoHeight();
-        }
-
-        private void RemoveInlineChipAt(int chipIndex)
-        {
-            if (chipIndex < 0 || chipIndex >= _chipTracker.Count) return;
-
-            // Find and remove the chipIndex-th U+FFFC marker from the text.
-            // Setting _input.value triggers ValueChangedCallback which calls SyncToText,
-            // so tracker + overlay are updated there — do NOT touch them here.
-            var text = _input.value ?? "";
-            int nth  = -1;
-            for (int i = 0; i < text.Length; i++)
-            {
-                if (text[i] == InlineChipTracker.Marker)
-                {
-                    nth++;
-                    if (nth == chipIndex)
-                    {
-                        _input.value = text.Remove(i, 1);
-                        break;
-                    }
-                }
-            }
-
-            UpdateAutoHeight();
-        }
-
         private void SetMode(bool agentMode)
         {
             if (_agentMode == agentMode) return;
@@ -250,19 +196,7 @@ namespace UnityMCP.Editor.Chat
             // F5: strip U+FFFC markers from displayed text before trimming
             var rawText = _input.value ?? "";
             var text    = rawText.Replace(InlineChipTracker.Marker.ToString(), "").Trim();
-            var chips   = CollectChipPaths();
-
-            // F5: merge inline chip paths (deduplicated, strip-strip chips already in chips)
-            foreach (var p in _chipTracker.Paths)
-                if (!chips.Contains(p)) chips.Add(p);
-
-            // #3 Auto-include selection: prepend summary line if not already a chip.
-            var selGo   = Selection.activeGameObject;
-            var chipSet = new HashSet<string>(chips);
-            if (SelectionSummary.ShouldPrepend(selGo, chipSet))
-                text = SelectionSummary.Summarize(selGo) + "\n" + text;
-
-            if (chips.Count > 0) text += "\n" + ChipContextResolver.ResolveAll(chips);
+            AppendChipContext(ref text);
             if (string.IsNullOrEmpty(text)) return;
 
             DispatchTurn(UserTurnBuilder.Build(text), text);
@@ -277,12 +211,36 @@ namespace UnityMCP.Editor.Chat
             if (string.IsNullOrEmpty(capturePath)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
             var bytes = File.ReadAllBytes(capturePath);
             // F5: strip markers from displayed text
-            var text  = (_input.value ?? "").Replace(InlineChipTracker.Marker.ToString(), "").Trim();
-            var chips = CollectChipPaths();
-            foreach (var p in _chipTracker.Paths)
-                if (!chips.Contains(p)) chips.Add(p);
-            if (chips.Count > 0) text += "\n" + ChipContextResolver.ResolveAll(chips);
+            var text = (_input.value ?? "").Replace(InlineChipTracker.Marker.ToString(), "").Trim();
+            AppendChipContext(ref text);
             DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: capturePath);
+        }
+
+        // F10: merge strip chips + inline chips, emit typed bracket format honouring ChipConfig.
+        private void AppendChipContext(ref string text)
+        {
+            // Start with strip chips (full ChipData).
+            var chips = CollectChipData();
+
+            // F5: merge inline chips — deduplicate by path.
+            for (int i = 0; i < _chipTracker.Count; i++)
+            {
+                var cd = _chipTracker[i];
+                if (!chips.Exists(x => x.Path == cd.Path)) chips.Add(cd);
+            }
+
+            // #3 Auto-include selection: prepend summary if not already a chip.
+            var selGo   = Selection.activeGameObject;
+            var chipSet = new HashSet<string>();
+            foreach (var c in chips) chipSet.Add(c.Path);
+            if (SelectionSummary.ShouldPrepend(selGo, chipSet))
+                text = SelectionSummary.Summarize(selGo) + "\n" + text;
+
+            if (chips.Count == 0) return;
+            // F10: typed emission — [kind:ref] bracket format, per-kind depth from config.
+            var cfg     = BackendConfigStore.Load().Chips;
+            var context = ChipContextResolver.ResolveAllTyped(chips, cfg);
+            if (!string.IsNullOrEmpty(context)) text += "\n" + context;
         }
 
         // Shared send sequence — OnSend and AttachScreenshot must not drift from each other.
@@ -317,15 +275,5 @@ namespace UnityMCP.Editor.Chat
             _inputArea.style.maxHeight = _heightCalc.ComputeMax(position.height);
         }
 
-        private void AddRefToContext(string refPath)
-        {
-            if (string.IsNullOrEmpty(refPath)) return;
-            // F5: use inline chip so ref is visually represented as a pill
-            // DisplayName = last segment of path (after last '/')
-            var display = refPath.Contains("/")
-                ? refPath.Substring(refPath.LastIndexOf('/') + 1)
-                : refPath;
-            InsertInlineChip(null, refPath, display);
-        }
     }
 }

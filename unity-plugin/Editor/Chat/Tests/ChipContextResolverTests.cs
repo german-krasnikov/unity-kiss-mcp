@@ -237,5 +237,108 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains($"#{go1.GetInstanceID()}", result);
             StringAssert.Contains($"#{go2.GetInstanceID()}", result);
         }
+
+        // ── F10: FormatChipRef ─────────────────────────────────────────────────
+
+        [Test]
+        public void FormatChipRef_Hierarchy_BracketFormatWithInstanceID()
+        {
+            var result = ChipContextResolver.FormatChipRef(ChipKind.Hierarchy, "/World/Player", 12345);
+            Assert.AreEqual("[hierarchy:/World/Player #12345]", result);
+        }
+
+        [Test]
+        public void FormatChipRef_Script_NameOnly_NoBracketID()
+        {
+            var result = ChipContextResolver.FormatChipRef(ChipKind.Script, "PlayerController", 0);
+            Assert.AreEqual("[script:PlayerController]", result);
+        }
+
+        [Test]
+        public void FormatChipRef_Scene_FullAssetPath()
+        {
+            var result = ChipContextResolver.FormatChipRef(ChipKind.Scene, "Assets/Scenes/Main.unity", 0);
+            Assert.AreEqual("[scene:Assets/Scenes/Main.unity]", result);
+        }
+
+        [Test]
+        public void FormatChipRef_Asset_AssetPath()
+        {
+            var result = ChipContextResolver.FormatChipRef(ChipKind.Asset, "Assets/Fonts/Arial.ttf", 0);
+            Assert.AreEqual("[asset:Assets/Fonts/Arial.ttf]", result);
+        }
+
+        [Test]
+        public void FormatChipRef_Hierarchy_ZeroInstanceID_OmitsHashSuffix()
+        {
+            // instanceID 0 = no object found; should omit the # suffix
+            var result = ChipContextResolver.FormatChipRef(ChipKind.Hierarchy, "/Player", 0);
+            Assert.AreEqual("[hierarchy:/Player]", result);
+        }
+
+        [Test]
+        public void FormatChipRef_ScriptableObject_UsesSoPrefix()
+        {
+            var result = ChipContextResolver.FormatChipRef(ChipKind.ScriptableObject, "Assets/Data/Cfg.asset", 0);
+            Assert.AreEqual("[so:Assets/Data/Cfg.asset]", result);
+        }
+
+        // ── F10: EmitTyped ────────────────────────────────────────────────────
+
+        [Test]
+        public void EmitTyped_DepthNone_ReturnsEmpty()
+        {
+            var result = ChipContextResolver.EmitTyped(ChipKind.Script, "Assets/Foo.cs", 0, "none", (p, d) => "RESOLVED");
+            Assert.AreEqual("", result);
+        }
+
+        [Test]
+        public void EmitTyped_DepthPath_ReturnsBracketOnly()
+        {
+            var result = ChipContextResolver.EmitTyped(ChipKind.Script, "Assets/Foo.cs", 0, "path", (p, d) => "RESOLVED");
+            Assert.AreEqual("[script:Assets/Foo.cs]", result);
+        }
+
+        [Test]
+        public void EmitTyped_DepthPath_Hierarchy_IncludesInstanceID()
+        {
+            var result = ChipContextResolver.EmitTyped(ChipKind.Hierarchy, "/Player", 123, "path", (p, d) => "RESOLVED");
+            Assert.AreEqual("[hierarchy:/Player #123]", result);
+        }
+
+        [Test]
+        public void EmitTyped_DepthSummary_StartsWithBracketThenResolved()
+        {
+            var result = ChipContextResolver.EmitTyped(ChipKind.Hierarchy, "/Player", 123, "summary",
+                (p, d) => "summary-text");
+            StringAssert.StartsWith("[hierarchy:/Player #123]", result);
+            StringAssert.Contains("summary-text", result);
+        }
+
+        [Test]
+        public void EmitTyped_DepthFull_StartsWithBracketThenResolved()
+        {
+            var result = ChipContextResolver.EmitTyped(ChipKind.Hierarchy, "/Player", 0, "full",
+                (p, d) => "full-dump");
+            StringAssert.StartsWith("[hierarchy:/Player]", result);
+            StringAssert.Contains("full-dump", result);
+        }
+
+        [Test]
+        public void EmitTyped_DepthSummary_Asset_BracketAndAssetPath()
+        {
+            // Assets don't have scene resolution; resolveFn still called but result may be path
+            var result = ChipContextResolver.EmitTyped(ChipKind.Script, "Assets/Foo.cs", 0, "summary",
+                (p, d) => p); // resolveFn returns path as-is for assets
+            StringAssert.StartsWith("[script:Assets/Foo.cs]", result);
+        }
+
+        [Test]
+        public void EmitTyped_UnknownDepth_TreatedAsPath()
+        {
+            // Any unrecognized depth string → treat as "path" (safe fallback)
+            var result = ChipContextResolver.EmitTyped(ChipKind.Asset, "Assets/X.png", 0, "bogus", (p, d) => "R");
+            Assert.AreEqual("[asset:Assets/X.png]", result);
+        }
     }
 }

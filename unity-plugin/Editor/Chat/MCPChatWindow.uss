@@ -438,6 +438,21 @@
     white-space: normal;
 }
 
+/* ── Kind prefix labels on chips (dimmer, smaller) ── */
+.inline-chip-kind {
+    font-size: 9px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.65;
+    margin-right: 2px;
+}
+
+.obj-chip-kind {
+    font-size: 9px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.65;
+    margin-right: 2px;
+}
+
 /* ── Obj-chip remove button ── */
 .obj-chip-remove {
     background-color: rgba(0,0,0,0);

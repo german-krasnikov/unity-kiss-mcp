@@ -23,11 +23,38 @@ namespace UnityMCP.Editor.Chat
         public string ExtraArgs         = "";
     }
 
+    /// <summary>Per-kind detail depth for chip context sent to AI.</summary>
+    [Serializable]
+    internal sealed class ChipConfig
+    {
+        // "path" = bracket format only. "summary" = SelectionSummary.
+        // "full" = ComponentSerializer dump (hierarchy only). "none" = omit.
+        public string HierarchyDepth = "summary";
+        public string ScriptDepth    = "path";
+        public string SceneDepth     = "path";
+        public string PrefabDepth    = "path";
+        public string AssetDepth     = "path";
+
+        /// <summary>Return the configured depth string for a given kind.</summary>
+        internal string DepthFor(ChipKind kind)
+        {
+            switch (kind)
+            {
+                case ChipKind.Hierarchy: return HierarchyDepth;
+                case ChipKind.Script:    return ScriptDepth;
+                case ChipKind.Scene:     return SceneDepth;
+                case ChipKind.Prefab:    return PrefabDepth;
+                default:                 return AssetDepth; // Material/Texture/SO/Asset
+            }
+        }
+    }
+
     [Serializable]
     internal sealed class BackendConfigStore
     {
         public ClaudeBackendConfig Claude = new ClaudeBackendConfig();
         public CodexBackendConfig  Codex  = new CodexBackendConfig();
+        public ChipConfig          Chips  = new ChipConfig();
 
         private static string DefaultPath =>
             Path.Combine(Application.dataPath, "..", "Library", "MCP_ChatBackendConfig.json");
@@ -48,6 +75,7 @@ namespace UnityMCP.Editor.Chat
                 // Null guard: JsonUtility can leave nested objects null if fields missing.
                 store.Claude = store.Claude ?? new ClaudeBackendConfig();
                 store.Codex  = store.Codex  ?? new CodexBackendConfig();
+                store.Chips  = store.Chips  ?? new ChipConfig();
                 return store;
             }
             catch

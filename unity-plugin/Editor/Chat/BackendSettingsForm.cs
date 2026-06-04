@@ -7,6 +7,40 @@ namespace UnityMCP.Editor.Chat
 {
     internal static class BackendSettingsForm
     {
+        private static readonly List<string> _depthOptions =
+            new List<string> { "path", "summary", "full", "none" };
+
+        internal static void BuildChipConfigForm(
+            VisualElement parent,
+            ChipConfig config,
+            Action onSave)
+        {
+            var hierarchyField = new DropdownField("Hierarchy Depth", _depthOptions,
+                System.Math.Max(0, _depthOptions.IndexOf(config.HierarchyDepth)));
+            hierarchyField.RegisterValueChangedCallback(e => { config.HierarchyDepth = e.newValue; onSave(); });
+            parent.Add(hierarchyField);
+
+            var scriptField = new DropdownField("Script Depth", _depthOptions,
+                System.Math.Max(0, _depthOptions.IndexOf(config.ScriptDepth)));
+            scriptField.RegisterValueChangedCallback(e => { config.ScriptDepth = e.newValue; onSave(); });
+            parent.Add(scriptField);
+
+            var sceneField = new DropdownField("Scene Depth", _depthOptions,
+                System.Math.Max(0, _depthOptions.IndexOf(config.SceneDepth)));
+            sceneField.RegisterValueChangedCallback(e => { config.SceneDepth = e.newValue; onSave(); });
+            parent.Add(sceneField);
+
+            var prefabField = new DropdownField("Prefab Depth", _depthOptions,
+                System.Math.Max(0, _depthOptions.IndexOf(config.PrefabDepth)));
+            prefabField.RegisterValueChangedCallback(e => { config.PrefabDepth = e.newValue; onSave(); });
+            parent.Add(prefabField);
+
+            var assetField = new DropdownField("Asset Depth", _depthOptions,
+                System.Math.Max(0, _depthOptions.IndexOf(config.AssetDepth)));
+            assetField.RegisterValueChangedCallback(e => { config.AssetDepth = e.newValue; onSave(); });
+            parent.Add(assetField);
+        }
+
         internal static void BuildClaudeForm(
             VisualElement parent,
             ClaudeBackendConfig config,

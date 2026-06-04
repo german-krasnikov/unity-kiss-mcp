@@ -51,6 +51,11 @@ namespace UnityMCP.Editor.Chat
             // Step 2: escape HTML in the non-code text.
             withPlaceholders = Escape(withPlaceholders);
 
+            // Step 2b: replace AI response bracket tags [kind:ref] with rich-text pills.
+            // Must run after escape (so < inside refs is neutralized) and before bold/italic
+            // (so the emitted <color>/<link> tags are not processed as markdown).
+            withPlaceholders = ResponseTagInliner.Apply(withPlaceholders);
+
             // Step 3: apply bold, italic, links.
             withPlaceholders = _bold.Replace(withPlaceholders, "<b>$1</b>");
             withPlaceholders = _under.Replace(withPlaceholders, "<i>$1</i>");

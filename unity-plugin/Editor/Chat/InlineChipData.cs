@@ -7,14 +7,21 @@ using System.Linq;
 
 namespace UnityMCP.Editor.Chat
 {
+    internal enum ChipKind
+    {
+        Hierarchy, Scene, Script, Prefab, Material, Texture, ScriptableObject, Asset
+    }
+
     internal readonly struct ChipData
     {
-        internal readonly string Path;
-        internal readonly string DisplayName;
-        internal readonly int    InstanceID;
+        internal readonly ChipKind Kind;
+        internal readonly string   Path;
+        internal readonly string   DisplayName;
+        internal readonly int      InstanceID;
 
-        internal ChipData(string path, string displayName, int instanceID)
+        internal ChipData(ChipKind kind, string path, string displayName, int instanceID)
         {
+            Kind        = kind;
             Path        = path;
             DisplayName = displayName;
             InstanceID  = instanceID;

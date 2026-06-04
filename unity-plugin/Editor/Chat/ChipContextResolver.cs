@@ -20,6 +20,61 @@ namespace UnityMCP.Editor.Chat
         internal static Func<string, GameObject> FindObjectOverride;
 #endif
 
+        /// <summary>
+        /// Serialize a chip ref to the AI-facing bracket format.
+        /// Hierarchy objects include instance ID: [hierarchy:/Player #12345]
+        /// Other refs: [script:PlayerController], [scene:Assets/Scenes/Main.unity]
+        /// </summary>
+        internal static string FormatChipRef(ChipKind kind, string path, int instanceID)
+        {
+            var prefix = ChipKindDetector.ShortPrefix(kind);
+            if (kind == ChipKind.Hierarchy && instanceID != 0)
+                return $"[{prefix}:{path} #{instanceID}]";
+            return $"[{prefix}:{path}]";
+        }
+
+        /// <summary>
+        /// Emit the AI-facing string for one chip, honoring the ChipConfig depth string.
+        /// Pure: the resolve logic is injected via <paramref name="resolveFn"/>.
+        /// depth "none"    → "" (skip).
+        /// depth "path"    → bracket format only.
+        /// depth "summary" → bracket + newline + resolved summary.
+        /// depth "full"    → bracket + newline + full resolved text.
+        /// Any other depth → treated as "path" (safe fallback).
+        /// </summary>
+        internal static string EmitTyped(ChipKind kind, string path, int instanceID, string depth,
+            Func<string, ChipDepth, string> resolveFn)
+        {
+            if (depth == "none") return "";
+            var bracket = FormatChipRef(kind, path, instanceID);
+            if (depth != "summary" && depth != "full") return bracket;
+            var chipDepth = depth == "full" ? ChipDepth.Full : ChipDepth.Summary;
+            var resolved  = resolveFn(path, chipDepth);
+            return bracket + "\n" + resolved;
+        }
+
+        /// <summary>
+        /// Typed resolution: emits bracket format + optional detail for each chip,
+        /// honoring per-kind depths from <paramref name="cfg"/>.
+        /// Chips with depth "none" are omitted entirely.
+        /// </summary>
+        internal static string ResolveAllTyped(List<ChipData> chips, ChipConfig cfg)
+        {
+            if (chips == null || chips.Count == 0) return "";
+            cfg = cfg ?? new ChipConfig();
+            var sb = new StringBuilder();
+            foreach (var chip in chips)
+            {
+                var depth  = cfg.DepthFor(chip.Kind);
+                var emitted = EmitTyped(chip.Kind, chip.Path, chip.InstanceID, depth,
+                    (p, d) => ResolveOne(p, d));
+                if (string.IsNullOrEmpty(emitted)) continue;
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(emitted);
+            }
+            return sb.ToString();
+        }
+
         /// <summary>1 chip → Full depth; 2+ chips → Summary for each.</summary>
         internal static string ResolveAll(List<string> chipPaths)
         {

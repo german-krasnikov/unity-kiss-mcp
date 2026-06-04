@@ -49,7 +49,7 @@ namespace UnityMCP.Editor.Chat
             _container.Clear();
             _pills.Clear();
             for (int i = 0; i < _tracker.Count; i++)
-                _pills.Add(BuildPill(i, _tracker[i].DisplayName));
+                _pills.Add(BuildPill(i, _tracker[i].Kind, _tracker[i].DisplayName));
         }
 
         /// <summary>Remove a single pill by chip index.</summary>
@@ -62,7 +62,7 @@ namespace UnityMCP.Editor.Chat
 
         // ── private ───────────────────────────────────────────────────────────
 
-        private VisualElement BuildPill(int index, string displayName)
+        private VisualElement BuildPill(int index, ChipKind kind, string displayName)
         {
             var pill = new VisualElement();
             pill.AddToClassList("inline-chip-pill");
@@ -73,6 +73,10 @@ namespace UnityMCP.Editor.Chat
             pill.style.borderTopLeftRadius = pill.style.borderTopRightRadius     = 4f;
             pill.style.borderBottomLeftRadius = pill.style.borderBottomRightRadius = 4f;
             pill.pickingMode = PickingMode.Position;
+
+            var kindLbl = new Label(ChipKindDetector.ShortPrefix(kind) + ":");
+            kindLbl.AddToClassList("inline-chip-kind");
+            kindLbl.style.fontSize = 9f;
 
             var lbl = new Label(displayName); lbl.AddToClassList("inline-chip-label");
             lbl.style.fontSize = 10f;
@@ -86,6 +90,7 @@ namespace UnityMCP.Editor.Chat
             btn.style.paddingLeft    = btn.style.paddingRight = 2f;
             btn.style.paddingTop     = btn.style.paddingBottom = 0f;
 
+            pill.Add(kindLbl);
             pill.Add(lbl);
             pill.Add(btn);
             _container.Add(pill);
