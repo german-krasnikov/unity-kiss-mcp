@@ -13,9 +13,7 @@ namespace UnityMCP.Editor.Chat
         private bool           _agentMode;
         private PermissionConfig _permConfig = new PermissionConfig();
         private int            _inputTokens, _outputTokens;
-#if UNITY_MCP_CHAT
         private readonly TurnUndoTracker _undoTracker = new TurnUndoTracker();
-#endif
         // FIX A: cache the sent text so SaveStateBeforeReload reads it, not the cleared input.
         private readonly SentTextCache _sentTextCache = new SentTextCache();
         private readonly List<ChatEvent>       _evBuf    = new List<ChatEvent>(16);
@@ -45,10 +43,8 @@ namespace UnityMCP.Editor.Chat
             AssemblyReloadEvents.beforeAssemblyReload += SaveStateBeforeReload;
             _autoFix.Subscribe();
             _autoFix.OnErrorsDetected += InjectCompileErrors;
-#if UNITY_MCP_CHAT
             // F6: group indices are stale after domain reload.
             _undoTracker.Invalidate();
-#endif
         }
 
         private void OnDisable()
@@ -59,11 +55,9 @@ namespace UnityMCP.Editor.Chat
             _autoFix.Unsubscribe();
             // #3 fix: window closed mid-turn → release the reload lock so the next compile isn't blocked.
             ReloadGuard.OnTurnFinished();
-#if UNITY_MCP_CHAT
             // F6: mark in-flight turn as failed so the group is still restorable.
             if (_activity.Phase != ActivityPhase.Idle)
                 _undoTracker.OnTurnFailed();
-#endif
             _backend?.Stop();
             _backend = null;
         }
@@ -174,12 +168,10 @@ namespace UnityMCP.Editor.Chat
         {
             // #1/#4 Lock reloads for the duration of this turn (symmetric for both send paths).
             ReloadGuard.OnTurnStarted();
-#if UNITY_MCP_CHAT
             // F6: open a named undo group for the duration of this turn.
             _undoTracker.OnTurnStart(displayText?.Length > 40
                 ? displayText.Substring(0, 40)
                 : displayText ?? "");
-#endif
             // FIX A: cache before clearing input so SaveStateBeforeReload can read the sent text.
             _sentTextCache.Set(displayText);
             _transcript.AppendUserBubble(displayText, screenshotPath);

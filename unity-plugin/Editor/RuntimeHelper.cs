@@ -291,12 +291,7 @@ namespace UnityMCP.Editor
         }
 
         private static Component FindComponent(GameObject go, string typeName)
-        {
-            var shortName = ComponentSerializer.StripNamespace(typeName);
-            return go.GetComponents<Component>()
-                .FirstOrDefault(c => c != null &&
-                    (c.GetType().Name == shortName || c.GetType().FullName == typeName));
-        }
+            => ComponentSerializer.FindComponent(go, typeName);
 
         private static string ReadField(Component comp, string fieldName)
         {

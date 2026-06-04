@@ -87,5 +87,33 @@ namespace UnityMCP.Editor.Tests
             var result = SpatialHelper.ObjectsInRadius("/" + _anchor.name, -1f);
             StringAssert.Contains("No objects within radius", result);
         }
+
+        // Scenario 26: float output uses '.' not ',' as decimal separator under de-DE locale
+        [Test]
+        public void InFrontOf_DeDE_Locale_UsesInvariantDecimalSeparator()
+        {
+            var saved = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture =
+                    new System.Globalization.CultureInfo("de-DE");
+
+                // anchor is at (0,0,0), forward is (0,0,1), distance=1.5 → z=1.5
+                _anchor.transform.position = Vector3.zero;
+                // reset rotation so forward = (0,0,1)
+                _anchor.transform.rotation = Quaternion.identity;
+
+                var result = SpatialHelper.InFrontOf("/" + _anchor.name, 1.5f);
+
+                // Must not contain a comma-decimal tuple like "(0,00,0,00,1,50)"
+                StringAssert.DoesNotContain("1,5", result);
+                // Must use '.' as decimal point
+                StringAssert.Contains(".", result);
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = saved;
+            }
+        }
     }
 }

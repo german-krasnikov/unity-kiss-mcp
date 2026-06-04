@@ -155,5 +155,24 @@ namespace UnityMCP.Editor.Tests
             StringAssert.DoesNotContain(
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().name, result);
         }
+
+        // Scenario 21: overflow value is exact total-minus-limit (single-pass correctness).
+        // Root(1) + Child1 + Child2 + Ov0..Ov4 = 8 total matches; limit=3 → overflow=5.
+        [Test]
+        public void Search_OverflowCount_IsExactTotalMinusLimit()
+        {
+            var extras = new GameObject[5];
+            for (int i = 0; i < 5; i++)
+            {
+                extras[i] = new GameObject($"SearchScope_Ov{i}");
+                extras[i].transform.SetParent(_root.transform);
+            }
+
+            var result = SearchHelper.Search("SearchScope_", root: "/" + _root.name, limit: 3);
+            // 8 total matches (root itself + 2 original children + 5 extras), limit=3, overflow=5
+            StringAssert.Contains("...+5 more (limit=3)", result);
+
+            foreach (var e in extras) Object.DestroyImmediate(e);
+        }
     }
 }

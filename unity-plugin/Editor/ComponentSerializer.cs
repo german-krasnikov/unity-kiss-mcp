@@ -350,7 +350,7 @@ namespace UnityMCP.Editor
             return dot >= 0 ? typeName.Substring(dot + 1) : typeName;
         }
 
-        private static Component FindComponent(GameObject go, string typeName)
+        internal static Component FindComponent(GameObject go, string typeName)
         {
             var shortName = InputNormalizer.NormalizeComponent(StripNamespace(typeName), go);
             foreach (var comp in go.GetComponents<Component>())

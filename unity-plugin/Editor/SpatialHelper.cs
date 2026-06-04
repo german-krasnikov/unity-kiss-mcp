@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using UnityEngine;
 
@@ -6,6 +7,9 @@ namespace UnityMCP.Editor
 {
     internal static class SpatialHelper
     {
+        private static string F(float v, string fmt = "F1") =>
+            v.ToString(fmt, CultureInfo.InvariantCulture);
+
         private static float ExtractFloat(string args, string key, float def)
         {
             var val = JsonHelper.ExtractString(args, key);
@@ -47,7 +51,7 @@ namespace UnityMCP.Editor
             System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
             var sb = new StringBuilder();
-            sb.AppendLine($"PATH: ({origin.x:F1},{origin.y:F1},{origin.z:F1}) -> ({target.x:F1},{target.y:F1},{target.z:F1}) dist={dist:F2}");
+            sb.AppendLine($"PATH: ({F(origin.x)},{F(origin.y)},{F(origin.z)}) -> ({F(target.x)},{F(target.y)},{F(target.z)}) dist={F(dist,"F2")}");
 
             int count = System.Math.Min(hits.Length, 20);
             for (int i = 0; i < count; i++)
@@ -55,7 +59,7 @@ namespace UnityMCP.Editor
                 var h = hits[i];
                 var p = h.point;
                 var col = h.collider.GetType().Name;
-                sb.AppendLine($"HIT {i + 1}: {ComponentSerializer.GetPath(h.collider.gameObject)} at ({p.x:F1},{p.y:F1},{p.z:F1}) dist={h.distance:F2} [{col}]");
+                sb.AppendLine($"HIT {i + 1}: {ComponentSerializer.GetPath(h.collider.gameObject)} at ({F(p.x)},{F(p.y)},{F(p.z)}) dist={F(h.distance,"F2")} [{col}]");
             }
 
             sb.Append(count == 0 ? "CLEAR (no hits)" : $"BLOCKED: {count} hit{(count > 1 ? "s" : "")}");
@@ -126,7 +130,7 @@ namespace UnityMCP.Editor
             for (int r = 0; r < rows; r++)
             {
                 float z = maxZ - r * cellSize;
-                sb.Append($"{z,4:F0} ");
+                sb.Append($"{F(z,"F0"),4} ");
                 for (int c = 0; c < cols; c++) sb.Append($" {grid[r, c]} ");
                 sb.AppendLine();
             }
@@ -160,7 +164,7 @@ namespace UnityMCP.Editor
 
             if (best == null) return "No matching object found";
             var pos = best.transform.position;
-            return $"{ComponentSerializer.GetPath(best)} dist={bestDist:F2} pos=({pos.x:F2},{pos.y:F2},{pos.z:F2})";
+            return $"{ComponentSerializer.GetPath(best)} dist={F(bestDist,"F2")} pos=({F(pos.x,"F2")},{F(pos.y,"F2")},{F(pos.z,"F2")})";
         }
 
         public static string InFrontOf(string path, float distance)
@@ -168,7 +172,7 @@ namespace UnityMCP.Editor
             var go = ComponentSerializer.FindObject(path);
             if (go == null) throw new System.ArgumentException(ErrorHelper.ObjectNotFound(path));
             var pos = go.transform.position + go.transform.forward * distance;
-            return $"({pos.x:F2},{pos.y:F2},{pos.z:F2})";
+            return $"({F(pos.x,"F2")},{F(pos.y,"F2")},{F(pos.z,"F2")})";
         }
 
         /// <summary>
@@ -203,7 +207,7 @@ namespace UnityMCP.Editor
                 float dist = Vector3.Distance(fromPos, go.transform.position);
                 if (dist <= radius)
                 {
-                    sb.AppendLine($"  {ComponentSerializer.GetPath(go)} dist={dist:F2}");
+                    sb.AppendLine($"  {ComponentSerializer.GetPath(go)} dist={F(dist,"F2")}");
                     count++;
                     if (count >= 20) { sb.AppendLine("  ...+more"); break; }
                 }
@@ -217,10 +221,10 @@ namespace UnityMCP.Editor
             var go = ComponentSerializer.FindObject(path);
             if (go == null) throw new System.ArgumentException(ErrorHelper.ObjectNotFound(path));
             var b = MultiViewCapture.ComputeBounds(go);
-            return $"center=({b.center.x:F2},{b.center.y:F2},{b.center.z:F2}) " +
-                   $"size=({b.size.x:F2},{b.size.y:F2},{b.size.z:F2}) " +
-                   $"min=({b.min.x:F2},{b.min.y:F2},{b.min.z:F2}) " +
-                   $"max=({b.max.x:F2},{b.max.y:F2},{b.max.z:F2})";
+            return $"center=({F(b.center.x,"F2")},{F(b.center.y,"F2")},{F(b.center.z,"F2")}) " +
+                   $"size=({F(b.size.x,"F2")},{F(b.size.y,"F2")},{F(b.size.z,"F2")}) " +
+                   $"min=({F(b.min.x,"F2")},{F(b.min.y,"F2")},{F(b.min.z,"F2")}) " +
+                   $"max=({F(b.max.x,"F2")},{F(b.max.y,"F2")},{F(b.max.z,"F2")})";
         }
 
         public static string Execute(string args)

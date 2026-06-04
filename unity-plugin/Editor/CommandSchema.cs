@@ -18,7 +18,7 @@ namespace UnityMCP.Editor
         private static readonly Dictionary<string, ParamDef> Schema = new Dictionary<string, ParamDef>
         {
             // --- Read ---
-            { "get_hierarchy", P(null, "depth", "root", "filter", "components") },
+            { "get_hierarchy", P(null, "depth", "root", "filter", "components", "summary", "incremental") },
             { "get_component", P("path,type") },
             { "get_components_list", P("id") },
             { "get_object_detail", P("id") },
@@ -41,10 +41,10 @@ namespace UnityMCP.Editor
             { "get_schema", P(null, "type") },
 
             // --- Write ---
-            { "set_property", P("path,component,prop,value") },
+            { "set_property", P("path,component,prop,value", "dry_run") },
             { "set_property_delta", P("path,component,prop,delta") },
             { "create_object", P("name", "parent", "components", "primitive", "prefab_path") },
-            { "delete_object", P(null, "id", "path") },
+            { "delete_object", P(null, "id", "path", "force") },
             { "set_active", P("path,active") },
             { "wire_event", P("path,component,event,target,method", "arg_type", "arg_value") },
             { "unwire_event", P("path,component,event", "index") },
@@ -84,23 +84,6 @@ namespace UnityMCP.Editor
             { "prefab", P("action", "path", "asset_path", "base_path", "variant_path", "recursive") },
             { "scriptable_object", P("action", "path", "type", "prop", "value", "filter") },
             { "spatial_query", P("action", "path", "target", "distance", "radius", "component", "cell_size", "layer_mask", "center") },
-
-            // --- Legacy aliases ---
-            { "new_scene", P(null) },
-            { "open_scene", P("path") },
-            { "save_scene", P(null, "path") },
-            { "discard_changes", P(null) },
-            { "get_animation", P("path", "clip", "time") },
-            { "create_animation", P("path", "clip_name", "property", "keys") },
-            { "edit_animation", P("path,clip,action", "property", "keys") },
-            { "preview_animation", P("path,clip", "action", "time") },
-            { "get_timeline", P("path", "track") },
-            { "create_timeline", P("asset_path", "director_path", "tracks") },
-            { "edit_timeline", P("path,action", "track", "track_type", "clip", "binding", "start", "duration", "blend_in", "blend_out") },
-            { "preview_timeline", P("path", "action", "time") },
-            { "get_references", P("path", "children", "depth") },
-            { "find_references_to", P("path") },
-            { "remap_references", P("source,target", "mappings") },
 
             // --- Meta ---
             { "ping", P(null) },

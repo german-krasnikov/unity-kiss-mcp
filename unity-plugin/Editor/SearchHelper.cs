@@ -16,19 +16,13 @@ namespace UnityMCP.Editor
 
             var q = ParseQuery(query);
             var results = new List<GameObject>();
-            if (!WalkScene(query, root, q, results, limit, out var notFound))
+            if (!WalkScene(query, root, q, results, limit, out var notFound, out int totalCount))
                 return notFound;
 
             if (results.Count == 0)
                 return BuildEmptyHint(query, root);
 
-            int overflow = 0;
-            if (limit > 0 && results.Count >= limit)
-            {
-                var all = new List<GameObject>();
-                WalkScene(query, root, q, all, 0, out _);
-                overflow = all.Count - results.Count;
-            }
+            int overflow = (limit > 0 && results.Count >= limit) ? totalCount - results.Count : 0;
 
             var sb = new StringBuilder();
             foreach (var go in results)
@@ -48,27 +42,28 @@ namespace UnityMCP.Editor
         }
 
         // Returns false + sets notFound hint when root is not found; otherwise populates results.
+        // totalCount = all matches found (including those beyond limit).
         private static bool WalkScene(string query, string root, SearchQuery q,
-            List<GameObject> results, int limit, out string notFound)
+            List<GameObject> results, int limit, out string notFound, out int totalCount)
         {
             notFound = null;
+            totalCount = 0;
             var stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage != null)
             {
-                CollectMatches(stage.prefabContentsRoot.transform, q, results, limit);
+                CollectMatches(stage.prefabContentsRoot.transform, q, results, limit, ref totalCount);
             }
             else if (!string.IsNullOrEmpty(root) && root != "/")
             {
                 var rootGO = ComponentSerializer.FindObject(root);
                 if (rootGO == null) { notFound = BuildEmptyHint(query); return false; }
-                CollectMatches(rootGO.transform, q, results, limit);
+                CollectMatches(rootGO.transform, q, results, limit, ref totalCount);
             }
             else
             {
                 foreach (var r in SceneManager.GetActiveScene().GetRootGameObjects())
                 {
-                    CollectMatches(r.transform, q, results, limit);
-                    if (limit > 0 && results.Count >= limit) break;
+                    CollectMatches(r.transform, q, results, limit, ref totalCount);
                 }
             }
             return true;
@@ -152,17 +147,18 @@ namespace UnityMCP.Editor
             return true;
         }
 
-        private static void CollectMatches(Transform t, SearchQuery q, List<GameObject> results, int limit = 0)
+        private static void CollectMatches(Transform t, SearchQuery q,
+            List<GameObject> results, int limit, ref int totalCount)
         {
-            if (limit > 0 && results.Count >= limit) return;
             if (Matches(t.gameObject, q))
-                results.Add(t.gameObject);
+            {
+                totalCount++;
+                if (limit <= 0 || results.Count < limit)
+                    results.Add(t.gameObject);
+            }
 
             foreach (Transform child in t)
-            {
-                if (limit > 0 && results.Count >= limit) return;
-                CollectMatches(child, q, results, limit);
-            }
+                CollectMatches(child, q, results, limit, ref totalCount);
         }
 
         private static string BuildEmptyHint(string query, string rootPath = null)
