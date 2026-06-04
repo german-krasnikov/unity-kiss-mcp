@@ -9,47 +9,69 @@ namespace UnityMCP.Editor
 {
     public static class SearchHelper
     {
-        public static string Search(string query)
+        public static string Search(string query, string root = null, int limit = 50)
         {
             if (string.IsNullOrEmpty(query))
                 throw new ArgumentException("query is required");
 
             var q = ParseQuery(query);
             var results = new List<GameObject>();
-
-            var stage = PrefabStageUtility.GetCurrentPrefabStage();
-            if (stage != null)
-            {
-                CollectMatches(stage.prefabContentsRoot.transform, q, results);
-            }
-            else
-            {
-                foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
-                    CollectMatches(root.transform, q, results);
-            }
+            if (!WalkScene(query, root, q, results, limit, out var notFound))
+                return notFound;
 
             if (results.Count == 0)
                 return BuildEmptyHint(query);
+
+            int overflow = 0;
+            if (limit > 0 && results.Count >= limit)
+            {
+                var all = new List<GameObject>();
+                WalkScene(query, root, q, all, 0, out _);
+                overflow = all.Count - results.Count;
+            }
 
             var sb = new StringBuilder();
             foreach (var go in results)
             {
                 sb.Append(go.name).Append(" #").Append(go.GetInstanceID());
-                // Append non-Transform components
-                var comps = go.GetComponents<Component>();
                 var compNames = new List<string>();
-                foreach (var c in comps)
-                {
-                    if (c != null && !(c is Transform))
-                        compNames.Add(c.GetType().Name);
-                }
+                foreach (var c in go.GetComponents<Component>())
+                    if (c != null && !(c is Transform)) compNames.Add(c.GetType().Name);
                 if (compNames.Count > 0)
                     sb.Append(" [").Append(string.Join(",", compNames)).Append("]");
-                if (!go.activeSelf)
-                    sb.Append(" !");
+                if (!go.activeSelf) sb.Append(" !");
                 sb.AppendLine();
             }
+            if (overflow > 0)
+                sb.AppendLine($"...+{overflow} more (limit={limit})");
             return sb.ToString().TrimEnd('\n');
+        }
+
+        // Returns false + sets notFound hint when root is not found; otherwise populates results.
+        private static bool WalkScene(string query, string root, SearchQuery q,
+            List<GameObject> results, int limit, out string notFound)
+        {
+            notFound = null;
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage != null)
+            {
+                CollectMatches(stage.prefabContentsRoot.transform, q, results, limit);
+            }
+            else if (!string.IsNullOrEmpty(root) && root != "/")
+            {
+                var rootGO = ComponentSerializer.FindObject(root);
+                if (rootGO == null) { notFound = BuildEmptyHint(query); return false; }
+                CollectMatches(rootGO.transform, q, results, limit);
+            }
+            else
+            {
+                foreach (var r in SceneManager.GetActiveScene().GetRootGameObjects())
+                {
+                    CollectMatches(r.transform, q, results, limit);
+                    if (limit > 0 && results.Count >= limit) break;
+                }
+            }
+            return true;
         }
 
         // Struct for parsed query
@@ -130,13 +152,17 @@ namespace UnityMCP.Editor
             return true;
         }
 
-        private static void CollectMatches(Transform t, SearchQuery q, List<GameObject> results)
+        private static void CollectMatches(Transform t, SearchQuery q, List<GameObject> results, int limit = 0)
         {
+            if (limit > 0 && results.Count >= limit) return;
             if (Matches(t.gameObject, q))
                 results.Add(t.gameObject);
 
             foreach (Transform child in t)
-                CollectMatches(child, q, results);
+            {
+                if (limit > 0 && results.Count >= limit) return;
+                CollectMatches(child, q, results, limit);
+            }
         }
 
         private static string BuildEmptyHint(string query)

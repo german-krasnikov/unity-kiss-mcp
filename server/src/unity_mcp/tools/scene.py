@@ -163,9 +163,13 @@ async def scene(action: str, path: str | None = None) -> str:
     return await _send("scene", _args(action=action, path=path))
 
 
-async def search_scene(query: str) -> str:
-    """Search scene objects. Syntax: name text, t:Component, tag=Tag, layer=N, active=bool. Combine with spaces."""
-    return await _send("search_scene", {"query": query})
+async def search_scene(query: str, root: str | None = None, limit: int = 50) -> str:
+    """Search scene objects. Syntax: name text, t:Component, tag=Tag, layer=N, active=bool. Combine with spaces.
+    root: scope search to subtree (path or None for whole scene).
+    limit: max results (default 50; 0=unlimited). Default not sent over wire."""
+    return await _send("search_scene", _args(
+        query=query, root=root,
+        limit=str(limit) if limit != 50 else None))
 
 
 async def editor(action: str = "state", path: str | None = None) -> str:

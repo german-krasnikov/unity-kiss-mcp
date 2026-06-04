@@ -253,7 +253,11 @@ namespace UnityMCP.Editor
             // registered here only for IsRegistered/IsMutating queries
             CommandRegistry.Register("screenshot", _ => throw new InvalidOperationException("screenshot intercepted before ExecuteCommand"));
             CommandRegistry.Register("recompile", _ => { UnityEditor.AssetDatabase.Refresh(); return "ok"; });
-            CommandRegistry.Register("search_scene", args => SearchHelper.Search(JsonHelper.ExtractString(args, "query")));
+            CommandRegistry.Register("search_scene", args => SearchHelper.Search(
+                JsonHelper.ExtractString(args, "query"),
+                JsonHelper.ExtractString(args, "root"),
+                int.TryParse(JsonHelper.ExtractString(args, "limit") ?? "50",
+                    out var sl) ? sl : 50));
             CommandRegistry.Register("editor", ExecEditor);
             CommandRegistry.Register("inspect", ExecInspect);
             CommandRegistry.Register("validate_references", args => ValidateReferencesHelper.Validate(

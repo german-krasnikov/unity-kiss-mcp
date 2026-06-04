@@ -26,7 +26,7 @@ namespace UnityMCP.Editor
             { "inspect", P("paths", "components") },
             { "get_console", P(null, "count", "level", "first") },
             { "screenshot", P(null, "width", "height", "camera", "path", "supersample", "angles", "zoom", "offset", "fixed_size", "highlight", "show_colliders", "angle") },
-            { "search_scene", P("query") },
+            { "search_scene", P("query", "root", "limit") },
             { "validate_references", P("path", "depth", "ignore_optional", "verbose") },
             { "run_tests", P(null, "mode") },
             { "get_test_results", P(null) },
@@ -83,7 +83,7 @@ namespace UnityMCP.Editor
             { "material", P("action", "path", "object_path", "shader", "prop", "value", "source", "targets") },
             { "prefab", P("action", "path", "asset_path", "base_path", "variant_path", "recursive") },
             { "scriptable_object", P("action", "path", "type", "prop", "value", "filter") },
-            { "spatial_query", P("action", "path", "target", "distance", "radius", "component", "cell_size", "layer_mask") },
+            { "spatial_query", P("action", "path", "target", "distance", "radius", "component", "cell_size", "layer_mask", "center") },
 
             // --- Legacy aliases ---
             { "new_scene", P(null) },

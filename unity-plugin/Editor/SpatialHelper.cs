@@ -171,16 +171,35 @@ namespace UnityMCP.Editor
             return $"({pos.x:F2},{pos.y:F2},{pos.z:F2})";
         }
 
-        public static string ObjectsInRadius(string path, float radius)
+        /// <summary>
+        /// List objects within radius. center wins over path when both provided.
+        /// center format: "x,y,z" (comma-separated, no parens).
+        /// </summary>
+        public static string ObjectsInRadius(string path, float radius, string center = null)
         {
-            var from = ComponentSerializer.FindObject(path);
-            if (from == null) throw new System.ArgumentException(ErrorHelper.ObjectNotFound(path));
-            var fromPos = from.transform.position;
+            if (radius <= 0f) return "No objects within radius";
+
+            Vector3 fromPos;
+            GameObject fromObj = null;
+
+            if (center != null)
+            {
+                // center wins — parse "x,y,z" by wrapping in parens for ParseVec3
+                try { fromPos = ParseVec3("(" + center + ")"); }
+                catch { throw new System.ArgumentException("Invalid center format, expected 'x,y,z'"); }
+            }
+            else
+            {
+                fromObj = ComponentSerializer.FindObject(path);
+                if (fromObj == null) throw new System.ArgumentException(ErrorHelper.ObjectNotFound(path));
+                fromPos = fromObj.transform.position;
+            }
+
             var sb = new StringBuilder();
             int count = 0;
             foreach (var go in Object.FindObjectsOfType<GameObject>())
             {
-                if (go == from || go.transform.IsChildOf(from.transform)) continue;
+                if (go == fromObj || (fromObj != null && go.transform.IsChildOf(fromObj.transform))) continue;
                 float dist = Vector3.Distance(fromPos, go.transform.position);
                 if (dist <= radius)
                 {
@@ -221,7 +240,8 @@ namespace UnityMCP.Editor
                     JsonHelper.ExtractString(args, "path"),
                     float.TryParse(JsonHelper.ExtractString(args, "radius") ?? "5",
                         System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out var r) ? r : 5f),
+                        System.Globalization.CultureInfo.InvariantCulture, out var r) ? r : 5f,
+                    JsonHelper.ExtractString(args, "center")),
                 "bounds_info" => BoundsInfo(JsonHelper.ExtractString(args, "path")),
                 "raycast" => Raycast(
                     JsonHelper.ExtractString(args, "path"),
