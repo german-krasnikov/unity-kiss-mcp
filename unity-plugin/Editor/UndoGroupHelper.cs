@@ -45,7 +45,7 @@ namespace UnityMCP.Editor
 
         public static void RevertToBeforeGroup(int groupId)
         {
-            Undo.RevertAllDownTo(groupId);
+            Undo.RevertAllDownToGroup(groupId);
         }
 
         /// <summary>True if groupId is a non-negative id. Does NOT verify the group still exists in Unity's undo stack (stale after domain reload).</summary>
