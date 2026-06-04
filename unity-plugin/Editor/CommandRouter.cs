@@ -385,6 +385,11 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "undo_label") ?? "execute_code"), mutating: true);
 
             PluginRegistry.RegisterAllPlugins();
+
+            // Eager-populate after ALL tools are registered (including plugins).
+            // This is the correct site: RegisterAll is the last step in CommandRegistry.InitDefaults
+            // and is always called on the main thread — safe to read EditorPrefs here.
+            _enabledToolsCache = ExecGetEnabledTools();
         }
 
         private static string BuildResponse(string id, string data)
@@ -418,7 +423,9 @@ namespace UnityMCP.Editor
         private static void OnDomainReload()
         {
             PluginRegistry.OnDomainReload();
-            _enabledToolsCache = null;
+            // Do NOT populate here: [InitializeOnLoadMethod] fires before CommandRegistry.static ctor
+            // (which calls RegisterAll). Populating now yields an empty/partial tool list.
+            // Instead, RegisterAll() eagerly populates at its end (after all tools are registered).
         }
 
     }

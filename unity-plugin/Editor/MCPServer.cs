@@ -107,6 +107,7 @@ namespace UnityMCP.Editor
             if (IsRunning || _starting) return;
             _starting = true;
             _shuttingDown = false;
+            CommandRouter.EnsureEnabledToolsCacheWarm();  // #29: warm tool cache on main thread before serving the read-thread fast-path
             // Tier 0: re-register idempotently so restart after Stop() works
             EditorApplication.update -= ProcessMainThreadQueue;
             EditorApplication.update += ProcessMainThreadQueue;

@@ -62,21 +62,30 @@ namespace UnityMCP.Editor
             return sb.ToString().TrimEnd();
         }
 
-        // Cache for fast-path get_enabled_tools (bypasses main thread dispatch).
-        // Invalidated on domain reload via [InitializeOnLoadMethod] in OnDomainReload.
-        private static volatile string _enabledToolsCache;
-
-        /// <summary>Thread-safe cached version for fast-path (called from TCP read thread).</summary>
-        internal static string ExecGetEnabledToolsCached()
+        // Forces CommandRegistry init (→ RegisterAll → eager-populate) on the MAIN thread,
+        // so the read thread's fast-path never returns "" before the registry is built (#29).
+        // Idempotent: CommandRegistry's static ctor runs exactly once; subsequent calls just
+        // confirm a warm cache.
+        internal static void EnsureEnabledToolsCacheWarm()
         {
-            var cached = _enabledToolsCache;
-            if (cached != null) return cached;
-            cached = ExecGetEnabledTools();
-            _enabledToolsCache = cached;
-            return cached;
+            _ = CommandRegistry.GetAllCommands();   // triggers static ctor → InitDefaults → RegisterAll (which populates the cache)
         }
 
-        internal static void InvalidateEnabledToolsCache() => _enabledToolsCache = null;
+        // Cache for fast-path get_enabled_tools (bypasses main thread dispatch).
+        // Always kept WARM so the TCP read thread never computes it (no EditorPrefs off-thread).
+        // Writes: InvalidateEnabledToolsCache (settings UI, main thread) + end of RegisterAll
+        //         (post-registration, main thread). Read thread uses ?? "" safety fallback only.
+        private static volatile string _enabledToolsCache;
+
+        // Internal accessor for tests — never null after first populate.
+        internal static string PeekEnabledToolsCache => _enabledToolsCache;
+
+        /// <summary>Thread-safe fast-path — never computes on the read thread (no EditorPrefs off-thread).</summary>
+        internal static string ExecGetEnabledToolsCached() => _enabledToolsCache ?? "";
+
+        // Called from Settings UI (always main thread) — REPOPULATES instead of nulling
+        // so the read thread always sees a warm non-null value.
+        internal static void InvalidateEnabledToolsCache() => _enabledToolsCache = ExecGetEnabledTools();
 
         private static string ExecGetEnabledTools()
         {
