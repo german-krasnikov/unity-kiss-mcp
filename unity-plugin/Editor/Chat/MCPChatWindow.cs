@@ -49,9 +49,6 @@ namespace UnityMCP.Editor.Chat
             // F6: group indices are stale after domain reload.
             _undoTracker.Invalidate();
 #endif
-            // #1 fix: OnEnable fires AFTER afterAssemblyReload, so the event already fired.
-            // Call directly here — it's a no-op when no pending file exists.
-            TryResumePendingTurn();
         }
 
         private void OnDisable()
@@ -100,6 +97,11 @@ namespace UnityMCP.Editor.Chat
             root.schedule.Execute(TickFlowBarSweep).Every(950);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
             root.RegisterCallback<DragPerformEvent>(OnDragPerform);
+            // Resume any pending turn here — CreateGUI runs after OnEnable, so _flowBar is ready.
+            // Calling this from OnEnable would NRE because _flowBar hasn't been built yet.
+            // MANUAL TEST: open chat → send a turn → edit any .cs to trigger domain reload mid-turn
+            //              → assert no NRE in console, flow bar shows Sending, turn resumes.
+            TryResumePendingTurn();
         }
 
         private VisualElement BuildInputArea()

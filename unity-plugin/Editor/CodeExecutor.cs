@@ -21,6 +21,10 @@ namespace UnityMCP.Editor
             "Activator", "System.Linq.Expressions.Expression",
             "GetMethods(", "CreateDelegate", "GetTypes(", "GetMembers(",
             "GetProperties(", "GetFields(", "GetConstructors(", ".Assembly",
+            // Block short-name bypass via using-directives and Environment.Exit (auto-using System)
+            "Environment.Exit", "Environment.SetEnvironmentVariable",
+            "using System.Diagnostics", "using System.IO", "using System.Net",
+            "using System.Reflection",
         };
 
         private const string Usings =
@@ -54,7 +58,7 @@ namespace UnityMCP.Editor
                    $"public static class __MCPScript {{ public static object Run() {{\n{code}\n}} }}";
         }
 
-        private static void SecurityScan(string code)
+        internal static void SecurityScan(string code)
         {
             foreach (var blocked in Blocked)
             {

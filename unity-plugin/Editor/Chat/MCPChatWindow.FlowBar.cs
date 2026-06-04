@@ -24,6 +24,7 @@ namespace UnityMCP.Editor.Chat
 
         private void OnActivityChanged()
         {
+            if (_flowBar == null) return; // defense-in-depth: guard against pre-CreateGUI calls
             switch (_activity.Phase)
             {
                 case ActivityPhase.Sending:

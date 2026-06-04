@@ -23,7 +23,15 @@ namespace UnityMCP.Editor
         internal static Vector2 ParseVector2(string v) { var f = ParseFloats(v, 2); return new Vector2(f[0], f[1]); }
         internal static Vector3 ParseVector3(string v) { var f = ParseFloats(v, 3); return new Vector3(f[0], f[1], f[2]); }
         internal static Vector4 ParseVector4(string v) { var f = ParseFloats(v, 4); return new Vector4(f[0], f[1], f[2], f[3]); }
-        internal static Quaternion ParseQuaternion(string v) { var f = ParseFloats(v, 4); return new Quaternion(f[0], f[1], f[2], f[3]); }
+        internal static Quaternion ParseQuaternion(string v)
+        {
+            // ComponentSerializer emits 3-component Euler "(x, y, z)" — detect by count.
+            // 4-component strings are raw xyzw (pass-through from LLM supplying explicit quaternion).
+            var parts = v.Trim('(', ')').Split(',');
+            if (parts.Length == 3) { var f = ParseFloats(v, 3); return Quaternion.Euler(f[0], f[1], f[2]); }
+            if (parts.Length == 4) { var f = ParseFloats(v, 4); return new Quaternion(f[0], f[1], f[2], f[3]); }
+            throw new ArgumentException($"Expected 3 or 4 components for Quaternion but got {parts.Length}: {v}");
+        }
 
         internal static Color ParseColor(string value)
         {
