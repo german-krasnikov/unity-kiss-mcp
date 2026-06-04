@@ -87,14 +87,39 @@ ToolError: <tool_name> requires typed MCP tool (Python DSL expansion), not batch
 - C# tests: `unity-test-project/Assets/Tests/Editor/MCPBatchTests.cs` (EditMode tests)
 - Validation tests: `unity-test-project/Assets/Tests/Editor/MCPCommandSchemaTests.cs`
 
+## Atomic Mode (F27, Transactional Batches)
+
+Opt-in `atomic=true` parameter enables transactional batch execution. On FIRST failure, all prior ops are reverted via F6's `UndoGroupHelper` (scene-only Undo rollback), leaving the scene exactly as before. Default `atomic=false` (backward-compatible) and is token-neutral (param not sent when false).
+
+**Semantics:**
+- **Outermost-only grouping**: `_batchDepth` counter ensures only the outermost batch (depth=1) opens/closes the Undo group. Nested batches roll back under the single outer group.
+- **atomic overrides on_error**: When atomic, batch always stops on first failure regardless of on_error setting.
+- **Error output format**:
+  - Normal rollback: `ATOMIC_ROLLBACK: reverted ops 0..K-1` (ops 0 through K-1 reverted)
+  - First op fails: `op 0 failed, nothing to revert` (no prior ops to rollback)
+- **Limitation**: `execute_code` file-system side effects are NOT reverted (only Unity Undo-registered scene mutations roll back).
+
+**Example:**
+```python
+batch(
+  commands="create_object name=A\nset_property path=/A value=X\ncreate_object name=BADCMD",
+  atomic=true
+)
+→ [0] ok: created /A
+→ [1] ok: set value
+→ [2] err: Unknown command 'create_object'
+→ ATOMIC_ROLLBACK: reverted ops 0..1
+→ err:1
+```
+
 ## MCP Tool
 
 ### Tool: `batch`
-**Parameters:** `commands` (required, text), `on_error` (default="continue"), `timeout` (optional, float seconds, default=30.0 — Python converts to `timeout_ms=(timeout-5)*1000` for C#, C# default=25000ms)
+**Parameters:** `commands` (required, text), `on_error` (default="continue"), `atomic` (optional, boolean, default=false), `timeout` (optional, float seconds, default=30.0 — Python converts to `timeout_ms=(timeout-5)*1000` for C#, C# default=25000ms)
 
 Executes multiple text-based commands. One command per line, format: `cmd key=value key=value`
 
-**Example:**
+**Examples:**
 ```python
 batch(
   commands="create_object name=A primitive=Cube\nset_material path=/A color=#FF0000",
@@ -102,6 +127,16 @@ batch(
 )
 → ok:2
 ```
+
+```python
+batch(
+  commands="create_object name=A\nset_property path=/A color=#FF0000\nBADCMD",
+  atomic=true
+)
+→ ATOMIC_ROLLBACK: reverted ops 0..1
+→ err:1
+```
+
 Note: commands returning `"ok"` are suppressed from output. Only data responses and errors get `[N]` lines.
 
 **Parsing rules:**
@@ -122,6 +157,8 @@ Note: commands returning `"ok"` are suppressed from output. Only data responses 
 [N] skip
 [N] TIMEOUT: batch deadline reached after Xs
 [N] BLOCKED: reason
+ATOMIC_ROLLBACK: reverted ops 0..K-1  # only in atomic mode on failure
+op 0 failed, nothing to revert         # in atomic mode when first op fails
 ok:N                  # summary line always present
 ok:N err:M            # when errors occurred
 ok:N err:M timeout:K  # when timeout hit
