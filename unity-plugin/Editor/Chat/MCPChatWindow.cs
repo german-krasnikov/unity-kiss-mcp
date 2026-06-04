@@ -15,8 +15,11 @@ namespace UnityMCP.Editor.Chat
         private int            _inputTokens, _outputTokens;
         // FIX A: cache the sent text so SaveStateBeforeReload reads it, not the cleared input.
         private readonly SentTextCache _sentTextCache = new SentTextCache();
-        private readonly List<ChatEvent>       _evBuf   = new List<ChatEvent>(16);
-        private readonly List<ToolCallRecord>  _toolBuf = new List<ToolCallRecord>(8);
+        private readonly List<ChatEvent>       _evBuf    = new List<ChatEvent>(16);
+        private readonly List<ToolCallRecord>  _toolBuf  = new List<ToolCallRecord>(8);
+        internal readonly CompileAutoFix       _autoFix  = new CompileAutoFix();
+        // Set when Claude's turn contained a code-editing tool call; cleared at TurnDone.
+        internal bool _turnEditedCode;
         private TextField     _input;
         private Label         _tokenReadout;
         private Button        _askBtn, _agentBtn;
@@ -37,6 +40,8 @@ namespace UnityMCP.Editor.Chat
             CreateBackend();
             ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
             AssemblyReloadEvents.beforeAssemblyReload += SaveStateBeforeReload;
+            _autoFix.Subscribe();
+            _autoFix.OnErrorsDetected += InjectCompileErrors;
             // #1 fix: OnEnable fires AFTER afterAssemblyReload, so the event already fired.
             // Call directly here — it's a no-op when no pending file exists.
             TryResumePendingTurn();
@@ -46,6 +51,8 @@ namespace UnityMCP.Editor.Chat
         {
             AssemblyReloadEvents.beforeAssemblyReload -= SaveStateBeforeReload;
             ChatProcess.OnAfterReloadResume -= TryResumePendingTurn;
+            _autoFix.OnErrorsDetected -= InjectCompileErrors;
+            _autoFix.Unsubscribe();
             // #3 fix: window closed mid-turn → release the reload lock so the next compile isn't blocked.
             ReloadGuard.OnTurnFinished();
             _backend?.Stop();
@@ -118,6 +125,7 @@ namespace UnityMCP.Editor.Chat
 
         private void OnSend()
         {
+            _autoFix.Disarm(); // user manually sending — cancel any pending auto-fix
             var text  = _input.value?.Trim() ?? "";
             var chips = CollectChipPaths();
 

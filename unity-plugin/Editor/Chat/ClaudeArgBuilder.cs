@@ -24,7 +24,8 @@ namespace UnityMCP.Editor.Chat
             string permissionMode,
             string resumeSessionId,
             string agentName = null,
-            string[] allowedMcpTools = null)
+            string[] allowedMcpTools = null,
+            string appendSystemPrompt = null)
         {
             var args = new List<string>
             {
@@ -66,6 +67,12 @@ namespace UnityMCP.Editor.Chat
             {
                 args.Add("--agent");
                 args.Add(agentName);
+            }
+
+            if (!string.IsNullOrEmpty(appendSystemPrompt))
+            {
+                args.Add("--append-system-prompt");
+                args.Add(appendSystemPrompt);
             }
 
             return (args.ToArray(), new[] { "ANTHROPIC_API_KEY" });

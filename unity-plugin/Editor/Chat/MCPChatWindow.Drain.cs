@@ -40,16 +40,21 @@ namespace UnityMCP.Editor.Chat
             _selectedAgent = p.AgentName;
             CreateBackendWithSession(p.SessionId);
 
-            var text = p.PendingText;
-            if (!string.IsNullOrEmpty(text))
+            var displayText = p.PendingText;
+            if (!string.IsNullOrEmpty(displayText))
             {
+                // Build the full text sent to Claude (snapshot + original), but display only original.
+                var snap     = EditorStateSnapshot.Capture();
+                var sentText = string.IsNullOrEmpty(snap)
+                    ? displayText
+                    : snap + "\n" + displayText;
                 // FIX B: lock reload for the resumed turn, symmetric with DispatchTurn.
-                // TurnDone/Error/dead-process paths already call OnTurnFinished via HandleEvent
-                // and the dead-process guard in DrainAndRender — this lock is balanced.
                 ReloadGuard.OnTurnStarted();
-                _sentTextCache.Set(text);
-                _transcript?.AppendUserBubble(text);
-                _backend.SendTurn(UserTurnBuilder.Build(text));
+                // Cache the FULL sent text (with snapshot) so a re-reload can persist it.
+                _sentTextCache.Set(sentText);
+                // Show only the original user text in the bubble (no state dump).
+                _transcript?.AppendUserBubble(displayText);
+                _backend.SendTurn(UserTurnBuilder.Build(sentText));
                 if (_activity.Send()) OnActivityChanged();
             }
         }
@@ -104,6 +109,17 @@ namespace UnityMCP.Editor.Chat
                         _tokenReadout.text =
                             $"↑ {TokenFormat.Abbr(_inputTokens)}  ↓ {TokenFormat.Abbr(_outputTokens)}";
                     }
+                    var hasErrors = CompileErrorCapture.GetErrors() != "No compilation errors";
+                    if (hasErrors)
+                    {
+                        // Cap reached: show chip once here, after the 3rd dispatched turn.
+                        if (_autoFix.RetriesLeft == 0 && !_autoFix.IsArmed)
+                            _transcript?.AppendToolChip("Auto-fix capped at 3 attempts.", ok: false);
+                        // Arm only when this turn edited code (CRITICAL #2 gate).
+                        else if (_turnEditedCode)
+                            _autoFix.Arm();
+                    }
+                    _turnEditedCode = false;
                     break;
                 case ChatEventKind.SessionInit:
                     break; // non-terminal: session established, keep animation running
@@ -111,8 +127,27 @@ namespace UnityMCP.Editor.Chat
                     ReloadGuard.OnTurnFinished(); // #1 unlock even on error
                     if (_activity.Fail()) OnActivityChanged();
                     _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
+                    _turnEditedCode = false; // provenance gate: symmetric with TurnDone
                     break;
             }
+        }
+
+        // Called by CompileAutoFix.OnErrorsDetected — fires on Unity main thread (compilationFinished).
+        // Only builds the message and dispatches the turn; cap chip is shown at TurnDone.
+        private void InjectCompileErrors(string errors)
+        {
+            var msg = $"Compile errors after your edit:\n{errors}\nFix them.";
+            DispatchTurn(UserTurnBuilder.Build(msg), msg);
+        }
+
+        // Tool names that edit source files — used to gate auto-fix arming (CRITICAL #2).
+        internal static bool IsCodeEditingTool(ToolCallRecord rec)
+        {
+            var n = rec.Name;
+            if (n == "Edit" || n == "Write" || n == "MultiEdit") return true;
+            // MCP mutating tools that write .cs files are identified by a .cs path in args.
+            if (rec.ArgsJson != null && rec.ArgsJson.Contains(".cs\"")) return true;
+            return false;
         }
 
         private void HandleToolRecord(ToolCallRecord rec)
@@ -125,7 +160,13 @@ namespace UnityMCP.Editor.Chat
             }
             else
             {
-                // ArgsJson or HasResult = detail update
+                // ArgsJson non-null + no result = args-complete record: ping + check provenance.
+                // HasResult = result record: detail update only (no double-ping).
+                if (rec.ArgsJson != null && !rec.HasResult)
+                {
+                    ToolPing.TryPing(rec);
+                    if (IsCodeEditingTool(rec)) _turnEditedCode = true;
+                }
                 _transcript.UpdateToolDetail(rec.Id, rec);
             }
         }

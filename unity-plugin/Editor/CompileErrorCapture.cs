@@ -39,5 +39,10 @@ namespace UnityMCP.Editor
         }
 
         public static void Clear() => _errors.Clear();
+
+#if UNITY_INCLUDE_TESTS
+        /// <summary>Test seam: inject a compile error without real compilation.</summary>
+        internal static void InjectForTest(string msg) => _errors.Add(msg);
+#endif
     }
 }

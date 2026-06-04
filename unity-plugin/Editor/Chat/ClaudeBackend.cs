@@ -40,7 +40,10 @@ namespace UnityMCP.Editor.Chat
                 return;
             }
             var allowed = _permConfig?.GetAllowedToolIds();
-            var (args, strip) = ClaudeArgBuilder.Build(binary, _mcpConfigPath, _permissionMode, SessionId, _agentName, allowed);
+            // Inject editor state on fresh sessions only (SessionId==null means no --resume).
+            var snapshot = SessionId == null ? EditorStateSnapshot.Capture() : null;
+            var (args, strip) = ClaudeArgBuilder.Build(binary, _mcpConfigPath, _permissionMode,
+                SessionId, _agentName, allowed, snapshot);
             _proc = new ChatProcess();
             _proc.Spawn(binary, args, strip);
         }
