@@ -73,6 +73,10 @@ namespace UnityMCP.Editor.Chat
                 {
                     // #2 fix: release the reload lock; without this the lock was held until the 120s watchdog.
                     ReloadGuard.OnTurnFinished();
+#if UNITY_MCP_CHAT
+                    // F6: dead process — treat as failed turn.
+                    _undoTracker.OnTurnFailed();
+#endif
                     if (_activity.Fail()) OnActivityChanged();
                 }
                 return;
@@ -120,6 +124,13 @@ namespace UnityMCP.Editor.Chat
                             _autoFix.Arm();
                     }
                     _turnEditedCode = false;
+#if UNITY_MCP_CHAT
+                    // F6: close the undo group and append a Restore button.
+                    _undoTracker.OnTurnEnd();
+                    var btnContainer = new VisualElement();
+                    btnContainer.Add(RestoreButton.Create(_undoTracker));
+                    _transcript?.Append(btnContainer);
+#endif
                     // Ask mode + valid session → inject one-shot approve button.
                     if (!_agentMode && !string.IsNullOrEmpty(_backend?.SessionId))
                     {
@@ -137,6 +148,13 @@ namespace UnityMCP.Editor.Chat
                     if (_activity.Fail()) OnActivityChanged();
                     _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
                     _turnEditedCode = false; // provenance gate: symmetric with TurnDone
+#if UNITY_MCP_CHAT
+                    // F6: partial mutations still restorable on error.
+                    _undoTracker.OnTurnFailed();
+                    var errBtnContainer = new VisualElement();
+                    errBtnContainer.Add(RestoreButton.Create(_undoTracker));
+                    _transcript?.Append(errBtnContainer);
+#endif
                     break;
             }
         }

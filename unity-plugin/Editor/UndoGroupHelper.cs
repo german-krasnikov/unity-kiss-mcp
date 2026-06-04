@@ -2,7 +2,7 @@ using UnityEditor;
 
 namespace UnityMCP.Editor
 {
-    internal static class UndoGroupHelper
+    public static class UndoGroupHelper
     {
         private static int _currentGroup = -1;
 
@@ -28,5 +28,26 @@ namespace UnityMCP.Editor
         {
             Undo.SetCurrentGroupName($"MCP: {command}");
         }
+
+        // ── Per-turn / per-batch named group primitive (F6 / F27) ──────────────
+
+        public static int OpenNamedGroup(string name)
+        {
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(name);
+            return Undo.GetCurrentGroup();
+        }
+
+        public static void CloseNamedGroup(int groupId)
+        {
+            Undo.CollapseUndoOperations(groupId);
+        }
+
+        public static void RevertToBeforeGroup(int groupId)
+        {
+            Undo.RevertAllDownTo(groupId);
+        }
+
+        public static bool CanRevert(int groupId) => groupId >= 0;
     }
 }

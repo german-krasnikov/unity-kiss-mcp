@@ -620,6 +620,26 @@
         var(--unity-colors-highlight-background));
 }
 
+/* ── Restore button (F6 per-turn undo) — amber/warning affordance ── */
+.chat-btn--restore {
+    background-color: rgba(230, 162, 60, 0.15);
+    border-color: rgba(230, 162, 60, 0.55);
+    color: #e6a23c;
+    align-self: center;
+    margin: 4px 0;
+}
+
+.chat-btn--restore:hover {
+    background-color: rgba(230, 162, 60, 0.28);
+    border-color: rgba(230, 162, 60, 0.8);
+}
+
+.chat-btn--restore:disabled {
+    opacity: 0.38;
+    color: var(--unity-colors-label-text);
+    border-color: var(--unity-colors-default-border);
+}
+
 /* ── Slash command popup ── */
 .slash-popup {
     position: absolute;
