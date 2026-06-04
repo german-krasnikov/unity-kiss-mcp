@@ -47,6 +47,7 @@ namespace UnityMCP.Editor.Chat
                 _selectedKind  = spec.Kind;
                 _selectedAgent = spec.AgentName;
                 _backend?.Stop();
+                ResetTokenCounters();
                 CreateBackend();
             });
 

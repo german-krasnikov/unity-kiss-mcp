@@ -23,6 +23,8 @@ namespace UnityMCP.Editor.Chat
 
         public bool HasRestorableGroup => _turns.Count > 0;
 
+        public int TurnCount => _turns.Count;
+
         // Exposes the in-flight group id so SaveStateBeforeReload can persist it (#12).
         // -1 when no turn is in flight.
         public int InflightGroupId => _inflightGroupId;
@@ -46,12 +48,19 @@ namespace UnityMCP.Editor.Chat
         // Partial mutations are still restorable — treat same as OnTurnEnd.
         public void OnTurnFailed() => OnTurnEnd();
 
-        public void RestoreLastTurn()
+        public void RestoreLastTurn() => RestoreFromIndex(TurnCount - 1);
+
+        /// <summary>
+        /// Reverts turns [index..Count-1] in reverse order (cascade), then removes them.
+        /// No-op if index is out of range.
+        /// </summary>
+        public void RestoreFromIndex(int index)
         {
-            if (_turns.Count == 0) return;
-            var top = _turns[_turns.Count - 1];
-            _turns.RemoveAt(_turns.Count - 1);
-            UndoGroupHelper.RevertToBeforeGroup(top.GroupId);
+            if (index < 0 || index >= _turns.Count) return;
+            // Revert in reverse order: last turn first, down to index.
+            for (int i = _turns.Count - 1; i >= index; i--)
+                UndoGroupHelper.RevertToBeforeGroup(_turns[i].GroupId);
+            _turns.RemoveRange(index, _turns.Count - index);
         }
 
         // Called on domain reload — in-memory group indices are stale.

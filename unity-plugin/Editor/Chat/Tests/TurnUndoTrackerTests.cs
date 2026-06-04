@@ -165,6 +165,57 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(inBatch  == null, "In-batch object already reverted by RevertToBeforeGroup");
         }
 
+        // --- F2: RestoreFromIndex scenarios ---
+
+        [Test]
+        public void RestoreFromIndex_LastIndex_RevertsOnlyLast()
+        {
+            _tracker.OnTurnStart("A"); var o1 = new GameObject("TUT_F2_A"); Undo.RegisterCreatedObjectUndo(o1, "A"); _tracker.OnTurnEnd();
+            _tracker.OnTurnStart("B"); var o2 = new GameObject("TUT_F2_B"); Undo.RegisterCreatedObjectUndo(o2, "B"); _tracker.OnTurnEnd();
+
+            _tracker.RestoreFromIndex(1); // last turn
+
+            Assert.IsTrue(o2 == null, "o2 reverted");
+            Assert.IsTrue(o1 != null, "o1 untouched");
+            Object.DestroyImmediate(o1);
+        }
+
+        [Test]
+        public void RestoreFromIndex_FirstOfThree_CascadeRevertsAll()
+        {
+            _tracker.OnTurnStart("A"); var o1 = new GameObject("TUT_F2_C1"); Undo.RegisterCreatedObjectUndo(o1, "A"); _tracker.OnTurnEnd();
+            _tracker.OnTurnStart("B"); var o2 = new GameObject("TUT_F2_C2"); Undo.RegisterCreatedObjectUndo(o2, "B"); _tracker.OnTurnEnd();
+            _tracker.OnTurnStart("C"); var o3 = new GameObject("TUT_F2_C3"); Undo.RegisterCreatedObjectUndo(o3, "C"); _tracker.OnTurnEnd();
+
+            _tracker.RestoreFromIndex(0);
+
+            Assert.IsTrue(o1 == null, "o1 reverted");
+            Assert.IsTrue(o2 == null, "o2 reverted");
+            Assert.IsTrue(o3 == null, "o3 reverted");
+        }
+
+        [Test]
+        public void RestoreFromIndex_MiddleOfThree_RevertsLastTwo()
+        {
+            _tracker.OnTurnStart("A"); var o1 = new GameObject("TUT_F2_M1"); Undo.RegisterCreatedObjectUndo(o1, "A"); _tracker.OnTurnEnd();
+            _tracker.OnTurnStart("B"); var o2 = new GameObject("TUT_F2_M2"); Undo.RegisterCreatedObjectUndo(o2, "B"); _tracker.OnTurnEnd();
+            _tracker.OnTurnStart("C"); var o3 = new GameObject("TUT_F2_M3"); Undo.RegisterCreatedObjectUndo(o3, "C"); _tracker.OnTurnEnd();
+
+            _tracker.RestoreFromIndex(1);
+
+            Assert.IsTrue(o2 == null, "o2 reverted");
+            Assert.IsTrue(o3 == null, "o3 reverted");
+            Assert.IsTrue(o1 != null, "o1 untouched");
+            Object.DestroyImmediate(o1);
+        }
+
+        [Test]
+        public void RestoreFromIndex_InvalidIndex_DoesNotThrow()
+        {
+            Assert.DoesNotThrow(() => _tracker.RestoreFromIndex(-1));
+            Assert.DoesNotThrow(() => _tracker.RestoreFromIndex(99));
+        }
+
         // #13: turn group wraps batch group — RestoreLastTurn reverts both after successful atomic batch.
         [Test]
         public void RestoreLastTurn_AfterSuccessfulAtomicBatch_RevertsBoth()

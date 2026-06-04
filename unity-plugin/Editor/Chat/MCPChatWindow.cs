@@ -22,6 +22,8 @@ namespace UnityMCP.Editor.Chat
         internal readonly CompileAutoFix       _autoFix  = new CompileAutoFix();
         // Set when Claude's turn contained a code-editing tool call; cleared at TurnDone.
         internal bool _turnEditedCode;
+        internal bool _turnHasToolCalls;
+        internal bool _autoScrollEnabled = true;
         private TextField     _input;
         private Label         _tokenReadout;
         private Button        _askBtn, _agentBtn;
@@ -48,9 +50,17 @@ namespace UnityMCP.Editor.Chat
             return false;
         }
 
+        internal void ResetTokenCounters()
+        {
+            _inputTokens = _outputTokens = 0;
+            if (_tokenReadout != null) _tokenReadout.text = "";
+        }
+
         private void OnEnable()
         {
+            _autoScrollEnabled = EditorPrefs.GetBool("MCPChat.AutoScroll", true);
             CreateBackend();
+            ResetTokenCounters();
             ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
             AssemblyReloadEvents.beforeAssemblyReload += SaveStateBeforeReload;
             _autoFix.Subscribe();
@@ -128,7 +138,9 @@ namespace UnityMCP.Editor.Chat
         {
             if (_agentMode == agentMode) return;
             _agentMode = agentMode;
-            _backend?.Stop(); CreateBackend();
+            _backend?.Stop();
+            ResetTokenCounters();
+            CreateBackend();
             _askBtn?.EnableInClassList("mode-toggle-btn--active",   !agentMode);
             _agentBtn?.EnableInClassList("mode-toggle-btn--active", agentMode);
         }

@@ -1,6 +1,7 @@
 // FlowBar partial: fixed track with inner chip sweep — fixes the ±100% glitch.
 // Animation: track fades in/out; chip sweeps left↔right via CSS translate classes.
 // Also owns BuildFooterBar / MakeModeBtn (footer is tightly coupled to mode-toggle state).
+using UnityEditor;
 using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
@@ -82,6 +83,15 @@ namespace UnityMCP.Editor.Chat
 
             var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
             bar.Add(spacer);
+
+            var autoScrollToggle = new Toggle("Auto-scroll") { value = _autoScrollEnabled };
+            autoScrollToggle.AddToClassList("autoscroll-toggle");
+            autoScrollToggle.RegisterValueChangedCallback(evt =>
+            {
+                _autoScrollEnabled = evt.newValue;
+                EditorPrefs.SetBool("MCPChat.AutoScroll", evt.newValue);
+            });
+            bar.Add(autoScrollToggle);
 
             _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
             bar.Add(_tokenReadout);

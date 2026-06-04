@@ -14,12 +14,13 @@ namespace UnityMCP.Editor.Chat
         /// </summary>
         public static VisualElement Create(TurnUndoTracker tracker, Action onRestored = null)
         {
-            int capturedGeneration = tracker.CurrentGeneration;
+            // Capture the index of the turn this button belongs to.
+            int capturedTurnIndex = tracker.TurnCount - 1;
 
             Button btn = null;
             btn = new Button(() =>
             {
-                tracker.RestoreLastTurn();
+                tracker.RestoreFromIndex(capturedTurnIndex);
                 btn.SetEnabled(false);
                 btn.text = "Restored";
                 onRestored?.Invoke();
@@ -31,24 +32,23 @@ namespace UnityMCP.Editor.Chat
             btn.AddToClassList("chat-btn--restore");
 
             // Refresh enabled state on geometry changes (covers repaint-equivalent).
-            btn.RegisterCallback<GeometryChangedEvent>(_ => RefreshEnabled(btn, tracker, capturedGeneration));
+            btn.RegisterCallback<GeometryChangedEvent>(_ => RefreshEnabled(btn, tracker, capturedTurnIndex));
             // Also refresh when the panel ticks (schedule-based refresh).
-            btn.schedule.Execute(() => RefreshEnabled(btn, tracker, capturedGeneration)).Every(200);
+            btn.schedule.Execute(() => RefreshEnabled(btn, tracker, capturedTurnIndex)).Every(200);
 
-            RefreshEnabled(btn, tracker, capturedGeneration);
+            RefreshEnabled(btn, tracker, capturedTurnIndex);
             return btn;
         }
 
         /// <summary>
-        /// Recomputes and applies the button's enabled state.
-        /// Exposed as internal static so tests can assert the last-only disable rule
-        /// without requiring a live UIElements panel.
+        /// Enabled when the tracker still has the captured turn (index in range).
+        /// Exposed as internal static so tests can assert without a live UIElements panel.
         /// </summary>
-        internal static void RefreshEnabled(Button btn, TurnUndoTracker tracker, int capturedGeneration)
+        internal static void RefreshEnabled(Button btn, TurnUndoTracker tracker, int capturedTurnIndex)
         {
             var shouldEnable =
                 tracker.HasRestorableGroup &&
-                tracker.CurrentGeneration == capturedGeneration;
+                capturedTurnIndex < tracker.TurnCount;
             btn.SetEnabled(shouldEnable);
         }
     }

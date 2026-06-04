@@ -110,7 +110,8 @@ namespace UnityMCP.Editor.Chat
             foreach (var ev in _evBuf) HandleEvent(ev);
             foreach (var rec in _toolBuf) HandleToolRecord(rec);
             _transcript.FlushStreaming();
-            _scroll.scrollOffset = new Vector2(0, float.MaxValue);
+            if (_autoScrollEnabled)
+                _scroll.scrollOffset = new Vector2(0, float.MaxValue);
         }
 
         private void HandleEvent(ChatEvent ev)
@@ -143,11 +144,13 @@ namespace UnityMCP.Editor.Chat
                             _autoFix.Arm();
                     }
                     _turnEditedCode = false;
+                    var hadToolCalls = _turnHasToolCalls;
+                    _turnHasToolCalls = false;
                     // F6: close the undo group and append a Restore button.
                     _undoTracker.OnTurnEnd();
                     _transcript?.Append(RestoreButton.Create(_undoTracker));
-                    // Ask mode + valid session → inject one-shot approve button.
-                    if (!_agentMode && !string.IsNullOrEmpty(_backend?.SessionId))
+                    // Ask mode + valid session + tool calls present → inject one-shot approve button.
+                    if (!_agentMode && !string.IsNullOrEmpty(_backend?.SessionId) && hadToolCalls)
                     {
                         var approveContainer = new VisualElement();
                         _transcript?.Append(approveContainer);
@@ -162,7 +165,8 @@ namespace UnityMCP.Editor.Chat
                     ReloadGuard.OnTurnFinished(); // #1 unlock even on error
                     if (_activity.Fail()) OnActivityChanged();
                     _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
-                    _turnEditedCode = false; // provenance gate: symmetric with TurnDone
+                    _turnEditedCode   = false; // provenance gate: symmetric with TurnDone
+                    _turnHasToolCalls = false;
                     // F6: partial mutations still restorable on error.
                     _undoTracker.OnTurnFailed();
                     _transcript?.Append(RestoreButton.Create(_undoTracker));
@@ -195,6 +199,7 @@ namespace UnityMCP.Editor.Chat
                 // null ArgsJson = chip-creation record (ToolStart moment)
                 if (_activity.FirstToken()) OnActivityChanged();
                 _transcript.AppendToolChip(rec.Name, ok: true, toolId: rec.Id);
+                _turnHasToolCalls = true;
             }
             else
             {
