@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.11.0] — 2026-06-04 <!-- svg: per-turn undo rollback + Restore button -->
+
+- **Per-Turn Undo Rollback (Plugin 0.11.0, F6)** (2026-06-04) — In-Unity Chat now wraps each agent turn in a named Unity Undo group; an amber **Restore** button appears after each turn and reverts that turn's scene mutations in one click (scene-only, native Unity Undo). Only the last turn's button is active; older buttons disable when a new turn starts. Resumed-after-domain-reload turns also get a group. Built on a new reusable core primitive in `UndoGroupHelper` (public API: `OpenNamedGroup`, `CloseNamedGroup`, `RevertToBeforeGroup`, `CanRevert`) that upcoming F27 (atomic batch rollback) will reuse — one rollback system, not two. New files: `TurnUndoTracker.cs`, `RestoreButton.cs`, `MCPChatWindow.Undo.cs` (split from MCPChatWindow.cs), 11 NUnit EditMode tests (TurnUndoTrackerTests 9/9 green, RestoreButtonTests 2/2 green). `MCPChatWindow.uss` updated with `.chat-btn--restore` styling. Core `UndoGroupHelper.cs` exposed with 6 NUnit EditMode tests (UndoGroupHelperTests green). Total test count: 15+ EditMode + 1637 Python unit tests green.
+
 ## [v0.10.0] — 2026-06-04 <!-- svg: chat plan/act approve & execute + slash templates -->
 
 - **Plan/Act "Approve & Execute" Bridge (Plugin 0.10.0, #11)** (2026-06-04) — After a Plan-mode (Ask) turn finishes, `MCPChatWindow.Drain.cs` injects a one-shot "Approve & Execute" button. Clicking it captures the backend `SessionId`, flips the window to Agent mode, recreates the backend with `--resume <sessionId>` (plan preserved), and auto-dispatches "Execute the plan above." Files: `MCPChatWindow.Approve.cs`, `ApproveHelper.cs`, `ApproveButtonFactory.cs`, +9 lines in `MCPChatWindow.Drain.cs`, `ChatTranscript.Append(VisualElement)` made internal. 10 NUnit EditMode tests green.

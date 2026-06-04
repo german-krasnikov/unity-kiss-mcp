@@ -143,6 +143,18 @@ Files: `SlashTemplate.cs` (`[Flags] ContextGather` enum + readonly struct), `Sla
 
 **Result:** Speed up common workflows with one keystroke; templates provide context automatically. 16 NUnit EditMode tests green. +44 lines MCPChatWindow.uss.
 
+### Per-Turn Undo Rollback (F6, plugin 0.11.0)
+
+`TurnUndoTracker.cs` + `RestoreButton.cs` wrap each agent turn in a named Unity Undo group. An amber **Restore** button appears after each turn and reverts that turn's scene mutations in one click (native Unity Undo, scene-only). Only the last turn's button is active; older buttons disable when a new turn starts. Resumed-after-domain-reload turns also get a group.
+
+Files: `TurnUndoTracker.cs` (group lifecycle), `RestoreButton.cs` (button UI + revert logic), `MCPChatWindow.Undo.cs` (partial, split from MCPChatWindow.cs), `.chat-btn--restore` in `MCPChatWindow.uss`.
+
+**Reusable Primitive:** Built on a new public `UndoGroupHelper` core API (4 methods: `OpenNamedGroup`, `CloseNamedGroup`, `RevertToBeforeGroup`, `CanRevert`). Upcoming F27 (atomic batch rollback) will reuse this same system — one rollback mechanism, not two.
+
+**Tests:** 11 NUnit EditMode tests green (TurnUndoTrackerTests 9/9, RestoreButtonTests 2/2). Core `UndoGroupHelper` has 6 NUnit EditMode tests.
+
+**Result:** Agents can now safely mutate scene state with instant undo per turn. Full isolation: behind UNITY_MCP_CHAT define. 9 EditMode tests in Chat, 6 EditMode tests in Core.
+
 ### Chat Context Resolution via Chips (F2, plugin 0.9.0)
 
 `ChipContextResolver.cs` resolves object-path chips to plain text at send-time. Three depth levels:

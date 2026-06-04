@@ -221,6 +221,11 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - Sandboxed with blocklist
 - Supports undo_label for undo grouping
 
+### Undo Group Primitives (C#: UndoGroupHelper)
+- **UndoGroupHelper** (`UndoGroupHelper.cs`, public core API): Reusable named-group rollback primitive with 4 methods: `OpenNamedGroup()`, `CloseNamedGroup()`, `RevertToBeforeGroup()`, `CanRevert()`.
+- **F6 (Chat):** `TurnUndoTracker` + `RestoreButton` consume this API to wrap each agent turn in an Undo group; Restore button reverts the turn's mutations. Only the last turn's button is active.
+- **F27 (upcoming):** Atomic batch rollback will reuse the same primitive — one unified rollback system across Chat (per-turn) and Batch (per-operation).
+
 ### Spatial Queries (C#: via spatial_query command)
 - Actions: nearest, in_front_of, objects_in_radius, bounds_info, raycast, spatial_map
 
