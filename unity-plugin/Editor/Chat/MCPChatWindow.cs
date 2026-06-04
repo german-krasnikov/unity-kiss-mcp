@@ -149,10 +149,13 @@ namespace UnityMCP.Editor.Chat
 
         private void CreateBackendWithSession(string resumeSessionId)
         {
+            var store = BackendConfigStore.Load();
             switch (_selectedKind)
             {
                 case BackendKind.Codex:
-                    _backend = new CodexBackend(resumeSessionId);
+                    _backend = new CodexBackend(resumeSessionId,
+                        store.Codex.StartupTimeoutSec,
+                        store.Codex.ExtraArgs);
                     break;
 
                 default: // BackendKind.Claude
@@ -161,7 +164,8 @@ namespace UnityMCP.Editor.Chat
                             System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
                             ".claude", "mcp.json");
                     _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan",
-                        _selectedAgent, _permConfig, resumeSessionId);
+                        _selectedAgent, _permConfig, resumeSessionId,
+                        store.Claude.Model, store.Claude.ExtraArgs);
                     break;
             }
         }

@@ -20,7 +20,9 @@ namespace UnityMCP.Editor.Chat
             string prompt,
             string resumeSessionId,
             string pythonCommand,
-            string[] pythonArgs)
+            string[] pythonArgs,
+            int startupTimeoutSec = 30,
+            string extraArgs = null)
         {
             var args = new List<string> { "exec" };
 
@@ -50,7 +52,14 @@ namespace UnityMCP.Editor.Chat
             args.Add("-c");
             args.Add($"mcp_servers.unity.args=[{BuildTomlStringArray(pythonArgs)}]");
             args.Add("-c");
-            args.Add("mcp_servers.unity.startup_timeout_sec=30");
+            args.Add($"mcp_servers.unity.startup_timeout_sec={startupTimeoutSec}");
+
+            // Args go through Process argv (not shell) — whitespace-split is safe; no shell injection risk.
+            if (!string.IsNullOrEmpty(extraArgs))
+            {
+                foreach (var token in extraArgs.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                    args.Add(token);
+            }
 
             // Prompt is always the last positional argument
             if (!string.IsNullOrEmpty(prompt))

@@ -18,7 +18,7 @@ namespace UnityMCP.Editor.Chat
 
         private static void AppendSection(VisualElement root)
         {
-            var foldout = new Foldout { text = "Agent Chat", value = false };
+            var foldout = new Foldout { text = "Agent Chat", value = false };  // F8: removed "(Beta)"
             foldout.style.marginTop = 8;
 
             // Binary path (auto + override)
@@ -56,13 +56,16 @@ namespace UnityMCP.Editor.Chat
                 foldout.Add(warn);
             }
 
-            // Backend dropdown (Claude only in MVP; others disabled)
-            var backendRow = new VisualElement(); backendRow.style.flexDirection = FlexDirection.Row;
-            var backendLbl = new Label("Backend: select in chat window dropdown");
-            backendLbl.style.fontSize = 10;
-            backendLbl.style.color    = new StyleColor(new Color(0.6f, 0.6f, 0.7f));
-            backendRow.Add(backendLbl);
-            foldout.Add(backendRow);
+            // Per-backend settings — F9
+            var store = BackendConfigStore.Load();
+
+            var claudeFoldout = new Foldout { text = "Claude Settings", value = false };
+            BackendSettingsForm.BuildClaudeForm(claudeFoldout, store.Claude, () => store.Save());
+            foldout.Add(claudeFoldout);
+
+            var codexFoldout = new Foldout { text = "Codex Settings", value = false };
+            BackendSettingsForm.BuildCodexForm(codexFoldout, store.Codex, () => store.Save());
+            foldout.Add(codexFoldout);
 
             root.Add(foldout);
         }

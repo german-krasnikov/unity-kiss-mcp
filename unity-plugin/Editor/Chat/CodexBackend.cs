@@ -10,10 +10,15 @@ namespace UnityMCP.Editor.Chat
     {
         private readonly string   _pythonCommand;
         private readonly string[] _pythonArgs;
+        private readonly int      _startupTimeoutSec;
+        private readonly string   _extraArgs;
 
-        internal CodexBackend(string resumeSessionId = null)
+        internal CodexBackend(string resumeSessionId = null,
+            int startupTimeoutSec = 30, string extraArgs = null)
         {
-            SessionId = resumeSessionId;
+            SessionId          = resumeSessionId;
+            _startupTimeoutSec = startupTimeoutSec;
+            _extraArgs         = extraArgs;
 
             var packageRoot = Path.GetFullPath("Packages/com.unity-mcp.editor");
             var serverDir   = ChatMcpConfigWriter.ResolveServerDir(packageRoot);
@@ -41,7 +46,8 @@ namespace UnityMCP.Editor.Chat
                     rawPrompt = snapshot + "\n\n" + rawPrompt;
             }
 
-            return CodexArgBuilder.Build(rawPrompt, resumeId, _pythonCommand, _pythonArgs);
+            return CodexArgBuilder.Build(rawPrompt, resumeId, _pythonCommand, _pythonArgs,
+                _startupTimeoutSec, _extraArgs);
         }
 
         protected override void ParseLine(string line, List<ChatEvent> sink)

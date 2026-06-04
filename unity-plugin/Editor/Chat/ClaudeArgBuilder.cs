@@ -1,4 +1,5 @@
 // Pure arg-construction logic — no process spawning, fully NUnit-testable.
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -25,7 +26,9 @@ namespace UnityMCP.Editor.Chat
             string resumeSessionId,
             string agentName = null,
             string[] allowedMcpTools = null,
-            string appendSystemPrompt = null)
+            string appendSystemPrompt = null,
+            string model = null,
+            string extraArgs = null)
         {
             var args = new List<string>
             {
@@ -73,6 +76,19 @@ namespace UnityMCP.Editor.Chat
             {
                 args.Add("--append-system-prompt");
                 args.Add(appendSystemPrompt);
+            }
+
+            if (!string.IsNullOrEmpty(model))
+            {
+                args.Add("--model");
+                args.Add(model);
+            }
+
+            // Args go through Process argv (not shell) — whitespace-split is safe; no shell injection risk.
+            if (!string.IsNullOrEmpty(extraArgs))
+            {
+                foreach (var token in extraArgs.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                    args.Add(token);
             }
 
             return (args.ToArray(), new[] { "ANTHROPIC_API_KEY" });

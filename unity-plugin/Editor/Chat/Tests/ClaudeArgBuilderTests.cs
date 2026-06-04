@@ -258,5 +258,54 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.Greater(idx, -1, "--disallowedTools must still be present");
             Assert.AreEqual("AskUserQuestion", args[idx + 1]);
         }
+
+        // ── F9: model + extraArgs ─────────────────────────────────────────────
+
+        [Test]
+        public void ClaudeArgBuilder_WithModel_AddsModelFlag()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null,
+                model: "claude-opus-4");
+
+            var idx = System.Array.IndexOf(args, "--model");
+            Assert.Greater(idx, -1, "--model flag must be present");
+            Assert.AreEqual("claude-opus-4", args[idx + 1]);
+        }
+
+        [Test]
+        public void ClaudeArgBuilder_EmptyModel_NoModelFlag()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null,
+                model: "");
+
+            Assert.IsFalse(System.Array.IndexOf(args, "--model") >= 0,
+                "--model must not appear when model is empty");
+        }
+
+        [Test]
+        public void ClaudeArgBuilder_WithExtraArgs_AppendsRaw()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null,
+                extraArgs: "--debug --timeout 5");
+
+            CollectionAssert.Contains(args, "--debug");
+            CollectionAssert.Contains(args, "--timeout");
+            CollectionAssert.Contains(args, "5");
+        }
+
+        [Test]
+        public void ClaudeArgBuilder_ExtraArgsEmptyTokensDropped()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/bin/claude", "/cfg.json", "plan", null,
+                extraArgs: "  --debug  ");
+
+            // Only "--debug" appended, no empty strings
+            int emptyCount = System.Array.FindAll(args, s => s == "").Length;
+            Assert.AreEqual(0, emptyCount);
+        }
     }
 }

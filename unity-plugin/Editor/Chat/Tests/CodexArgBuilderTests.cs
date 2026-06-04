@@ -152,5 +152,58 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(afterEq.StartsWith("\""), $"command value should be quoted: {afterEq}");
             Assert.IsTrue(afterEq.EndsWith("\""), $"command value should end with quote: {afterEq}");
         }
+
+        // ── F9: startupTimeoutSec + extraArgs ─────────────────────────────────
+
+        [Test]
+        public void CodexArgBuilder_CustomTimeout_OverridesDefault()
+        {
+            var (args, _) = CodexArgBuilder.Build(
+                SomePrompt, null, DefaultPythonCmd, DefaultPythonArgs,
+                startupTimeoutSec: 60);
+
+            var cValues = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == "-c") cValues.Add(args[i + 1]);
+
+            var timeoutVal = cValues.First(v => v.StartsWith("mcp_servers.unity.startup_timeout_sec="));
+            Assert.AreEqual("mcp_servers.unity.startup_timeout_sec=60", timeoutVal);
+        }
+
+        [Test]
+        public void CodexArgBuilder_DefaultTimeout_Is30()
+        {
+            var (args, _) = CodexArgBuilder.Build(
+                SomePrompt, null, DefaultPythonCmd, DefaultPythonArgs);
+
+            var cValues = new System.Collections.Generic.List<string>();
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == "-c") cValues.Add(args[i + 1]);
+
+            var timeoutVal = cValues.First(v => v.StartsWith("mcp_servers.unity.startup_timeout_sec="));
+            Assert.AreEqual("mcp_servers.unity.startup_timeout_sec=30", timeoutVal);
+        }
+
+        [Test]
+        public void CodexArgBuilder_WithExtraArgs_AppendsRaw()
+        {
+            var (args, _) = CodexArgBuilder.Build(
+                SomePrompt, null, DefaultPythonCmd, DefaultPythonArgs,
+                extraArgs: "--no-color --quiet");
+
+            CollectionAssert.Contains(args, "--no-color");
+            CollectionAssert.Contains(args, "--quiet");
+        }
+
+        [Test]
+        public void CodexArgBuilder_ExtraArgsEmptyTokensDropped()
+        {
+            var (args, _) = CodexArgBuilder.Build(
+                SomePrompt, null, DefaultPythonCmd, DefaultPythonArgs,
+                extraArgs: "  --no-color  ");
+
+            int emptyCount = System.Array.FindAll(args, s => s == "").Length;
+            Assert.AreEqual(0, emptyCount);
+        }
     }
 }
