@@ -37,7 +37,10 @@ namespace UnityMCP.Editor
                 if (isAtomicRoot && UndoGroupHelper.CanRevert(gid))
                 {
                     UndoGroupHelper.RevertToBeforeGroup(gid);
-                    sb.AppendLine($"ATOMIC_ROLLBACK: reverted ops 0..{opIndex - 1}");
+                    if (opIndex > 0)
+                        sb.AppendLine($"ATOMIC_ROLLBACK: reverted ops 0..{opIndex - 1}");
+                    else
+                        sb.AppendLine("ATOMIC_ROLLBACK: op 0 failed, nothing to revert");
                 }
                 return atomic; // break only in atomic mode
             }
@@ -130,6 +133,7 @@ namespace UnityMCP.Editor
             finally
             {
                 if (isAtomicRoot)
+                    // CollapseUndoOperations on an already-reverted/empty group is a Unity no-op — safe to call unconditionally.
                     UndoGroupHelper.CloseNamedGroup(gid);
 
                 // Only the outermost batch flushes physics — once, after all nested ops settle.

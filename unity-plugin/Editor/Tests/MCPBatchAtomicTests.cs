@@ -100,7 +100,21 @@ namespace UnityMCP.Editor.Tests
             });
         }
 
-        // ── 6. atomic=true overrides on_error=continue (still stops+reverts) ──
+        // ── 6. Op0 fails in atomic mode — message must not say "0..-1" ──────────
+        [Test]
+        public void Atomic_FirstOpFails_NothingToRevert()
+        {
+            // atomic batch whose FIRST op fails → message must not say "0..-1"
+            string result = BatchHelper.Execute(
+                "set_property path=/NONEXISTENT component=Transform prop=m_LocalPosition value=(0,0,0)",
+                "continue", 25000, atomic: true);
+
+            Assert.IsTrue(result.Contains("ATOMIC_ROLLBACK"), "Rollback message expected even for op 0 failure");
+            Assert.IsFalse(result.Contains("0..-1"), "Must not emit misleading '0..-1' range");
+            Assert.IsTrue(result.Contains("nothing to revert"), "Must clarify nothing was applied");
+        }
+
+        // ── 7. atomic=true overrides on_error=continue (still stops+reverts) ──
         [Test]
         public void Atomic_OverridesOnErrorContinue()
         {

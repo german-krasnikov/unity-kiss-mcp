@@ -114,7 +114,7 @@ async def test_batch_atomic_false_not_sent(mock_bridge, bridge_response):
 
 @pytest.mark.asyncio
 async def test_batch_atomic_with_on_error(mock_bridge, bridge_response):
-    """atomic=True with on_error set — both forwarded, C# decides precedence."""
+    """atomic=True overrides on_error; both forwarded so C# can enforce precedence (atomic wins)."""
     bridge_response(data="ok:1")
     await batch(commands="create_object name=A", atomic=True, on_error="continue")
     call_args = mock_bridge.send.call_args[0]
