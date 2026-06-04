@@ -84,6 +84,43 @@ public interface IChatBackend
 
 ## Features
 
+### Compile Auto-Fix Loop (F5, plugin 0.8.0)
+
+`CompileAutoFix.cs` automatically retries after edits fail to compile. Lifecycle:
+
+1. **On turn start:** Arm the retry loop (MAX_RETRIES = 3)
+2. **On each compile finish:** Check if retries remain
+3. **If compile succeeds:** Disarm immediately
+4. **If retries exhausted:** Show a cap chip; final compile absorbed silently (no error spam)
+
+**Provenance gating:** Only arms when the turn actually edited a `.cs` file (tracked by `_turnEditedCode` flag in MCPChatWindow.Drain.cs). Manual IDE edits never trigger auto-retries, preventing false positives.
+
+### Editor State Snapshot Injection (F7, plugin 0.8.0)
+
+`EditorStateSnapshot.cs` builds a lightweight context block and injects it early:
+
+**Content:**
+- Active scene name
+- Compile status (OK, Compiling, Error)
+- Console error count
+- First 500 chars of scene hierarchy (with "…(truncated)" if longer)
+
+**Injection:** Via `--append-system-prompt` on fresh chat sessions (ClaudeArgBuilder.cs sets the flag; ClaudeBackend.cs appends the block). On domain-reload resume, the snapshot is prepended to sent text via SentTextCache.
+
+**Result:** Claude starts with full context, eliminating the 2–3 cold-start probe calls it used to make ("What scene are we in?", "Are there compile errors?", "Show me the hierarchy"). Immediate productivity boost; no extra token cost on subsequent turns.
+
+### Tool Ping on Call Complete (F29, plugin 0.8.0)
+
+`ToolPing.cs` flashes any GameObject a tool call touches. Behavior:
+
+1. Tool call completes with args (e.g., `set_property path=/Enemies/Boss`)
+2. `ToolPing` extracts the object path from the args
+3. Resolves via `ComponentSerializer.FindObject(path)`
+4. Calls `EditorGUIUtility.PingObject(instance)` (main thread, inside MCPChatWindow.Drain)
+5. Object flashes briefly in the Hierarchy window
+
+**Graceful:** If path missing or unresolvable, no-op (no error shown). Fires exactly once per tool call. Immediate visual feedback for the user on which object was just mutated.
+
 ### Humanized Tool Card Rendering
 
 Stream-json output from `claude -p` emits raw JSON tool cards. Chat parses and humanizes them to plain English:
@@ -206,6 +243,9 @@ unity-plugin/Editor/
 │   ├── PendingTurnState.cs           # Domain-reload: persist in-flight turn state
 │   ├── SelectionSummary.cs           # Auto-Selection: prepend active GameObject context
 │   ├── SentTextCache.cs              # Domain-reload: track sent text for dedup
+│   ├── CompileAutoFix.cs             # Auto-retry on compile failures (MAX_RETRIES=3)
+│   ├── EditorStateSnapshot.cs        # Inject context block (scene, compile, errors)
+│   ├── ToolPing.cs                   # Flash object on tool-call completion
 │   ├── UnityMCP.Editor.Chat.asmdef   # Assembly definition (references Core)
 │   └── Tests/
 │       ├── ChatStreamParserTests.cs
