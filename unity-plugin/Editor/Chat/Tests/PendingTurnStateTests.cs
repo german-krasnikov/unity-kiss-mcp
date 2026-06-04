@@ -156,5 +156,46 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(rt);
             Assert.AreEqual(-1, rt.Value.UndoGroupId);
         }
+
+        // ── v3 BackendKind (reload-survival) ──────────────────────────────────
+
+        [Test]
+        public void RoundTrip_BackendKind_Codex_Persists()
+        {
+            var orig = new PendingTurnState("sess-codex", "do stuff", new string[0], true, "agent",
+                "Sending", undoGroupId: 0, savedAtUtc: 1000L, backendKind: BackendKind.Codex);
+            var rt = PendingTurnState.Deserialize(orig.Serialize());
+            Assert.IsNotNull(rt);
+            Assert.AreEqual(BackendKind.Codex, rt.Value.BackendKind);
+            Assert.AreEqual("sess-codex",      rt.Value.SessionId);
+            Assert.AreEqual("do stuff",        rt.Value.PendingText);
+        }
+
+        [Test]
+        public void Deserialize_V2Header_DefaultsBackendKindToClaude()
+        {
+            // Hand-crafted v2 header (8 pipe-fields, NO BackendKind field).
+            // B64("t")="dA==", B64("")="", B64("Idle")="SWRsZQ=="
+            // Fields: SessionId|PendingTextB64|AgentMode|AgentNameB64|ActivityPhaseB64|ChipCount|UndoGroupId|SavedAtUtc
+            const string v2 = "sess1|dA==|0||SWRsZQ==|0|5|1717502400";
+            var rt = PendingTurnState.Deserialize(v2);
+            Assert.IsNotNull(rt);
+            Assert.AreEqual(BackendKind.Claude, rt.Value.BackendKind,
+                "v2 state without BackendKind field must default to Claude");
+            Assert.AreEqual(5,           rt.Value.UndoGroupId);
+            Assert.AreEqual(1717502400L, rt.Value.SavedAtUtc);
+        }
+
+        [Test]
+        public void Deserialize_V1Header_DefaultsBackendKindToClaude()
+        {
+            // v1: 6 fields — no UndoGroupId, SavedAtUtc, or BackendKind
+            const string v1 = "sess1|dA==|0||SWRsZQ==|0";
+            var rt = PendingTurnState.Deserialize(v1);
+            Assert.IsNotNull(rt);
+            Assert.AreEqual(BackendKind.Claude, rt.Value.BackendKind);
+            Assert.AreEqual(-1, rt.Value.UndoGroupId);
+            Assert.AreEqual(0L, rt.Value.SavedAtUtc);
+        }
     }
 }

@@ -44,15 +44,16 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(result[0].Enabled);
         }
 
-        // ── Last entry is always Codex (disabled) ─────────────────────────────
+        // ── Last entry is always Codex (enabled) ──────────────────────────────
 
         [Test]
         public void Discover_CodexIsLast()
         {
             var result = BackendRegistry.Discover(new string[0]);
             var last = result[result.Count - 1];
-            Assert.AreEqual("Codex (soon)", last.DisplayName);
-            Assert.IsFalse(last.Enabled);
+            Assert.AreEqual("Codex", last.DisplayName);
+            Assert.IsTrue(last.Enabled);
+            Assert.AreEqual(BackendKind.Codex, last.Kind);
         }
 
         // ── Agent files are discovered ────────────────────────────────────────
@@ -109,7 +110,8 @@ namespace UnityMCP.Editor.Chat.Tests
 
             Assert.AreEqual(2, result.Count);
             Assert.AreEqual("Claude", result[0].DisplayName);
-            Assert.AreEqual("Codex (soon)", result[1].DisplayName);
+            Assert.AreEqual("Codex", result[1].DisplayName);
+            Assert.IsTrue(result[1].Enabled);
         }
 
         // ── Agent named "Claude" is skipped (collision guard) ─────────────────
@@ -126,20 +128,20 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(2, result.Count);
         }
 
-        // ── Agent named "Codex (soon)" is skipped (collision guard) ──────────
+        // ── Agent named "Codex" is skipped (collision guard) ─────────────────
 
         [Test]
-        public void Discover_AgentNamedCodexSoon_IsSkipped()
+        public void Discover_AgentNamedCodex_IsSkipped()
         {
             var projDir = MakeAgentsDir("proj");
-            WriteAgent(projDir, "codex.md", "Codex (soon)");
+            WriteAgent(projDir, "codex.md", "Codex");
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            // Exactly one "Codex (soon)" entry, and it is the disabled placeholder
-            var codexEntries = result.FindAll(b => b.DisplayName == "Codex (soon)");
+            // Exactly one "Codex" entry, and it is the built-in enabled Codex
+            var codexEntries = result.FindAll(b => b.DisplayName == "Codex");
             Assert.AreEqual(1, codexEntries.Count);
-            Assert.IsFalse(codexEntries[0].Enabled);
+            Assert.IsTrue(codexEntries[0].Enabled);
         }
     }
 }

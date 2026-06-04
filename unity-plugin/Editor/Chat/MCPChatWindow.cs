@@ -11,6 +11,7 @@ namespace UnityMCP.Editor.Chat
         private IChatBackend   _backend;
         private ChatTranscript _transcript;
         private bool           _agentMode;
+        private BackendKind    _selectedKind = BackendKind.Claude;
         private PermissionConfig _permConfig = new PermissionConfig();
         private int            _inputTokens, _outputTokens;
         private readonly TurnUndoTracker _undoTracker = new TurnUndoTracker();
@@ -125,12 +126,21 @@ namespace UnityMCP.Editor.Chat
 
         private void CreateBackendWithSession(string resumeSessionId)
         {
-            var cfg = ChatMcpConfigWriter.GetOrCreateConfigPath()
-                ?? Path.Combine(
-                    System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                    ".claude", "mcp.json");
-            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan",
-                _selectedAgent, _permConfig, resumeSessionId);
+            switch (_selectedKind)
+            {
+                case BackendKind.Codex:
+                    _backend = new CodexBackend(resumeSessionId);
+                    break;
+
+                default: // BackendKind.Claude
+                    var cfg = ChatMcpConfigWriter.GetOrCreateConfigPath()
+                        ?? Path.Combine(
+                            System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
+                            ".claude", "mcp.json");
+                    _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan",
+                        _selectedAgent, _permConfig, resumeSessionId);
+                    break;
+            }
         }
 
         private void OnSend()

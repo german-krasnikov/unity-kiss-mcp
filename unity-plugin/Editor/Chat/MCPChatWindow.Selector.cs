@@ -44,6 +44,7 @@ namespace UnityMCP.Editor.Chat
                     return;
                 }
 
+                _selectedKind  = spec.Kind;
                 _selectedAgent = spec.AgentName;
                 _backend?.Stop();
                 CreateBackend();

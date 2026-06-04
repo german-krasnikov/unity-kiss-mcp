@@ -9,13 +9,14 @@ namespace UnityMCP.Editor.Chat
     {
         internal static List<BackendSpec> Discover(IEnumerable<string> agentDirs)
         {
-            var result = new List<BackendSpec> { new BackendSpec("Claude", null, true) };
-            var seen   = new HashSet<string>(StringComparer.Ordinal) { "Claude", "Codex (soon)" };
+            var result = new List<BackendSpec> { new BackendSpec("Claude", null, true, BackendKind.Claude) };
+            // Dedup: block agent .md files from colliding with reserved names.
+            var seen   = new HashSet<string>(StringComparer.Ordinal) { "Claude", "Codex" };
 
             foreach (var dir in agentDirs)
                 AddFromDir(dir, result, seen);
 
-            result.Add(new BackendSpec("Codex (soon)", null, false));
+            result.Add(new BackendSpec("Codex", null, true, BackendKind.Codex));
             return result;
         }
 
@@ -34,7 +35,7 @@ namespace UnityMCP.Editor.Chat
                 var name = AgentFrontmatterParser.ParseName(text, stem);
 
                 if (!seen.Add(name)) continue; // dedup (project wins if added first)
-                result.Add(new BackendSpec(name, name, true));
+                result.Add(new BackendSpec(name, name, true, BackendKind.Claude));
             }
         }
     }

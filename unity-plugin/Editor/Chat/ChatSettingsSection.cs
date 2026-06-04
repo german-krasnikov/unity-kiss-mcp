@@ -58,7 +58,7 @@ namespace UnityMCP.Editor.Chat
 
             // Backend dropdown (Claude only in MVP; others disabled)
             var backendRow = new VisualElement(); backendRow.style.flexDirection = FlexDirection.Row;
-            var backendLbl = new Label("Backend: Claude (Codex / Cursor — coming soon)");
+            var backendLbl = new Label("Backend: select in chat window dropdown");
             backendLbl.style.fontSize = 10;
             backendLbl.style.color    = new StyleColor(new Color(0.6f, 0.6f, 0.7f));
             backendRow.Add(backendLbl);

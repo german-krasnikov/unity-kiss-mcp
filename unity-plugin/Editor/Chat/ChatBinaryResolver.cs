@@ -36,6 +36,16 @@ namespace UnityMCP.Editor.Chat
             return _cached;
         }
 
+        /// <summary>
+        /// Resolve an arbitrary CLI binary by name via login shell (no PrefKey/cache).
+        /// For "claude", delegates to <see cref="Resolve()"/> to honour EditorPrefs override.
+        /// </summary>
+        internal static string Resolve(string binaryName)
+        {
+            if (binaryName == "claude") return Resolve();
+            return WhichViaSh(binaryName);
+        }
+
         private static string WhichViaSh(string binary)
         {
 #if UNITY_INCLUDE_TESTS

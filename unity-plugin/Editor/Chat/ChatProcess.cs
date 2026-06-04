@@ -148,6 +148,13 @@ namespace UnityMCP.Editor.Chat
             _stdin.Flush();
         }
 
+        /// <summary>Close stdin without killing the process. Required for Codex (spike fact #4).</summary>
+        internal void CloseStdin()
+        {
+            try { _stdin?.Close(); } catch { }
+            _stdin = null;
+        }
+
         public void Dispose()
         {
             _disposing = true;

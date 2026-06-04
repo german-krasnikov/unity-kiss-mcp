@@ -27,7 +27,8 @@ namespace UnityMCP.Editor.Chat
                 _selectedAgent,
                 _activity.Phase.ToString(),
                 undoGroupId: _undoTracker.InflightGroupId,
-                savedAtUtc:  DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                savedAtUtc:  DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                backendKind: _selectedKind);
             ReloadGuard.SavePendingState(state);
         }
 
@@ -48,6 +49,7 @@ namespace UnityMCP.Editor.Chat
 
             _agentMode     = p.AgentMode;
             _selectedAgent = p.AgentName;
+            _selectedKind  = p.BackendKind;
             CreateBackendWithSession(p.SessionId);
 
             var displayText = p.PendingText;

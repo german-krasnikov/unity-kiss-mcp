@@ -7,18 +7,20 @@ namespace UnityMCP.Editor.Chat
 {
     internal struct PendingTurnState
     {
-        public string   SessionId;
-        public string   PendingText;
-        public string[] ChipPaths;
-        public bool     AgentMode;
-        public string   AgentName;
-        public string   ActivityPhase;
-        public int      UndoGroupId;   // -1 = none/legacy
-        public long     SavedAtUtc;    // 0  = legacy/no-timestamp
+        public string      SessionId;
+        public string      PendingText;
+        public string[]    ChipPaths;
+        public bool        AgentMode;
+        public string      AgentName;
+        public string      ActivityPhase;
+        public int         UndoGroupId;    // -1 = none/legacy
+        public long        SavedAtUtc;     // 0  = legacy/no-timestamp
+        public BackendKind BackendKind;    // v3 — default Claude
 
         internal PendingTurnState(string sessionId, string pendingText, string[] chipPaths,
             bool agentMode, string agentName, string activityPhase,
-            int undoGroupId = -1, long savedAtUtc = 0)
+            int undoGroupId = -1, long savedAtUtc = 0,
+            BackendKind backendKind = BackendKind.Claude)
         {
             SessionId     = sessionId     ?? "";
             PendingText   = pendingText   ?? "";
@@ -28,15 +30,15 @@ namespace UnityMCP.Editor.Chat
             ActivityPhase = activityPhase ?? "";
             UndoGroupId   = undoGroupId;
             SavedAtUtc    = savedAtUtc;
+            BackendKind   = backendKind;
         }
 
         // ── Serialization ─────────────────────────────────────────────────────
         // v1 header: SessionId|PendingTextB64|AgentMode|AgentNameB64|ActivityPhaseB64|ChipCount
-        // v2 header: ...same...|UndoGroupId|SavedAtUtc   (appended; length-based version gate)
-        //            ChipPath0B64
-        //            ChipPath1B64
-        //            ...
-        // ALL string fields are B64-encoded so pipes/newlines in values never corrupt the header.
+        // v2 header: ...same...|UndoGroupId|SavedAtUtc
+        // v3 header: ...same...|BackendKind (int)
+        //            ChipPath0B64 ...
+        // ALL string fields are B64-encoded so pipes/newlines never corrupt the header.
 
         internal string Serialize()
         {
@@ -51,7 +53,8 @@ namespace UnityMCP.Editor.Chat
                 ToB64(ActivityPhase ?? ""),
                 chipCount.ToString(),
                 UndoGroupId.ToString(),
-                SavedAtUtc.ToString());
+                SavedAtUtc.ToString(),
+                ((int)BackendKind).ToString());
             for (var i = 0; i < chipCount; i++)
                 lines[1 + i] = ToB64(ChipPaths[i] ?? "");
             return string.Join("\n", lines);
@@ -73,16 +76,19 @@ namespace UnityMCP.Editor.Chat
                 var activityPhase = FromB64(header[4]);
                 var chipCount     = int.Parse(header[5]);
 
-                // v2 fields — length-based gate preserves back-compat in both directions.
+                // v2/v3 fields — length-based gate preserves back-compat.
                 var undoGroupId = header.Length > 6 ? int.Parse(header[6])  : -1;
                 var savedAtUtc  = header.Length > 7 ? long.Parse(header[7]) : 0L;
+                var backendKind = header.Length > 8
+                    ? (BackendKind)int.Parse(header[8])
+                    : BackendKind.Claude;
 
                 var chips = new string[chipCount];
                 for (var i = 0; i < chipCount; i++)
                     chips[i] = (1 + i < lines.Length) ? FromB64(lines[1 + i]) : "";
 
                 return new PendingTurnState(sessionId, pendingText, chips, agentMode, agentName,
-                    activityPhase, undoGroupId, savedAtUtc);
+                    activityPhase, undoGroupId, savedAtUtc, backendKind);
             }
             catch
             {
