@@ -111,7 +111,6 @@ class Middleware(PathResolverMixin):
         self._retry_cache: OrderedDict = OrderedDict()  # h -> (timestamp, None)
         self._RETRY_TTL = float(os.environ.get("UNITY_MCP_RETRY_TTL", "5.0"))
         self._RETRY_MAX = 32
-        self._hashes: deque = deque(maxlen=10)  # KEEP for back-compat
         self.confidence: float = 1.0
         self.sampling: Optional["SamplingService"] = None  # type: ignore[name-defined]
         self._mutation_log = None
@@ -196,11 +195,8 @@ class Middleware(PathResolverMixin):
         self._retry_cache.clear()
         self._error_dedup.clear()
         self._negative_path_cache.clear()
-        self._hashes.clear()
-        if hasattr(self, "_response_hashes"):
-            self._response_hashes.clear()
-        if hasattr(self, "_last_writes"):
-            self._last_writes.clear()
+        self._response_hashes.clear()
+        self._last_writes.clear()
         self.is_playing = False
         self.circuit = CircuitBreaker(is_ready_fn=self._circuit_ready_fn)
         if self.schema_cache is not None:

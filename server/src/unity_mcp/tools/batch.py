@@ -17,7 +17,11 @@ async def batch(commands: str, on_error: str = "continue", timeout: float = 30.0
         if cmd in _dsl_tools:
             raise ToolError(f"{cmd} requires typed MCP tool (Python DSL expansion), not batch")
     timeout_ms = int((timeout - 5) * 1000)
-    args = {"commands": commands, "on_error": on_error, "timeout_ms": timeout_ms}
+    args = {"commands": commands}
+    if on_error != "continue":
+        args["on_error"] = on_error
+    if timeout_ms != 25000:
+        args["timeout_ms"] = timeout_ms
     if atomic:
         args["atomic"] = "true"
     return await _send("batch", args, timeout=timeout)

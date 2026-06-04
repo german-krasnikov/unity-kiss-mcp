@@ -142,7 +142,7 @@ async def test_batch_physics_workflow(mock_bridge):
     result = await batch(commands=commands)
     mock_bridge.send.assert_called_once_with(
         "batch",
-        {"commands": commands, "on_error": "continue", "timeout_ms": 25000},
+        {"commands": commands},
         timeout=30.0,
     )
     assert "[0] ok" in result

@@ -13,7 +13,7 @@ async def test_batch_text_forwarded(mock_bridge, bridge_response):
     result = await batch(commands=commands)
     mock_bridge.send.assert_called_once_with(
         "batch",
-        {"commands": commands, "on_error": "continue", "timeout_ms": 25000},
+        {"commands": commands},
         timeout=30.0,
     )
     assert result == "[0] ok: /A\n[1] ok"
@@ -30,13 +30,31 @@ async def test_batch_on_error_stop(mock_bridge, bridge_response):
 
 
 @pytest.mark.asyncio
+async def test_batch_non_default_timeout_sent(mock_bridge, bridge_response):
+    """Non-default timeout is included in args."""
+    bridge_response(data="[0] ok: /A")
+    await batch(commands="create_object name=A", timeout=60.0)
+    call_args = mock_bridge.send.call_args[0]
+    assert call_args[1]["timeout_ms"] == 55000  # (60-5)*1000
+
+
+@pytest.mark.asyncio
+async def test_batch_default_timeout_omitted(mock_bridge, bridge_response):
+    """Default timeout=30.0 → timeout_ms absent from args."""
+    bridge_response(data="[0] ok: /A")
+    await batch(commands="create_object name=A")
+    call_args = mock_bridge.send.call_args[0]
+    assert "timeout_ms" not in call_args[1]
+
+
+@pytest.mark.asyncio
 async def test_batch_on_error_continue(mock_bridge, bridge_response):
-    """Default on_error=continue."""
+    """Default on_error=continue is omitted from args (token economy)."""
     bridge_response(data="[0] ok: /A")
     result = await batch(commands="create_object name=A")
     mock_bridge.send.assert_called_once()
     call_args = mock_bridge.send.call_args[0]
-    assert call_args[1]["on_error"] == "continue"
+    assert "on_error" not in call_args[1]
 
 
 @pytest.mark.asyncio
@@ -74,7 +92,7 @@ async def test_batch_single_command(mock_bridge):
     result = await batch(commands="create_object name=A primitive=Cube")
     mock_bridge.send.assert_called_once_with(
         "batch",
-        {"commands": "create_object name=A primitive=Cube", "on_error": "continue", "timeout_ms": 25000},
+        {"commands": "create_object name=A primitive=Cube"},
         timeout=30.0,
     )
     assert result == "[0] ok: /A"
@@ -114,9 +132,9 @@ async def test_batch_atomic_false_not_sent(mock_bridge, bridge_response):
 
 @pytest.mark.asyncio
 async def test_batch_atomic_with_on_error(mock_bridge, bridge_response):
-    """atomic=True overrides on_error; both forwarded so C# can enforce precedence (atomic wins)."""
+    """atomic=True is forwarded; on_error omitted when default (not sent to C#)."""
     bridge_response(data="ok:1")
     await batch(commands="create_object name=A", atomic=True, on_error="continue")
     call_args = mock_bridge.send.call_args[0]
     assert call_args[1].get("atomic") == "true"
-    assert call_args[1].get("on_error") == "continue"
+    assert "on_error" not in call_args[1]  # default value omitted

@@ -35,7 +35,7 @@ class Layout(NamedTuple):
 # ---------------------------------------------------------------------------
 
 _HEADING_RE = re.compile(
-    r'^## \[v([\d.]+)\]\s*—\s*([\d-]*)(?:\s*<!--\s*svg:\s*(.+?)\s*-->)?\s*$'
+    r'^## \[v([\d.]+)(?:\s*/[^\]]+)?\]\s*—\s*([\d-]*)(?:\s*<!--\s*svg:\s*(.+?)\s*-->)?\s*$'
 )
 _BOLD_RE = re.compile(r'^\s*-\s*\*\*(.+?)\*\*')
 _STOP_RE = re.compile(r'^## Earlier history', re.IGNORECASE)

@@ -79,15 +79,11 @@ def test_write_commands_blocked_on_repeat(mw):
     assert result is not None and "RETRY" in result
 
 
-# ── Test: reset_session clears _hashes too (back-compat) ─────────────────────
+# ── Test: _hashes dead field removed ─────────────────────────────────────────
 
-def test_reset_session_clears_hashes_deque(mw):
-    """reset_session empties both _retry_cache and legacy _hashes deque."""
-    mw._hashes.append(hash(("set_property", '{"path": "/X"}')))
-    mw.check_retry("delete_object", {"path": "/Y"})
-    mw.reset_session()
-    assert len(mw._hashes) == 0
-    assert len(mw._retry_cache) == 0
+def test_no_hashes_field(mw):
+    """_hashes was write-only dead code — must no longer exist."""
+    assert not hasattr(mw, "_hashes")
 
 
 # ── Test: get_console and others from extended set never blocked ──────────────
@@ -98,3 +94,18 @@ def test_extended_read_cmds_in_READ_CMDS_set():
                 "screenshot"}
     missing = required - READ_CMDS
     assert not missing, f"Missing from READ_CMDS: {missing}"
+
+
+# ── Test: reset_session clears both response_hashes and last_writes ───────────
+
+def test_reset_session_clears_response_hashes_and_last_writes(mw):
+    """reset_session() must clear both _response_hashes and _last_writes."""
+    # populate _response_hashes via check_duplicate_response
+    mw._response_hashes.append("abc123")
+    # populate _last_writes via check_duplicate_write
+    mw._last_writes["k"] = "v"
+
+    mw.reset_session()
+
+    assert len(mw._response_hashes) == 0
+    assert len(mw._last_writes) == 0
