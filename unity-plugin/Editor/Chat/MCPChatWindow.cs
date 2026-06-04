@@ -135,7 +135,7 @@ namespace UnityMCP.Editor.Chat
             if (SelectionSummary.ShouldPrepend(selGo, chipSet))
                 text = SelectionSummary.Summarize(selGo) + "\n" + text;
 
-            if (chips.Count > 0) text += "\n" + string.Join("\n", chips);
+            if (chips.Count > 0) text += "\n" + ChipContextResolver.ResolveAll(chips);
             if (string.IsNullOrEmpty(text)) return;
 
             DispatchTurn(UserTurnBuilder.Build(text), text);
@@ -150,7 +150,7 @@ namespace UnityMCP.Editor.Chat
             var bytes  = File.ReadAllBytes(path);
             var text   = _input.value?.Trim() ?? "";
             var chips  = CollectChipPaths();
-            if (chips.Count > 0) text += "\n" + string.Join("\n", chips);
+            if (chips.Count > 0) text += "\n" + ChipContextResolver.ResolveAll(chips);
             DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: path);
         }
 
