@@ -7,6 +7,9 @@ namespace UnityMCP.Editor.Chat
     {
         public ActivityPhase Phase { get; private set; } = ActivityPhase.Idle;
 
+        // True only when Idle — the sole guard for OnSend and AttachScreenshot entry points.
+        public bool CanSend => Phase == ActivityPhase.Idle;
+
         // Returns true if state changed (Idle -> Sending). Idempotent: Sending -> Sending = false.
         public bool Send()
         {

@@ -145,6 +145,42 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.Greater(gen1, gen0, "Generation should increase after first OnTurnStart");
             Assert.Greater(gen2, gen1, "Generation should increase after second OnTurnStart");
         }
+
+        // --- #13: cross-consumer rollback tests ---
+
+        // #13: turn group wraps batch group — RestoreLastTurn reverts both after failed atomic batch.
+        [Test]
+        public void RestoreLastTurn_AfterFailedAtomicBatch_RevertsBoth()
+        {
+            _tracker.OnTurnStart("Turn_FailedBatch");
+            var preBatch = new GameObject("TUT_PreBatch_Fail");
+            Undo.RegisterCreatedObjectUndo(preBatch, "pre-batch object");
+            int batchGid = UndoGroupHelper.OpenNamedGroup("MCP Atomic Batch");
+            var inBatch = new GameObject("TUT_InBatch_Fail");
+            Undo.RegisterCreatedObjectUndo(inBatch, "in-batch object");
+            UndoGroupHelper.RevertToBeforeGroup(batchGid); // atomic rollback
+            _tracker.OnTurnFailed();
+            _tracker.RestoreLastTurn();
+            Assert.IsTrue(preBatch == null, "Pre-batch object must be reverted by RestoreLastTurn");
+            Assert.IsTrue(inBatch  == null, "In-batch object already reverted by RevertToBeforeGroup");
+        }
+
+        // #13: turn group wraps batch group — RestoreLastTurn reverts both after successful atomic batch.
+        [Test]
+        public void RestoreLastTurn_AfterSuccessfulAtomicBatch_RevertsBoth()
+        {
+            _tracker.OnTurnStart("Turn_SuccessBatch");
+            var preBatch = new GameObject("TUT_PreBatch_Ok");
+            Undo.RegisterCreatedObjectUndo(preBatch, "pre-batch object ok");
+            int batchGid = UndoGroupHelper.OpenNamedGroup("MCP Atomic Batch");
+            var inBatch = new GameObject("TUT_InBatch_Ok");
+            Undo.RegisterCreatedObjectUndo(inBatch, "in-batch object ok");
+            UndoGroupHelper.CloseNamedGroup(batchGid); // batch succeeded
+            _tracker.OnTurnEnd();
+            _tracker.RestoreLastTurn();
+            Assert.IsTrue(preBatch == null, "Pre-batch object must be reverted");
+            Assert.IsTrue(inBatch  == null, "In-batch object must be reverted");
+        }
     }
 }
 #endif

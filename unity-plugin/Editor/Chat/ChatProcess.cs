@@ -44,6 +44,9 @@ namespace UnityMCP.Editor.Chat
         private readonly ConcurrentQueue<string> _lines = new ConcurrentQueue<string>();
         private Thread _readerThread;
         private volatile bool _running;
+        private volatile bool _disposing;
+        // Bounded ring buffer for last N stderr lines — surfaced on unexpected exit.
+        private readonly StderrRingBuffer _stderrRing = new StderrRingBuffer(5);
 
         internal bool IsRunning => _running && _process != null && !_process.HasExited;
 
@@ -81,12 +84,32 @@ namespace UnityMCP.Editor.Chat
             _readerThread = new Thread(ReadLoop) { IsBackground = true, Name = "ChatProcess.Reader" };
             _readerThread.Start(new StreamReader(_process.StandardOutput.BaseStream, utf8));
 
-            // Drain stderr to prevent 64KB pipe fill / deadlock
+            // Buffer stderr (last 5 lines) and emit synthetic error event on unexpected exit.
             var stderrReader = new StreamReader(_process.StandardError.BaseStream, utf8);
+            var stderrRing   = _stderrRing;
+            var linesQueue   = _lines;
             var errThread = new System.Threading.Thread(() =>
             {
-                try { while (stderrReader.ReadLine() != null) { } }
+                try
+                {
+                    string line;
+                    while ((line = stderrReader.ReadLine()) != null)
+                        stderrRing.Add(line);
+                }
                 catch { }
+                finally
+                {
+                    var exitCode = -1;
+                    try { exitCode = _process?.ExitCode ?? -1; } catch { }
+                    // Surface only genuine failures: not an intentional Dispose, and a non-zero/unknown exit.
+                    // (Clean exit 0 = normal completion; do NOT depend on the racy _running flag here.)
+                    if (!_disposing && exitCode != 0)
+                    {
+                        var msg = StderrRingBuffer.BuildExitErrorMessage(exitCode, stderrRing.Lines);
+                        linesQueue.Enqueue(
+                            $"{{\"type\":\"result\",\"is_error\":true,\"error\":\"{JsonHelper.EscapeJson(msg)}\"}}");
+                    }
+                }
             }) { IsBackground = true, Name = "ChatProcess.StderrDrain" };
             errThread.Start();
         }
@@ -127,6 +150,7 @@ namespace UnityMCP.Editor.Chat
 
         public void Dispose()
         {
+            _disposing = true;
             _running = false;
             try { _process?.Kill(); } catch { }
             try { _stdin?.Dispose(); } catch { }

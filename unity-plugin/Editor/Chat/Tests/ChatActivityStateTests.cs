@@ -109,6 +109,31 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsFalse(s.Send());
         }
 
+        // #6: CanSend predicate — guards OnSend and AttachScreenshot entry points.
+        [Test] public void CanSend_WhenIdle_IsTrue()
+            => Assert.IsTrue(new ChatActivityState().CanSend);
+
+        [Test] public void CanSend_WhenSending_IsFalse()
+        {
+            var s = new ChatActivityState();
+            s.Send();
+            Assert.IsFalse(s.CanSend);
+        }
+
+        [Test] public void CanSend_WhenReceiving_IsFalse()
+        {
+            var s = new ChatActivityState();
+            s.Send(); s.FirstToken();
+            Assert.IsFalse(s.CanSend);
+        }
+
+        [Test] public void CanSend_AfterDone_IsTrue()
+        {
+            var s = new ChatActivityState();
+            s.Send(); s.FirstToken(); s.Done();
+            Assert.IsTrue(s.CanSend);
+        }
+
         // F2 regression: system/init must not stop the activity animation.
         // Drain.HandleEvent must treat SessionInit as a no-op (verified here at policy level).
         [Test] public void SessionInit_Is_Noop_ActivityStaysInSending()

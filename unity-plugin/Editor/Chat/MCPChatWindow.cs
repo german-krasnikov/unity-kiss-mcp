@@ -134,6 +134,7 @@ namespace UnityMCP.Editor.Chat
 
         private void OnSend()
         {
+            if (!_activity.CanSend) return; // #6: no re-entrant send during active turn
             _autoFix.Disarm(); // user manually sending — cancel any pending auto-fix
             var text  = _input.value?.Trim() ?? "";
             var chips = CollectChipPaths();
@@ -152,6 +153,7 @@ namespace UnityMCP.Editor.Chat
 
         private void AttachScreenshot()
         {
+            if (!_activity.CanSend) return; // #6: guard second vector — SS button also dispatches a turn
             var target = Selection.activeGameObject;
             if (target == null) { Debug.LogWarning("[MCP Chat] Select a GameObject first"); return; }
             var path = MultiViewCapture.CaptureToFile(target);

@@ -24,11 +24,12 @@ namespace UnityMCP.Editor
 
         public static bool IsChatEnabled()
         {
+            var group = EditorUserBuildSettings.selectedBuildTargetGroup;
 #if UNITY_2021_2_OR_NEWER
             PlayerSettings.GetScriptingDefineSymbols(
-                NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone), out var symbols);
+                NamedBuildTarget.FromBuildTargetGroup(group), out var symbols);
 #else
-            var symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone).Split(';');
+            var symbols = PlayerSettings.GetScriptingDefineSymbolsForGroup(group).Split(';');
 #endif
             foreach (var s in symbols)
                 if (s.Trim() == ChatDefine) return true;
@@ -37,23 +38,51 @@ namespace UnityMCP.Editor
 
         public static void SetChatEnabled(bool enabled)
         {
+            var group = EditorUserBuildSettings.selectedBuildTargetGroup;
 #if UNITY_2021_2_OR_NEWER
-            var named = NamedBuildTarget.FromBuildTargetGroup(BuildTargetGroup.Standalone);
+            var named = NamedBuildTarget.FromBuildTargetGroup(group);
             PlayerSettings.GetScriptingDefineSymbols(named, out var current);
 #else
-            var current = PlayerSettings.GetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone).Split(';');
+            var current = PlayerSettings.GetScriptingDefineSymbolsForGroup(group).Split(';');
 #endif
-            var list = new List<string>(current);
-            list.RemoveAll(s => s.Trim() == ChatDefine);
-            if (enabled) list.Add(ChatDefine);
-            var joined = string.Join(";", list);
+            var joined = enabled ? AddDefine(string.Join(";", current), ChatDefine)
+                                 : RemoveDefine(string.Join(";", current), ChatDefine);
 
 #if UNITY_2021_2_OR_NEWER
             PlayerSettings.SetScriptingDefineSymbols(named, joined);
 #else
-            PlayerSettings.SetScriptingDefineSymbolsForGroup(BuildTargetGroup.Standalone, joined);
+            PlayerSettings.SetScriptingDefineSymbolsForGroup(group, joined);
 #endif
             UnityEngine.Debug.Log($"[MCP Chat] {ChatDefine} define {(enabled ? "added" : "removed")}. Unity will recompile.");
+        }
+
+        // Pure helpers — testable without Unity API. Semicolon-separated define lists.
+        internal static string AddDefine(string defines, string symbol)
+        {
+            var list = SplitDefines(defines);
+            if (list.Contains(symbol)) return defines; // idempotent
+            list.Add(symbol);
+            return string.Join(";", list);
+        }
+
+        internal static string RemoveDefine(string defines, string symbol)
+        {
+            var list = SplitDefines(defines);
+            // Exact match only — never remove FOOBAR when removing FOO
+            list.RemoveAll(s => s == symbol);
+            return string.Join(";", list);
+        }
+
+        private static List<string> SplitDefines(string defines)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrEmpty(defines)) return result;
+            foreach (var s in defines.Split(';'))
+            {
+                var t = s.Trim();
+                if (t.Length > 0) result.Add(t);
+            }
+            return result;
         }
     }
 }
