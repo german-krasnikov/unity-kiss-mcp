@@ -1,0 +1,12 @@
+Mono path[0] = 'C:/fake/Editor/Data/Managed/UnityEngine'
+##### Starting build
+[Worker0] UnityMCP.Editor.dll
+<csc /nostdlib /noconfig /additionalfile:"Library/Bee/artifacts/5678efgh.dag/UnityMCP.Editor.UnityAdditionalFile.txt" /out:"Library/Bee/artifacts/5678efgh.dag/UnityMCP.Editor.dll" /target:library /debug:portable /optimize- "Assets/Editor/CommandRouter.cs" "Assets/Editor/MaterialHelper.cs">
+##### Custom Environment Variables
+DOTNET_HOST_PATH="/usr/local/share/dotnet/dotnet"
+DOTNET_MULTILEVEL_LOOKUP=0
+##### ExitCode
+0
+##### Output
+Assets/Editor/MaterialHelper.cs(80,73): warning CS0618: 'Material.SetTextureOffset(string, Vector2)' is obsolete: 'Use SetTextureOffset(int nameID, Vector2 value) instead'
+*** Tundra build done (1.12 seconds), 3 items updated, 946 evaluated

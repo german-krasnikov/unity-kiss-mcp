@@ -252,3 +252,46 @@ async def test_ask_no_unity_noun_returns_rejection():
     assert result is not None
     # should indicate it can't answer or is out of scope
     assert len(result) < 300
+
+
+# ---------------------------------------------------------------------------
+# 13. Executor corroboration — get_compile_errors result passes through corroborate
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_executor_corroborates_get_compile_errors():
+    """AskExecutor.run must pass get_compile_errors result through editor_log.corroborate."""
+    import unity_mcp.editor_log as el
+    from unity_mcp.ask.executor import AskExecutor
+    from unity_mcp.ask.plans import ToolPlan
+
+    raw_csharp = "No compilation errors."
+    corroborated = "[editor.log - dll stale]\nAssets/Foo.cs:1:1: error CS0117: stale"
+
+    send = AsyncMock(return_value=raw_csharp)
+
+    with patch.object(el, "corroborate", return_value=corroborated) as mock_cor:
+        ex = AskExecutor(send)
+        plan = ToolPlan([("get_compile_errors", {})], "compile errors", "COMPILE_ERRORS")
+        results = await ex.run(plan)
+
+    mock_cor.assert_called_once_with(raw_csharp)
+    assert results[0] == corroborated
+
+
+@pytest.mark.asyncio
+async def test_executor_does_not_corroborate_other_tools():
+    """AskExecutor.run must NOT call corroborate for non-compile tools."""
+    import unity_mcp.editor_log as el
+    from unity_mcp.ask.executor import AskExecutor
+    from unity_mcp.ask.plans import ToolPlan
+
+    send = AsyncMock(return_value="scan ok")
+
+    with patch.object(el, "corroborate") as mock_cor:
+        ex = AskExecutor(send)
+        plan = ToolPlan([("scan_scene", {})], "scan", "SCAN")
+        results = await ex.run(plan)
+
+    mock_cor.assert_not_called()
+    assert results[0] == "scan ok"

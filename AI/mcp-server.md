@@ -53,6 +53,10 @@ Code Intel (4): find_references, compile_preflight, semantic_at, await_compile
 
 Runtime (8): invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 
+### Compile-Tool Corroboration (v0.7.0+)
+
+`get_compile_errors`, `await_compile`, `auto_fix`, and `ask` now cross-verify clean responses via `editor_log.py`: an out-of-band reader of Unity's `Editor.log` that catches cases where the in-plugin C# reporter is itself broken (stale bytecode, unsafe to trust). Only overrides when both signals agree: log shows errors AND dll is stale. Zero false positives (fresh dll trusted). Resolves P0 silent-blindness bug where plugin compile failures masked themselves.
+
 **Ungated (always visible, not in TIER1 or categories — pass through as "unknown"):**
 
 get_test_results, budget_status

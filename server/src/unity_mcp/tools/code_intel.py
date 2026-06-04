@@ -63,9 +63,11 @@ async def await_compile(timeout: float = 60.0) -> str:
     Handles domain reload disconnects transparently. timeout=0 → immediate check, no loop."""
     async def _get_errors() -> str:
         try:
-            return await _send("get_compile_errors", {})
+            csharp = await _send("get_compile_errors", {})
         except ConnectionError:
             return ""
+        from .. import editor_log
+        return editor_log.corroborate(csharp)
 
     # timeout=0: single check, no loop
     if timeout == 0:
@@ -107,6 +109,8 @@ async def await_compile(timeout: float = 60.0) -> str:
 def register(mcp, send, args):
     global _send
     _send = send
+    from .. import editor_log
+    editor_log.init_corroboration()
     from ._annotations import RO as _RO
     mcp.tool(annotations=_RO)(find_references)
     mcp.tool(annotations=_RO)(compile_preflight)

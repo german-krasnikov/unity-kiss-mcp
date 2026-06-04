@@ -1,0 +1,20 @@
+Mono path[0] = 'C:/fake/Editor/Data/Managed/UnityEngine'
+##### Starting build
+[Worker0] UnityMCP.Editor.dll
+<csc /nostdlib /noconfig /additionalfile:"Library/Bee/artifacts/1234abcd.dag/UnityMCP.Editor.UnityAdditionalFile.txt" /out:"Library/Bee/artifacts/1234abcd.dag/UnityMCP.Editor.dll" /target:library /debug:portable /optimize- "Assets/Editor/CommandRouter.cs" "Assets/Editor/UndoGroupHelper.cs" "Assets/Editor/MaterialHelper.cs">
+##### Custom Environment Variables
+DOTNET_HOST_PATH="/usr/local/share/dotnet/dotnet"
+DOTNET_MULTILEVEL_LOOKUP=0
+##### ExitCode
+1
+##### Output
+Assets/Editor/MaterialHelper.cs(80,73): warning CS0618: 'Material.SetTextureOffset(string, Vector2)' is obsolete: 'Use SetTextureOffset(int nameID, Vector2 value) instead'
+Assets/Editor/UndoGroupHelper.cs(48,18): error CS0117: 'Undo' does not contain a definition for 'RevertAllDownTo'
+Assets/Editor/CommandRouter.cs(12,5): warning CS0169: The field 'CommandRouter._unused' is never used
+*** Tundra build failed (2.36 seconds), 5 items updated, 946 evaluated
+## Script Compilation Error for: Csc Library/Bee/artifacts/1234abcd.dag/UnityMCP.Editor.dll (+2 others)
+## CmdLine: "/usr/local/share/dotnet/dotnet" exec "/usr/local/share/dotnet/packs/Microsoft.NETCore.App.Host.osx-x64/csc.dll" /nostdlib /noconfig /out:"Library/Bee/artifacts/1234abcd.dag/UnityMCP.Editor.dll"
+## Output:
+Assets/Editor/MaterialHelper.cs(80,73): warning CS0618: 'Material.SetTextureOffset(string, Vector2)' is obsolete: 'Use SetTextureOffset(int nameID, Vector2 value) instead'
+Assets/Editor/UndoGroupHelper.cs(48,18): error CS0117: 'Undo' does not contain a definition for 'RevertAllDownTo'
+Assets/Editor/CommandRouter.cs(12,5): warning CS0169: The field 'CommandRouter._unused' is never used

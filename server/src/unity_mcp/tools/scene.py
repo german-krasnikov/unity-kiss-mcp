@@ -73,7 +73,8 @@ async def get_console(count: int = 10, level: str | None = None, first: int = 0)
 
 async def get_compile_errors() -> str:
     """Compilation errors with file:line:column. Not lost on Console.Clear(). Structured, typed."""
-    return await _send("get_compile_errors", {})
+    from .. import editor_log
+    return editor_log.corroborate(await _send("get_compile_errors", {}))
 
 
 def _get_describer_safe():
@@ -268,6 +269,8 @@ def register(mcp, send, args):
     global _send, _args
     _send = send
     _args = args
+    from .. import editor_log
+    editor_log.init_corroboration()
     mcp.tool(annotations=_RO)(get_hierarchy)
     mcp.tool(annotations=_RO)(get_console)
     mcp.tool(annotations=_RO)(get_compile_errors)

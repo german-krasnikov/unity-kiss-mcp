@@ -29,8 +29,9 @@ except ImportError:
 
 async def auto_fix(ctx: _Context) -> str:
     """Auto-detect and fix Unity errors. Uses MCP sampling to ask Claude for fixes."""
+    from .. import editor_log
     console = await _send("get_console", {"count": 10, "level": "Error"})
-    compile_errors = await _send("get_compile_errors", {})
+    compile_errors = editor_log.corroborate(await _send("get_compile_errors", {}))
     if "No compilation errors" in compile_errors and not console:
         return "No errors to fix."
     errors = []
@@ -74,6 +75,8 @@ def register(mcp, send, args):
     global _send, _args
     _send = send
     _args = args
+    from .. import editor_log
+    editor_log.init_corroboration()
     mcp.tool(annotations=_RW)(execute_code)
     mcp.tool(annotations=_RO)(get_schema)
     mcp.tool(annotations=_RO)(auto_fix)

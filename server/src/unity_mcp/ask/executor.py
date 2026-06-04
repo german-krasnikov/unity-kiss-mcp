@@ -1,6 +1,7 @@
 """AskExecutor — runs a ToolPlan's steps via _send."""
-from typing import Callable, Awaitable
+from typing import Callable
 from .plans import ToolPlan
+from .. import editor_log
 
 
 class AskExecutor:
@@ -13,6 +14,8 @@ class AskExecutor:
         for tool, args in plan.steps:
             try:
                 result = await self._send(tool, args)
+                if tool == "get_compile_errors":
+                    result = editor_log.corroborate(str(result))
                 results.append(str(result))
             except Exception as e:
                 results.append(f"ERROR: {e}")
