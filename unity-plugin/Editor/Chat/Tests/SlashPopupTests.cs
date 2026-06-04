@@ -86,5 +86,17 @@ namespace UnityMCP.Editor.Chat.Tests
             for (int i = 0; i < count; i++) _popup.MoveDown();
             Assert.AreEqual(0, _popup.SelectedIndex);
         }
+
+        [Test]
+        public void Show_AllItemsRendered_NoMaxCap()
+        {
+            var templates = new SlashTemplate[10];
+            for (int i = 0; i < 10; i++)
+                templates[i] = new SlashTemplate($"cmd-{i}", $"Prefill {i}.", ContextGather.None);
+
+            _popup.Show(templates);
+
+            Assert.AreEqual(10, _popup.VisibleCount, "All 10 items must be rendered — no MaxVisible cap");
+        }
     }
 }

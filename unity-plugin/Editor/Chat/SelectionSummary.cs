@@ -14,14 +14,20 @@ namespace UnityMCP.Editor.Chat
         /// Returns "[Selection: /Path (Comp1, Comp2)]" or "" if go is null.
         /// Lists top MaxComponents non-Transform components; appends "..." if more exist.
         /// </summary>
-        internal static string Summarize(GameObject go)
+        internal static string Summarize(GameObject go) => Summarize(go, "Selection");
+
+        /// <summary>
+        /// Returns "[{tag}: /Path (Comp1, Comp2)]" or "" if go is null.
+        /// </summary>
+        internal static string Summarize(GameObject go, string tag)
         {
             if (go == null || !go) return ""; // !go catches destroyed-but-non-null Unity refs
 
             var path = ComponentSerializer.GetPath(go);
             var comps = go.GetComponents<Component>();
 
-            var sb = new StringBuilder("[Selection: ");
+            var sb = new StringBuilder("[");
+            sb.Append(tag); sb.Append(": ");
             sb.Append(path);
 
             // Collect non-Transform component names

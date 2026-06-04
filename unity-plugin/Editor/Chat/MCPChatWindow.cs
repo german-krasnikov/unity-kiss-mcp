@@ -71,6 +71,7 @@ namespace UnityMCP.Editor.Chat
                 "Packages/com.unity-mcp.editor/Editor/Chat/MCPChatWindow.uss");
             if (ss != null) root.styleSheets.Add(ss);
             root.AddToClassList("chat-root");
+            if (!EditorGUIUtility.isProSkin) root.AddToClassList("chat-root--light");
             _scroll = new ScrollView(ScrollViewMode.Vertical);
             _scroll.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             _scroll.AddToClassList("chat-scroll");

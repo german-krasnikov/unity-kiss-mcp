@@ -44,13 +44,13 @@ namespace UnityMCP.Editor.Chat
             var go = FindGo(chipPath);
             if (go == null || !go) return chipPath; // destroyed or not found → PathOnly
 
-            if (depth == ChipDepth.Summary) return BuildSummary(go);
+            if (depth == ChipDepth.Summary) return SelectionSummary.Summarize(go, "Context");
 
             // Full
             var budget = budgetOverride >= 0 ? budgetOverride : FullBudget;
             var full = ComponentSerializer.SerializeAll(go.GetInstanceID());
             if (full != null && full.Length <= budget) return full;
-            return BuildSummary(go); // budget exceeded → Summary
+            return SelectionSummary.Summarize(go, "Context"); // budget exceeded → Summary
         }
 
         // ── private helpers ───────────────────────────────────────────────────
@@ -65,37 +65,6 @@ namespace UnityMCP.Editor.Chat
 #endif
             try { return ComponentSerializer.FindObject(path); }
             catch { return null; }
-        }
-
-        private static string BuildSummary(GameObject go)
-        {
-            // Matches SelectionSummary structure: [Context: /Path (Comp1, Comp2)]
-            const int MaxComponents = 3;
-            var path  = ComponentSerializer.GetPath(go);
-            var comps = go.GetComponents<Component>();
-            var sb    = new StringBuilder("[Context: ");
-            sb.Append(path);
-
-            var names = new List<string>(comps.Length);
-            foreach (var c in comps)
-                if (c != null && !(c is Transform))
-                    names.Add(c.GetType().Name);
-
-            if (names.Count > 0)
-            {
-                sb.Append(" (");
-                var shown = names.Count <= MaxComponents ? names.Count : MaxComponents;
-                for (var i = 0; i < shown; i++)
-                {
-                    if (i > 0) sb.Append(", ");
-                    sb.Append(names[i]);
-                }
-                if (names.Count > MaxComponents) sb.Append(", ...");
-                sb.Append(")");
-            }
-
-            sb.Append("]");
-            return sb.ToString();
         }
     }
 }

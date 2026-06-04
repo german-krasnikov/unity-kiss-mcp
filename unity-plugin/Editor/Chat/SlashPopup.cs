@@ -8,16 +8,18 @@ namespace UnityMCP.Editor.Chat
 {
     internal sealed class SlashPopup
     {
-        private const int MaxVisible = 5;
-
         private readonly VisualElement _anchor;
         private readonly TextField     _field;
         private VisualElement          _root;
+        private ScrollView             _scrollView;
         private List<SlashTemplate>    _items = new List<SlashTemplate>();
         private int                    _selectedIndex;
 
         internal bool IsVisible    => _root != null && _root.parent != null;
         internal int  SelectedIndex => _selectedIndex;
+
+        /// <summary>Number of rendered items — for testing (no MaxVisible cap).</summary>
+        internal int VisibleCount => _scrollView?.childCount ?? 0;
 
         internal SlashPopup(VisualElement anchor, TextField field)
         {
@@ -50,6 +52,7 @@ namespace UnityMCP.Editor.Chat
         {
             _root?.RemoveFromHierarchy();
             _root = null;
+            _scrollView = null;
         }
 
         internal void OnBlur() => Dismiss();
@@ -59,6 +62,7 @@ namespace UnityMCP.Editor.Chat
             if (_items.Count == 0) return;
             _selectedIndex = (_selectedIndex + 1) % _items.Count;
             HighlightSelected();
+            ScrollToSelected();
         }
 
         internal void MoveUp()
@@ -66,6 +70,7 @@ namespace UnityMCP.Editor.Chat
             if (_items.Count == 0) return;
             _selectedIndex = (_selectedIndex - 1 + _items.Count) % _items.Count;
             HighlightSelected();
+            ScrollToSelected();
         }
 
         private void Rebuild()
@@ -75,27 +80,34 @@ namespace UnityMCP.Editor.Chat
             _root = new VisualElement();
             _root.AddToClassList("slash-popup");
 
-            for (int i = 0; i < _items.Count && i < MaxVisible; i++)
+            _scrollView = new ScrollView(ScrollViewMode.Vertical);
+            _scrollView.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+
+            for (int i = 0; i < _items.Count; i++)
             {
                 var idx = i;
                 var item = new Label(_items[i].Name);
                 item.AddToClassList("slash-item");
                 if (i == _selectedIndex) item.AddToClassList("slash-item--selected");
                 item.RegisterCallback<ClickEvent>(_ => Apply(_items[idx]));
-                _root.Add(item);
+                _scrollView.Add(item);
             }
+
+            _root.Add(_scrollView);
             _anchor.Add(_root);
         }
 
         private void HighlightSelected()
         {
-            if (_root == null) return;
-            int shown = System.Math.Min(_items.Count, MaxVisible);
-            for (int i = 0; i < shown; i++)
-            {
-                var child = _root[i];
-                child.EnableInClassList("slash-item--selected", i == _selectedIndex);
-            }
+            if (_scrollView == null) return;
+            for (int i = 0; i < _scrollView.childCount; i++)
+                _scrollView[i].EnableInClassList("slash-item--selected", i == _selectedIndex);
+        }
+
+        private void ScrollToSelected()
+        {
+            if (_scrollView?.panel == null || _selectedIndex < 0 || _selectedIndex >= _scrollView.childCount) return;
+            _scrollView.ScrollTo(_scrollView[_selectedIndex]);
         }
     }
 }

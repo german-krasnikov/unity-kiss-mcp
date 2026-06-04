@@ -665,3 +665,65 @@
     background-color: var(--unity-colors-highlight-background);
     color: var(--unity-colors-highlight-text);
 }
+
+/* ── Light-skin color overrides ──
+   Applied when EditorGUIUtility.isProSkin == false (C# adds chat-root--light class).
+   Only overrides the hardcoded hex/rgba colors that wash out on a white background.
+   All --unity-colors-* variables already adapt; only literal colors need overrides. */
+
+/* green: #4CAF50 → #2E7D32 */
+.chat-root--light .tool-chip-label                                    { color: #2E7D32; }
+.chat-root--light .tool-group .unity-foldout__text                    { color: #2E7D32; }
+.chat-root--light .tool-detail-header                                 { color: #2E7D32; }
+
+/* green foldout checkmark tint */
+.chat-root--light .tool-group > .unity-foldout__toggle > .unity-foldout__checkmark {
+    -unity-background-image-tint-color: #2E7D32;
+}
+
+/* green rgba chip backgrounds: rgba(76,175,80,…) → rgba(46,125,50,…) */
+.chat-root--light .tool-chip {
+    background-color: rgba(46, 125, 50, 0.08);
+    border-color:     rgba(46, 125, 50, 0.2);
+}
+.chat-root--light .tool-chip--expanded      { background-color: rgba(46, 125, 50, 0.12); }
+.chat-root--light .tool-detail              { border-top-color: rgba(46, 125, 50, 0.2); }
+.chat-root--light .tool-group              {
+    background-color: rgba(46, 125, 50, 0.06);
+    border-color:     rgba(46, 125, 50, 0.15);
+}
+.chat-root--light .tool-group-body          { border-left-color: rgba(46, 125, 50, 0.2); }
+
+/* red rgba: rgba(244,67,54,…) → rgba(211,47,47,…) */
+.chat-root--light .tool-chip--error         {
+    background-color: rgba(211, 47, 47, 0.08);
+    border-color:     rgba(211, 47, 47, 0.2);
+}
+.chat-root--light .tool-group--has-error    {
+    background-color: rgba(211, 47, 47, 0.06);
+    border-color:     rgba(211, 47, 47, 0.15);
+}
+.chat-root--light .tool-group--has-error .tool-group-body {
+    border-left-color: rgba(211, 47, 47, 0.2);
+}
+.chat-root--light .tool-detail-result--error { background-color: rgba(211, 47, 47, 0.06); }
+
+/* blue rgba obj-chip: rgba(66,133,244,…) → rgba(25,118,210,…) */
+.chat-root--light .obj-chip {
+    background-color: rgba(25, 118, 210, 0.1);
+    border-color:     rgba(25, 118, 210, 0.25);
+}
+
+/* amber flowbar receiving: #e0a050 → #c77c00 */
+.chat-root--light .flowbar__fill--receiving { background-color: #c77c00; }
+
+/* amber restore button: #e6a23c → #b7791f; rgba(230,162,60,…) → rgba(183,121,31,…) */
+.chat-root--light .chat-btn--restore {
+    background-color: rgba(183, 121, 31, 0.15);
+    border-color:     rgba(183, 121, 31, 0.55);
+    color: #b7791f;
+}
+.chat-root--light .chat-btn--restore:hover {
+    background-color: rgba(183, 121, 31, 0.28);
+    border-color:     rgba(183, 121, 31, 0.8);
+}

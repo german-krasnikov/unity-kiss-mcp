@@ -51,10 +51,10 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = ChipContextResolver.ResolveOne("/Hero", ChipDepth.Summary);
 
-            // Must contain path and component type, enclosed in brackets
+            // Must contain path and component type, enclosed in brackets, with correct tag
+            StringAssert.StartsWith("[Context:", result);
             StringAssert.Contains("/Hero", result);
             StringAssert.Contains("BoxCollider", result);
-            Assert.IsTrue(result.StartsWith("["), "Should start with '['");
         }
 
         [Test]
@@ -169,7 +169,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void Summary_Format_MatchesSelectionSummary()
+        public void Summary_Format_IsStructurallyValid()
         {
             var go = MakeGo("Check");
             go.AddComponent<BoxCollider>();

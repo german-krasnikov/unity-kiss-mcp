@@ -11,8 +11,6 @@ namespace UnityMCP.Editor.Chat
     [InitializeOnLoad]
     internal static class ChatSettingsSection
     {
-        private const string PrefKey = "UnityMCP_Chat_ClaudePath";
-
         static ChatSettingsSection()
         {
             ChatSettingsHook.OnBuild += AppendSection;
@@ -31,13 +29,13 @@ namespace UnityMCP.Editor.Chat
             foldout.Add(pathHint);
 
             var pathField = new TextField("Override Path")
-                { value = EditorPrefs.GetString(PrefKey, "") };
+                { value = EditorPrefs.GetString(ChatBinaryResolver.PrefKey, "") };
             pathField.RegisterValueChangedCallback(e =>
             {
                 if (string.IsNullOrEmpty(e.newValue))
-                    EditorPrefs.DeleteKey(PrefKey);
+                    EditorPrefs.DeleteKey(ChatBinaryResolver.PrefKey);
                 else
-                    EditorPrefs.SetString(PrefKey, e.newValue);
+                    EditorPrefs.SetString(ChatBinaryResolver.PrefKey, e.newValue);
                 ChatBinaryResolver.Resolve(forceRefresh: true);
             });
             foldout.Add(pathField);

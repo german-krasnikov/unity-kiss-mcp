@@ -147,5 +147,24 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsFalse(SelectionSummary.ShouldPrepend(_go, chips));
             _go = null;
         }
+
+        // ── #21: tagged overload ─────────────────────────────────────────────
+
+        [Test]
+        public void Summarize_WithTag_UsesCustomPrefix()
+        {
+            _go = new GameObject("Tagged");
+            var result = SelectionSummary.Summarize(_go, "Context");
+            StringAssert.StartsWith("[Context:", result);
+            StringAssert.EndsWith("]", result);
+        }
+
+        [Test]
+        public void Summarize_DefaultTag_UsesSelection()
+        {
+            _go = new GameObject("Default");
+            var result = SelectionSummary.Summarize(_go);
+            StringAssert.StartsWith("[Selection:", result);
+        }
     }
 }
