@@ -55,7 +55,10 @@ Name #InstanceID [Component1,Component2] !
 
 ### `search_scene`
 
-**Parameters:** `query` (required)
+**Parameters:**
+- `query` (required) — search expression
+- `root` (optional) — scope search to subtree (object path); `None` searches whole scene
+- `limit` (optional, default 50) — cap results; `0` = unlimited. Default not sent over wire for token savings.
 
 Search GameObject hierarchy by name, component, tag, layer, active state.
 
@@ -74,7 +77,15 @@ search_scene(query="Player")
 search_scene(query="t:Light active=true")
 → Directional Light #1200 [Light]
   Spotlight #1201 [Light]
+
+# Scoped search — within subtree, limit results
+search_scene(query="t:Renderer", root="/Level/Cave", limit=10)
+→ Rock_1 #4050 [Renderer]
+  Rock_2 #4051 [Renderer]
+  ...+8 more (limit=10)
 ```
+
+**Overflow marker:** When results exceed limit, the final line is `...+{N} more (limit={L})` showing remaining count.
 
 ## TDD Scenarios
 
