@@ -84,12 +84,10 @@ namespace UnityMCP.Editor.Chat
                 args.Add(model);
             }
 
-            // Args go through Process argv (not shell) — whitespace-split is safe; no shell injection risk.
+            // ArgTokenizer handles quoted spans: --append-system-prompt "be terse" stays 2 tokens.
             if (!string.IsNullOrEmpty(extraArgs))
-            {
-                foreach (var token in extraArgs.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                foreach (var token in ArgTokenizer.Split(extraArgs))
                     args.Add(token);
-            }
 
             return (args.ToArray(), new[] { "ANTHROPIC_API_KEY" });
         }

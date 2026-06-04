@@ -54,12 +54,10 @@ namespace UnityMCP.Editor.Chat
             args.Add("-c");
             args.Add($"mcp_servers.unity.startup_timeout_sec={startupTimeoutSec}");
 
-            // Args go through Process argv (not shell) — whitespace-split is safe; no shell injection risk.
+            // ArgTokenizer handles quoted spans: --flag "multi word" stays 2 tokens.
             if (!string.IsNullOrEmpty(extraArgs))
-            {
-                foreach (var token in extraArgs.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
+                foreach (var token in ArgTokenizer.Split(extraArgs))
                     args.Add(token);
-            }
 
             // Prompt is always the last positional argument
             if (!string.IsNullOrEmpty(prompt))

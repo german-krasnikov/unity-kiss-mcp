@@ -17,8 +17,7 @@ namespace UnityMCP.Editor.Chat
         private int  _inflightGroupId = -1;
         private bool _turnInFlight;
 
-        // Increments each time OnTurnStart is called — lets RestoreButton know
-        // that the captured generation is stale and must disable itself.
+        // No longer gates RestoreButton (uses turn index); kept for API compat.
         public int CurrentGeneration { get; private set; }
 
         public bool HasRestorableGroup => _turns.Count > 0;

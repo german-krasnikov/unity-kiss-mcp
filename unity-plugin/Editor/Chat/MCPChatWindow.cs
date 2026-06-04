@@ -165,9 +165,9 @@ namespace UnityMCP.Editor.Chat
 
         private void CreateBackend() => CreateBackendWithSession(null);
 
-        private void CreateBackendWithSession(string resumeSessionId)
+        private void CreateBackendWithSession(string resumeSessionId, BackendConfigStore store = null)
         {
-            var store = BackendConfigStore.Load();
+            store ??= BackendConfigStore.Load();
             switch (_selectedKind)
             {
                 case BackendKind.Codex:
@@ -193,10 +193,13 @@ namespace UnityMCP.Editor.Chat
             if (!_activity.CanSend) return; // #6: no re-entrant send during active turn
             _autoFix.Disarm(); // user manually sending — cancel any pending auto-fix
 
+            // Load once here — AppendChipContext and CreateBackendWithSession both need it.
+            var store = BackendConfigStore.Load();
+
             // F5: strip U+FFFC markers from displayed text before trimming
             var rawText = _input.value ?? "";
             var text    = rawText.Replace(InlineChipTracker.Marker.ToString(), "").Trim();
-            AppendChipContext(ref text);
+            AppendChipContext(ref text, store);
             if (string.IsNullOrEmpty(text)) return;
 
             DispatchTurn(UserTurnBuilder.Build(text), text);
@@ -210,14 +213,16 @@ namespace UnityMCP.Editor.Chat
             var capturePath = MultiViewCapture.CaptureToFile(target);
             if (string.IsNullOrEmpty(capturePath)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
             var bytes = File.ReadAllBytes(capturePath);
+            var store = BackendConfigStore.Load();
             // F5: strip markers from displayed text
             var text = (_input.value ?? "").Replace(InlineChipTracker.Marker.ToString(), "").Trim();
-            AppendChipContext(ref text);
+            AppendChipContext(ref text, store);
             DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: capturePath);
         }
 
         // F10: merge strip chips + inline chips, emit typed bracket format honouring ChipConfig.
-        private void AppendChipContext(ref string text)
+        // store is pre-loaded by the caller to avoid a double file-read per send.
+        private void AppendChipContext(ref string text, BackendConfigStore store = null)
         {
             // Start with strip chips (full ChipData).
             var chips = CollectChipData();
@@ -238,7 +243,7 @@ namespace UnityMCP.Editor.Chat
 
             if (chips.Count == 0) return;
             // F10: typed emission — [kind:ref] bracket format, per-kind depth from config.
-            var cfg     = BackendConfigStore.Load().Chips;
+            var cfg     = (store ?? BackendConfigStore.Load()).Chips;
             var context = ChipContextResolver.ResolveAllTyped(chips, cfg);
             if (!string.IsNullOrEmpty(context)) text += "\n" + context;
         }
