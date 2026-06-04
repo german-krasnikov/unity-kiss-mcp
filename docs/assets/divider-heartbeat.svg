@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 48" width="1200" height="48" role="img" aria-label="heartbeat divider">
+  <defs>
+    <linearGradient id="hb-fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%"   stop-color="#1a1a2e"/>
+      <stop offset="8%"   stop-color="#3ad29f" stop-opacity="0.5"/>
+      <stop offset="50%"  stop-color="#3ad29f"/>
+      <stop offset="92%"  stop-color="#3ad29f" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1a1a2e"/>
+    </linearGradient>
+    <filter id="hb-glow" x="-2%" y="-120%" width="104%" height="340%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="dot-glow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      /* CSS fallback keyframes for wider compat */
+      @keyframes hb-draw {
+        from { stroke-dashoffset: 1400; }
+        to   { stroke-dashoffset: -1400; }
+      }
+      @keyframes qrs-flash {
+        0%,35%,55%,100% { opacity: 0; r: 3; }
+        43%             { opacity: .9; r: 6; }
+        50%             { opacity: .5; r: 4; }
+      }
+      @keyframes qrs-flash2 {
+        0%,77%,97%,100% { opacity: 0; r: 3; }
+        85%             { opacity: .9; r: 6; }
+        92%             { opacity: .5; r: 4; }
+      }
+      .hb-sweep { animation: hb-draw 4s linear infinite; }
+      .qrs-dot  { animation: qrs-flash  4s linear infinite; }
+      .qrs-dot2 { animation: qrs-flash2 4s linear infinite; }
+    </style>
+    <!-- The ECG path (two QRS complexes): total path length ~1380px -->
+    <!-- Segment: flat→P→flat→QRS→flat→T→flat→QRS→flat (repeated) -->
+  </defs>
+
+  <rect width="1200" height="48" fill="#1a1a2e"/>
+
+  <!-- static base trace (dim, always visible) -->
+  <path d="M 0,24
+    L 140,24
+    Q 165,24 175,21 Q 185,18 195,24
+    L 270,24
+    L 300,24 L 315,22 L 330,40 L 348,6 L 366,38 L 380,24
+    L 460,24
+    Q 490,24 510,19 Q 530,14 550,24
+    L 660,24
+    L 700,24
+    Q 725,24 735,21 Q 745,18 755,24
+    L 830,24
+    L 860,24 L 875,22 L 890,40 L 908,6 L 926,38 L 940,24
+    L 1020,24
+    Q 1050,24 1070,19 Q 1090,14 1110,24
+    L 1200,24"
+    fill="none" stroke="#3ad29f" stroke-width="1" stroke-opacity="0.18" stroke-linecap="round"/>
+
+  <!-- animated drawing sweep (CSS + SMIL both) -->
+  <path d="M 0,24
+    L 140,24
+    Q 165,24 175,21 Q 185,18 195,24
+    L 270,24
+    L 300,24 L 315,22 L 330,40 L 348,6 L 366,38 L 380,24
+    L 460,24
+    Q 490,24 510,19 Q 530,14 550,24
+    L 660,24
+    L 700,24
+    Q 725,24 735,21 Q 745,18 755,24
+    L 830,24
+    L 860,24 L 875,22 L 890,40 L 908,6 L 926,38 L 940,24
+    L 1020,24
+    Q 1050,24 1070,19 Q 1090,14 1110,24
+    L 1200,24"
+    fill="none" stroke="url(#hb-fade)" stroke-width="2" stroke-linecap="round"
+    stroke-dasharray="160 1400" class="hb-sweep" filter="url(#hb-glow)">
+    <!-- SMIL fallback -->
+    <animate attributeName="stroke-dashoffset" values="1400;-1400" dur="4s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- QRS peak flash #1 @ x=348,y=6 -->
+  <circle cx="348" cy="6" r="3" fill="#e94560" class="qrs-dot" filter="url(#dot-glow)">
+    <animate attributeName="opacity" values="0;0;0;0.9;0.5;0;0" keyTimes="0;0.35;0.40;0.43;0.50;0.55;1" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="r"       values="3;3;3;6;4;3;3"     keyTimes="0;0.35;0.40;0.43;0.50;0.55;1" dur="4s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- QRS peak flash #2 @ x=908,y=6 -->
+  <circle cx="908" cy="6" r="3" fill="#e94560" class="qrs-dot2" filter="url(#dot-glow)">
+    <animate attributeName="opacity" values="0;0;0;0.9;0.5;0;0" keyTimes="0;0.77;0.82;0.85;0.92;0.97;1" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="r"       values="3;3;3;6;4;3;3"     keyTimes="0;0.77;0.82;0.85;0.92;0.97;1" dur="4s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- scanning dot that rides the trace -->
+  <circle r="3.5" fill="#3ad29f" filter="url(#dot-glow)">
+    <animateMotion dur="4s" repeatCount="indefinite" rotate="auto">
+      <mpath href="#hb-scan-path"/>
+    </animateMotion>
+    <animate attributeName="opacity" values="0;0.9;0.9;0" keyTimes="0;0.05;0.95;1" dur="4s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- hidden path for animateMotion (same ECG shape) -->
+  <path id="hb-scan-path" d="M 0,24
+    L 140,24
+    Q 165,24 175,21 Q 185,18 195,24
+    L 270,24
+    L 300,24 L 315,22 L 330,40 L 348,6 L 366,38 L 380,24
+    L 460,24
+    Q 490,24 510,19 Q 530,14 550,24
+    L 660,24
+    L 700,24
+    Q 725,24 735,21 Q 745,18 755,24
+    L 830,24
+    L 860,24 L 875,22 L 890,40 L 908,6 L 926,38 L 940,24
+    L 1020,24
+    Q 1050,24 1070,19 Q 1090,14 1110,24
+    L 1200,24"
+    fill="none" stroke="none" visibility="hidden"/>
+</svg>

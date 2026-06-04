@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 120" width="960" height="120" role="img" aria-label="Unity MCP stats: 89 MCP Tools, 1726 Tests Passing, 80-95% Batch Savings">
+  <defs>
+    <style>
+      .lbl-num  { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; font-size: 36px; font-weight: 700; fill: #ffffff; }
+      .lbl-head { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; font-size: 10px; font-weight: 700; fill: #ccccff; letter-spacing: 1.5px; }
+      .lbl-dim  { font-family: ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace; font-size: 9px; fill: #888899; }
+      @keyframes scan {
+        0%   { transform: translateX(-100px); opacity: 0; }
+        15%  { opacity: .55; }
+        85%  { opacity: .35; }
+        100% { transform: translateX(400px); opacity: 0; }
+      }
+      @keyframes accent-pulse { 0%,100% { opacity:.6; } 50% { opacity:1; } }
+      @keyframes card-glow    { 0%,100% { opacity:.25; } 50% { opacity:.7; } }
+      .scan1 { animation: scan 3s ease-in-out infinite; animation-delay: 0s; }
+      .scan2 { animation: scan 3s ease-in-out infinite; animation-delay: 0.5s; }
+      .scan3 { animation: scan 3s ease-in-out infinite; animation-delay: 1.0s; }
+      .ap1 { animation: accent-pulse 2s ease-in-out infinite; }
+      .ap2 { animation: accent-pulse 2s ease-in-out infinite; animation-delay: .4s; }
+      .ap3 { animation: accent-pulse 2s ease-in-out infinite; animation-delay: .8s; }
+      .cg1 { animation: card-glow 3s ease-in-out infinite; }
+      .cg2 { animation: card-glow 3s ease-in-out infinite; animation-delay: .6s; }
+      .cg3 { animation: card-glow 3s ease-in-out infinite; animation-delay: 1.2s; }
+    </style>
+    <filter id="sg" x="-25%" y="-30%" width="150%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="c1"><rect x="10"  y="8" width="290" height="104" rx="10"/></clipPath>
+    <clipPath id="c2"><rect x="335" y="8" width="290" height="104" rx="10"/></clipPath>
+    <clipPath id="c3"><rect x="660" y="8" width="290" height="104" rx="10"/></clipPath>
+  </defs>
+
+  <rect width="960" height="120" fill="#1a1a2e"/>
+  <line x1="0" y1="60" x2="960" y2="60" stroke="#888899" stroke-opacity="0.05" stroke-width="1"/>
+
+  <!-- ===== CARD 1: Tools ===== -->
+  <rect x="10" y="8" width="290" height="104" rx="10" fill="none" stroke="#3ad29f" stroke-width="8" opacity="0.12" filter="url(#sg)" class="cg1"/>
+  <rect x="10" y="8" width="290" height="104" rx="10" fill="#111125"/>
+  <rect x="10" y="8" width="290" height="104" rx="10" fill="none" stroke="#3ad29f" stroke-width="1.2"/>
+  <g clip-path="url(#c1)">
+    <rect x="10" y="8" width="60" height="104" fill="rgba(58,210,159,0.10)" class="scan1"/>
+  </g>
+  <text x="155" y="60" text-anchor="middle" class="lbl-num"><!-- STAT:TOOLS -->91<!-- /STAT --></text>
+  <text x="155" y="78" text-anchor="middle" class="lbl-head">MCP TOOLS</text>
+  <rect x="120" y="86" width="70" height="2" rx="1" fill="#3ad29f" class="ap1"/>
+
+  <!-- ===== CARD 2: Tests ===== -->
+  <rect x="335" y="8" width="290" height="104" rx="10" fill="none" stroke="#3ad29f" stroke-width="8" opacity="0.12" filter="url(#sg)" class="cg2"/>
+  <rect x="335" y="8" width="290" height="104" rx="10" fill="#111125"/>
+  <rect x="335" y="8" width="290" height="104" rx="10" fill="none" stroke="#3ad29f" stroke-width="1.2"/>
+  <g clip-path="url(#c2)">
+    <rect x="335" y="8" width="60" height="104" fill="rgba(58,210,159,0.10)" class="scan2"/>
+  </g>
+  <text x="480" y="60" text-anchor="middle" class="lbl-num"><!-- STAT:TESTS -->1136<!-- /STAT --></text>
+  <text x="480" y="78" text-anchor="middle" class="lbl-head">TESTS PASSING</text>
+  <rect x="445" y="86" width="70" height="2" rx="1" fill="#3ad29f" class="ap2"/>
+
+  <!-- ===== CARD 3: Savings ===== -->
+  <rect x="660" y="8" width="290" height="104" rx="10" fill="none" stroke="#3ad29f" stroke-width="8" opacity="0.12" filter="url(#sg)" class="cg3"/>
+  <rect x="660" y="8" width="290" height="104" rx="10" fill="#111125"/>
+  <rect x="660" y="8" width="290" height="104" rx="10" fill="none" stroke="#3ad29f" stroke-width="1.2"/>
+  <g clip-path="url(#c3)">
+    <rect x="660" y="8" width="60" height="104" fill="rgba(58,210,159,0.10)" class="scan3"/>
+  </g>
+  <text x="805" y="57" text-anchor="middle" class="lbl-num">80–95%</text>
+  <text x="805" y="75" text-anchor="middle" class="lbl-head">BATCH SAVINGS</text>
+  <text x="805" y="90" text-anchor="middle" class="lbl-dim">token reduction per batch</text>
+  <rect x="770" y="82" width="70" height="2" rx="1" fill="#3ad29f" class="ap3"/>
+
+</svg>
