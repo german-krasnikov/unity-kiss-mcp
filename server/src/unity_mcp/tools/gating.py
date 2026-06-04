@@ -18,6 +18,8 @@ _CORE_TOOLS: frozenset[str] = frozenset({
     "editor", "do", "ask",
     # FORCE_VISIBLE connection tools — always must be reachable
     "reconnect_unity", "list_connections",
+    # F4: deferred schema resolution
+    "resolve_tool_schema",
 })
 
 # Themed categories (non-CORE tools only — each tool in exactly one)
@@ -120,6 +122,7 @@ FORCE_VISIBLE: set[str] = {
     "do", "ask", "editor",
     "get_console", "get_compile_errors",
     "reconnect_unity", "list_connections",
+    "resolve_tool_schema",
 }
 
 
@@ -179,6 +182,11 @@ def enable_category(category: str) -> list[str]:
     names = CATEGORIES[category]
     _session_enabled.update(names)
     return sorted(names)
+
+
+def is_deferred(name: str) -> bool:
+    """True if tool should have schema deferred: known but not in _CORE_TOOLS."""
+    return name in _ALL_KNOWN and name not in _CORE_TOOLS
 
 
 def filter_by_tier(tools: list) -> list:

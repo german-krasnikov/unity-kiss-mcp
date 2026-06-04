@@ -249,3 +249,25 @@ def test_unwire_event_hidden_without_enable():
     reset()
     tools = [_make_tool("unwire_event")]
     assert filter_by_tier(tools) == []
+
+
+# --- TDD F4: is_deferred ---
+
+def test_is_deferred_returns_true_for_non_core_known_tool():
+    """A tool in CATEGORIES but not in _CORE_TOOLS is deferred."""
+    from unity_mcp.tools.gating import is_deferred
+    # 'animation' is in CATEGORIES["animation"] but not in _CORE_TOOLS
+    assert is_deferred("animation") is True
+
+
+def test_is_deferred_returns_false_for_core_tool():
+    """A CORE tool is not deferred."""
+    from unity_mcp.tools.gating import is_deferred
+    assert is_deferred("get_hierarchy") is False
+    assert is_deferred("batch") is False
+
+
+def test_is_deferred_returns_false_for_unknown_plugin_tool():
+    """Unknown tools (not in _ALL_KNOWN) pass through — not deferred."""
+    from unity_mcp.tools.gating import is_deferred
+    assert is_deferred("my_totally_unknown_plugin_tool_xyz") is False

@@ -12,7 +12,11 @@ from .lockfile import acquire_lock, release_lock
 from .plugins import load_plugins
 from .tools import register_all
 from mcp.server.fastmcp import Context
-from .tools.gating import filter_by_tier, discover_tools as _discover_tools_impl, TIER1, is_visible, FORCE_VISIBLE, get_catalog
+from .tools.gating import filter_by_tier, discover_tools as _discover_tools_impl, TIER1, is_visible, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
+from .tools.schema_registry import _registry as _schema_registry, STUB_SCHEMA
+
+# FORCE_VISIBLE ⊆ _CORE_TOOLS, so the union equals _CORE_TOOLS — precomputed once.
+_SCHEMA_KEEP_FULL: frozenset[str] = _CORE_TOOLS
 
 # Re-export tool functions for test imports
 from .tools.scene import (
@@ -274,12 +278,40 @@ async def discover_tools(category: str | None = None, enable: bool = True, ctx: 
 from .resources import register as register_resources
 register_resources(mcp, _send, _args)
 
+
+@mcp.tool()
+async def resolve_tool_schema(tools: str) -> str:
+    """Return full parameter schemas for deferred tools. tools=comma-separated names."""
+    names = [n.strip() for n in tools.split(",") if n.strip()]
+    text = _schema_registry.format_text(names)
+    if not text:
+        unknown = ", ".join(names)
+        return f"No schema found for: {unknown}"
+    return text
+
+
 # --- Dynamic tool filtering based on Unity MCPSettings ---
 
 def _apply_gating(tools: list) -> list:
     if os.environ.get("UNITY_MCP_NO_GATING"):
         return tools
     return filter_by_tier(tools)
+
+
+def _strip_deferred_schemas(tools: list) -> list:
+    """Replace inputSchema of non-core tools with STUB unless UNITY_MCP_FULL_SCHEMAS=1.
+
+    Safe: these are ListTools *response* objects, separate from mcp._tool_manager._tools
+    which holds the callable fn. FastMCP dispatches via _tool_manager (validate_input=False
+    path), so stripping inputSchema here cannot block tool execution.
+    """
+    if os.environ.get("UNITY_MCP_FULL_SCHEMAS", "0") == "1":
+        return tools
+    for t in tools:
+        if t.name not in _SCHEMA_KEEP_FULL:
+            # Fresh dict per tool — avoids shared-singleton mutation bugs
+            t.inputSchema = {"type": "object"}
+    return tools
 
 
 async def _push_catalog(bridge_) -> None:
@@ -326,7 +358,7 @@ async def _filter_tools(tools: list, bridge_) -> list:
     disabled = _disabled_tools_cache
     if disabled:
         result = [t for t in result if t.name not in disabled or t.name in FORCE_VISIBLE]
-    return result
+    return _strip_deferred_schemas(result)
 
 
 _original_handler = mcp._mcp_server.request_handlers[mcp_types.ListToolsRequest]
@@ -334,6 +366,12 @@ _original_handler = mcp._mcp_server.request_handlers[mcp_types.ListToolsRequest]
 
 async def _filtered_tools_handler(req):
     result = await _original_handler(req)
+    # Capture full schemas into registry BEFORE stripping
+    for t in result.root.tools:
+        schema = getattr(t, "inputSchema", None) or {}
+        desc = getattr(t, "description", "") or ""
+        ann = getattr(t, "annotations", None)
+        _schema_registry.capture(t.name, schema, desc, annotations=ann)
     result.root.tools = await _filter_tools(result.root.tools, slot.bridge if slot else None)
     return result
 

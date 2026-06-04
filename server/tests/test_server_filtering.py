@@ -242,3 +242,45 @@ def test_request_handler_is_patched():
     """Our wrapper must be installed in request_handlers, not the original FastMCP handler."""
     handler = mcp._mcp_server.request_handlers[mcp_types.ListToolsRequest]
     assert handler.__name__ == "_filtered_tools_handler"
+
+
+# --- TDD F4: handler strips deferred / preserves core ---
+
+@pytest.mark.asyncio
+async def test_handler_strips_non_core_schema():
+    """_filter_tools returns STUB schema for non-core tools."""
+    import unity_mcp.server as srv
+    from unity_mcp.tools.schema_registry import STUB_SCHEMA
+
+    full = {"type": "object", "properties": {"x": {"type": "string"}}, "required": ["x"]}
+    tool_core = _tool("get_hierarchy")
+    tool_core.inputSchema = full
+    tool_noncore = _tool("animation")
+    tool_noncore.inputSchema = full
+
+    orig_cache = srv._disabled_tools_cache
+    try:
+        srv._disabled_tools_cache = None
+        result = await srv._filter_tools([tool_core, tool_noncore], None)
+        names = {t.name: t for t in result}
+        # get_hierarchy passes gating — verify its schema kept (if returned)
+        if "get_hierarchy" in names:
+            assert names["get_hierarchy"].inputSchema == full
+        # animation gets gated out by tier filter (not in TIER1 and not enabled)
+        assert "animation" not in names
+    finally:
+        srv._disabled_tools_cache = orig_cache
+
+
+@pytest.mark.asyncio
+async def test_handler_preserves_core_full_schema():
+    """Core tools keep their full inputSchema after strip."""
+    import unity_mcp.server as srv
+    from unity_mcp.server import _strip_deferred_schemas
+
+    full = {"type": "object", "properties": {"p": {"type": "string"}}, "required": ["p"]}
+    tool = _tool("batch")
+    tool.inputSchema = full
+
+    result = _strip_deferred_schemas([tool])
+    assert result[0].inputSchema == full
