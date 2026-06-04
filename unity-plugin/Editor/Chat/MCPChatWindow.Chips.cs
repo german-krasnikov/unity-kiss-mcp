@@ -17,6 +17,9 @@ namespace UnityMCP.Editor.Chat
         private void OnDragPerform(DragPerformEvent e)
         {
             DragAndDrop.AcceptDrag();
+            // F5: if drop lands inside the text field → inline chip; else strip chip
+            bool dropOnField = _input != null && _input.worldBound.Contains(e.mousePosition);
+
             foreach (var obj in DragAndDrop.objectReferences)
             {
                 if (obj == null) continue;
@@ -24,7 +27,10 @@ namespace UnityMCP.Editor.Chat
                 // Scene GameObject (not an asset).
                 if (obj is GameObject go && !AssetDatabase.Contains(go))
                 {
-                    AddChip(go, ComponentSerializer.GetPath(go), go.name);
+                    if (dropOnField)
+                        InsertInlineChip(go, ComponentSerializer.GetPath(go), go.name);
+                    else
+                        AddChip(go, ComponentSerializer.GetPath(go), go.name);
                     continue;
                 }
 
@@ -33,7 +39,12 @@ namespace UnityMCP.Editor.Chat
                 {
                     var assetPath = AssetDatabase.GetAssetPath(obj);
                     if (!string.IsNullOrEmpty(assetPath))
-                        AddChip(obj, assetPath, obj.name);
+                    {
+                        if (dropOnField)
+                            InsertInlineChip(obj, assetPath, obj.name);
+                        else
+                            AddChip(obj, assetPath, obj.name);
+                    }
                 }
                 else if (!(obj is GameObject)) // not a scene GO, not an allowlisted asset
                     Debug.LogWarning($"[MCP Chat] {obj.GetType().Name} not supported as a context chip");

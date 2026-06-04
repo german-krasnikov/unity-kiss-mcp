@@ -24,13 +24,15 @@ namespace UnityMCP.Editor.Chat
         internal bool _turnEditedCode;
         internal bool _turnHasToolCalls;
         internal bool _autoScrollEnabled = true;
-        private TextField     _input;
-        private Label         _tokenReadout;
-        private Button        _askBtn, _agentBtn;
-        private VisualElement _objChipStrip;
-        private VisualElement _inputArea;
-        private ScrollView    _scroll;
-        private InputHeightCalc _heightCalc = new InputHeightCalc();
+        private TextField          _input;
+        private Label              _tokenReadout;
+        private Button             _askBtn, _agentBtn;
+        private VisualElement      _objChipStrip;
+        private VisualElement      _inputArea;
+        private ScrollView         _scroll;
+        private InputHeightCalc    _heightCalc = new InputHeightCalc();
+        private InlineChipTracker  _chipTracker;
+        private InlineChipOverlay  _chipOverlay;
 
         [MenuItem("MCP/Chat", priority = 0)]
         public static void ShowWindow()
@@ -129,9 +131,79 @@ namespace UnityMCP.Editor.Chat
             area.Add(_objChipStrip);
             _input = new TextField { multiline = true }; _input.AddToClassList("chat-input");
             area.Add(_input);
+
+            // F5: inline chip overlay (absolute-positioned row of pills over the TextField)
+            _chipTracker = new InlineChipTracker();
+            _chipOverlay = new InlineChipOverlay(_input, _chipTracker);
+            _chipOverlay.SetRemoveCallback(RemoveInlineChipAt);
+            _chipOverlay.AttachTo(area);
+            InlineChipKeyHandler.Attach(_input, _chipTracker, _chipOverlay);
+
+            // Context-menu: right-click the input → "Add Selection to Context"
+            _input.AddManipulator(new ContextualMenuManipulator(evt =>
+            {
+                evt.menu.AppendAction("Add Selection to Context",
+                    _ => InsertInlineChip(UnityEditor.Selection.activeGameObject),
+                    _ => UnityEditor.Selection.activeGameObject != null
+                        ? DropdownMenuAction.Status.Normal
+                        : DropdownMenuAction.Status.Disabled);
+            }));
+
             EnterKeySend.Attach(_input, OnSend);
             area.Add(BuildFooterBar());
             return area;
+        }
+
+        /// <summary>Insert a chip marker at the cursor in _input and record ChipData.</summary>
+        internal void InsertInlineChip(UnityEngine.GameObject go)
+        {
+            if (go == null) return;
+            var path = ComponentSerializer.GetPath(go);
+            InsertInlineChip(go, path, go.name);
+        }
+
+        internal void InsertInlineChip(UnityEngine.Object cap, string path, string displayName)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            var cur   = _input.value ?? "";
+            var caret = Mathf.Clamp(_input.cursorIndex, 0, cur.Length);
+            // Insert marker char at caret position
+            _input.value = cur.Substring(0, caret)
+                         + InlineChipTracker.Marker
+                         + cur.Substring(caret);
+            // Move caret past the inserted marker
+            _input.SelectRange(caret + 1, caret + 1);
+
+            var instanceID = cap != null ? cap.GetInstanceID() : 0;
+            _chipTracker.Add(new ChipData(path, displayName, instanceID));
+            _chipOverlay.Refresh();
+            _input.Focus();
+            UpdateAutoHeight();
+        }
+
+        private void RemoveInlineChipAt(int chipIndex)
+        {
+            if (chipIndex < 0 || chipIndex >= _chipTracker.Count) return;
+
+            // Find and remove the chipIndex-th U+FFFC marker from the text.
+            // Setting _input.value triggers ValueChangedCallback which calls SyncToText,
+            // so tracker + overlay are updated there — do NOT touch them here.
+            var text = _input.value ?? "";
+            int nth  = -1;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == InlineChipTracker.Marker)
+                {
+                    nth++;
+                    if (nth == chipIndex)
+                    {
+                        _input.value = text.Remove(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            UpdateAutoHeight();
         }
 
         private void SetMode(bool agentMode)
@@ -174,11 +246,18 @@ namespace UnityMCP.Editor.Chat
         {
             if (!_activity.CanSend) return; // #6: no re-entrant send during active turn
             _autoFix.Disarm(); // user manually sending — cancel any pending auto-fix
-            var text  = _input.value?.Trim() ?? "";
-            var chips = CollectChipPaths();
+
+            // F5: strip U+FFFC markers from displayed text before trimming
+            var rawText = _input.value ?? "";
+            var text    = rawText.Replace(InlineChipTracker.Marker.ToString(), "").Trim();
+            var chips   = CollectChipPaths();
+
+            // F5: merge inline chip paths (deduplicated, strip-strip chips already in chips)
+            foreach (var p in _chipTracker.Paths)
+                if (!chips.Contains(p)) chips.Add(p);
 
             // #3 Auto-include selection: prepend summary line if not already a chip.
-            var selGo  = Selection.activeGameObject;
+            var selGo   = Selection.activeGameObject;
             var chipSet = new HashSet<string>(chips);
             if (SelectionSummary.ShouldPrepend(selGo, chipSet))
                 text = SelectionSummary.Summarize(selGo) + "\n" + text;
@@ -194,13 +273,16 @@ namespace UnityMCP.Editor.Chat
             if (!_activity.CanSend) return; // #6: guard second vector — SS button also dispatches a turn
             var target = Selection.activeGameObject;
             if (target == null) { Debug.LogWarning("[MCP Chat] Select a GameObject first"); return; }
-            var path = MultiViewCapture.CaptureToFile(target);
-            if (string.IsNullOrEmpty(path)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
-            var bytes  = File.ReadAllBytes(path);
-            var text   = _input.value?.Trim() ?? "";
-            var chips  = CollectChipPaths();
+            var capturePath = MultiViewCapture.CaptureToFile(target);
+            if (string.IsNullOrEmpty(capturePath)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
+            var bytes = File.ReadAllBytes(capturePath);
+            // F5: strip markers from displayed text
+            var text  = (_input.value ?? "").Replace(InlineChipTracker.Marker.ToString(), "").Trim();
+            var chips = CollectChipPaths();
+            foreach (var p in _chipTracker.Paths)
+                if (!chips.Contains(p)) chips.Add(p);
             if (chips.Count > 0) text += "\n" + ChipContextResolver.ResolveAll(chips);
-            DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: path);
+            DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: capturePath);
         }
 
         // Shared send sequence — OnSend and AttachScreenshot must not drift from each other.
@@ -218,6 +300,9 @@ namespace UnityMCP.Editor.Chat
             _backend.SendTurn(turnJson);
             _input.value = ""; _input.cursorIndex = _input.selectIndex = 0;
             _objChipStrip.Clear();
+            // F5: clear inline chips
+            _chipTracker?.Clear();
+            _chipOverlay?.Refresh();
             _heightCalc.Reset();
             ResetInputAreaHeight();
             if (_activity.Send()) OnActivityChanged();
@@ -235,12 +320,12 @@ namespace UnityMCP.Editor.Chat
         private void AddRefToContext(string refPath)
         {
             if (string.IsNullOrEmpty(refPath)) return;
-            var current = _input.value ?? "";
-            var sep     = current.Length > 0 && !current.EndsWith(" ") ? " " : "";
-            _input.value = current + sep + refPath + " ";
-            _input.Focus();
-            _input.SelectRange(_input.value.Length, _input.value.Length);
-            UpdateAutoHeight();
+            // F5: use inline chip so ref is visually represented as a pill
+            // DisplayName = last segment of path (after last '/')
+            var display = refPath.Contains("/")
+                ? refPath.Substring(refPath.LastIndexOf('/') + 1)
+                : refPath;
+            InsertInlineChip(null, refPath, display);
         }
     }
 }
