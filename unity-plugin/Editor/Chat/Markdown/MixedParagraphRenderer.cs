@@ -65,6 +65,7 @@ namespace UnityMCP.Editor.Chat
                 provider?.Navigate(capturedRef);
             });
 
+            ChipPillFactory.AttachAddToContextMenu(pill, chip);
             return pill;
         }
     }

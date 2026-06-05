@@ -43,7 +43,9 @@ namespace UnityMCP.Editor.Chat
             {
                 if (seg.IsChip)
                 {
-                    wrap.Add(ChipPillFactory.Build(seg.Chip));
+                    var pill = ChipPillFactory.Build(seg.Chip);
+                    ChipPillFactory.AttachAddToContextMenu(pill, seg.Chip);
+                    wrap.Add(pill);
                     any = true;
                 }
                 else if (!string.IsNullOrWhiteSpace(seg.Text))
@@ -70,7 +72,12 @@ namespace UnityMCP.Editor.Chat
             if (hasChips)
             {
                 var strip = new VisualElement(); strip.AddToClassList("user-chip-strip");
-                foreach (var c in chips) strip.Add(ChipPillFactory.Build(c));
+                foreach (var c in chips)
+                {
+                    var p = ChipPillFactory.Build(c);
+                    ChipPillFactory.AttachAddToContextMenu(p, c);
+                    strip.Add(p);
+                }
                 bubble.Add(strip);
             }
             var dt = hasChips ? UserTextCleaner.Strip(text) : text;
@@ -114,14 +121,13 @@ namespace UnityMCP.Editor.Chat
             {
                 var raw        = _assistantRaw.ToString();
                 var normalized = AtMentionNormalizer.Normalize(raw, _lastTurnChips);
+                normalized     = BareNameNormalizer.Normalize(normalized, _lastTurnChips);
                 if (normalized != raw)
                 {
                     _assistantRaw.Clear(); _assistantRaw.Append(normalized);
                     // Re-render all blocks since normalization changed text
                     _assistantBubble.Clear();
                     _committed = 0;
-                    _liveTail = null;
-                    _liveTailSrc = null;
                 }
             }
             RenderProgressive(final: true);
