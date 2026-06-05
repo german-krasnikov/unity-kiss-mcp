@@ -204,6 +204,8 @@ unity-kiss-mcp/
 │       │   ├── CompileAutoFix.cs          # Auto-retry on compile
 │       │   ├── EditorStateSnapshot.cs     # Context block injection
 │       │   ├── ToolPing.cs                # Flash object on tool-call
+│       │   ├── HierarchyContextMenu.cs    # Right-click Hierarchy GameObject → Add to Chat Context (F16a)
+│       │   ├── ComponentContextMenu.cs    # Right-click Component → Add to Chat Context (F16b)
 │       │   ├── ChipContextResolver.cs     # Resolve chips + emit typed (F10)
 │       │   ├── MCPChatWindow.Approve.cs   # Event handler (F3 gate)
 │       │   ├── ApproveHelper.cs           # Session management

@@ -255,6 +255,14 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **InlineChipField @mention Injection:** `AddChip()` inserts "@DisplayName " at cursor; `RemoveChipAt()` strips corresponding @mention text. `InlineChipModel.AdjustOffsetsAfterTextChangeInclusive` adjusts chip offsets for TextField mutations. MCPChatWindow.Send.cs uses BuildFromRaw instead of Build.
 - **Tests:** 201 BareNameNormalizerTests (16/17 fenced-block edge cases + lowercase match + bare-name cycle tests). ChipTextInterleaverTests expanded to 186 tests (R1–R5 BuildFromRaw coverage + @mention spacing edge cases). AssistantBubbleNormalizationTests (68 tests for frozen-bubble normalization flow). PillContextMenuTests (93 tests for right-click injection). New E2E chips integration: M1–M10 (interleaver), E2E_1–E2E_3 (normalization in bubble). 1586/1591 EditMode pass (5 pre-existing reds).
 
+### Context Menus + Linker Streaming Fix (v0.17.17 F15a-F19)
+- **HierarchyContextMenu.cs** — Menu item `GameObject/Add to Chat Context`. Right-click any GameObject in the Hierarchy window, option appears to inject the selected object as a chip into the chat input. Includes validation to ensure the object is valid before injection.
+- **ComponentContextMenu.cs** — Menu item `CONTEXT/Component/Add to Chat Context`. Right-click any Component in the Inspector, option appears to inject the parent GameObject as a chip into the chat input. Includes validation before injection.
+- **Scene Linker Streaming Disable (F15b):** `SceneNameLinker` disabled during AI response streaming by setting `MarkdownInline.Linker = null` in `ChatTranscript.BeginAssistant()`, restored in `FreezeAssistantBubble()`. Ensures scene object references render as graphical pills (via `ResponseTagInliner`) rather than live hyperlinks during streaming. Pills remain interactive (click-to-ping/select) without link-processing side effects.
+- **Leading-Space Guard (F15c):** Consolidated space-handling in `InlineChipField.AddChip()`, `InsertChipAt()`, `InjectMentionAt()` via `prependSpace` parameter. Chips no longer glue to surrounding text; @mention format preserved on round-trip (space before chip, no space after).
+- **Tool-Detail CSS (F19):** Response tool cards now render with correct flex-layout: `tool-chip--expanded { flex-direction: column }` stacks details vertically; `tool-detail { flex-shrink: 0 }` prevents content collapse during overflow.
+- **Tests:** BuildFromRawDefensiveTests (65), ContextMenuTests (102), F15bScenePillPipelineTests (104), F15cSpaceAfterChipTests (76), F19ToolDetailTests (54), MixedParagraphBreakTests additions, SceneObjectNormalizationTests assertions fixed. Total 25 new tests.
+
 ### UX Features (v0.15.0 F1–F10 + v0.15.8 F11 + v0.16.0 F12)
 - **F1 (Token Reset):** TokenResetTests ensure counters reset on backend/model switch
 - **F2 (Cascade Restore):** TurnUndoTracker.RestoreFromIndex() reverts any earlier turn + all later turns (reverse order)
