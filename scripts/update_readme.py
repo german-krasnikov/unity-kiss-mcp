@@ -109,6 +109,72 @@ def parse_latest_changelog(text: str) -> tuple[str, str]:
     return m.group(1).strip(), m.group(2).strip()
 
 
+def generate_changelog_details(text: str, n: int = 5) -> str:
+    """Generate HTML <details> blocks from CHANGELOG.md for README injection.
+
+    Latest n versions get individual <details> blocks.
+    Older versions go into a collapsed "Older releases" list.
+    """
+    parts = re.split(r"(?=^## \[)", text, flags=re.MULTILINE)
+    releases = [p for p in parts if re.match(r"## \[", p)]
+
+    def parse_entry(block: str) -> tuple[str, str, str, str]:
+        """Return (version, date, title, first_sentence)."""
+        header_line = block.splitlines()[0]
+        m = re.match(r"## \[([^\]]+)\]\s*[—–-]\s*([\d-]+)(.*)", header_line)
+        if not m:
+            return "?", "?", "", ""
+        ver, date, rest = m.group(1).strip(), m.group(2).strip(), m.group(3)
+
+        svg_m = re.search(r"<!--\s*svg:\s*(.+?)\s*-->", rest)
+        title = svg_m.group(1) if svg_m else ""
+
+        bullets = [l for l in block.splitlines()[1:] if l.strip().startswith("- ")]
+        first_sentence = ""
+        if bullets:
+            raw = bullets[0].lstrip("- ").strip()
+            # Take up to first ". " or end
+            sent = re.split(r"(?<=\.)\s+(?=[A-Z*\[])", raw, maxsplit=1)[0]
+            first_sentence = sent[:150] + " …" if len(sent) > 150 else sent
+
+        if not title:
+            title = first_sentence[:80] + " …" if len(first_sentence) > 80 else first_sentence
+
+        return ver, date, title, first_sentence
+
+    recent = releases[:n]
+    older = releases[n:]
+
+    blocks: list[str] = []
+    for block in recent:
+        ver, date, title, first_sentence = parse_entry(block)
+        body = first_sentence or title
+        blocks.append(
+            f"<details>\n"
+            f"<summary><b>{ver}</b> — {date} — {title}</summary>\n"
+            f"\n"
+            f"{body}\n"
+            f"\n"
+            f"</details>"
+        )
+
+    if older:
+        items = []
+        for block in older:
+            ver, date, title, _ = parse_entry(block)
+            items.append(f"- **{ver}** — {date} — {title}")
+        older_block = (
+            "<details>\n"
+            "<summary>Older releases</summary>\n"
+            "\n"
+            + "\n".join(items)
+            + "\n\n</details>"
+        )
+        blocks.append(older_block)
+
+    return "\n\n".join(blocks)
+
+
 def extract_changelog_blocks(text: str, n: int = 2, max_bullets: int = 3,
                               max_chars: int = 200) -> list[str]:
     """Extract the latest n release blocks, truncated for README display."""
@@ -281,10 +347,8 @@ def main() -> None:
     readme = update_readme_badges(readme, stats)
 
     # --- changelog injection ---
-    blocks = extract_changelog_blocks(changelog_text, n=2, max_bullets=3)
-    if blocks:
-        changelog_md = "\n\n".join(blocks)
-        readme = inject_changelog_into_readme(readme, changelog_md)
+    changelog_html = generate_changelog_details(changelog_text, n=5)
+    readme = inject_changelog_into_readme(readme, changelog_html)
 
     if readme != original_readme:
         readme_path.write_text(readme, encoding="utf-8")

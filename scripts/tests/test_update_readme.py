@@ -213,3 +213,108 @@ class TestUpdateStatsSvg:
         svg = '<text><!-- STAT:TOOLS -->89<!-- /STAT --></text>'
         result = ur.update_stats_svg(svg, tools=None, tests=None)
         assert result == svg
+
+
+# ---------------------------------------------------------------------------
+# generate_changelog_details
+# ---------------------------------------------------------------------------
+
+SAMPLE_CHANGELOG = """\
+# Changelog
+
+## [v3.0.0] — 2026-06-10 <!-- svg: feature A title -->
+
+- **Feature A** — First sentence. Second sentence.
+- Other bullet.
+
+## [v2.0.0] — 2026-06-09 <!-- svg: feature B title -->
+
+- **Feature B** — Some description here.
+
+## [v1.9.0] — 2026-06-08 <!-- svg: feature C -->
+
+- **Feature C** — Detail.
+
+## [v1.8.0] — 2026-06-07 <!-- svg: feature D -->
+
+- **Feature D** — Detail.
+
+## [v1.7.0] — 2026-06-06 <!-- svg: feature E -->
+
+- **Feature E** — Detail.
+
+## [v1.6.0] — 2026-06-05 <!-- svg: feature F -->
+
+- **Feature F** — older.
+
+## [v1.5.0] — 2026-06-04 <!-- svg: feature G -->
+
+- **Feature G** — even older.
+"""
+
+
+class TestGenerateChangelogDetails:
+    def test_produces_details_blocks(self) -> None:
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG)
+        assert "<details>" in result
+        assert "</details>" in result
+
+    def test_latest_version_present(self) -> None:
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG)
+        assert "v3.0.0" in result
+
+    def test_limits_to_n_recent_with_details(self) -> None:
+        # Default n=5: first 5 get <details>, rest in "Older releases"
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG, n=5)
+        # Count <details> blocks: 5 individual + 1 "Older releases" = 6
+        assert result.count("<details>") == 6
+
+    def test_older_releases_block_present(self) -> None:
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG, n=5)
+        assert "Older releases" in result
+        assert "v1.6.0" in result
+        assert "v1.5.0" in result
+
+    def test_extracts_svg_comment_as_title(self) -> None:
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG)
+        assert "feature A title" in result
+
+    def test_summary_has_version_date_and_title(self) -> None:
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG)
+        assert "<summary><b>v3.0.0</b>" in result
+        assert "2026-06-10" in result
+
+    def test_blank_line_after_summary(self) -> None:
+        # GitHub requires blank line after <summary> for markdown rendering
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG)
+        assert "</summary>\n\n" in result
+
+    def test_blank_line_before_closing_details(self) -> None:
+        result = ur.generate_changelog_details(SAMPLE_CHANGELOG)
+        assert "\n\n</details>" in result
+
+    def test_truncates_summary_to_150_chars(self) -> None:
+        long_bullet = "- **X** — " + "A" * 200 + ". More text."
+        cl = f"## [v9.0.0] — 2026-06-01 <!-- svg: long title -->\n\n{long_bullet}\n"
+        result = ur.generate_changelog_details(cl, n=5)
+        # Extract text between the blank-after-summary and closing details
+        import re
+        body = re.search(r"</summary>\n\n(.+?)\n\n</details>", result, re.DOTALL)
+        assert body is not None
+        assert len(body.group(1)) <= 155  # some slack for truncation marker
+
+    def test_no_older_releases_when_few_versions(self) -> None:
+        cl = "## [v1.0.0] — 2026-01-01 <!-- svg: only one -->\n\n- Single bullet.\n"
+        result = ur.generate_changelog_details(cl, n=5)
+        assert "Older releases" not in result
+
+    def test_fallback_to_first_bullet_when_no_svg_comment(self) -> None:
+        cl = "## [v1.0.0] — 2026-01-01\n\n- No svg comment here. More text.\n"
+        result = ur.generate_changelog_details(cl, n=5)
+        assert "No svg comment here" in result
+
+    def test_real_changelog(self) -> None:
+        text = (REPO_ROOT / "CHANGELOG.md").read_text()
+        result = ur.generate_changelog_details(text, n=5)
+        assert "<details>" in result
+        assert "v0.15.8" in result
