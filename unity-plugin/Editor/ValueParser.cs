@@ -110,7 +110,7 @@ namespace UnityMCP.Editor
                 case SerializedPropertyType.Enum:
                     if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var enumIdx))
                     {
-                        if (enumIdx >= property.enumNames.Length)
+                        if (enumIdx < 0 || enumIdx >= property.enumNames.Length)
                             throw new ArgumentException($"Enum index {enumIdx} out of range (0..{property.enumNames.Length - 1}): {property.propertyPath}");
                         property.enumValueIndex = enumIdx;
                     }

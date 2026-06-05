@@ -162,5 +162,59 @@ namespace UnityMCP.Editor.Chat.Tests
             ChatWindowAssertions.AssertPillContent(pill, ChipKindKeys.Hierarchy, "Player");
         }
 
+        // D10: text label in F13 bubble has msg-text CSS class
+        [Test]
+        public void D10_TextLabel_HasMsgTextClass()
+        {
+            var msg = ChipTextInterleaver.Build("hello", new List<PositionedChip>());
+            _transcript.AppendUserBubble(msg);
+            var wrap   = Bubble().Q(className: "msg-user-content");
+            var labels = wrap.Query<Label>().ToList();
+            Assert.AreEqual(1, labels.Count, "One label for text segment");
+            Assert.IsTrue(labels[0].ClassListContains("msg-text"),
+                "Text label must carry msg-text class for USS styling");
+        }
+
+        // D11: whitespace-only segment produces no Label child
+        [Test]
+        public void D11_WhitespaceOnlySegment_NoLabelAdded()
+        {
+            // chip at offset 0 with spaces only before it → whitespace segment skipped
+            var chip = H("/A", "A", 1);
+            // Build a message that has "   " text + chip — whitespace text must not render
+            var segments = new List<MessageSegment>
+            {
+                new MessageSegment("   "),
+                new MessageSegment(chip),
+            };
+            var msg = new UserMessage(segments, new List<ChipData> { chip });
+            _transcript.AppendUserBubble(msg);
+            var wrap = Bubble().Q(className: "msg-user-content");
+            int directLabels = 0;
+            foreach (var child in wrap.Children())
+                if (child is Label) directLabels++;
+            Assert.AreEqual(0, directLabels, "Whitespace-only text segment must not produce a Label");
+            var pills = wrap.Query(className: "inline-chip-pill").ToList();
+            Assert.AreEqual(1, pills.Count, "Chip must still render as pill");
+        }
+
+        // D12: chip segment renders via ChipPillFactory (pill), not as a Label
+        [Test]
+        public void D12_ChipSegment_RendersPill_NotLabel()
+        {
+            var chip = H("/Enemy", "Enemy", 2);
+            var msg  = ChipTextInterleaver.Build("", new List<PositionedChip> { PC(chip, 0) });
+            _transcript.AppendUserBubble(msg);
+            var wrap = Bubble().Q(className: "msg-user-content");
+            // Must have a pill
+            var pills = wrap.Query(className: "inline-chip-pill").ToList();
+            Assert.AreEqual(1, pills.Count, "Chip segment must produce an inline-chip-pill");
+            // Must NOT have a direct Label child (chip goes through ChipPillFactory, not ChatLabel)
+            int directLabels = 0;
+            foreach (var child in wrap.Children())
+                if (child is Label) directLabels++;
+            Assert.AreEqual(0, directLabels, "Chip segment must not produce a Label");
+        }
+
     }
 }
