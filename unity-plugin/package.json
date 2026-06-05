@@ -3,7 +3,7 @@
   "version": "0.15.8",
   "displayName": "Unity MCP",
   "description": "MCP server for Unity Editor control",
-  "unity": "2022.3",
+  "unity": "6000.0",
   "license": "MIT",
   "author": {
     "name": "German Krasnikov",

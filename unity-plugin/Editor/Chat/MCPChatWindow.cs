@@ -127,16 +127,14 @@ namespace UnityMCP.Editor.Chat
             area.Add(BuildFlowBar());
             _objChipStrip = new VisualElement(); _objChipStrip.AddToClassList("obj-chip-strip");
             area.Add(_objChipStrip);
-            _input = new TextField { multiline = true }; _input.AddToClassList("chat-input");
-            area.Add(_input);
 
-            // F5/H9: inline chip overlay — wiring extracted to MCPChatWindow.ChipInput.cs.
-            _chipTracker = new InlineChipTracker();
-            _chipOverlay = new InlineChipOverlay(_input, _chipTracker);
-            _chipOverlay.SetRemoveCallback(RemoveInlineChipAt);
-            InlineChipKeyHandler.Attach(_input, _chipTracker, _chipOverlay);
-            InlineChipKeyHandler.AttachAtomicCaret(_input, _chipTracker);
-            // MF1 + context menu + dirty wiring all live in WireChipInput (H9).
+            // Wave 0: replace raw TextField + overlay with composed InlineChipField.
+            _chipField = new InlineChipField();
+            _chipField.AddToClassList("chat-input");
+            _input = _chipField.TextField; // keep _input for back-compat (EnterKeySend, height calc)
+            area.Add(_chipField);
+
+            // Wire context menu on the chip field.
             WireChipInput();
 
             EnterKeySend.Attach(_input, OnSend);

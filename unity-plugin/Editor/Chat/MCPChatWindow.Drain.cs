@@ -18,17 +18,30 @@ namespace UnityMCP.Editor.Chat
             // FIX A: read from _sentTextCache (set by DispatchTurn before input was cleared),
             // NOT from _input.value which is already "" at this point.
             var text  = _sentTextCache.Get();
-            var chips = CollectChipPaths();
+            // Serialize from InlineChipField.Model (v5: same ChipPaths/KindKeys arrays as v4).
+            string[] chipPaths, kindKeys;
+            if (_chipField?.Model != null)
+            {
+                var reload = _chipField.Model.SerializeForReload();
+                chipPaths  = reload.Paths;
+                kindKeys   = reload.KindKeys;
+            }
+            else
+            {
+                chipPaths = System.Array.Empty<string>();
+                kindKeys  = System.Array.Empty<string>();
+            }
             var state = new PendingTurnState(
                 _backend?.SessionId,
                 text,
-                chips.ToArray(),
+                chipPaths,
                 _agentMode,
                 _selectedAgent,
                 _activity.Phase.ToString(),
                 undoGroupId: _undoTracker.InflightGroupId,
                 savedAtUtc:  DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                backendKind: _selectedKind);
+                backendKind: _selectedKind,
+                kindKeys:    kindKeys);
             ReloadGuard.SavePendingState(state);
         }
 
@@ -51,6 +64,11 @@ namespace UnityMCP.Editor.Chat
             _selectedAgent = p.AgentName;
             _selectedKind  = p.BackendKind;
             CreateBackendWithSession(p.SessionId);
+
+            // Restore chips from PendingTurnState (v4/v5 format).
+            if (_chipField?.Model != null && p.ChipPaths?.Length > 0)
+                _chipField.Model.RestoreFromReload(p.ChipPaths, p.KindKeys);
+            _chipField?.RebuildFromModel();
 
             var displayText = p.PendingText;
             if (!string.IsNullOrEmpty(displayText))

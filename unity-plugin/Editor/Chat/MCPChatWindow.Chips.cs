@@ -18,7 +18,10 @@ namespace UnityMCP.Editor.Chat
         private void OnDragPerform(DragPerformEvent e)
         {
             DragAndDrop.AcceptDrag();
-            bool dropOnField = _input != null && _input.worldBound.Contains(e.mousePosition);
+            // Use _chipField bounds (the full composed control) so drops on pill area are detected.
+            bool dropOnField = _chipField != null
+                ? _chipField.worldBound.Contains(e.mousePosition)
+                : _input != null && _input.worldBound.Contains(e.mousePosition);
 
             foreach (var obj in DragAndDrop.objectReferences)
             {
