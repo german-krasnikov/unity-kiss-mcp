@@ -58,7 +58,7 @@ namespace UnityMCP.Editor.Chat
         {
             _autoScrollEnabled = EditorPrefs.GetBool("MCPChat.AutoScroll", true);
             RefreshColorResolver();
-            ChipPillFactory.AddToContextAction = chip => AddRefToContext(chip.Path);
+            ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
             CreateBackend();
             ResetTokenCounters();
             ChatProcess.OnAfterReloadResume += TryResumePendingTurn;

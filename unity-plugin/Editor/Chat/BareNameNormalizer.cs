@@ -80,8 +80,14 @@ namespace UnityMCP.Editor.Chat
                 }
                 else if (text[i] == '`')
                 {
-                    int close = text.IndexOf('`', i + 1);
-                    if (close > i) { ranges.Add((i, close + 1)); i = close + 1; continue; }
+                    // Triple-backtick fenced block — must be checked BEFORE single backtick
+                    if (i + 2 < text.Length && text[i+1] == '`' && text[i+2] == '`')
+                    {
+                        int close = text.IndexOf("```", i + 3, System.StringComparison.Ordinal);
+                        if (close > i) { ranges.Add((i, close + 3)); i = close + 3; continue; }
+                    }
+                    int singleClose = text.IndexOf('`', i + 1);
+                    if (singleClose > i) { ranges.Add((i, singleClose + 1)); i = singleClose + 1; continue; }
                 }
                 i++;
             }

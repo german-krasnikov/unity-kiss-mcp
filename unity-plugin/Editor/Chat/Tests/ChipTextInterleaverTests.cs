@@ -348,5 +348,63 @@ namespace UnityMCP.Editor.Chat.Tests
             var display = ChipTextInterleaver.ToDisplayText(msg);
             Assert.AreEqual("fix @Foo.cs", display);
         }
+
+        // ── Group R: BuildFromRaw tests ──────────────────────────────────────
+
+        // R1: @mention stripped, display text round-trips
+        [Test]
+        public void R1_BuildFromRaw_StripsAtMention()
+        {
+            var chip = H("/Player", "Player", 1);
+            var positioned = new List<PositionedChip> { PC(chip, 0) };
+            var msg = ChipTextInterleaver.BuildFromRaw("@Player fix", positioned);
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("@Player fix", display);
+        }
+
+        // R2: chip at end of text, no trailing space
+        [Test]
+        public void R2_BuildFromRaw_ChipAtEndNoTrailingSpace()
+        {
+            var chip = H("/Player", "Player", 1);
+            var positioned = new List<PositionedChip> { PC(chip, 4) };
+            var msg = ChipTextInterleaver.BuildFromRaw("fix @Player", positioned);
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("fix @Player", display);
+        }
+
+        // R3: two chips in raw text
+        [Test]
+        public void R3_BuildFromRaw_TwoChips()
+        {
+            var chipA = H("/A", "Alpha", 1);
+            var chipB = H("/B", "Beta", 2);
+            // "@Alpha @Beta go" — chipA at 0, chipB at 7
+            var positioned = new List<PositionedChip> { PC(chipA, 0), PC(chipB, 7) };
+            var msg = ChipTextInterleaver.BuildFromRaw("@Alpha @Beta go", positioned);
+            Assert.AreEqual(2, msg.Chips.Count);
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            StringAssert.Contains("@Alpha", display);
+            StringAssert.Contains("@Beta", display);
+        }
+
+        // R4: no chips — passthrough to Build
+        [Test]
+        public void R4_BuildFromRaw_NoChips_Passthrough()
+        {
+            var msg = ChipTextInterleaver.BuildFromRaw("hello world", new List<PositionedChip>());
+            Assert.AreEqual(1, msg.Segments.Count);
+            Assert.AreEqual("hello world", msg.Segments[0].Text);
+        }
+
+        // R5: chip offset beyond text length — guard path, chip still present
+        [Test]
+        public void R5_BuildFromRaw_OffsetBeyondText_GuardPath()
+        {
+            var chip = H("/Player", "Player", 1);
+            var positioned = new List<PositionedChip> { PC(chip, 100) };
+            var msg = ChipTextInterleaver.BuildFromRaw("hi", positioned);
+            Assert.AreEqual(1, msg.Chips.Count);
+        }
     }
 }

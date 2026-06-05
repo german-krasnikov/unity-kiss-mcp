@@ -1,5 +1,5 @@
 // Partial: inline chip methods — simplified with InlineChipField (Wave 0).
-// F13: No @mention injection. Chip position is stored in InlineChipModel only.
+// F13→F14: @mention injected into TextField for visual display.
 using UnityEditor;
 using UnityEngine;
 
@@ -23,7 +23,6 @@ namespace UnityMCP.Editor.Chat
             var kindKey    = ChipKindDetector.Detect(cap, assetPath ?? path);
             var instanceID = cap != null ? cap.GetInstanceID() : 0;
 
-            // Store chip with current cursor position — no @mention written to TextField.
             _chipField?.AddChip(new ChipData(kindKey, path, displayName, instanceID));
 
             UpdateAutoHeight();

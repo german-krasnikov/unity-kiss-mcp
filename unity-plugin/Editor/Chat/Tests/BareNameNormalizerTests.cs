@@ -167,6 +167,27 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.DoesNotContain("[hierarchy:/Grid #1]", result);
         }
 
+        // 16. InsideCodeBlock_NotReplaced
+        [Test]
+        public void InsideCodeBlock_NotReplaced()
+        {
+            var chips = new List<ChipData> { H("/Player", "Player", 1) };
+            var text = "```\nPlayer.Move();\n```";
+            var result = BareNameNormalizer.Normalize(text, chips);
+            Assert.AreEqual(text, result);
+        }
+
+        // 17. OutsideCodeBlock_ReplacedButInsideNot
+        [Test]
+        public void OutsideCodeBlock_ReplacedButInsideNot()
+        {
+            var chips = new List<ChipData> { H("/Player", "Player", 1) };
+            var text = "fix Player here:\n```\nPlayer.Move();\n```";
+            var result = BareNameNormalizer.Normalize(text, chips);
+            StringAssert.Contains("[hierarchy:/Player #1]", result); // outside block
+            StringAssert.Contains("Player.Move()", result);          // inside block preserved
+        }
+
         // ── helper ────────────────────────────────────────────────────────────
 
         private static int CountOccurrences(string text, string pattern)
