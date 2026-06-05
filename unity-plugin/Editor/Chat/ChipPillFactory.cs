@@ -1,5 +1,6 @@
 // ChipPillFactory: shared static pill builder for input field and response rendering.
 // All display/color routed through ChipKindRegistry — zero hardcoded per-kind logic.
+// P4: ColorResolver seam allows per-kind color overrides from BackendConfigStore.
 using System;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -14,6 +15,12 @@ namespace UnityMCP.Editor.Chat
     /// </summary>
     internal static class ChipPillFactory
     {
+        /// <summary>
+        /// Seam: when non-null, overrides provider.HexColor. Set from config on window open.
+        /// Set to null in tests TearDown to prevent leakage.
+        /// </summary>
+        internal static Func<string, string> ColorResolver;
+
         /// <summary>Build from explicit kindKey and display name.</summary>
         internal static VisualElement Build(string kindKey, string displayName, Action onRemove = null)
         {
@@ -29,7 +36,7 @@ namespace UnityMCP.Editor.Chat
             pill.style.borderBottomLeftRadius  = pill.style.borderBottomRightRadius  = 4f;
             pill.pickingMode = PickingMode.Position;
 
-            ApplyColor(pill, provider);
+            ApplyColor(pill, kindKey, provider);
 
             var kindLbl = new Label(kindKey + ":");
             kindLbl.AddToClassList("inline-chip-kind");
@@ -60,21 +67,25 @@ namespace UnityMCP.Editor.Chat
         internal static VisualElement Build(ChipData chip, Action onRemove = null)
             => Build(chip.KindKey, chip.DisplayName, onRemove);
 
-        // ── private ───────────────────────────────────────────────────────────
+        // ── internal helpers ──────────────────────────────────────────────────
 
-        private static void ApplyColor(VisualElement pill, IChipKindProvider provider)
-        {
-            if (provider == null) return;
-            if (!TryParseHex(provider.HexColor, out var col)) return;
-            col.a = 0.85f;
-            pill.style.backgroundColor = col;
-        }
-
-        private static bool TryParseHex(string hex, out Color col)
+        /// <summary>Try to parse a hex color string. Returns false and Color.gray on failure.</summary>
+        internal static bool TryParseHex(string hex, out Color col)
         {
             col = Color.gray;
             if (string.IsNullOrEmpty(hex) || hex[0] != '#') return false;
             return ColorUtility.TryParseHtmlString(hex, out col);
+        }
+
+        // ── private ───────────────────────────────────────────────────────────
+
+        private static void ApplyColor(VisualElement pill, string kindKey, IChipKindProvider provider)
+        {
+            // Resolution: ColorResolver → provider.HexColor → gray fallback
+            var hex = ColorResolver?.Invoke(kindKey) ?? provider?.HexColor ?? "#94a3b8";
+            if (!TryParseHex(hex, out var col)) col = new Color(0.58f, 0.64f, 0.72f); // #94a3b8
+            col.a = 0.85f;
+            pill.style.backgroundColor = col;
         }
     }
 }

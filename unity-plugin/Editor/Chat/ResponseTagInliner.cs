@@ -25,7 +25,9 @@ namespace UnityMCP.Editor.Chat
             {
                 var kind  = m.Groups["kind"].Value.ToLowerInvariant();
                 var refer = m.Groups["ref"].Value;
-                var color = ChipKindRegistry.ForKey(kind)?.HexColor ?? "#94a3b8";
+                // P4: honor per-kind color overrides via the same resolver as ChipPillFactory.
+                var color = ChipPillFactory.ColorResolver?.Invoke(kind)
+                    ?? ChipKindRegistry.ForKey(kind)?.HexColor ?? "#94a3b8";
                 var linkId = "chip:" + kind + ":" + refer; // H2
                 return $"<link=\"{linkId}\"><color={color}><b>[{kind}]</b></color> {refer}</link>";
             });

@@ -98,33 +98,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Object.DestroyImmediate(parent);
         }
 
-        [Test]
-        public void OnSend_Dedup_WhenChipAlreadyHasPath_SummaryNotPrepended()
-        {
-            // Simulate: chipPaths already contains the selection path.
-            // SelectionSummary.ShouldPrepend must return false.
-            _go = new GameObject("Dup");
-            var path = ComponentSerializer.GetPath(_go);
-            var chips = new System.Collections.Generic.HashSet<string> { path };
-            Assert.IsFalse(SelectionSummary.ShouldPrepend(_go, chips));
-        }
-
-        [Test]
-        public void OnSend_NewPath_ShouldPrepend_ReturnsTrue()
-        {
-            _go = new GameObject("Fresh");
-            var chips = new System.Collections.Generic.HashSet<string>();
-            Assert.IsTrue(SelectionSummary.ShouldPrepend(_go, chips));
-        }
-
-        [Test]
-        public void OnSend_NullGo_ShouldNotPrepend()
-        {
-            var chips = new System.Collections.Generic.HashSet<string>();
-            Assert.IsFalse(SelectionSummary.ShouldPrepend(null, chips));
-        }
-
-        // ── New: destroyed GameObject must return "" / false ─────────────────
+        // ── New: destroyed GameObject must return "" ─────────────────────────
 
         [Test]
         public void Summarize_DestroyedGameObject_ReturnsEmpty()
@@ -136,16 +110,6 @@ namespace UnityMCP.Editor.Chat.Tests
             // The guard `!go` catches the destroyed-but-alive reference.
             Assert.AreEqual("", SelectionSummary.Summarize(_go));
             _go = null; // already destroyed, prevent double-destroy in TearDown
-        }
-
-        [Test]
-        public void ShouldPrepend_DestroyedGameObject_ReturnsFalse()
-        {
-            _go = new GameObject("DestroyedForPrepend");
-            Object.DestroyImmediate(_go);
-            var chips = new System.Collections.Generic.HashSet<string>();
-            Assert.IsFalse(SelectionSummary.ShouldPrepend(_go, chips));
-            _go = null;
         }
 
         // ── #21: tagged overload ─────────────────────────────────────────────

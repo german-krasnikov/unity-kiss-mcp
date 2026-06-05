@@ -39,10 +39,7 @@ namespace UnityMCP.Editor.Chat
             w.minSize = new Vector2(320, 400);
         }
 
-        /// <summary>
-        /// Called by ChatBackendProbe via reflection. Returns true when any open chat window
-        /// has a live backend process.
-        /// </summary>
+        /// <summary>Called by ChatBackendProbe via reflection. True when any open chat window has a live backend.</summary>
         public static bool IsChatBackendRunning()
         {
             foreach (var w in Resources.FindObjectsOfTypeAll<MCPChatWindow>())
@@ -56,9 +53,17 @@ namespace UnityMCP.Editor.Chat
             if (_tokenReadout != null) _tokenReadout.text = "";
         }
 
+        /// <summary>Load config once and bind its ResolveColor — avoids per-pill file read.</summary>
+        internal void RefreshColorResolver()
+        {
+            ChipPillFactory.ColorResolver = BackendConfigStore.Load().Chips.ResolveColor;
+        }
+
         private void OnEnable()
         {
             _autoScrollEnabled = EditorPrefs.GetBool("MCPChat.AutoScroll", true);
+            // P4: wire color resolver so pills use persisted overrides (re-set after domain reload).
+            RefreshColorResolver();
             CreateBackend();
             ResetTokenCounters();
             ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
@@ -67,6 +72,12 @@ namespace UnityMCP.Editor.Chat
             _autoFix.OnErrorsDetected += InjectCompileErrors;
             // F6: group indices are stale after domain reload.
             _undoTracker.Invalidate();
+        }
+
+        /// <summary>Live-refresh input chip colors after settings change.</summary>
+        internal void RefreshChipDisplay()
+        {
+            _chipField?.RebuildFromModel();
         }
 
         private void OnDisable()
@@ -114,10 +125,7 @@ namespace UnityMCP.Editor.Chat
             root.schedule.Execute(TickFlowBarSweep).Every(950);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
             root.RegisterCallback<DragPerformEvent>(OnDragPerform);
-            // Resume any pending turn here — CreateGUI runs after OnEnable, so _flowBar is ready.
-            // Calling this from OnEnable would NRE because _flowBar hasn't been built yet.
-            // MANUAL TEST: open chat → send a turn → edit any .cs to trigger domain reload mid-turn
-            //              → assert no NRE in console, flow bar shows Sending, turn resumes.
+            // CreateGUI runs after OnEnable, so _flowBar is ready here (OnEnable would NRE).
             TryResumePendingTurn();
         }
 

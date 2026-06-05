@@ -67,6 +67,19 @@ namespace UnityMCP.Editor.Chat
             BackendSettingsForm.BuildCodexForm(codexFoldout, store.Codex, () => store.Save());
             foldout.Add(codexFoldout);
 
+            // P4: Context Chips — per-kind depth + color overrides; refresh all open chat windows live.
+            var chipFoldout = new Foldout { text = "Context Chips", value = false };
+            BackendSettingsForm.BuildChipDisplayForm(chipFoldout, store.Chips, () =>
+            {
+                store.Save();
+                foreach (var w in Resources.FindObjectsOfTypeAll<MCPChatWindow>())
+                {
+                    w.RefreshColorResolver();
+                    w.RefreshChipDisplay();
+                }
+            });
+            foldout.Add(chipFoldout);
+
             root.Add(foldout);
         }
 

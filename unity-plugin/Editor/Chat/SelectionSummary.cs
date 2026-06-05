@@ -54,15 +54,5 @@ namespace UnityMCP.Editor.Chat
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Returns true when the selection line should be prepended:
-        /// go is non-null AND its path is not already in chipPaths.
-        /// </summary>
-        internal static bool ShouldPrepend(GameObject go, HashSet<string> chipPaths)
-        {
-            if (go == null || !go) return false; // !go catches destroyed-but-non-null Unity refs
-            var path = ComponentSerializer.GetPath(go);
-            return !chipPaths.Contains(path);
-        }
     }
 }

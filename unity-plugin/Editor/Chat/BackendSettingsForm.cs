@@ -1,6 +1,9 @@
 // UIToolkit forms for per-backend settings. Pure UI wiring — no persistence logic.
+// P4: BuildChipDisplayForm replaces hardcoded BuildChipConfigForm — registry-driven.
 using System;
 using System.Collections.Generic;
+using UnityEditor.UIElements;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
@@ -10,35 +13,66 @@ namespace UnityMCP.Editor.Chat
         private static readonly List<string> _depthOptions =
             new List<string> { "path", "summary", "full", "none" };
 
-        internal static void BuildChipConfigForm(
+        /// <summary>Registry-driven chip display form: one row per registered kind.</summary>
+        internal static void BuildChipDisplayForm(
             VisualElement parent,
             ChipConfig config,
             Action onSave)
         {
-            var hierarchyField = new DropdownField("Hierarchy Depth", _depthOptions,
-                System.Math.Max(0, _depthOptions.IndexOf(config.HierarchyDepth)));
-            hierarchyField.RegisterValueChangedCallback(e => { config.HierarchyDepth = e.newValue; onSave(); });
-            parent.Add(hierarchyField);
+            foreach (var kindKey in ChipKindRegistry.AllKeys)
+            {
+                var provider = ChipKindRegistry.ForKey(kindKey);
+                if (provider == null) continue;
 
-            var scriptField = new DropdownField("Script Depth", _depthOptions,
-                System.Math.Max(0, _depthOptions.IndexOf(config.ScriptDepth)));
-            scriptField.RegisterValueChangedCallback(e => { config.ScriptDepth = e.newValue; onSave(); });
-            parent.Add(scriptField);
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems   = Align.Center;
+                row.style.marginBottom = 2;
 
-            var sceneField = new DropdownField("Scene Depth", _depthOptions,
-                System.Math.Max(0, _depthOptions.IndexOf(config.SceneDepth)));
-            sceneField.RegisterValueChangedCallback(e => { config.SceneDepth = e.newValue; onSave(); });
-            parent.Add(sceneField);
+                var label = new Label(kindKey);
+                label.style.width    = 90;
+                label.style.fontSize = 11;
+                row.Add(label);
 
-            var prefabField = new DropdownField("Prefab Depth", _depthOptions,
-                System.Math.Max(0, _depthOptions.IndexOf(config.PrefabDepth)));
-            prefabField.RegisterValueChangedCallback(e => { config.PrefabDepth = e.newValue; onSave(); });
-            parent.Add(prefabField);
+                var currentDepth = config.DepthFor(kindKey);
+                var depthField = new DropdownField(_depthOptions,
+                    System.Math.Max(0, _depthOptions.IndexOf(currentDepth)));
+                depthField.style.width = 80;
+                var capturedKey = kindKey;
+                depthField.RegisterValueChangedCallback(e =>
+                {
+                    config.SetDepthOverride(capturedKey, e.newValue);
+                    onSave();
+                });
+                row.Add(depthField);
 
-            var assetField = new DropdownField("Asset Depth", _depthOptions,
-                System.Math.Max(0, _depthOptions.IndexOf(config.AssetDepth)));
-            assetField.RegisterValueChangedCallback(e => { config.AssetDepth = e.newValue; onSave(); });
-            parent.Add(assetField);
+                var currentColor = config.ResolveColor(kindKey);
+                ChipPillFactory.TryParseHex(currentColor, out var col);
+                var colorField = new ColorField { value = col, showAlpha = false };
+                colorField.style.width = 50;
+                colorField.RegisterValueChangedCallback(e =>
+                {
+                    config.SetColorOverride(capturedKey,
+                        "#" + ColorUtility.ToHtmlStringRGB(e.newValue));
+                    onSave();
+                });
+                row.Add(colorField);
+
+                var resetBtn = new Button(() =>
+                {
+                    config.SetDepthOverride(capturedKey, provider.DefaultDepth); // explicit default wins over legacy
+                    config.SetColorOverride(capturedKey, null);                  // null → provider color
+                    depthField.value = provider.DefaultDepth;
+                    ChipPillFactory.TryParseHex(provider.HexColor, out var defaultCol);
+                    colorField.value = defaultCol;
+                    onSave();
+                }) { text = "Reset" };
+                resetBtn.style.fontSize   = 9;
+                resetBtn.style.marginLeft = 4;
+                row.Add(resetBtn);
+
+                parent.Add(row);
+            }
         }
 
         internal static void BuildClaudeForm(
