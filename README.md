@@ -117,7 +117,13 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="Stats: MCP Tools, Tests Passing, Batch Savings">
+<table>
+<tr>
+<td align="center" width="33%"><h2><code>91</code></h2><sub>MCP TOOLS</sub><br><sub>core + plugin</sub></td>
+<td align="center" width="33%"><h2><code>1136</code></h2><sub>TESTS PASSING</sub><br><sub>unit + live</sub></td>
+<td align="center" width="33%"><h2><code>80–95%</code></h2><sub>BATCH SAVINGS</sub><br><sub>vs. individual calls</sub></td>
+</tr>
+</table>
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
@@ -136,20 +142,14 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
-## Architecture
-
-<img src="docs/assets/architecture.svg" width="100%" alt="Architecture: Claude Code → Python MCP Server → TCP :9500 → Unity Editor Plugin">
-
-<img src="docs/assets/divider.svg" width="100%" alt="">
-
 ## Recent Changes
 
 <!-- CHANGELOG_START -->
+## [v0.15.8] — 2026-06-05
+- **Inline Chips + Extensible Chip-Kind Registry (Plugin v0.15.8, F11)** (2026-06-05) — Production-ready extensible typed-context-chip system for in-Unity agent chat.
+
 ## [v0.15.0] — 2026-06-04
 - **Chat UX Sprint: 10 Features + Review-Hardening (Plugin v0.15.0)** (2026-06-04) — Six-wave comprehensive UX polish for in-Unity agent chat.
-
-## [v0.14.0] — 2026-06-04
-- **Multi-Backend Agent Chat: Codex Support via DRY CliBackendBase (Plugin v0.14.0)** (2026-06-04) — Added OpenAI Codex as a sibling backend alongside Claude, sharing one abstract `CliBackendBase` host.
 <!-- CHANGELOG_END -->
 
 <div align="center"><sub>Auto-updated by CI — see <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a> for full history</sub></div>

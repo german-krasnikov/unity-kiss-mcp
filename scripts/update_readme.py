@@ -187,7 +187,7 @@ _BADGE_PATTERNS = {
 
 
 def update_readme_badges(readme: str, stats: dict) -> str:
-    """Update hardcoded badge values in README shield URLs."""
+    """Update hardcoded badge values in README shield URLs and stats table."""
     if "tests" in stats and stats["tests"] is not None:
         readme = re.sub(
             r"tests-\d+_passing",
@@ -199,11 +199,21 @@ def update_readme_badges(readme: str, stats: dict) -> str:
             rf"\g<1>{stats['tests']} tests passing",
             readme,
         )
+        readme = re.sub(
+            r"(<code>)\d+(</code></h2><sub>TESTS PASSING)",
+            rf"\g<1>{stats['tests']}\2",
+            readme,
+        )
     if "tools" in stats and stats["tools"] is not None:
         readme = re.sub(r"tools-\d+_MCP", f"tools-{stats['tools']}_MCP", readme)
         readme = re.sub(
             r"(alt=\")\d+ MCP tools",
             rf"\g<1>{stats['tools']} MCP tools",
+            readme,
+        )
+        readme = re.sub(
+            r"(<code>)\d+(</code></h2><sub>MCP TOOLS)",
+            rf"\g<1>{stats['tools']}\2",
             readme,
         )
     if "server_ver" in stats and stats["server_ver"] is not None:
@@ -282,16 +292,6 @@ def main() -> None:
     else:
         print("  README.md unchanged")
 
-    # --- stats.svg ---
-    svg_path = REPO_ROOT / "docs" / "assets" / "stats.svg"
-    if svg_path.exists():
-        svg = svg_path.read_text(encoding="utf-8")
-        updated_svg = update_stats_svg(svg, tools=tools, tests=tests)
-        if updated_svg != svg:
-            svg_path.write_text(updated_svg, encoding="utf-8")
-            print("  updated docs/assets/stats.svg")
-        else:
-            print("  docs/assets/stats.svg has no STAT markers — unchanged")
 
 
 if __name__ == "__main__":
