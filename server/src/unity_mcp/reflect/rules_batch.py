@@ -3,6 +3,7 @@ import re
 from typing import Callable, Awaitable, Optional
 
 from . import register_rule, Mismatch, reflect as _reflect
+from ..utils import parse_kv_line
 
 
 _SUB_RESP_HEADER = re.compile(r"^\[(\d+)\]")
@@ -31,14 +32,9 @@ def _parse_batch_commands(commands: str) -> list[tuple[str, dict]]:
         line = line.strip()
         if not line:
             continue
-        parts = line.split()
-        cmd = parts[0]
-        args: dict = {}
-        for part in parts[1:]:
-            if "=" in part:
-                k, v = part.split("=", 1)
-                args[k] = v
-        result.append((cmd, args))
+        cmd, args = parse_kv_line(line)
+        if cmd:
+            result.append((cmd, args))
     return result
 
 

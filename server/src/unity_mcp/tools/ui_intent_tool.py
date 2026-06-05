@@ -128,7 +128,7 @@ async def ui_intent(intent: str, parent: Optional[str] = None, template: Optiona
     else:
         from .intent_common import sanitize_intent
         prompt = _PROMPT_TEMPLATE.format(parent=sanitize_intent(parent or "root"), intent=sanitize_intent(intent))
-        dsl_raw = await _sampling.generate(prompt, max_tokens=600)
+        dsl_raw = await _sampling.generate(prompt)
         if not dsl_raw:
             return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
         dsl = strip_fences(dsl_raw)

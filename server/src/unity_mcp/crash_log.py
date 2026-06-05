@@ -56,12 +56,5 @@ class CrashLogger:
         self._write({"ev": "reconnect", "outage_s": outage_s,
                      "retries": retries, "port": port})
 
-    def log_exhausted(self, *, cmd: str, retries: int, error_type: str,
-                      unity_busy: bool, port: int,
-                      probe_remaining_s: Optional[float]) -> None:
-        self._write({"ev": "exhausted", "cmd": cmd, "retries": retries,
-                     "err": error_type, "busy": unity_busy, "port": port,
-                     "remaining_s": probe_remaining_s})
-
     def close(self) -> None:
         self._closed = True

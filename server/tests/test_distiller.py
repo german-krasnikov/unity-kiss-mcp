@@ -160,30 +160,3 @@ async def test_distill_haiku_handles_exception():
     assert result is None
 
 
-# ---------------------------------------------------------------------------
-# strip_defaults integration
-# ---------------------------------------------------------------------------
-
-def test_strip_defaults_applied_for_get_component():
-    d = ResponseDistiller(min_size=10)
-    text = "[Transform]\nposition: (0, 0, 0)\nlocalPosition: (5, 3, 0)\nrotation: (0, 0, 0, 1)"
-    result = d.distill_heuristic("get_component", text, ())
-    assert "position: (0, 0, 0)" not in result.text
-    assert "rotation: (0, 0, 0, 1)" not in result.text
-    assert "localPosition: (5, 3, 0)" in result.text
-
-
-def test_strip_defaults_applied_for_inspect():
-    d = ResponseDistiller(min_size=10)
-    text = "[Rigidbody]\ndrag: 0\nmass: 5\nvelocity: (0, 0, 0)"
-    result = d.distill_heuristic("inspect", text, ())
-    assert "drag" not in result.text
-    assert "velocity" not in result.text
-    assert "mass: 5" in result.text
-
-
-def test_strip_defaults_not_applied_for_hierarchy():
-    d = ResponseDistiller(min_size=10)
-    text = "drag: 0\nmass: 5"
-    result = d.distill_heuristic("get_hierarchy", text, ())
-    assert "drag: 0" in result.text

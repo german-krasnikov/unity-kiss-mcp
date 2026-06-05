@@ -14,6 +14,7 @@ from typing import Optional, Callable, Awaitable
 from .prefetch_cache import PrefetchCache, GATE_PRIORS
 from .compressor import strip_defaults
 from .middleware_paths import PathResolverMixin, _levenshtein
+from .utils import parse_kv_line
 
 # Commands whose responses benefit from default-value stripping (F08)
 _STRIP_CMDS: frozenset = frozenset({"get_component", "inspect", "get_object_detail"})
@@ -469,19 +470,8 @@ class Middleware(PathResolverMixin):
         deleted_paths: set[str] = set()
         created_names: set[str] = set()
 
-        def parse_kv(line: str) -> dict[str, str]:
-            """Parse 'cmd key=val key2=val2' into dict."""
-            parts = line.split()
-            result: dict[str, str] = {}
-            for part in parts[1:]:
-                if "=" in part:
-                    k, v = part.split("=", 1)
-                    result[k] = v
-            return result
-
         for i, line in enumerate(lines):
-            cmd = line.split()[0] if line else ""
-            kv = parse_kv(line)
+            cmd, kv = parse_kv_line(line)
 
             if cmd == "set_property":
                 key = (kv.get("path"), kv.get("component"), kv.get("prop"))

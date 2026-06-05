@@ -47,7 +47,7 @@ class Executor:
                     f"Original intent: {original_intent}\n"
                     f"Failed:\n" + "\n".join(failed_lines)
                 )
-                fixed = await self._svc.generate(fix_prompt, max_tokens=400)
+                fixed = await self._svc.generate(fix_prompt)
                 fixed, _ = normalize(fixed, "dsl")
                 if fixed:
                     # Fix 11: validate retry plan before executing

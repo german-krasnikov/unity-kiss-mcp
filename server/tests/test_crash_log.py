@@ -45,28 +45,6 @@ def test_log_reconnect_writes_jsonl(tmp_path):
     assert entry["port"] == 9500
 
 
-def test_log_exhausted_writes_jsonl(tmp_path):
-    logger = CrashLogger(log_dir=tmp_path)
-    logger.log_exhausted(cmd="batch", retries=3, error_type="TimeoutError",
-                         unity_busy=True, port=9500, probe_remaining_s=12.0)
-    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
-    assert entry["ev"] == "exhausted"
-    assert entry["cmd"] == "batch"
-    assert entry["retries"] == 3
-    assert entry["err"] == "TimeoutError"
-    assert entry["busy"] is True
-    assert entry["port"] == 9500
-    assert entry["remaining_s"] == 12.0
-
-
-def test_log_exhausted_nullable_remaining(tmp_path):
-    logger = CrashLogger(log_dir=tmp_path)
-    logger.log_exhausted(cmd="ping", retries=1, error_type="ConnectionError",
-                         unity_busy=False, port=9500, probe_remaining_s=None)
-    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
-    assert entry["remaining_s"] is None
-
-
 def test_entries_have_timestamp(tmp_path):
     before = time.time()
     logger = CrashLogger(log_dir=tmp_path)
@@ -109,8 +87,6 @@ def test_write_after_close_no_crash(tmp_path):
     # All methods must silently drop — no exception
     logger.log_disconnect(cmd="x", retry=0, error_type="E", unity_busy=False, port=9500)
     logger.log_reconnect(outage_s=1.0, retries=1, port=9500)
-    logger.log_exhausted(cmd="x", retries=1, error_type="E", unity_busy=False,
-                         port=9500, probe_remaining_s=None)
 
 
 # ── Group 2: Bridge integration ───────────────────────────────────────────────

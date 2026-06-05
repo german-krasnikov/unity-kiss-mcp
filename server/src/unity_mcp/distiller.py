@@ -11,9 +11,6 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-from .compressor import strip_defaults
-
-
 @dataclass
 class DistillResult:
     text: str
@@ -30,8 +27,6 @@ _SECTION_RE = re.compile(r"^---\s*(/\S+)\s*---\s*$")
 _SKIP_CMDS = frozenset({"set_property", "ping", "batch", "wire_event", "set_active",
                          "create_object", "delete_object", "manage_component", "recompile"})
 
-_STRIP_DEFAULTS_CMDS = frozenset({"get_component", "inspect", "get_object_detail"})
-
 
 class ResponseDistiller:
     """Pure transform: text + focus → trimmed text. Stateless."""
@@ -46,8 +41,6 @@ class ResponseDistiller:
 
     def distill_heuristic(self, cmd: str, text: str, focus: tuple[str, ...]) -> DistillResult:
         """Synchronous heuristic filter."""
-        if cmd in _STRIP_DEFAULTS_CMDS:
-            text = strip_defaults(text)
         original_size = len(text)
 
         # Skip checks
@@ -183,7 +176,7 @@ class ResponseDistiller:
         )
 
         try:
-            result = await self._sampling.generate(prompt, max_tokens=1500, feature="distiller")
+            result = await self._sampling.generate(prompt, feature="distiller")
         except Exception:
             return None
 

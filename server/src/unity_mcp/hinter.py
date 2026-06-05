@@ -8,14 +8,7 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-# keep in sync with middleware.WRITE_CMDS
-_WRITE_CMDS: frozenset[str] = frozenset({
-    "set_property", "set_property_delta", "create_object", "delete_object",
-    "manage_component", "wire_event", "set_active", "set_material",
-    "set_runtime_property", "set_rect", "move_to", "batch",
-    "animation", "timeline", "animator", "particle", "shader",
-    "material", "prefab", "scriptable_object", "asset", "scene",
-})
+from .middleware import WRITE_CMDS as _WRITE_CMDS
 
 
 @dataclass(frozen=True)

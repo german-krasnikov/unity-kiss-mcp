@@ -12,23 +12,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional
 
-
-def _levenshtein(a: str, b: str) -> int:
-    if a == b:
-        return 0
-    if not a:
-        return len(b)
-    if not b:
-        return len(a)
-    dp = list(range(len(b) + 1))
-    for i, ca in enumerate(a, 1):
-        prev = dp[0]
-        dp[0] = i
-        for j, cb in enumerate(b, 1):
-            cur = dp[j]
-            dp[j] = prev if ca == cb else 1 + min(prev, dp[j - 1], dp[j])
-            prev = cur
-    return dp[-1]
+from .utils import _levenshtein
 
 
 @dataclass
