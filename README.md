@@ -117,13 +117,7 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 </details>
 
-<table>
-<tr>
-<td align="center" width="33%"><h2><code>91</code></h2><sub>MCP TOOLS</sub><br><sub>core + plugin</sub></td>
-<td align="center" width="33%"><h2><code>1136</code></h2><sub>TESTS PASSING</sub><br><sub>unit + live</sub></td>
-<td align="center" width="33%"><h2><code>80–95%</code></h2><sub>BATCH SAVINGS</sub><br><sub>vs. individual calls</sub></td>
-</tr>
-</table>
+<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 1136 Tests · 80-95% Batch Savings">
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
@@ -144,30 +138,10 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 ## Recent Changes
 
-<!-- CHANGELOG_START -->
-## [v0.15.8] — 2026-06-05
-- **Inline Chips + Extensible Chip-Kind Registry (Plugin v0.15.8, F11)** (2026-06-05) — Production-ready extensible typed-context-chip system for in-Unity agent chat.
+<img src="docs/assets/changelog.svg" width="100%" alt="Animated changelog — release timeline with heartbeat trace">
 
-## [v0.15.0] — 2026-06-04
-- **Chat UX Sprint: 10 Features + Review-Hardening (Plugin v0.15.0)** (2026-06-04) — Six-wave comprehensive UX polish for in-Unity agent chat.
-<!-- CHANGELOG_END -->
-
-<div align="center"><sub>Auto-updated by CI — see <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a> for full history</sub></div>
+<div align="center"><sub>See <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a> for full history</sub></div>
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
-<div align="center">
-
-<img src="https://github.com/german-krasnikov.png" width="80" alt="German Krasnikov">
-
-**German Krasnikov** — the human at the console.
-
-Released under the **MIT License** — see [`LICENSE`](LICENSE).
-
-**If the heartbeat resonates, give it a star**
-
-<a href="https://github.com/german-krasnikov/unity-kiss-mcp">
-<img src="https://img.shields.io/github/stars/german-krasnikov/unity-kiss-mcp?style=for-the-badge&labelColor=1a1a2e&color=3ad29f&logo=github&logoColor=white" alt="GitHub stars">
-</a>
-
-</div>
+<div align="center"><sub>MIT License · © <a href="https://github.com/german-krasnikov">German Krasnikov</a> · <a href="https://github.com/german-krasnikov/unity-kiss-mcp">⭐ Star</a></sub></div>
