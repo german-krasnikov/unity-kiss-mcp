@@ -44,7 +44,7 @@ class CircuitBreaker:
         self.failures += 1
         if self.failures >= self.threshold:
             self.state = self.OPEN
-            self.opened_at = time.time()
+            self.opened_at = time.monotonic()
 
     def allow_request(self) -> bool:
         if self.state == self.CLOSED:
@@ -59,7 +59,7 @@ class CircuitBreaker:
                         return True
                 except Exception:
                     pass
-            if time.time() - self.opened_at > self.cooldown:
+            if time.monotonic() - self.opened_at > self.cooldown:
                 self.state = self.HALF_OPEN
                 self._probe_in_flight = True
                 return True
@@ -74,7 +74,7 @@ class CircuitBreaker:
         return ["CLOSED", "OPEN", "HALF_OPEN"][self.state]
 
     def remaining(self) -> float:
-        return max(0.0, self.cooldown - (time.time() - self.opened_at))
+        return max(0.0, self.cooldown - (time.monotonic() - self.opened_at))
 
 BLAST_RADIUS = {
     "get_hierarchy": 0, "get_component": 0, "inspect": 0, "screenshot": 0,
@@ -89,6 +89,7 @@ WRITE_CMDS = {
     "wire_event", "set_active", "set_material", "set_runtime_property", "set_rect", "move_to",
     "batch", "animation", "timeline", "animator", "particle", "shader",
     "material", "prefab", "scriptable_object", "asset", "scene",
+    "create_ui", "execute_code", "menu", "project_settings", "set_parent", "unwire_event",
 }
 
 READ_CMDS = {
@@ -128,7 +129,7 @@ class Middleware(PathResolverMixin):
         self._last_writes: OrderedDict = OrderedDict()
         self._MAX_WRITES = 128
         self._circuit_ready_fn = None
-        self.circuit: CircuitBreaker = CircuitBreaker(is_ready_fn=self._circuit_ready_fn)
+        self.circuit: CircuitBreaker = CircuitBreaker(is_ready_fn=lambda: self._circuit_ready_fn and self._circuit_ready_fn())
         self._error_dedup: OrderedDict = OrderedDict()
         self._negative_path_cache: dict = {}
         self._NEGATIVE_PATH_TTL: float = 10.0
@@ -198,7 +199,7 @@ class Middleware(PathResolverMixin):
         self._response_hashes.clear()
         self._last_writes.clear()
         self.is_playing = False
-        self.circuit = CircuitBreaker(is_ready_fn=self._circuit_ready_fn)
+        self.circuit = CircuitBreaker(is_ready_fn=lambda: self._circuit_ready_fn and self._circuit_ready_fn())
         if self.schema_cache is not None:
             self.schema_cache.invalidate_all()
         self._component_cache.clear()

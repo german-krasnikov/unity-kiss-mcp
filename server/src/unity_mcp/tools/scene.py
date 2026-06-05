@@ -226,6 +226,10 @@ async def load_session() -> str:
     return f"Previous ({label}):\n{prev['hierarchy']}\n\nCurrent:\n{current}"
 
 
+def _extract_saved_path(result: str) -> str:
+    return result.split("Data saved to: ")[-1].strip()
+
+
 async def screenshot_baseline(name: str = "default", width: int = 640, height: int = 480,
                                camera: str | None = None) -> str:
     """Save screenshot as baseline for visual regression. name: identifier for this baseline."""
@@ -233,7 +237,7 @@ async def screenshot_baseline(name: str = "default", width: int = 640, height: i
     result = await _send("screenshot", _args(width=width, height=height, camera=camera))
     if "Data saved to:" not in result:
         return result
-    src = result.replace("Data saved to: ", "").strip()
+    src = _extract_saved_path(result)
     baseline_dir = os.path.join(os.getcwd(), ".claude", "baselines")
     os.makedirs(baseline_dir, exist_ok=True)
     baseline_path = os.path.join(baseline_dir, f"{name}.png")
@@ -261,7 +265,7 @@ async def screenshot_compare(name: str = "default", width: int = 640, height: in
     result = await _send("screenshot", _args(width=width, height=height, camera=camera))
     if "Data saved to:" not in result:
         return "Could not capture current screenshot"
-    current_path = result.replace("Data saved to: ", "").strip()
+    current_path = _extract_saved_path(result)
     return await visual_diff(baseline_path, current_path, mode=mode, question=question)
 
 

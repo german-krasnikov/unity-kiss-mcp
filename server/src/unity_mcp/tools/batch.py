@@ -16,7 +16,7 @@ async def batch(commands: str, on_error: str = "continue", timeout: float = 30.0
         cmd = line.strip().split()[0] if line.strip() else ""
         if cmd in _dsl_tools:
             raise ToolError(f"{cmd} requires typed MCP tool (Python DSL expansion), not batch")
-    timeout_ms = int((timeout - 5) * 1000)
+    timeout_ms = max(1000, int((timeout - 5) * 1000))
     args = {"commands": commands}
     if on_error != "continue":
         args["on_error"] = on_error

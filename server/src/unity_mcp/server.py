@@ -66,6 +66,7 @@ COMMAND_TIMEOUTS: dict[str, float] = {
 slot: Optional[ConnectionSlot] = None
 manager: Optional[ConnectionSlot] = None  # backward-compat alias for tests/conftest
 _middleware: Optional[Middleware] = None
+_wrapped_send = None
 _budget_tracker = None
 _budget_router = None
 
@@ -111,8 +112,8 @@ async def _send_raw(cmd: str, args: dict, timeout: float = 0) -> str:
 
 
 async def _send(cmd: str, args: dict, timeout: float = 30.0) -> str:
-    if _middleware is not None:
-        return await wrap_send(_send_raw, _middleware)(cmd, args, timeout=timeout)
+    if _wrapped_send is not None:
+        return await _wrapped_send(cmd, args, timeout=timeout)
     return await _send_raw(cmd, args, timeout)
 
 
@@ -154,7 +155,7 @@ def _read_unity_port() -> int:
 
 @asynccontextmanager
 async def lifespan(app):
-    global slot, manager, _middleware, _budget_tracker, _budget_router
+    global slot, manager, _middleware, _wrapped_send, _budget_tracker, _budget_router
     try:
         unity_port = _read_unity_port()
     except (ValueError, OSError):
@@ -220,6 +221,9 @@ async def lifespan(app):
             init_budget(_budget_tracker, _budget_router)
             from .tools import budget_tool as _bt
             _bt._tracker = _budget_tracker
+        global _wrapped_send
+        if _middleware is not None:
+            _wrapped_send = wrap_send(_send_raw, _middleware)
         await slot.connect(unity_port)
         active = slot.bridge
         if active is not None:
@@ -248,6 +252,7 @@ async def lifespan(app):
             active.start_heartbeat()
         yield
     finally:
+        _wrapped_send = None
         if slot and slot.bridge:
             slot.bridge.stop_heartbeat()
         if _middleware and _middleware.watchdog:

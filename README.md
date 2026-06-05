@@ -146,6 +146,13 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.16.0</b> — 2026-06-05 — F12 chat UX overhaul — composed inline-chip field + response pills + session clear</summary>
+
+**F12 Chat UX Overhaul (Plugin v0.16.0)** (2026-06-05) — Five production-ready pieces shipping together: (1) **W0 composed inline-chip field (P1+P2 re …
+
+</details>
+
+<details>
 <summary><b>v0.15.8</b> — 2026-06-05 — inline-chips + extensible chip-kind registry — F11</summary>
 
 **Inline Chips + Extensible Chip-Kind Registry (Plugin v0.15.8, F11)** (2026-06-05) — Production-ready extensible typed-context-chip system for in-Uni …
@@ -174,15 +181,9 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 </details>
 
 <details>
-<summary><b>v0.7.0</b> — 2026-06-04 — Editor.log out-of-band corroboration — P0 compile-tool blindness fix</summary>
-
-**Out-of-Band Compile-Tool Corroboration via Editor.log (Server v0.7.0, P0)** (2026-06-04) — `get_compile_errors`, `await_compile`, `auto_fix`, and `a …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.7.0** — 2026-06-04 — Editor.log out-of-band corroboration — P0 compile-tool blindness fix
 - **v0.6.1** — 2026-06-04 — atomic batch rollback — transactional scene edits
 - **v0.5.0 / 0.12.0** — 2026-06-04 — scoped scene queries — search_scene root+limit + spatial center
 - **v0.11.0** — 2026-06-04 — per-turn undo rollback + Restore button
