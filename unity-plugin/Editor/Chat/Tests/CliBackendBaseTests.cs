@@ -16,12 +16,16 @@ namespace UnityMCP.Editor.Chat.Tests
         internal bool   SimulateRunning;
         internal int    SpawnCallCount, WriteLineCallCount, CloseStdinCallCount;
         internal string LastWrittenLine;
+        internal string LastResumeId = "UNSET"; // sentinel; null = was explicitly passed null
 
         protected override string BinaryName          => "test";
         protected override bool   IsPersistentProcess => _persistent;
 
         protected override (string[] args, string[] stripEnvKeys) BuildArgs(string binaryPath, string resumeId)
-            => (new[] { "arg1" }, new[] { "ENV_KEY" });
+        {
+            LastResumeId = resumeId; // capture for assertions
+            return (new[] { "arg1" }, new[] { "ENV_KEY" });
+        }
 
         protected override void ParseLine(string line, List<ChatEvent> sink)
             => ParseLineFunc?.Invoke(line, sink);

@@ -181,19 +181,18 @@ namespace UnityMCP.Editor.Chat
             return null;
         }
 
-        private static VisualElement Row(string extraClass)
+        internal void Clear()
         {
-            var row = new VisualElement(); row.AddToClassList("msg-row");
-            if (extraClass != null) row.AddToClassList(extraClass);
-            return row;
+            FinalizeAssistant(); _container.Clear(); _msgCount = 0;
         }
+
+        private static VisualElement Row(string cls)
+        { var r = new VisualElement(); r.AddToClassList("msg-row"); if (cls != null) r.AddToClassList(cls); return r; }
 
         internal void Append(VisualElement el)
         {
-            _container.Add(el);
-            _msgCount++;
-            if (_msgCount > MaxMessages)
-            { _container.RemoveAt(0); _msgCount--; }
+            _container.Add(el); _msgCount++;
+            if (_msgCount > MaxMessages) { _container.RemoveAt(0); _msgCount--; }
         }
     }
 }

@@ -92,6 +92,7 @@ namespace UnityMCP.Editor.Chat
                 EditorPrefs.SetBool("MCPChat.AutoScroll", evt.newValue);
             });
             bar.Add(autoScrollToggle);
+            bar.Add(BuildSessionMenuButton());
 
             _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
             bar.Add(_tokenReadout);
