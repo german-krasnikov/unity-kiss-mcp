@@ -1,0 +1,145 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+
+namespace UnityMCP.Editor
+{
+    public static partial class ComponentSerializer
+    {
+        public static GameObject FindObjectOrThrow(string path)
+        {
+            var go = FindObject(path);
+            if (go == null) throw new System.ArgumentException(ErrorHelper.ObjectNotFound(path));
+            return go;
+        }
+
+        public static GameObject FindObject(string path, bool strict = false)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            if (RefManager.IsRef(path))
+            {
+                var resolved = RefManager.Resolve(path);
+                if (resolved != null) return resolved;
+                throw new System.ArgumentException($"Stale ref: {path}. Call get_hierarchy to refresh.");
+            }
+
+            if (path.StartsWith("/")) path = path.Substring(1);
+            if (string.IsNullOrEmpty(path)) return null;
+
+            var parts = path.Split('/');
+            var root = FindRoot(parts[0]);
+            if (root == null) return strict ? null : TryFuzzyFind(path, parts);
+
+            GameObject current = root;
+            for (int i = 1; i < parts.Length; i++)
+            {
+                Transform child = current.transform.Find(parts[i]);
+                if (child == null) return strict ? null : TryFuzzyFind(path, parts);
+                current = child.gameObject;
+            }
+            return current;
+        }
+
+        internal static GameObject FindObjectById(int instanceId)
+        {
+            var obj = EditorUtility.InstanceIDToObject(instanceId);
+            return obj as GameObject;
+        }
+
+        private static GameObject FindRoot(string name)
+        {
+            var stage = PrefabStageUtility.GetCurrentPrefabStage();
+            if (stage != null && stage.prefabContentsRoot.name == name)
+                return stage.prefabContentsRoot;
+
+            for (int s = 0; s < UnityEngine.SceneManagement.SceneManager.sceneCount; s++)
+            {
+                var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(s);
+                if (!scene.isLoaded) continue;
+                foreach (var root in scene.GetRootGameObjects())
+                    if (root.name == name) return root;
+            }
+            return null;
+        }
+
+        private static GameObject TryFuzzyFind(string path, string[] parts)
+        {
+            var lastName = parts[parts.Length - 1];
+            var candidates = new List<GameObject>();
+
+            for (int s = 0; s < UnityEngine.SceneManagement.SceneManager.sceneCount; s++)
+            {
+                var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(s);
+                if (!scene.isLoaded) continue;
+                foreach (var root in scene.GetRootGameObjects())
+                    FindByName(root, lastName, candidates, 5);
+            }
+
+            if (parts.Length > 1)
+            {
+                var suffix = "/" + string.Join("/", parts);
+                candidates.RemoveAll(c => !GetPath(c).EndsWith(suffix, System.StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (candidates.Count == 1)
+                return candidates[0];
+            if (candidates.Count > 1)
+                throw new System.ArgumentException(
+                    $"Ambiguous: '{path}'. Did you mean: " +
+                    string.Join(", ", candidates.ConvertAll(c => GetPath(c))));
+            return null;
+        }
+
+        private static void FindByName(GameObject root, string name, List<GameObject> results, int max)
+        {
+            var queue = new Queue<GameObject>();
+            queue.Enqueue(root);
+            while (queue.Count > 0 && results.Count < max)
+            {
+                var go = queue.Dequeue();
+                if (go.name.Equals(name, System.StringComparison.OrdinalIgnoreCase))
+                    results.Add(go);
+                for (int i = 0; i < go.transform.childCount; i++)
+                    queue.Enqueue(go.transform.GetChild(i).gameObject);
+            }
+        }
+
+        /// <summary>Strip namespace prefix: "UnityEngine.UI.Button" → "Button"</summary>
+        internal static string StripNamespace(string typeName)
+        {
+            if (typeName == null) return null;
+            var dot = typeName.LastIndexOf('.');
+            return dot >= 0 ? typeName.Substring(dot + 1) : typeName;
+        }
+
+        internal static Component FindComponent(GameObject go, string typeName)
+        {
+            var shortName = InputNormalizer.NormalizeComponent(StripNamespace(typeName), go);
+            foreach (var comp in go.GetComponents<Component>())
+            {
+                if (comp == null) continue;
+                var t = comp.GetType();
+                if (t.Name == shortName || t.FullName == typeName)
+                    return comp;
+                var bt = t.Name.IndexOf('`');
+                if (bt > 0 && t.Name.Substring(0, bt).Equals(shortName, System.StringComparison.OrdinalIgnoreCase))
+                    return comp;
+            }
+            return null;
+        }
+
+        internal static string GetPath(GameObject go)
+        {
+            var path = go.name;
+            var t = go.transform.parent;
+            while (t != null)
+            {
+                path = t.name + "/" + path;
+                t = t.parent;
+            }
+            return "/" + path;
+        }
+    }
+}
