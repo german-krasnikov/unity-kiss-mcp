@@ -5,7 +5,7 @@ namespace UnityMCP.Editor.Chat
     internal static class UserTextCleaner
     {
         private static readonly Regex AtMention = new Regex(
-            @"(?<=^|\s)@[\w.]+ ?", RegexOptions.Compiled);
+            @"(?<=^|\s)@\S+ ?", RegexOptions.Compiled);
 
         internal static string Strip(string text)
         {

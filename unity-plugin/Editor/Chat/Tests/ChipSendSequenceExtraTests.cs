@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
@@ -30,39 +29,11 @@ namespace UnityMCP.Editor.Chat.Tests
             ChipPillFactory.ColorResolver = null;
         }
 
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
-
-        private void InsertChip(ChipData chip, string displayName)
-        {
-            var tf = _chipField.TextField;
-            int cursor = tf.cursorIndex;
-            _chipField.AddChip(chip);
-            var mention = "@" + displayName + " ";
-            tf.value = (tf.value ?? "").Insert(cursor, mention);
-            tf.selectIndex = tf.cursorIndex = cursor + mention.Length;
-        }
-
-        private void SetCursor(int pos) { _chipField.TextField.cursorIndex = pos; _chipField.TextField.selectIndex = pos; }
-        private void Type(string text) { _chipField.Text = (_chipField.Text ?? "") + text; SetCursor(_chipField.Text.Length); }
-
-        private (string turnJson, string rawText) SimulateSend()
-        {
-            var rawText  = (_chipField.Text ?? "").Trim();
-            var snapshot = _chipField.Model.Count > 0 ? new List<ChipData>(_chipField.Model.Chips) : null;
-            var llmText  = rawText;
-            if (_chipField.Model.Count > 0)
-            {
-                var ctx = _chipField.Model.SerializePayload(_cfg);
-                if (!string.IsNullOrEmpty(ctx)) llmText += "\n" + ctx;
-            }
-            if (string.IsNullOrEmpty(llmText)) return (null, rawText);
-            var turnJson = UserTurnBuilder.Build(llmText);
-            _transcript.AppendUserBubble(rawText, snapshot);
-            _chipField.ClearChips();
-            _chipField.Text = "";
-            return (turnJson, rawText);
-        }
+        private static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
+        private void InsertChip(ChipData c, string n) => ChipTestHelpers.InsertChip(_chipField, c, n);
+        private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
+        private void Type(string t) => ChipTestHelpers.Type(_chipField, t);
+        private (string, string) SimulateSend() => ChipTestHelpers.SimulateSend(_chipField, _transcript, _cfg);
 
         [Test]
         public void Send_MixedKinds_AllBracketsInPayload()

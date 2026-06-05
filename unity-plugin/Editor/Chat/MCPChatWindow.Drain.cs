@@ -62,9 +62,7 @@ namespace UnityMCP.Editor.Chat
             // #26 Staleness guard: discard state saved by a crash/restart older than threshold.
             // SavedAtUtc == 0 means legacy file (no timestamp) — allowed through.
             // Idle saves are exempt: they represent user-composed (not in-flight) state.
-            const long StalenessThresholdSec = 60;
-            if (p.ActivityPhase != "Idle" && p.SavedAtUtc > 0
-                && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - p.SavedAtUtc > StalenessThresholdSec)
+            if (PendingTurnState.IsStale(p, DateTimeOffset.UtcNow.ToUnixTimeSeconds()))
                 return; // stale crash/restart artifact — file already cleared, silently discard
 
             _agentMode     = p.AgentMode;

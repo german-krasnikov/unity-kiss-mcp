@@ -71,5 +71,17 @@ namespace UnityMCP.Editor.Chat.Tests
             field.RemoveChipAt(0);
             Assert.AreEqual("@A", field.Text);
         }
+
+        [Test]
+        public void TwoChipsWithoutRefocus_SecondUsesLastCursorPos()
+        {
+            var field = new InlineChipField();
+            field.AddChip(Chip("A"));
+            field.TextField.value = "@A ";
+            field.TextField.cursorIndex = 3;
+            field.TextField.selectIndex = 3;
+            // Without FocusOut, LastCursorPos is still 0 (stale)
+            Assert.AreEqual(0, field.LastCursorPos, "LastCursorPos stale without FocusOut");
+        }
     }
 }

@@ -31,5 +31,17 @@ namespace UnityMCP.Editor.Chat.Tests
 
         [Test] public void Strip_EmptyInput()
             => Assert.AreEqual("", UserTextCleaner.Strip(""));
+
+        [Test] public void Strip_MentionWithHyphen()
+            => Assert.AreEqual("check", UserTextCleaner.Strip("@Main-Camera check"));
+
+        [Test] public void Strip_MentionWithParens()
+            => Assert.AreEqual("what", UserTextCleaner.Strip("@Capsule_(1) what"));
+
+        [Test] public void Strip_MentionWithParensAndHyphen()
+            => Assert.AreEqual("fix", UserTextCleaner.Strip("@My-Object_(2) fix"));
+
+        [Test] public void Strip_MentionWithTrailingComma()
+            => Assert.AreEqual("fix", UserTextCleaner.Strip("@Player, fix"));
     }
 }

@@ -38,6 +38,14 @@ namespace UnityMCP.Editor.Chat
             BackendKind   = backendKind;
         }
 
+        // ── Staleness guard ───────────────────────────────────────────────────
+        internal static bool IsStale(PendingTurnState state, long nowUtc, long thresholdSec = 60)
+        {
+            return state.ActivityPhase != "Idle"
+                && state.SavedAtUtc > 0
+                && nowUtc - state.SavedAtUtc > thresholdSec;
+        }
+
         // ── Serialization ─────────────────────────────────────────────────────
         // v1 header: SessionId|PendingTextB64|AgentMode|AgentNameB64|ActivityPhaseB64|ChipCount
         // v2 header: ...same...|UndoGroupId|SavedAtUtc

@@ -23,30 +23,10 @@ namespace UnityMCP.Editor.Chat.Tests
             ChipPillFactory.ColorResolver = null;
         }
 
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
-
-        private void InsertChip(ChipData chip, string displayName)
-        {
-            var tf = _chipField.TextField;
-            int cursor = tf.cursorIndex;
-            _chipField.AddChip(chip);
-            var mention = "@" + displayName + " ";
-            tf.value = (tf.value ?? "").Insert(cursor, mention);
-            tf.selectIndex = tf.cursorIndex = cursor + mention.Length;
-        }
-
-        private void SetCursor(int pos)
-        {
-            _chipField.TextField.cursorIndex = pos;
-            _chipField.TextField.selectIndex = pos;
-        }
-
-        private void Type(string text)
-        {
-            _chipField.Text = (_chipField.Text ?? "") + text;
-            SetCursor(_chipField.Text.Length);
-        }
+        private static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
+        private void InsertChip(ChipData c, string n) => ChipTestHelpers.InsertChip(_chipField, c, n);
+        private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
+        private void Type(string t) => ChipTestHelpers.Type(_chipField, t);
 
         // ── Cursor placement ──────────────────────────────────────────────────
 
