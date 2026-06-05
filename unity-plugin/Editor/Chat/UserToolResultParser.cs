@@ -42,14 +42,31 @@ namespace UnityMCP.Editor.Chat
         {
             var toolUseId  = JsonHelper.ExtractString(obj, "tool_use_id") ?? "";
             var isErr      = JsonHelper.ExtractString(obj, "is_error") == "true";
-            var resultText = JsonHelper.ExtractString(obj, "content");
-            if (resultText == null)
-            {
-                var inner    = JsonHelper.ExtractArray(obj, "content");
-                var innerObj = JsonHelper.ExtractFirstArrayObject(inner);
-                resultText   = innerObj != null ? JsonHelper.ExtractString(innerObj, "text") ?? "" : "";
-            }
+            // content can be a JSON string OR a JSON array of {type,text} objects.
+            // ExtractString returns garbage for arrays (not null), so peek at raw char.
+            var resultText = IsContentArray(obj)
+                ? ExtractNestedText(obj)
+                : JsonHelper.ExtractString(obj, "content");
             return ChatEvent.ToolResult(toolUseId, resultText ?? "", !isErr);
+        }
+
+        // Peek after "content": — '[' means array, '"' means string.
+        private static bool IsContentArray(string obj)
+        {
+            int idx = obj.IndexOf("\"content\"", System.StringComparison.Ordinal);
+            if (idx == -1) return false;
+            int colon = obj.IndexOf(':', idx + 9);
+            if (colon == -1) return false;
+            int i = colon + 1;
+            while (i < obj.Length && obj[i] == ' ') i++;
+            return i < obj.Length && obj[i] == '[';
+        }
+
+        private static string ExtractNestedText(string obj)
+        {
+            var inner    = JsonHelper.ExtractArray(obj, "content");
+            var innerObj = JsonHelper.ExtractFirstArrayObject(inner);
+            return innerObj != null ? JsonHelper.ExtractString(innerObj, "text") ?? "" : "";
         }
     }
 }
