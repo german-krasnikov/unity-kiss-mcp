@@ -235,30 +235,32 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **Receive-side (response):** ResponseTagInliner.Apply() parses ONLY exact `[kind:ref]` format (conservative regex, no false positives on markdown/code/bare brackets); renders compact colored pills with `<link>` click-nav (symmetric with input)
 - **Tests:** ChipKindDetector 13/13, ResponseTagInliner 17/17 (false-positive guards), EmitTyped 7/7, DepthFor 10/10, ChipConfig 3/3
 
-### Extensible Chip-Kind Registry + Inline Rendering (v0.15.8 F11)
+### Extensible Chip-Kind Registry + Composed Inline Field (v0.15.8 F11 + v0.16.0 F12)
 - **IChipKindProvider** — Public interface for third-party plugins: Key, Priority, CanHandle, Create, IconName, HexColor, FormatPayload, DefaultDepth, Navigate
 - **ChipKindRegistry** — Public static registry; plugins call `Register(provider)` from `[InitializeOnLoad]`. Detection: `Resolve(obj, assetPath)` returns first provider where `CanHandle` true (sorted by Priority). Supports dynamic Unregister + per-key lookup
 - **Priority Convention:** <100 overrides built-in type, 100–800 built-ins, >800 extends (new kinds). 8 built-in providers: Hierarchy/Scene/Script/Prefab/Material/Texture/ScriptableObject/Asset
-- **Inline Rendering:** Chips render at cursor (not row strip). `UitkCharRect.cs` uses PUBLIC `TextField.textSelection.GetCursorPositionFromStringIndex` API (confirmed live Unity 6000.3.0b7). H10 degradation: if API unavailable, falls back to row-layout
-- **Width Reservation:** `NbspReservation.cs` reserves pill space via U+FFFC + N×U+00A0 (non-breaking spaces), prevents layout reflow
-- **Atomic Caret:** `TokenSpan.cs` — caret skips whole chips (never mid-pill), backspace deletes entire chip (not char-by-char)
+- **Inline Rendering (F12 refactor):** Replaced overlay stack (InlineChipOverlay/UitkCharRect/NbspReservation/TokenSpan) with **composed `InlineChipField`** — a flex-row VisualElement with pill children + trailing TextField. Pills are layout children, not overlays, eliminating mis-positioning and vanish-on-type bugs. Atomic backspace-at-0 removes last chip (standard tag-input UX). `InlineChipModel` is pure headless data (no rendering). `ChipPillFactory` builds pills shared by input field and response rendering.
+- **Chip Display Overrides (F12 P4):** `ChipDisplayOverride` struct + parallel arrays in `ChipConfig` support per-kind LLM-payload depth (none/path/summary/full) and graphical color customization. Settings form enumerates all registered kinds (built-in + 3rd-party) dynamically with depth dropdown + color field. `ChipPillFactory.ColorResolver` static seam (set once on window open, consulted by both input and response pills). Zero core edits needed for 3rd-party customization.
 - **Show LLM Payload:** Right-click context menu reveals exact byte-for-byte AI payload (symmetry test enforces match)
-- **Reload Survival:** `PendingTurnState v4` serializes `KindKeys[]` parallel to chip paths; on resume, re-binds by key (fallback: re-detect if provider not registered yet)
-- **Breaking Change (BUG B):** `ChipConfig` default depth `"summary"` → `"path"` (token-minimal). Restore via F9 settings form. Marked in-code: `// BREAKING (H15)`
-- **Tests:** ChipKindRegistryTests, ChipKindRegistryPipelineTests, NbspReservationTests, TokenSpanTests, UitkCharRectProbeTests, Wave4ChipInputTests — all suites 100% pass
+- **Reload Survival:** `PendingTurnState v5` serializes `KindKeys[]` parallel to chip paths; on resume, re-binds by key (fallback: re-detect if provider not registered yet)
+- **Breaking Change (BUG B):** `ChipConfig` default depth `"summary"` → `"path"` (token-minimal). Restore via F9 settings form. Marked in-code: `// BREAKING (v0.16.0)`.
+- **Response Pills (F12 P7):** `ResponseTagInliner.Split()` + `MixedParagraphRenderer` render response-side `[kind:ref]` tags as graphical pills (leaf name, click→ping/select, tooltip=full ref) in paragraphs and lists. `RefParser` (inverse of FormatChipRef) strips ` #id` from hierarchy refs before lookup. Pills colored via shared `ChipPillFactory.ColorResolver` (live-updated on settings change).
+- **No Auto-Selection (F12 P3+P5):** Removed legacy auto-prepend of SelectionSummary. Context flows exclusively through explicit typed chips (prevents duplicate/verbose context). SelectionSummary class kept for depth="summary" resolution in ChipContextResolver.
+- **Tests:** ChipKindRegistryTests, InlineChipModelTests, ChipPillFactoryTests, InlineChipFieldTests, ChipDisplayOverrideTests, ResponseTagInlinerTests, MixedParagraphRendererTests, NewSessionTests — 1581/1586 EditMode pass (5 pre-existing reds)
 
-### UX Features (v0.15.0 F1–F10 + v0.15.8 F11)
+### UX Features (v0.15.0 F1–F10 + v0.15.8 F11 + v0.16.0 F12)
 - **F1 (Token Reset):** TokenResetTests ensure counters reset on backend/model switch
 - **F2 (Cascade Restore):** TurnUndoTracker.RestoreFromIndex() reverts any earlier turn + all later turns (reverse order)
 - **F3 (Approve Gate):** Button shows only when turn has real tool calls (_turnHasToolCalls flag)
 - **F4 (Hierarchy #ID):** ChipContextResolver appends `#<instanceID>` to scene object refs (SelectionSummary.Summarize disambiguation)
-- **F5 (Inline Chips):** InlineChipTracker + InlineChipOverlay (drag-drop, removable ✕, context menu "Add Selection")
+- **F5 (Inline Chips):** InlineChipField composed control (flex-row of pill children + TextField) replacing overlay stack; drag-drop, removable ✕ button, context menu "Add Selection"
 - **F6 (Auto-Scroll Toggle):** EditorPref gate (default ON) for scroll behavior during streaming
 - **F7 (Status Distinction):** ChatBackendProbe detects Chat-active vs CLI-listening (3-state: Down/Listen/ChatActive); domain-reload safe (per-call resolution)
 - **F8 (No Beta Labels):** Removed "(Beta)" from chat toggle + settings foldout
-- **F9 (Settings Form):** Per-backend config form → own JSON → CLI args (see BackendConfig above)
+- **F9 (Settings Form):** Per-backend config form → own JSON → CLI args; includes per-kind chip depth/color overrides (see BackendConfig above)
 - **F10 (Typed Tags):** Kind-aware input/output chips with configurable depth (see Typed Context Tags above)
-- **F11 (Extensible Registry + Inline Render):** IChipKindProvider public interface + ChipKindRegistry for third-party chip kinds; inline-at-cursor rendering via UitkCharRect.GetCursorPositionFromStringIndex + NbspReservation; TokenSpan atomic-caret behavior; BUG B breaking change (see Extensible Chip-Kind Registry above)
+- **F11 (Extensible Registry + Inline Render):** IChipKindProvider public interface + ChipKindRegistry for third-party chip kinds (see Chip-Kind Registry above)
+- **F12 (Chip UX Overhaul):** Composed inline-chip field (P1+P2), removed auto-selection (P3+P5), per-kind display settings (P4), response scene-object pills (P7), new-session/clear button (P6). See Extensible Chip-Kind Registry + Composed Inline Field above for details.
 
 ### Editor UI Windows (C#: UIToolkit)
 - **MCPSettings Window** (MCPSettings.cs): Tool visibility toggles, organized by theme categories (CORE locked, others toggle/tri-state group masters), search bar, presets (Minimal/Full/No-visuals), dynamic Plugins section from PluginRegistry. Stylesheet: `MCPSettings.uss`.
@@ -387,15 +389,16 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 **C#** (130+ files, 13400+ LOC):
 - **Core** (50+ files): MCPServer, CommandRouter (3 partials), CommandRegistry/Schema, IMCPPlugin/PluginRegistry, ObjectManager, ValueParser, InputNormalizer, BatchHelper, HierarchySerializer, ComponentSerializer, RefManager, ErrorHelper, RuntimeHelper, PlaytestRunner (2 partials), PlaytestParser, MultiViewCapture, CodeExecutor, SearchHelper, SpatialHelper, AnimationHelper, TimelineHelper, AnimatorControllerHelper, ParticleHelper, ShaderHelper, ShaderGraphHelper, UIHelper, ReferenceHelper, AssetDatabaseHelper, ProjectSettingsHelper, MaterialHelper, PrefabHelper, ScriptableObjectHelper, MCPSettings, MCPSettingsUI, MCPSettingsCategoryGroup, CatalogParser, MCPStatusWindow, MCPStatusModel, MCPStatusBarWidget, MCPActions
-- **Chat Module** (80+ files, optional behind UNITY_MCP_CHAT define):
+- **Chat Module** (85+ files, optional behind UNITY_MCP_CHAT define):
   - **Backends:** CliBackendBase, ClaudeBackend, CodexBackend, CodexArgBuilder, CodexStreamParser, BackendRegistry, BackendConfig, BackendConfigStore, BackendSettingsForm
-  - **UX Features:** MCPChatWindow (7 partials: Drain, FlowBar, Chips, InlineChips, Selector, Approve, Slash, Resize), RestoreButton, TurnUndoTracker, SelectionSummary, CompileAutoFix, EditorStateSnapshot, ToolPing
-  - **Context & Tags:** ChipContextResolver, ChipKindDetector, ResponseTagInliner, InlineChipData, InlineChipOverlay, InlineChipKeyHandler
+  - **UX Features:** MCPChatWindow (8 partials: Drain, FlowBar, Chips, InlineChips, Selector, Approve, Slash, Session, Resize), RestoreButton, TurnUndoTracker, SelectionSummary, CompileAutoFix, EditorStateSnapshot, ToolPing
+  - **Context & Tags:** ChipContextResolver, ChipKindDetector, ResponseTagInliner, InlineChipData, InlineChipModel, ChipPillFactory, InlineChipField
+  - **Response Rendering:** MixedParagraphRenderer (paragraph pills), RefParser (ref parsing for response pills)
   - **Infrastructure:** ChatStreamParser, ChatEvent, ChatTranscript, IChatBackend, ChatBinaryResolver, ChatProcess, ChatMcpConfigWriter, PendingTurnState, ReloadGuard, SentTextCache, StderrRingBuffer
   - **Tools & Input:** ToolVerbMap, ToolCallAccumulator, ToolCallRecord, ToolChipGrouper, ToolDetailBuilder, ToolGroupState, ToolGroupSummary, UserTurnBuilder, UserToolResultParser
   - **UX/Formatting:** TokenFormat, EnterKeySend, EnterKeyLogic, ChatActivityState, ChatLabel, ChatRefAction, ChatRefResolver, CopyableText, CopyTextBuilder, InputHeightCalc, JsonArrayScan, ArgTokenizer, ArgQuoting
   - **Rendering:** Markdown/ (MdBlock, MarkdownParser, MarkdownParser.Blocks, MarkdownInline, IChatBlockRenderer, ChatBlockRendererRegistry, ChatBlockRendererFactory, MarkdownBlockRenderer, MarkdownBlockRenderer.Table, MarkdownBlockRenderer.List, ImageBlockRenderer, ChatLinkify), Mermaid/ (MermaidGraph, MermaidParser, MermaidLayout, MermaidLayout.Layers, MermaidBlockRenderer, MermaidView, MermaidEdgePainter)
-  - **Test Suites** (25+ NUnit files): ChatStreamParserTests, CliBackendBaseTests, CodexArgBuilderTests, CodexStreamParserTests, ClaudeArgBuilderTests, ToolVerbMapTests, EnterKeySendTests, PendingTurnStateTests, SelectionSummaryTests, SentTextCacheTests, ApproveFlowTests, SlashRegistryTests, SlashPopupTests, InlineChipTrackerTests, ArgTokenizerTests, ArgQuotingTests, BackendConfigStoreTests, BackendRegistryTests, ChatActivityStateTests, ChatLinkifyTests, ChatMcpConfigWriterTests, ChatProcessTests, ChatBinaryResolverTests, ChipContextResolverTests, ChipKindDetectorTests, ResponseTagInlinerTests, TokenResetTests, RestoreButtonTests, TurnUndoTrackerTests, and Markdown/Mermaid render tests (66 cases total)
+  - **Test Suites** (30+ NUnit files): ChatStreamParserTests, CliBackendBaseTests, CodexArgBuilderTests, CodexStreamParserTests, ClaudeArgBuilderTests, ToolVerbMapTests, EnterKeySendTests, PendingTurnStateTests, SelectionSummaryTests, SentTextCacheTests, ApproveFlowTests, SlashRegistryTests, SlashPopupTests, InlineChipModelTests, InlineChipFieldTests, ChipPillFactoryTests, ChipDisplayOverrideTests, ArgTokenizerTests, ArgQuotingTests, BackendConfigStoreTests, BackendRegistryTests, ChatActivityStateTests, ChatLinkifyTests, ChatMcpConfigWriterTests, ChatProcessTests, ChatBinaryResolverTests, ChipContextResolverTests, ChipKindDetectorTests, ResponseTagInlinerTests, ResponseTagPillTests, MixedParagraphRendererTests, NewSessionTests, TokenResetTests, RestoreButtonTests, TurnUndoTrackerTests, and Markdown/Mermaid render tests (80+ cases total)
   - **Styling:** MCPChatWindow.uss
   - **Assembly:** UnityMCP.Editor.Chat.asmdef (one-way ref to core)
 

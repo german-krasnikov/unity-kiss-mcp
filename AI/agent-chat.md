@@ -310,15 +310,17 @@ Result: No stale token carry-over across model changes.
 
 ### Feature F5 — Inline Removable Chips + Drag-Drop + Context Menu
 
-`InlineChipData.cs` + `InlineChipTracker.cs` + `InlineChipOverlay.cs` + `InlineChipKeyHandler.cs`: Type objects directly into the composer via drag-drop. Chips appear as removable pills (✕) at cursor (fallback: top-left row if char-rect API unavailable in 2021).
+`InlineChipModel.cs` + `InlineChipField.cs` + `ChipPillFactory.cs`: Type objects directly into the composer via drag-drop. Chips appear as removable pills (✕) in a leading flex-row before the TextField (v0.16.0 refactored from overlay stack).
 
-**Drag-drop routing** (`Chips.cs` OnDragPerform): hit-test vs `_input.worldBound` chooses inline vs strip chip.
+**Composed field** (`InlineChipField`): Pills are real layout children (flex-row), not overlays. No pixel-positioning bugs, no NBSP markers. Backspace-at-caret-0 removes last chip (atomic).
 
-**Context menu** (`MCPChatWindow.cs` OnContextualMenuPopulate): "Add Selection to Context" inserts chip at cursor.
+**Drag-drop routing** (`Chips.cs` OnDragPerform): Drops on field area add chips.
 
-**Tracker logic** (`InlineChipTracker.SyncToText()`): Common-prefix/suffix diff detects which U+FFFC marker was deleted → drops matching chip (handles backspace, selection-delete, paste).
+**Context menu** (`InlineChipField` + right-click on pill): "Add Selection to Context" inserts chip, "Show LLM Payload" reveals send-path format, "Remove" deletes chip.
 
-Verified: InlineChipTrackerTests 13/13 green, visual/interactive paths compile clean.
+**Model logic** (`InlineChipModel.Add/Remove/Clear`): Headless data layer. Pill rendering delegated to `ChipPillFactory` (shared with response pills, v0.16.0 P7).
+
+Verified: InlineChipModelTests 11/11, InlineChipFieldTests 7/7, visual/interactive paths compile clean.
 
 ### Feature F6 — Auto-Scroll Toggle
 
@@ -469,6 +471,73 @@ All suites: 100% pass, zero new failures (5 pre-existing reds unrelated to F11).
 **ChatBackendProbe Reload-Safety:** Drops stale static MethodInfo cache; resolved per-call so status stays correct across domain reloads (was wrongly showing Listen when Chat was active).
 
 **Dedup BackendConfigStore.Load():** MCPChatWindow.OnSend/AttachScreenshot now load store once and thread into AppendChipContext (lazy ??= fallback), avoiding double file-read+parse per turn.
+
+### Feature F12 — Chip UX Overhaul (v0.16.0)
+
+**Five production-ready pieces shipped together, resolving seven user problems (P1–P7):**
+
+#### P1+P2: Composed Inline-Chip Field (Overlay Stack Deleted)
+
+Replaced 466-line overlay architecture (InlineChipOverlay, NbspReservation, UitkCharRect, TokenSpan) with a simple **composed `InlineChipField`** — a flex-row VisualElement with pill children + trailing TextField.
+
+**Why composed > overlay:**
+- Pills are layout children, not overlays → never mis-position, never vanish on typing (P1+P2 solved by construction)
+- No pixel-chasing, no NBSP markers, no coordinate-space drift
+- Backspace-at-caret-0 removes last chip (atomic, standard tag-input UX)
+
+**New classes:**
+- `InlineChipModel` — Pure headless data (add/remove/clear/serialize/restore). Fully unit-testable. No Unity rendering dependency.
+- `ChipPillFactory` — Static factory builds pills from registry. Shared by input field + response rendering (P7).
+- `InlineChipField` — Composed VisualElement control. Flex-row of pill children + trailing TextField. Backspace-at-0 handler, context menu per pill.
+
+#### P3+P5: Removed Legacy Auto-Selection
+
+Deleted auto-prepend of `SelectionSummary` in send path. Context now flows **exclusively through explicit typed chips**. Prevents duplicate/verbose context. `SelectionSummary` class kept for depth="summary" resolution in chip context resolver.
+
+#### P4: Per-Kind Chip Display Settings (Depth + Color)
+
+Registry-driven settings form enumerates all registered kinds (built-in + 3rd-party plugins) dynamically. Each kind has:
+- **Depth dropdown:** none/path/summary/full (LLM payload customization)
+- **Color field:** Graphical pill color override
+
+**Classes:**
+- `ChipDisplayOverride` struct — Per-kind overrides (depth + hex color). Null fields = use provider default.
+- `ChipConfig` — Extended with parallel arrays (`OverrideKeys[]`, `OverrideDepths[]`, `OverrideColors[]`) for 3rd-party kinds. Maintains backward compat with legacy explicit fields.
+- `ChipPillFactory.ColorResolver` — Static `Func<string, string>` seam. Set once on window open, consulted by both input + response pills. Live-updated on settings save.
+
+**Resolution order (per-kind):** Override > Legacy field > Provider default. No hardcoded kind lists, no switches.
+
+#### P7: Response Scene-Object Pills (MixedParagraphRenderer)
+
+Response-side `[kind:ref]` tags now render as graphical pills (leaf name, click→ping/select, tooltip=full ref) in paragraphs and lists — identical to input pills.
+
+**Classes:**
+- `ResponseTagInliner.Split()` — Returns ordered segments (text runs + parsed tags). Reuses existing registry-driven regex.
+- `RefParser` — Inverse of `ChipContextResolver.FormatChipRef`. Strips ` #id` from hierarchy refs (`/Root/Child #123` → path="/Root/Child"), extracts leaf name, parses InstanceID.
+- `MixedParagraphRenderer.Render()` — Flex-row container with Labels (text runs via MarkdownInline.ToRichText) + ChipPillFactory pills (response mode: no remove button, click-to-navigate). Tooltip = full ref.
+
+**Side benefit:** Fixed pre-existing bug where `HierarchyChipProvider.Navigate` received full ref WITH `#id` suffix and couldn't match paths.
+
+#### P6: New-Session / Clear Button
+
+Dropdown button with confirm dialog. Clicking "Clear" tears down the current chat:
+1. Kill + restart the backend (fresh `CreateBackend()` with new `EditorStateSnapshot` + `SessionId=null` → next turn has no `--resume`)
+2. Clear transcript + input + inline chips
+3. Call `ReloadGuard.ClearPendingState()` so domain-reload can't resurrect old turn state
+4. Reset per-session window state (sent-text cache, activity, token counters, turn flags)
+
+**New class:** `MCPChatWindow.Session.cs` partial.
+
+#### Test Coverage & Metrics
+
+- **New test suites:** InlineChipModelTests, InlineChipFieldTests, ChipPillFactoryTests, ChipDisplayOverrideTests, ResponseTagInlinerTests, MixedParagraphRendererTests, NewSessionTests
+- **Test count:** 1581/1586 EditMode pass (5 pre-existing reds, 0 CS errors)
+- **Code delta:** −806 net lines (overlay stack deleted), +23 new tests
+- **Breaking change:** `ChipConfig` default depth `"summary"` → `"path"` (token-minimal). Users restore via F9 settings form. Marked in-code: `// BREAKING (v0.16.0)`.
+
+#### Package Version Change
+
+`package.json` unity min bumped **2022.3 → 6000.0**. Rationale: The editor is already running 6000.3.0b7; the old minimum was a lie. Per META mandate: "If a limitation forces raising the Unity minimum to 6.0, DO IT." Migration cost: one line. Risk: Users on 2022.3 lose access — but they never had the full chip feature anyway (text APIs differ).
 
 ### Binary Resolution on macOS
 

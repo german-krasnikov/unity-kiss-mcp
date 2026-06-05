@@ -9,7 +9,8 @@ namespace UnityMCP.Editor.Chat
     {
         /// <summary>
         /// Render a paragraph with mixed text+tag content.
-        /// Returns a flex-row/wrap VisualElement container marked with md-para and md-para--mixed.
+        /// Returns a flex-row/wrap VisualElement container marked with md-para--mixed;
+        /// caller adds the contextual class (md-para / md-list-content).
         /// </summary>
         internal static VisualElement Render(string rawText)
         {
