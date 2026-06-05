@@ -34,7 +34,7 @@ namespace UnityMCP.Editor.Chat
 
         private void OnCompilationFinished(object obj)
         {
-            var hasErrors = CompileErrorCapture.GetErrors() != "No compilation errors";
+            var hasErrors = CompileErrorCapture.HasErrors();
             SimulateCompilation(hasErrors);
         }
 

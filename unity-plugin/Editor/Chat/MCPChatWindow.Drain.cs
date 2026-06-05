@@ -151,7 +151,7 @@ namespace UnityMCP.Editor.Chat
                         _tokenReadout.text =
                             $"↑ {TokenFormat.Abbr(_inputTokens)}  ↓ {TokenFormat.Abbr(_outputTokens)}";
                     }
-                    var hasErrors = CompileErrorCapture.GetErrors() != "No compilation errors";
+                    var hasErrors = CompileErrorCapture.HasErrors();
                     if (hasErrors)
                     {
                         // Cap reached: show chip once here, after the 3rd dispatched turn.

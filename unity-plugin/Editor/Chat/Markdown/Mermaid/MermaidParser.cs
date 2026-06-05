@@ -178,8 +178,10 @@ namespace UnityMCP.Editor.Chat
             return seg;
         }
 
+        private static readonly Regex _validId = new Regex(@"^[A-Za-z0-9_]+$", RegexOptions.Compiled);
+
         private static bool IsValidId(string s) =>
-            !string.IsNullOrEmpty(s) && Regex.IsMatch(s, @"^[A-Za-z0-9_]+$");
+            !string.IsNullOrEmpty(s) && _validId.IsMatch(s);
 
         // Case-insensitive: <br>, <br/>, <br />, <BR/>, etc.
         private static readonly Regex _br = new Regex(

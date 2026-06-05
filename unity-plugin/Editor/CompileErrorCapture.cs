@@ -29,6 +29,8 @@ namespace UnityMCP.Editor
             }
         }
 
+        public static bool HasErrors() => _errors.Count > 0;
+
         public static string GetErrors()
         {
             if (_errors.Count == 0) return "No compilation errors";

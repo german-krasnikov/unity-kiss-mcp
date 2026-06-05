@@ -29,22 +29,10 @@ namespace UnityMCP.Editor.Chat
             switch (_activity.Phase)
             {
                 case ActivityPhase.Sending:
-                    _flowBar.AddToClassList("flowbar--active");
-                    _flowFill.RemoveFromClassList("flowbar__fill--receiving");
-                    _flowFill.AddToClassList("flowbar__fill--sending");
-                    // Kick chip to --a immediately so motion starts now, not ~950ms later
-                    _flowFill.RemoveFromClassList("flowbar__fill--b");
-                    _flowFill.AddToClassList("flowbar__fill--a");
-                    _sweepPhase = false; // first tick flips to --b → chip sweeps --a→--b, no dead hold
+                    SetFlowBarActive("flowbar__fill--sending", "flowbar__fill--receiving");
                     break;
                 case ActivityPhase.Receiving:
-                    _flowBar.AddToClassList("flowbar--active");
-                    _flowFill.RemoveFromClassList("flowbar__fill--sending");
-                    _flowFill.AddToClassList("flowbar__fill--receiving");
-                    // Kick chip to --a immediately so motion starts now, not ~950ms later
-                    _flowFill.RemoveFromClassList("flowbar__fill--b");
-                    _flowFill.AddToClassList("flowbar__fill--a");
-                    _sweepPhase = false; // first tick flips to --b → chip sweeps --a→--b, no dead hold
+                    SetFlowBarActive("flowbar__fill--receiving", "flowbar__fill--sending");
                     break;
                 default:
                     _flowBar.RemoveFromClassList("flowbar--active");
@@ -55,6 +43,17 @@ namespace UnityMCP.Editor.Chat
                     _sweepPhase = false;
                     break;
             }
+        }
+
+        private void SetFlowBarActive(string addCls, string removeCls)
+        {
+            _flowBar.AddToClassList("flowbar--active");
+            _flowFill.RemoveFromClassList(removeCls);
+            _flowFill.AddToClassList(addCls);
+            // Kick chip to --a immediately so motion starts now, not ~950ms later
+            _flowFill.RemoveFromClassList("flowbar__fill--b");
+            _flowFill.AddToClassList("flowbar__fill--a");
+            _sweepPhase = false; // first tick flips to --b → chip sweeps --a→--b, no dead hold
         }
 
         private void TickFlowBarSweep()

@@ -85,9 +85,10 @@ namespace UnityMCP.Editor.Chat
             _readerThread.Start(new StreamReader(_process.StandardOutput.BaseStream, utf8));
 
             // Buffer stderr (last 5 lines) and emit synthetic error event on unexpected exit.
-            var stderrReader = new StreamReader(_process.StandardError.BaseStream, utf8);
-            var stderrRing   = _stderrRing;
-            var linesQueue   = _lines;
+            var stderrReader  = new StreamReader(_process.StandardError.BaseStream, utf8);
+            var stderrRing    = _stderrRing;
+            var linesQueue    = _lines;
+            var capturedProc  = _process; // capture before thread start to avoid TOCTOU with Dispose
             var errThread = new System.Threading.Thread(() =>
             {
                 try
@@ -100,7 +101,7 @@ namespace UnityMCP.Editor.Chat
                 finally
                 {
                     var exitCode = -1;
-                    try { exitCode = _process?.ExitCode ?? -1; } catch { }
+                    try { exitCode = capturedProc.ExitCode; } catch { }
                     // Surface only genuine failures: not an intentional Dispose, and a non-zero/unknown exit.
                     // (Clean exit 0 = normal completion; do NOT depend on the racy _running flag here.)
                     if (!_disposing && exitCode != 0)
