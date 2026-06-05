@@ -1,7 +1,6 @@
 // Partial MCPChatWindow — send path: OnSend, AttachScreenshot, AppendChipContext, DispatchTurn.
 // Text is clean by construction (InlineChipField — no FFFC/NBSP stripping needed).
 // Extracted from MCPChatWindow.cs to keep it under 200 lines.
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -39,26 +38,12 @@ namespace UnityMCP.Editor.Chat
             DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: capturePath);
         }
 
-        // F10: merge strip chips + inline chips, emit typed bracket format honouring ChipConfig.
-        // store is pre-loaded by the caller to avoid a double file-read per send.
+        // P1: all chips go through _chipField.Model — no separate strip.
         private void AppendChipContext(ref string text, BackendConfigStore store = null)
         {
-            // Auto-attach removed by design (F12 P3/P5): only explicit chips are sent.
-            var chips = CollectChipData();
-
-            // Merge inline chips from InlineChipField — deduplicate by path.
-            if (_chipField?.Model != null)
-            {
-                foreach (var cd in _chipField.Model.Chips)
-                {
-                    if (!chips.Exists(x => x.Path == cd.Path)) chips.Add(cd);
-                }
-            }
-
-            if (chips.Count == 0) return;
-            // F10: typed emission — [kind:ref] bracket format, per-kind depth from config.
+            if (_chipField?.Model == null || _chipField.Model.Count == 0) return;
             var cfg     = (store ?? BackendConfigStore.Load()).Chips;
-            var context = ChipContextResolver.ResolveAllTyped(chips, cfg);
+            var context = _chipField.Model.SerializePayload(cfg);
             if (!string.IsNullOrEmpty(context)) text += "\n" + context;
         }
 
@@ -77,7 +62,6 @@ namespace UnityMCP.Editor.Chat
             _backend.SendTurn(turnJson);
             if (_chipField != null) { _chipField.ClearChips(); _chipField.Text = ""; }
             else if (_input != null) { _input.value = ""; _input.cursorIndex = _input.selectIndex = 0; }
-            _objChipStrip.Clear();
             _heightCalc.Reset();
             ResetInputAreaHeight();
             if (_activity.Send()) OnActivityChanged();

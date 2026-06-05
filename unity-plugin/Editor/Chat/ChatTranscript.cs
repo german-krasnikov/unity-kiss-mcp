@@ -40,10 +40,7 @@ namespace UnityMCP.Editor.Chat
             bubble.userData = text ?? "";
             CopyableText.Attach(bubble);
             if (!string.IsNullOrEmpty(text))
-            {
-                var lbl = ChatLabel.Selectable(text); lbl.AddToClassList("msg-text");
-                bubble.Add(lbl);
-            }
+                bubble.Add(MixedParagraphRenderer.InlineElement(text, "msg-text"));
             if (!string.IsNullOrEmpty(imagePath))
             {
                 var img = MdBlock.Image(imagePath, "");

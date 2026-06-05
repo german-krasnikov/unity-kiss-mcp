@@ -15,19 +15,16 @@ namespace UnityMCP.Editor.Chat
         private PermissionConfig _permConfig = new PermissionConfig();
         private int            _inputTokens, _outputTokens;
         private readonly TurnUndoTracker _undoTracker = new TurnUndoTracker();
-        // FIX A: cache the sent text so SaveStateBeforeReload reads it, not the cleared input.
         private readonly SentTextCache _sentTextCache = new SentTextCache();
         private readonly List<ChatEvent>       _evBuf    = new List<ChatEvent>(16);
         private readonly List<ToolCallRecord>  _toolBuf  = new List<ToolCallRecord>(8);
         internal readonly CompileAutoFix       _autoFix  = new CompileAutoFix();
-        // Set when Claude's turn contained a code-editing tool call; cleared at TurnDone.
         internal bool _turnEditedCode;
         internal bool _turnHasToolCalls;
         internal bool _autoScrollEnabled = true;
         private TextField          _input;
         private Label              _tokenReadout;
         private Button             _askBtn, _agentBtn;
-        private VisualElement      _objChipStrip;
         private VisualElement      _inputArea;
         private ScrollView         _scroll;
         private InputHeightCalc    _heightCalc = new InputHeightCalc();
@@ -39,7 +36,6 @@ namespace UnityMCP.Editor.Chat
             w.minSize = new Vector2(320, 400);
         }
 
-        /// <summary>Called by ChatBackendProbe via reflection. True when any open chat window has a live backend.</summary>
         public static bool IsChatBackendRunning()
         {
             foreach (var w in Resources.FindObjectsOfTypeAll<MCPChatWindow>())
@@ -53,7 +49,6 @@ namespace UnityMCP.Editor.Chat
             if (_tokenReadout != null) _tokenReadout.text = "";
         }
 
-        /// <summary>Load config once and bind its ResolveColor — avoids per-pill file read.</summary>
         internal void RefreshColorResolver()
         {
             ChipPillFactory.ColorResolver = BackendConfigStore.Load().Chips.ResolveColor;
@@ -62,19 +57,17 @@ namespace UnityMCP.Editor.Chat
         private void OnEnable()
         {
             _autoScrollEnabled = EditorPrefs.GetBool("MCPChat.AutoScroll", true);
-            // P4: wire color resolver so pills use persisted overrides (re-set after domain reload).
             RefreshColorResolver();
             CreateBackend();
             ResetTokenCounters();
             ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
             AssemblyReloadEvents.beforeAssemblyReload += SaveStateBeforeReload;
+            EditorApplication.hierarchyChanged += RefreshLinker;
             _autoFix.Subscribe();
             _autoFix.OnErrorsDetected += InjectCompileErrors;
-            // F6: group indices are stale after domain reload.
             _undoTracker.Invalidate();
         }
 
-        /// <summary>Live-refresh input chip colors after settings change.</summary>
         internal void RefreshChipDisplay()
         {
             _chipField?.RebuildFromModel();
@@ -82,13 +75,12 @@ namespace UnityMCP.Editor.Chat
 
         private void OnDisable()
         {
+            EditorApplication.hierarchyChanged -= RefreshLinker;
             AssemblyReloadEvents.beforeAssemblyReload -= SaveStateBeforeReload;
             ChatProcess.OnAfterReloadResume -= TryResumePendingTurn;
             _autoFix.OnErrorsDetected -= InjectCompileErrors;
             _autoFix.Unsubscribe();
-            // #3 fix: window closed mid-turn → release the reload lock so the next compile isn't blocked.
             ReloadGuard.OnTurnFinished();
-            // F6: mark in-flight turn as failed so the group is still restorable.
             if (_activity.Phase != ActivityPhase.Idle)
                 _undoTracker.OnTurnFailed();
             _backend?.Stop();
@@ -96,6 +88,14 @@ namespace UnityMCP.Editor.Chat
         }
 
         private ChatRefResolver _resolver;
+        private SceneNameLinker  _linker;
+
+        private void RefreshLinker()
+        {
+            if (_resolver == null) return;
+            _resolver.Refresh();
+            _linker?.Refresh(_resolver.Objects);
+        }
 
         private void CreateGUI()
         {
@@ -112,6 +112,10 @@ namespace UnityMCP.Editor.Chat
             _scroll.Add(inner);
             _resolver = new ChatRefResolver();
             _resolver.Refresh();
+            _linker = new SceneNameLinker();
+            _linker.Refresh(_resolver.Objects);
+            // Static seam: all windows share one scene, so last-write-wins is correct.
+            MarkdownInline.Linker = _linker;
             var registry = ChatBlockRendererFactory.CreateDefault(_resolver, AddRefToContext);
             _transcript = new ChatTranscript(inner, registry);
             root.Add(_scroll);
@@ -125,7 +129,6 @@ namespace UnityMCP.Editor.Chat
             root.schedule.Execute(TickFlowBarSweep).Every(950);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
             root.RegisterCallback<DragPerformEvent>(OnDragPerform);
-            // CreateGUI runs after OnEnable, so _flowBar is ready here (OnEnable would NRE).
             TryResumePendingTurn();
         }
 
@@ -133,16 +136,11 @@ namespace UnityMCP.Editor.Chat
         {
             var area = new VisualElement(); area.AddToClassList("input-area");
             area.Add(BuildFlowBar());
-            _objChipStrip = new VisualElement(); _objChipStrip.AddToClassList("obj-chip-strip");
-            area.Add(_objChipStrip);
 
-            // Wave 0: replace raw TextField + overlay with composed InlineChipField.
             _chipField = new InlineChipField();
             _chipField.AddToClassList("chat-input");
-            _input = _chipField.TextField; // keep _input for back-compat (EnterKeySend, height calc)
+            _input = _chipField.TextField;
             area.Add(_chipField);
-
-            // Wire context menu on the chip field.
             WireChipInput();
 
             EnterKeySend.Attach(_input, OnSend);
@@ -188,8 +186,6 @@ namespace UnityMCP.Editor.Chat
 
         private void ResetInputAreaHeight()
         {
-            // Definite height (not minHeight) is required so flex-grow on .chat-input
-            // has a parent size to grow into — minHeight is a floor and leaves a dead gap.
             _inputArea.style.height    = InputHeightCalc.CompactH;
             _inputArea.style.minHeight = StyleKeyword.Null;
             _inputArea.style.maxHeight = _heightCalc.ComputeMax(position.height);
