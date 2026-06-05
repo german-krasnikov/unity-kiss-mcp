@@ -1,0 +1,90 @@
+"""Constants and CircuitBreaker for Unity MCP middleware."""
+import time
+
+
+_STRIP_CMDS: frozenset = frozenset({"get_component", "inspect", "get_object_detail"})
+
+BLAST_RADIUS = {
+    "get_hierarchy": 0, "get_component": 0, "inspect": 0, "screenshot": 0,
+    "query_state": 0, "get_object_detail": 0, "find_objects": 0,
+    "set_property": 1, "set_active": 1, "set_material": 1, "set_runtime_property": 1,
+    "create_object": 2, "manage_component": 2, "wire_event": 2,
+    "delete_object": 3, "scene": 3, "batch": 3,
+}
+
+WRITE_CMDS = {
+    "set_property", "set_property_delta", "create_object", "delete_object", "manage_component",
+    "wire_event", "set_active", "set_material", "set_runtime_property", "set_rect", "move_to",
+    "batch", "animation", "timeline", "animator", "particle", "shader",
+    "material", "prefab", "scriptable_object", "asset", "scene",
+    "create_ui", "execute_code", "menu", "project_settings", "set_parent", "unwire_event",
+}
+
+READ_CMDS = {
+    "get_hierarchy", "get_component", "inspect", "get_object_detail",
+    "get_components_list", "find_objects", "search_scene", "compress_hierarchy",
+    "query_state", "get_spatial_context", "scan_scene",
+    "get_console", "get_compile_errors", "validate_references", "screenshot",
+}
+
+# Reads safe to serve from PrefetchCache (both above-circuit and pre-TCP paths).
+_READ_CACHEABLE = frozenset({
+    "get_component", "get_hierarchy", "get_components_list", "inspect", "get_compile_errors",
+})
+
+
+class CircuitBreaker:
+    CLOSED, OPEN, HALF_OPEN = 0, 1, 2
+
+    def __init__(self, threshold: int = 3, cooldown: float = 15.0, is_ready_fn=None):
+        self.state = self.CLOSED
+        self.failures = 0
+        self.threshold = threshold
+        self.cooldown = cooldown
+        self.opened_at = 0.0
+        self._probe_in_flight: bool = False
+        self._is_ready_fn = is_ready_fn
+
+    def record_success(self) -> None:
+        self.failures = 0
+        self.state = self.CLOSED
+        self._probe_in_flight = False
+
+    def release_probe(self) -> None:
+        self._probe_in_flight = False
+
+    def record_failure(self) -> None:
+        self.failures += 1
+        if self.failures >= self.threshold:
+            self.state = self.OPEN
+            self.opened_at = time.monotonic()
+
+    def allow_request(self) -> bool:
+        if self.state == self.CLOSED:
+            return True
+        if self.state == self.OPEN:
+            # Check external readiness signal (e.g. compile state) before time-based cooldown
+            if self._is_ready_fn is not None:
+                try:
+                    if self._is_ready_fn():
+                        self.state = self.HALF_OPEN
+                        self._probe_in_flight = True
+                        return True
+                except Exception:
+                    pass
+            if time.monotonic() - self.opened_at > self.cooldown:
+                self.state = self.HALF_OPEN
+                self._probe_in_flight = True
+                return True
+            return False
+        # HALF_OPEN: allow only the first probe request
+        if self._probe_in_flight:
+            return False
+        self._probe_in_flight = True
+        return True
+
+    def get_status(self) -> str:
+        return ["CLOSED", "OPEN", "HALF_OPEN"][self.state]
+
+    def remaining(self) -> float:
+        return max(0.0, self.cooldown - (time.monotonic() - self.opened_at))

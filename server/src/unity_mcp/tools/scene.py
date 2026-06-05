@@ -1,7 +1,4 @@
-import json
-import os
 import re
-import time
 from ._annotations import RO as _RO, RW as _RW, RW_IDEM as _RW_IDEM, DEL as _DEL
 
 _RE_SLOT = re.compile(r'slot_\d+\s+\[\]\s+#')
@@ -194,79 +191,11 @@ async def scene_diff() -> str:
     return await _send("scene_diff", {})
 
 
-async def save_session() -> str:
-    """Save current scene state to .claude/session-context.json for cold-start recovery."""
-    hierarchy = await _send("get_hierarchy", {"summary": "true"})
-    console = await _send("get_console", {"count": 5, "level": "Error"})
-    editor_state = await _send("editor", {"action": "state"})
-    state = {"hierarchy": hierarchy, "console": console, "editor": editor_state, "timestamp": time.time()}
-    path = os.path.join(os.getcwd(), ".claude", "session-context.json")
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(state, f, indent=2)
-    except OSError as e:
-        return f"Failed to save session: {e}"
-    return f"Session saved to {path}"
-
-
-async def load_session() -> str:
-    """Load previous session context. Shows hierarchy diff since last save."""
-    path = os.path.join(os.getcwd(), ".claude", "session-context.json")
-    if not os.path.exists(path):
-        return "No previous session found."
-    try:
-        with open(path) as f:
-            prev = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        return f"Session file corrupt or unreadable: {e}"
-    current = await _send("get_hierarchy", {"summary": "true"})
-    ts = prev.get("timestamp", "?")
-    label = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if isinstance(ts, float) else ts
-    return f"Previous ({label}):\n{prev['hierarchy']}\n\nCurrent:\n{current}"
-
-
-def _extract_saved_path(result: str) -> str:
-    return result.split("Data saved to: ")[-1].strip()
-
-
-async def screenshot_baseline(name: str = "default", width: int = 640, height: int = 480,
-                               camera: str | None = None) -> str:
-    """Save screenshot as baseline for visual regression. name: identifier for this baseline."""
-    import shutil
-    result = await _send("screenshot", _args(width=width, height=height, camera=camera))
-    if "Data saved to:" not in result:
-        return result
-    src = _extract_saved_path(result)
-    baseline_dir = os.path.join(os.getcwd(), ".claude", "baselines")
-    os.makedirs(baseline_dir, exist_ok=True)
-    baseline_path = os.path.join(baseline_dir, f"{name}.png")
-    shutil.copy2(src, baseline_path)
-    return f"Baseline saved: {baseline_path}"
-
-
-async def get_changes(clear: bool = True) -> str:
-    """Get Unity editor changes since last call. Tracks: hierarchy changes, undo/redo,
-    play mode, scene open/save, selection. Returns chronological event list or NO_CHANGES."""
-    return await _send("get_changes", _args(clear="true" if clear else "false"))
-
-
-async def screenshot_compare(name: str = "default", width: int = 640, height: int = 480,
-                              camera: str | None = None, mode: str = "auto",
-                              question: str | None = None) -> str:
-    """Compare current screenshot with saved baseline.
-    mode: auto (pixel->escalate), pixel (free), structural (Haiku general),
-          targeted (needs question=), ui_layout|animation|color|position (specialized).
-    Cached by image hashes. Cost: structural ~$0.005."""
-    from ..visual_diff import visual_diff
-    baseline_path = os.path.join(os.getcwd(), ".claude", "baselines", f"{name}.png")
-    if not os.path.exists(baseline_path):
-        return f"No baseline '{name}' found. Use screenshot_baseline first."
-    result = await _send("screenshot", _args(width=width, height=height, camera=camera))
-    if "Data saved to:" not in result:
-        return "Could not capture current screenshot"
-    current_path = _extract_saved_path(result)
-    return await visual_diff(baseline_path, current_path, mode=mode, question=question)
+# Re-exports from scene_session for backward compatibility
+from .scene_session import (  # noqa: E402
+    save_session, load_session, screenshot_baseline, screenshot_compare,
+    get_changes, _extract_saved_path,
+)
 
 
 def register(mcp, send, args):
@@ -288,8 +217,5 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RW)(checkpoint)
     mcp.tool(annotations=_RO)(fingerprint)
     mcp.tool(annotations=_RO)(scene_diff)
-    mcp.tool(annotations=_RW)(save_session)
-    mcp.tool(annotations=_RO)(load_session)
-    mcp.tool(annotations=_RW)(screenshot_baseline)
-    mcp.tool(annotations=_RO)(screenshot_compare)
-    mcp.tool(annotations=_RO)(get_changes)
+    from . import scene_session
+    scene_session.register(mcp, send, args)

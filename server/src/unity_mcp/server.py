@@ -1,22 +1,27 @@
 import asyncio
-import json
 import os
 import time
 os.environ.setdefault("UNITY_MCP_DISTILL", "1")
 from contextlib import asynccontextmanager
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
-import mcp.types as mcp_types
 from .connection_slot import ConnectionSlot
 from .lockfile import acquire_lock, release_lock
 from .plugins import load_plugins
 from .tools import register_all
 from mcp.server.fastmcp import Context
-from .tools.gating import filter_by_tier, discover_tools as _discover_tools_impl, TIER1, is_visible, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
-from .tools.schema_registry import _registry as _schema_registry, STUB_SCHEMA
-
-# FORCE_VISIBLE ⊆ _CORE_TOOLS, so the union equals _CORE_TOOLS — precomputed once.
-_SCHEMA_KEEP_FULL: frozenset[str] = _CORE_TOOLS
+from .tools.gating import discover_tools as _discover_tools_impl
+from .tools.schema_registry import _registry as _schema_registry
+from .server_filtering import (
+    _SCHEMA_KEEP_FULL,
+    _apply_gating,
+    _strip_deferred_schemas,
+    push_catalog as _push_catalog,
+    filter_tools as _filter_tools_pure,
+    install_list_tools_filter,
+    read_unity_port as _read_unity_port,
+)
+from .server_lifespan import build_middleware, init_budget, wire_circuit_breaker
 
 # Re-export tool functions for test imports
 from .tools.scene import (
@@ -52,8 +57,39 @@ from .middleware import wrap_send, Middleware
 
 from typing import Optional
 
+# Disabled-tools state lives here so tests can mutate srv._disabled_tools_cache directly.
 _disabled_tools_cache: Optional[set] = None
 _refresh_tools_lock: Optional[asyncio.Lock] = None
+
+
+async def _refresh_tools_cache(bridge_) -> None:
+    """Fetch disabled tools from Unity and populate cache. Called on connect/reconnect.
+
+    Idempotent: if already refreshing, skip. Failures are silent — stale cache
+    is acceptable until next successful reconnect.
+    """
+    global _disabled_tools_cache, _refresh_tools_lock
+    if _refresh_tools_lock is None:
+        _refresh_tools_lock = asyncio.Lock()
+    if _refresh_tools_lock.locked():
+        return  # another refresh in flight — skip
+    if bridge_ is None or not bridge_.connected:
+        return
+    async with _refresh_tools_lock:
+        try:
+            result = await bridge_.send("get_disabled_tools", {}, timeout=5.0)
+            if result.get("ok"):
+                data = result.get("data", "").strip()
+                _disabled_tools_cache = set(data.split(",")) if data else set()
+        except Exception:
+            pass
+
+
+async def _filter_tools(tools: list, bridge_) -> list:
+    """Filter tools by gating then subtract disabled set (from Unity MCPSettings).
+    Cache is None → gating-only fallback (no TCP call)."""
+    return _filter_tools_pure(tools, _disabled_tools_cache)
+
 
 COMMAND_TIMEOUTS: dict[str, float] = {
     "run_tests": 120.0,
@@ -117,40 +153,8 @@ async def _send(cmd: str, args: dict, timeout: float = 30.0) -> str:
     return await _send_raw(cmd, args, timeout)
 
 
-
 def _args(**kwargs) -> dict:
     return {k: v for k, v in kwargs.items() if v is not None}
-
-
-def _read_unity_port() -> int:
-    """Discover Unity MCP port from discovery files, env var, or default 9500."""
-    if os.environ.get("UNITY_MCP_PORT"):
-        return int(os.environ["UNITY_MCP_PORT"])
-    from pathlib import Path
-    ports_dir = Path.home() / ".unity-mcp" / "ports"
-    if ports_dir.exists():
-        candidates = []
-        for f in ports_dir.glob("*.port"):
-            try:
-                lines = f.read_text().strip().split("\n")
-                port = int(lines[0])
-                pid = int(f.stem)
-                os.kill(pid, 0)
-                project = lines[2] if len(lines) > 2 else "?"
-                candidates.append((f.stat().st_mtime, port, project, pid))
-            except (ValueError, ProcessLookupError, PermissionError, OSError):
-                try:
-                    f.unlink()
-                except OSError:
-                    pass
-        if candidates:
-            candidates.sort(reverse=True)
-            _, port, project, pid = candidates[0]
-            import logging
-            logging.getLogger("unity_mcp").info(
-                "Auto-discovered Unity '%s' on port %d (pid %d)", project, port, pid)
-            return port
-    return 9500
 
 
 @asynccontextmanager
@@ -164,61 +168,9 @@ async def lifespan(app):
     try:
         slot = ConnectionSlot()
         manager = slot  # backward-compat alias
-        if os.environ.get("UNITY_MCP_MIDDLEWARE"):
-            _middleware = Middleware()
-            from .sampling import SamplingService
-            _middleware.sampling = SamplingService()
-        # ToolHinter: always wired when middleware is active (or standalone)
-        if os.environ.get("UNITY_MCP_HINTS", "1") != "0":
-            if _middleware is None:
-                _middleware = Middleware()
-            from .hinter import ToolHinter
-            _middleware.hinter = ToolHinter(enabled=True)
-        if os.environ.get("UNITY_MCP_SCENE_BRIEF"):
-            if _middleware is None:
-                _middleware = Middleware()
-            from .scene_brief import SceneBrief
-            _middleware.scene_brief = SceneBrief()
-        if os.environ.get("UNITY_MCP_SPECULATION"):
-            from .speculation import SpeculativeLayer
-            if _middleware is None:
-                _middleware = Middleware()
-            _middleware.speculation = SpeculativeLayer(_send_raw)
-        if os.environ.get("UNITY_MCP_LESSONS"):
-            from .lessons import LessonStore, LessonRecorder
-            from pathlib import Path
-            if _middleware is None:
-                _middleware = Middleware()
-            store = LessonStore(Path.home() / ".unity-mcp" / "lessons.json")
-            _middleware.lessons = store
-            _middleware.recorder = LessonRecorder(store)
-        if os.environ.get("UNITY_MCP_WATCHDOG"):
-            from .watchdog import ProactiveWatchdog
-            if _middleware is None:
-                _middleware = Middleware()
-            _middleware.watchdog = ProactiveWatchdog(_send_raw)
-        if os.environ.get("UNITY_MCP_INFERENCE"):
-            from .inference import SessionContext, Inferrer
-            if _middleware is None:
-                _middleware = Middleware()
-            _middleware.session = SessionContext()
-            _middleware.inferrer = Inferrer()
-        if os.environ.get("UNITY_MCP_BUDGET", "1") != "0":
-            from .budget import CostTracker, BudgetRouter
-            from .sampling import init_budget
-            session_cap = float(os.environ.get("UNITY_MCP_HAIKU_BUDGET", "0.50"))
-            day_cap = float(os.environ.get("UNITY_MCP_HAIKU_DAY_CAP", "5.00"))
-            _budget_tracker = CostTracker(session_cap=session_cap, day_cap=day_cap)
-
-            def _hit_rate(feature: str):
-                if feature == "speculation" and _middleware and _middleware.speculation:
-                    spec = _middleware.speculation
-                    total = spec._hits + spec._misses
-                    return spec._hits / total if total > 0 else None
-                return None
-
-            _budget_router = BudgetRouter(_budget_tracker, _hit_rate)
-            init_budget(_budget_tracker, _budget_router)
+        _middleware = build_middleware(_send_raw)
+        _budget_tracker, _budget_router = init_budget(_middleware)
+        if _budget_tracker is not None:
             from .tools import budget_tool as _bt
             _bt._tracker = _budget_tracker
         global _wrapped_send
@@ -243,12 +195,7 @@ async def lifespan(app):
             slot.add_reconnect_callback(_on_reconnect)
             if _middleware is not None:
                 slot.add_reconnect_callback(_middleware.reset_session)
-                # F05: wire circuit breaker readiness to compile state probe
-                probe = getattr(active, "_probe", None)
-                if probe is not None:
-                    ready_fn = lambda: not probe.has_strong_busy_signal()
-                    _middleware._circuit_ready_fn = ready_fn
-                    _middleware.circuit._is_ready_fn = ready_fn
+                wire_circuit_breaker(_middleware, active)
             active.start_heartbeat()
         yield
     finally:
@@ -270,6 +217,8 @@ mcp = FastMCP("UnityMCP", lifespan=lifespan)
 register_all(mcp, _send, _args, get_slot=lambda: slot,
              get_middleware=lambda: _middleware)
 load_plugins(mcp, _send, _args)
+
+
 @mcp.tool()
 async def discover_tools(category: str | None = None, enable: bool = True, ctx: Context = None) -> str:
     """Find and enable tools by category.
@@ -279,6 +228,7 @@ async def discover_tools(category: str | None = None, enable: bool = True, ctx: 
     if enable and category and ctx:
         await ctx.session.send_tool_list_changed()
     return result
+
 
 from .resources import register as register_resources
 register_resources(mcp, _send, _args)
@@ -295,93 +245,8 @@ async def resolve_tool_schema(tools: str) -> str:
     return text
 
 
-# --- Dynamic tool filtering based on Unity MCPSettings ---
-
-def _apply_gating(tools: list) -> list:
-    if os.environ.get("UNITY_MCP_NO_GATING"):
-        return tools
-    return filter_by_tier(tools)
-
-
-def _strip_deferred_schemas(tools: list) -> list:
-    """Replace inputSchema of non-core tools with STUB unless UNITY_MCP_FULL_SCHEMAS=1.
-
-    Safe: these are ListTools *response* objects, separate from mcp._tool_manager._tools
-    which holds the callable fn. FastMCP dispatches via _tool_manager (validate_input=False
-    path), so stripping inputSchema here cannot block tool execution.
-    """
-    if os.environ.get("UNITY_MCP_FULL_SCHEMAS", "0") == "1":
-        return tools
-    for t in tools:
-        if t.name not in _SCHEMA_KEEP_FULL:
-            # Fresh dict per tool — avoids shared-singleton mutation bugs
-            t.inputSchema = {"type": "object"}
-    return tools
-
-
-async def _push_catalog(bridge_) -> None:
-    """Push the Python-authoritative tool catalog to Unity on connect/reconnect.
-
-    Silent on failure — Unity can still operate with stale/no catalog.
-    """
-    try:
-        if bridge_ is None or not bridge_.connected:
-            return
-        catalog_str = json.dumps(get_catalog())
-        await bridge_.send("set_tool_catalog", {"catalog": catalog_str}, timeout=5.0)
-    except Exception:
-        pass
-
-
-async def _refresh_tools_cache(bridge_) -> None:
-    """Fetch disabled tools from Unity and populate cache. Called on connect/reconnect.
-
-    Idempotent: if already refreshing, skip. Failures are silent — stale cache
-    is acceptable until next successful reconnect.
-    """
-    global _disabled_tools_cache, _refresh_tools_lock
-    if _refresh_tools_lock is None:
-        _refresh_tools_lock = asyncio.Lock()
-    if _refresh_tools_lock.locked():
-        return  # another refresh in flight — skip
-    if bridge_ is None or not bridge_.connected:
-        return
-    async with _refresh_tools_lock:
-        try:
-            result = await bridge_.send("get_disabled_tools", {}, timeout=5.0)
-            if result.get("ok"):
-                data = result.get("data", "").strip()
-                _disabled_tools_cache = set(data.split(",")) if data else set()
-        except Exception:
-            pass
-
-
-async def _filter_tools(tools: list, bridge_) -> list:
-    """Filter tools by gating then subtract disabled set (from Unity MCPSettings).
-    Cache is None → gating-only fallback (no TCP call)."""
-    result = _apply_gating(tools)
-    disabled = _disabled_tools_cache
-    if disabled:
-        result = [t for t in result if t.name not in disabled or t.name in FORCE_VISIBLE]
-    return _strip_deferred_schemas(result)
-
-
-_original_handler = mcp._mcp_server.request_handlers[mcp_types.ListToolsRequest]
-
-
-async def _filtered_tools_handler(req):
-    result = await _original_handler(req)
-    # Capture full schemas into registry BEFORE stripping
-    for t in result.root.tools:
-        schema = getattr(t, "inputSchema", None) or {}
-        desc = getattr(t, "description", "") or ""
-        ann = getattr(t, "annotations", None)
-        _schema_registry.capture(t.name, schema, desc, annotations=ann)
-    result.root.tools = await _filter_tools(result.root.tools, slot.bridge if slot else None)
-    return result
-
-
-mcp._mcp_server.request_handlers[mcp_types.ListToolsRequest] = _filtered_tools_handler
+# Install filtering handler — captures schemas + applies gating + disabled-set.
+install_list_tools_filter(mcp, lambda: slot, lambda: _disabled_tools_cache)
 
 
 def main():

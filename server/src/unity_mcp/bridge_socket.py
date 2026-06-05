@@ -1,0 +1,37 @@
+import socket
+import sys
+
+
+_TCP_KEEPALIVE_DARWIN = 0x10
+_TCP_KEEPINTVL_DARWIN = 0x101
+_TCP_KEEPCNT_DARWIN   = 0x102
+
+
+class DomainReloadError(ConnectionError):
+    """Unity signaled domain reload via going_away frame."""
+
+
+def _apply_socket_options(sock) -> None:
+    setsockopt = getattr(sock, "setsockopt", None)
+    if not callable(setsockopt):
+        return
+
+    def _try(level, opt, val):
+        try:
+            setsockopt(level, opt, val)
+        except OSError:
+            pass
+
+    _try(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    _try(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    # Relaxed keepalive: idle=60s, interval=10s, count=3 (~90s dead peer detect).
+    # Previous 10s/5s/3 was too aggressive for macOS App Nap timer coalescing.
+    # App-level heartbeat (15s) handles faster liveness checks.
+    if sys.platform == "darwin":
+        _try(socket.IPPROTO_TCP, _TCP_KEEPALIVE_DARWIN, 60)
+        _try(socket.IPPROTO_TCP, _TCP_KEEPINTVL_DARWIN, 10)
+        _try(socket.IPPROTO_TCP, _TCP_KEEPCNT_DARWIN, 3)
+    elif sys.platform.startswith("linux"):
+        _try(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
+        _try(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+        _try(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)

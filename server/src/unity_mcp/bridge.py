@@ -4,53 +4,36 @@ import os
 import select
 import socket
 import struct
-import sys
 import time
 from typing import Optional
 
+from unity_mcp.bridge_socket import (
+    DomainReloadError,
+    _apply_socket_options,
+    _TCP_KEEPALIVE_DARWIN,
+    _TCP_KEEPINTVL_DARWIN,
+    _TCP_KEEPCNT_DARWIN,
+)
+from unity_mcp.bridge_heartbeat import HeartbeatMixin
 from unity_mcp.compile_state import CompileStateProbe
 from unity_mcp.crash_log import CrashLogger
 from unity_mcp.metrics import METRICS
+
+# Re-export so existing `from .bridge import DomainReloadError` keeps working
+__all__ = [
+    "UnityBridge", "DomainReloadError",
+    "MIN_RECONNECT_INTERVAL",
+    "_apply_socket_options",
+    "_TCP_KEEPALIVE_DARWIN", "_TCP_KEEPINTVL_DARWIN",
+]
 
 CONNECT_TIMEOUT = float(os.environ.get("UNITY_MCP_CONNECT_TIMEOUT", "5.0"))
 SESSION_TIMEOUT = float(os.environ.get("UNITY_MCP_SESSION_TIMEOUT", "120.0"))
 MAX_RETRIES = int(os.environ.get("UNITY_MCP_MAX_RETRIES", "3"))
 MIN_RECONNECT_INTERVAL = float(os.environ.get("UNITY_MCP_MIN_RECONNECT_INTERVAL", "2.0"))
 
-_TCP_KEEPALIVE_DARWIN = 0x10
-_TCP_KEEPINTVL_DARWIN = 0x101
-_TCP_KEEPCNT_DARWIN   = 0x102
 
-
-def _apply_socket_options(sock) -> None:
-    setsockopt = getattr(sock, "setsockopt", None)
-    if not callable(setsockopt):
-        return
-    def _try(level, opt, val):
-        try:
-            setsockopt(level, opt, val)
-        except OSError:
-            pass
-    _try(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-    _try(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-    # Relaxed keepalive: idle=60s, interval=10s, count=3 (~90s dead peer detect).
-    # Previous 10s/5s/3 was too aggressive for macOS App Nap timer coalescing.
-    # App-level heartbeat (15s) handles faster liveness checks.
-    if sys.platform == "darwin":
-        _try(socket.IPPROTO_TCP, _TCP_KEEPALIVE_DARWIN, 60)
-        _try(socket.IPPROTO_TCP, _TCP_KEEPINTVL_DARWIN, 10)
-        _try(socket.IPPROTO_TCP, _TCP_KEEPCNT_DARWIN, 3)
-    elif sys.platform.startswith("linux"):
-        _try(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
-        _try(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
-        _try(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
-
-
-class DomainReloadError(ConnectionError):
-    """Unity signaled domain reload via going_away frame."""
-
-
-class UnityBridge:
+class UnityBridge(HeartbeatMixin):
     """TCP client for Unity Editor communication."""
 
     def __init__(self, host: str = "127.0.0.1", port: Optional[int] = None,
@@ -74,82 +57,10 @@ class UnityBridge:
         self._heartbeat_interval: float = 15.0
         self._ping_failures: int = 0
         self._last_reconnect_at: float = 0.0
+        self._min_reconnect_interval: float = MIN_RECONNECT_INTERVAL
 
     def add_reconnect_callback(self, fn) -> None:
         self._on_reconnect_callbacks.append(fn)
-
-    def start_heartbeat(self, interval: float = 15.0) -> None:
-        if self._heartbeat_task is not None and not self._heartbeat_task.done():
-            return
-        self._heartbeat_interval = interval
-        self._heartbeat_task = asyncio.ensure_future(self._heartbeat_loop(interval))
-
-    def stop_heartbeat(self) -> None:
-        if self._heartbeat_task is not None:
-            self._heartbeat_task.cancel()
-            self._heartbeat_task = None
-
-    async def _heartbeat_loop(self, interval: float) -> None:
-        while True:
-            try:
-                await self._heartbeat_tick(interval)
-            except asyncio.CancelledError:
-                return
-            except Exception:
-                # Safety net: never let heartbeat task die silently.
-                await asyncio.sleep(5.0)
-
-    async def _heartbeat_tick(self, interval: float) -> None:
-        """Single heartbeat iteration. Separated for safety-net wrapping."""
-        if not self.connected:
-            busy = self._probe_busy()
-            wait = 5.0 if busy else 2.0
-            await asyncio.sleep(wait)
-            if self._reconnect_cooldown_ok():
-                async with self._lock:
-                    if self.connected:
-                        return
-                    try:
-                        await self._reconnect()
-                        self._ping_failures = 0
-                    except Exception:
-                        pass
-            return
-        await asyncio.sleep(interval)
-        if self._lock.locked():
-            return
-        try:
-            await self._raw_ping(timeout=5.0)
-            self._ping_failures = 0
-        except DomainReloadError:
-            self._probe.mark_recompile_issued()
-            async with self._lock:
-                await self.close()
-            self._ping_failures = 0
-        except Exception:
-            self._ping_failures += 1
-            if self._probe.is_process_dead() or self._ping_failures >= 3:
-                async with self._lock:
-                    await self.close()
-                self._ping_failures = 0
-
-    def _reconnect_cooldown_ok(self) -> bool:
-        """True if enough time elapsed since last reconnect."""
-        return (time.monotonic() - self._last_reconnect_at) >= MIN_RECONNECT_INTERVAL
-
-    async def _raw_ping(self, timeout: float = 5.0) -> None:
-        """Send ping directly on socket, bypassing send() retry machinery."""
-        async with self._lock:
-            if not self.connected:
-                raise ConnectionError("Not connected")
-            self._counter += 1
-            ping_id = f"hb{self._counter:04x}"
-            payload = json.dumps({"id": ping_id, "cmd": "ping", "args": {}}).encode("utf-8")
-            self._writer.write(struct.pack("!I", len(payload)) + payload)
-            await self._writer.drain()
-            resp = await asyncio.wait_for(self._read_response(), timeout=timeout)
-            if resp.get("id") != ping_id:
-                raise ConnectionError(f"Heartbeat ID mismatch: {resp.get('id')} != {ping_id}")
 
     async def connect(self):
         self._reader, self._writer = await asyncio.wait_for(
