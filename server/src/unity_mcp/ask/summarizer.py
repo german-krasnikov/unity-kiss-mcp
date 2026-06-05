@@ -28,7 +28,7 @@ class Summarizer:
             hint=hint,
             raw=combined[:3000],
         )
-        result = await self._svc.generate(prompt, max_tokens=200)
+        result = await self._svc.generate(prompt)
         if result:
             return result
 

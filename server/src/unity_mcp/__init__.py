@@ -1,3 +1,7 @@
 """Unity MCP Server - Control Unity Editor from Claude Code."""
 
-__version__ = "0.1.0"
+from importlib.metadata import version, PackageNotFoundError
+try:
+    __version__ = version("unity-mcp")
+except PackageNotFoundError:
+    __version__ = "0.0.0-dev"

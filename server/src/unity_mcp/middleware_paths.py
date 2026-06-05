@@ -6,18 +6,7 @@ PathResolverMixin is mixed into Middleware; methods bind to the same `self`
 import time
 from typing import Optional
 
-
-def _levenshtein(a: str, b: str) -> int:
-    """Simple Levenshtein distance for fuzzy path matching."""
-    if len(a) < len(b):
-        a, b = b, a
-    prev = list(range(len(b) + 1))
-    for ch_a in a:
-        curr = [prev[0] + 1]
-        for j, ch_b in enumerate(b):
-            curr.append(min(prev[j] + (ch_a != ch_b), prev[j + 1] + 1, curr[j] + 1))
-        prev = curr
-    return prev[-1]
+from .utils import _levenshtein
 
 
 class PathResolverMixin:

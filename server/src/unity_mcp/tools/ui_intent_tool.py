@@ -76,7 +76,19 @@ def parse_ui_dsl(dsl: str) -> list[dict]:
     return nodes
 
 
+def _node_path(node: dict, name_map: dict) -> str:
+    parts = [node["name"]]
+    parent = node.get("parent")
+    visited: set = set()
+    while parent and parent in name_map and parent not in visited:
+        visited.add(parent)
+        parts.insert(0, parent)
+        parent = name_map[parent].get("parent")
+    return "/" + "/".join(parts)
+
+
 def build_ui_batch(nodes: list[dict], parent: Optional[str]) -> list[str]:
+    name_map = {n["name"]: n for n in nodes}
     lines = []
     for node in nodes:
         elem_parent = node.get("parent") or parent
@@ -102,12 +114,12 @@ def build_ui_batch(nodes: list[dict], parent: Optional[str]) -> list[str]:
         if "size" in attrs:
             rect_args["size"] = attrs["size"]
         if rect_args:
-            lines.append(build_batch_line("set_rect", path=f"/{node['name']}", **rect_args))
+            lines.append(build_batch_line("set_rect", path=_node_path(node, name_map), **rect_args))
 
         # Layout component
         layout_comp = _LAYOUT_COMPONENTS.get(node["type"])
         if layout_comp:
-            comp_line = f"manage_component action=add path=/{node['name']} component={layout_comp}"
+            comp_line = f"manage_component action=add path={_node_path(node, name_map)} component={layout_comp}"
             if "spacing" in attrs:
                 comp_line += f" spacing={attrs['spacing']}"
             lines.append(comp_line)
@@ -128,7 +140,7 @@ async def ui_intent(intent: str, parent: Optional[str] = None, template: Optiona
     else:
         from .intent_common import sanitize_intent
         prompt = _PROMPT_TEMPLATE.format(parent=sanitize_intent(parent or "root"), intent=sanitize_intent(intent))
-        dsl_raw = await _sampling.generate(prompt, max_tokens=600)
+        dsl_raw = await _sampling.generate(prompt, feature='ui_intent')
         if not dsl_raw:
             return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
         dsl = strip_fences(dsl_raw)

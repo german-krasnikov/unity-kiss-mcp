@@ -104,7 +104,8 @@ namespace UnityMCP.Editor
                     return "animation_mode: stopped";
                 case "sample":
                 default:
-                    if (!AnimationMode.InAnimationMode())
+                    bool wasActive = AnimationMode.InAnimationMode();
+                    if (!wasActive)
                         AnimationMode.StartAnimationMode();
                     try
                     {
@@ -124,7 +125,7 @@ namespace UnityMCP.Editor
                         }
                         return sb.ToString().TrimEnd('\n');
                     }
-                    finally { AnimationMode.StopAnimationMode(); }
+                    finally { if (!wasActive) AnimationMode.StopAnimationMode(); }
             }
         }
 

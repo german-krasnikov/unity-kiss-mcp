@@ -1,20 +1,9 @@
 """Static plan validation for do() tool."""
 from typing import Optional
 from .catalog import ALLOWED, FORBIDDEN
+from ..utils import parse_kv_line as _parse_line
 
 MAX_LINES = 50
-
-
-def _parse_line(line: str) -> tuple[str, dict[str, str]]:
-    """Parse 'cmd key=val key=val' → (cmd, {key: val})."""
-    parts = line.split()
-    cmd = parts[0]
-    kv: dict[str, str] = {}
-    for p in parts[1:]:
-        if "=" in p:
-            k, v = p.split("=", 1)
-            kv[k] = v
-    return cmd, kv
 
 
 def validate_plan(plan: str, scene_paths: set[str]) -> Optional[str]:

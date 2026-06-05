@@ -203,7 +203,7 @@ namespace UnityMCP.Editor
                     mat.SetFloat(prop, float.Parse(value, IC));
                     break;
                 case UnityEngine.Rendering.ShaderPropertyType.Vector:
-                    mat.SetVector(prop, ParseVector(value));
+                    mat.SetVector(prop, ValueParser.ParseVector4Lenient(value));
                     break;
                 case UnityEngine.Rendering.ShaderPropertyType.Texture:
                     var tex = AssetDatabase.LoadAssetAtPath<Texture>(value);
@@ -211,24 +211,14 @@ namespace UnityMCP.Editor
                     mat.SetTexture(prop, tex);
                     break;
                 case UnityEngine.Rendering.ShaderPropertyType.Int:
-                    mat.SetInt(prop, int.Parse(value, IC));
+                    if (!int.TryParse(value, NumberStyles.Integer, IC, out var shaderIntVal))
+                        throw new ArgumentException($"Invalid int: '{value}'");
+                    mat.SetInt(prop, shaderIntVal);
                     break;
                 default:
                     throw new ArgumentException($"Unsupported property type: {type}");
             }
         }
 
-        static Vector4 ParseVector(string value)
-        {
-            // Expects "(x,y,z,w)" or "x,y,z,w"
-            var s = value.Trim().Trim('(', ')');
-            var parts = s.Split(',');
-            if (parts.Length < 2) throw new ArgumentException($"Invalid vector '{value}'. Use (x,y,z,w)");
-            float x = float.Parse(parts[0].Trim(), IC);
-            float y = float.Parse(parts[1].Trim(), IC);
-            float z = parts.Length > 2 ? float.Parse(parts[2].Trim(), IC) : 0f;
-            float w = parts.Length > 3 ? float.Parse(parts[3].Trim(), IC) : 0f;
-            return new Vector4(x, y, z, w);
-        }
     }
 }

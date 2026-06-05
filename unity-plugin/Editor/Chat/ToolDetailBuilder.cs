@@ -95,7 +95,7 @@ namespace UnityMCP.Editor.Chat
                         sb.Append('\n').Append(' ', depth * 2); break;
                     case '}': case ']':
                         depth--;
-                        sb.Append('\n').Append(' ', depth * 2).Append(c); break;
+                        sb.Append('\n').Append(' ', System.Math.Max(0, depth) * 2).Append(c); break;
                     case ',':
                         sb.Append(c).Append('\n').Append(' ', depth * 2); break;
                     default: sb.Append(c); break;

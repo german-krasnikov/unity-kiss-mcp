@@ -361,7 +361,7 @@ namespace UnityMCP.Editor
         private static object ConvertValue(string value, Type targetType)
         {
             if (targetType == typeof(bool))
-                return bool.Parse(value);
+                return ValueParser.ParseBool(value);
             if (targetType == typeof(Vector3))
             {
                 var f = ValueParser.ParseFloats(value, 3);

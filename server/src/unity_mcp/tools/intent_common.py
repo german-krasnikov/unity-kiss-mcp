@@ -38,9 +38,9 @@ def parse_indent_tree(dsl: str) -> list[dict]:
     return nodes
 
 
-def sanitize_intent(text: str, max_len: int = 400) -> str:
-    """Cap length and strip braces to mitigate prompt injection."""
-    return text[:max_len].replace("{", "").replace("}", "")
+def sanitize_intent(text: str, max_len: int = 500) -> str:
+    """Cap length, strip newlines and braces to mitigate prompt injection."""
+    return text[:max_len].replace("\n", " ").replace("{", "").replace("}", "")
 
 
 def build_batch_line(cmd: str, **kwargs) -> str:

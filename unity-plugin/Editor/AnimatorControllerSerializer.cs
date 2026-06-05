@@ -165,26 +165,25 @@ namespace UnityMCP.Editor
             {
                 if (i > 0) sb.Append(" & ");
                 var c = conditions[i];
-                sb.Append(c.parameter);
                 switch (c.mode)
                 {
                     case AnimatorConditionMode.Greater:
-                        sb.Append(">").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
+                        sb.Append(c.parameter).Append(">").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
                         break;
                     case AnimatorConditionMode.Less:
-                        sb.Append("<").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
+                        sb.Append(c.parameter).Append("<").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
                         break;
                     case AnimatorConditionMode.Equals:
-                        sb.Append("=").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
+                        sb.Append(c.parameter).Append("=").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
                         break;
                     case AnimatorConditionMode.NotEqual:
-                        sb.Append("!=").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
+                        sb.Append(c.parameter).Append("!=").Append(c.threshold.ToString("G4", CultureInfo.InvariantCulture));
                         break;
                     case AnimatorConditionMode.If:
-                        // bool/trigger = true, no suffix needed
+                        sb.Append(c.parameter);
                         break;
                     case AnimatorConditionMode.IfNot:
-                        sb.Insert(sb.Length - c.parameter.Length, "!");
+                        sb.Append('!').Append(c.parameter);
                         break;
                 }
             }

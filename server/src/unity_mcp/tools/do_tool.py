@@ -5,6 +5,7 @@ from ..do_intent.planner import Planner
 from ..do_intent.validator import validate_plan
 from ..do_intent.executor import Executor
 from ._annotations import RW as _RW
+from .intent_common import sanitize_intent
 
 # Module-level references — patched in tests
 _send = None
@@ -27,8 +28,7 @@ async def do(intent: str, dry_run: bool = False) -> str:
     Haiku generates a batch DSL plan, which is validated then executed.
     dry_run=True returns the plan without executing it.
     """
-    # Sanitize intent against prompt injection: cap length, strip newlines/braces
-    intent = intent[:500].replace("\n", " ").replace("{", "").replace("}", "")
+    intent = sanitize_intent(intent)
     scene_brief = await _get_scene_brief()
 
     planner = Planner(_sampling)

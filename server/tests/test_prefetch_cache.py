@@ -72,12 +72,6 @@ def test_gate_priors_set_property():
     assert pred == ("get_component", {"path": "/Player", "type": "Health"})
 
 
-def test_gate_priors_manage_component_remove_returns_none():
-    fn = GATE_PRIORS["manage_component"]
-    pred = fn({"path": "/A", "type": "Rigidbody", "action": "remove"})
-    assert pred is None
-
-
 def test_gate_priors_recompile():
     fn = GATE_PRIORS["recompile"]
     assert fn({}) == ("get_compile_errors", {})

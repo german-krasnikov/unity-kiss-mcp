@@ -25,7 +25,7 @@
 <img src="https://img.shields.io/github/package-json/v/german-krasnikov/unity-kiss-mcp?filename=unity-plugin/package.json&label=plugin&style=for-the-badge&labelColor=1a1a2e&color=888899" alt="Plugin Version">
 
 <sub>**STACK**</sub><br>
-<img src="https://img.shields.io/badge/Unity-2021.3+-e8a23a?style=for-the-badge&labelColor=1a1a2e&logo=unity&logoColor=white" alt="Unity">
+<img src="https://img.shields.io/badge/Unity-6000.0+-e8a23a?style=for-the-badge&labelColor=1a1a2e&logo=unity&logoColor=white" alt="Unity">
 <img src="https://img.shields.io/badge/Python-3.10+-ccccff?style=for-the-badge&labelColor=1a1a2e&logo=python&logoColor=white" alt="Python">
 <img src="https://img.shields.io/badge/MCP-1.0+-ccccff?style=for-the-badge&labelColor=1a1a2e&logo=anthropic&logoColor=white" alt="MCP">
 
@@ -72,7 +72,7 @@ batch([
 
 ## Quick Start
 
-**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 2021.3+</kbd> · <kbd>Claude Code</kbd> · TCP port <kbd>9500</kbd> free
+**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 6000.0+</kbd> · <kbd>Claude Code</kbd> · TCP port <kbd>9500</kbd> free
 
 **1. Install the Python server**
 
@@ -146,6 +146,20 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.17.0</b> — 2026-06-05 — full-project code review sprint — 12 waves of fixes across Python + C#</summary>
+
+**Full-Project Code Review Sprint (Server v0.8.0, Plugin v0.17.0)** (2026-06-05) — 12-wave autonomous review sprint covering all Python and C# subsyst …
+
+</details>
+
+<details>
+<summary><b>v0.16.0</b> — 2026-06-05 — F12 chat UX overhaul — composed inline-chip field + response pills + session clear</summary>
+
+**F12 Chat UX Overhaul (Plugin v0.16.0)** (2026-06-05) — Five production-ready pieces shipping together: (1) **W0 composed inline-chip field (P1+P2 re …
+
+</details>
+
+<details>
 <summary><b>v0.15.8</b> — 2026-06-05 — inline-chips + extensible chip-kind registry — F11</summary>
 
 **Inline Chips + Extensible Chip-Kind Registry (Plugin v0.15.8, F11)** (2026-06-05) — Production-ready extensible typed-context-chip system for in-Uni …
@@ -167,22 +181,10 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 </details>
 
 <details>
-<summary><b>v0.7.1</b> — 2026-06-04 — tech-debt sprint wave 1–3 (Python/C#/Chat) — pure quality</summary>
-
-**Tech-Debt Sprint: Python Tooling + C# Plugin + Chat Hardening (Server v0.7.1, Plugin v0.13.4, 6 commits)** (2026-06-04) — Six-wave quality sprint ad …
-
-</details>
-
-<details>
-<summary><b>v0.7.0</b> — 2026-06-04 — Editor.log out-of-band corroboration — P0 compile-tool blindness fix</summary>
-
-**Out-of-Band Compile-Tool Corroboration via Editor.log (Server v0.7.0, P0)** (2026-06-04) — `get_compile_errors`, `await_compile`, `auto_fix`, and `a …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.7.1** — 2026-06-04 — tech-debt sprint wave 1–3 (Python/C#/Chat) — pure quality
+- **v0.7.0** — 2026-06-04 — Editor.log out-of-band corroboration — P0 compile-tool blindness fix
 - **v0.6.1** — 2026-06-04 — atomic batch rollback — transactional scene edits
 - **v0.5.0 / 0.12.0** — 2026-06-04 — scoped scene queries — search_scene root+limit + spatial center
 - **v0.11.0** — 2026-06-04 — per-turn undo rollback + Restore button

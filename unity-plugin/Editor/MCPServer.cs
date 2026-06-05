@@ -26,6 +26,7 @@ namespace UnityMCP.Editor
         private static long _clientGeneration;
         private static volatile bool _shuttingDown;
         private static volatile bool _starting;
+        private static volatile bool _isCompiling;
         private static readonly int Port = GetPort();
         private static DateTime _compileStartTime;
         private static int GetPort()
@@ -75,9 +76,10 @@ namespace UnityMCP.Editor
             EditorApplication.update += WatchdogTick;
             EditorApplication.quitting += OnQuit;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeReload;
-            CompilationPipeline.compilationStarted += _ => { _compileStartTime = DateTime.UtcNow; WriteStateFile("compiling"); };
+            CompilationPipeline.compilationStarted += _ => { _isCompiling = true; _compileStartTime = DateTime.UtcNow; WriteStateFile("compiling"); };
             CompilationPipeline.compilationFinished += _ =>
             {
+                _isCompiling = false;
                 EditorApplication.delayCall += () =>
                 {
                     if (!EditorApplication.isCompiling && !_shuttingDown)
@@ -287,7 +289,7 @@ namespace UnityMCP.Editor
                         }
                         if (cmdName == "status")
                         {
-                            var isCompiling = EditorApplication.isCompiling;
+                            var isCompiling = _isCompiling;
                             var elapsed = isCompiling ? (DateTime.UtcNow - _compileStartTime).TotalSeconds : 0.0;
                             await SendAsync(stream, FormatStatusResponse(msgId, isCompiling, elapsed), clientToken);
                             continue;
@@ -433,30 +435,31 @@ namespace UnityMCP.Editor
             catch { }
         }
 
-        public static void Stop()
+        private static void TeardownCore()
         {
-            Debug.Log("[MCP] Server stopping");
-            _shuttingDown = true;
-            EditorApplication.update -= ProcessMainThreadQueue;
-            // 1. Cancel tokens first — unblocks async loops
             try { _clientCts?.Cancel(); } catch { }
             try { _cts?.Cancel(); } catch { }
-            // 2. Close sockets — unblocks blocked reads
             try { _currentClient?.Close(); } catch { }
             _currentClient = null;
             _clientConnected = false;
-            // 3. Dispose CTS (after cancel, allow callbacks to complete)
             try { _clientCts?.Dispose(); } catch { }
             _clientCts = null;
             try { _cts?.Dispose(); } catch { }
             _cts = null;
-            // 4. Stop listener (wrapped — can throw SocketException)
             try { _listener?.Server?.Shutdown(SocketShutdown.Both); } catch { }
             try { _listener?.Stop(); } catch { }
             _listener = null;
-            // 5. Drain queue
-            while (_mainThreadQueue.TryDequeue(out _)) { }
+            EditorApplication.update -= ProcessMainThreadQueue;
             EditorApplication.update -= WatchdogTick;
+        }
+
+        public static void Stop()
+        {
+            Debug.Log("[MCP] Server stopping");
+            _shuttingDown = true;
+            TeardownCore();
+            // Drain queue after handlers are unregistered
+            while (_mainThreadQueue.TryDequeue(out _)) { }
             DeletePortFile();
         }
 
@@ -472,29 +475,12 @@ namespace UnityMCP.Editor
         {
             _shuttingDown = true;
             WriteStateFile("reloading");
-            // 1. Send going_away FIRST — stream still alive, handler still running
+            // Send going_away FIRST — stream still alive, handler still running
             if (_currentClient != null && _clientConnected)
             {
                 try { SendGoingAwaySync(_currentClient.GetStream()); } catch { }
             }
-            // 2. Cancel client CTS — handler catches OperationCanceledException cleanly
-            try { _clientCts?.Cancel(); } catch { }
-            // 3. Cancel server CTS — stops accept loop
-            // Wrapped: linked _clientCts registers a callback on _cts; if _clientCts was
-            // already cancelled above, Mono may throw ObjectDisposedException from the callback.
-            try { _cts?.Cancel(); } catch { }
-            try { _currentClient?.Close(); } catch { }
-            _currentClient = null;
-            _clientConnected = false;
-            try { _clientCts?.Dispose(); } catch { }
-            _clientCts = null;
-            try { _cts?.Dispose(); } catch { }
-            _cts = null;
-            try { _listener?.Server?.Shutdown(SocketShutdown.Both); } catch { }
-            try { _listener?.Stop(); } catch { }
-            _listener = null;
-            EditorApplication.update -= ProcessMainThreadQueue;
-            EditorApplication.update -= WatchdogTick;
+            TeardownCore();
             // Do NOT delete port file — port stays the same after reload, Python needs it
         }
 

@@ -10,4 +10,4 @@ class Planner:
     async def plan(self, intent: str, scene_brief: str) -> Optional[str]:
         """Generate batch DSL plan from intent. Returns plan text or None."""
         prompt = build_prompt(intent, scene_brief)
-        return await self._svc.generate(prompt, max_tokens=800)
+        return await self._svc.generate(prompt)

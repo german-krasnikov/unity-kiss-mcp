@@ -24,9 +24,9 @@ class ScreenshotDescriber:
         legend: Optional[str] = None,
     ) -> str:
         if mark and legend and legend != "(no marks)":
-            prompt, max_tok = resolve_som(prompt_key, legend)
+            prompt, _ = resolve_som(prompt_key, legend)
         else:
-            prompt, max_tok = resolve(prompt_key)
+            prompt, _ = resolve(prompt_key)
         cache_key = scene_fp or path
         # Fast path: warm cache (no API cost)
         hit = self._cache.get(cache_key, prompt)
@@ -34,7 +34,7 @@ class ScreenshotDescriber:
             return hit
 
         async def _haiku_call():
-            text = await self._sampling.describe_image(prompt, path, max_tokens=max_tok)
+            text = await self._sampling.describe_image(prompt, path)
             cleaned, refused = normalize(text, "description")
             if refused:
                 return wrap_degraded("screenshot_describe", "haiku_refused",

@@ -146,7 +146,10 @@ namespace UnityMCP.Editor
                             System.Globalization.CultureInfo.InvariantCulture, out timeout);
                     var waitTcs = new TaskCompletionSource<string>();
                     RuntimeHelper.WaitUntil(path, component, field, value, timeout, negate, waitTcs);
-                    waitTcs.Task.ContinueWith(t => tcs.TrySetResult(BuildResponse(id, t.Result)));
+                    waitTcs.Task.ContinueWith(t =>
+                        tcs.TrySetResult(t.IsFaulted
+                            ? BuildResponse(id, $"wait_until error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                            : BuildResponse(id, t.Result)));
                     return;
                 }
 
@@ -164,7 +167,10 @@ namespace UnityMCP.Editor
                             System.Globalization.CultureInfo.InvariantCulture, out timeout);
                     var moveTcs = new TaskCompletionSource<string>();
                     RuntimeHelper.MoveTo(path, position, timeout, moveTcs);
-                    moveTcs.Task.ContinueWith(t => tcs.TrySetResult(BuildResponse(id, t.Result)));
+                    moveTcs.Task.ContinueWith(t =>
+                        tcs.TrySetResult(t.IsFaulted
+                            ? BuildResponse(id, $"move_to error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                            : BuildResponse(id, t.Result)));
                     return;
                 }
 
@@ -189,7 +195,10 @@ namespace UnityMCP.Editor
                             System.Globalization.CultureInfo.InvariantCulture, out timeout);
                     var stepTcs = new TaskCompletionSource<string>();
                     RuntimeHelper.TestStep(path, position, checksBefore, checksAfter, waitAfter, timeout, stepTcs);
-                    stepTcs.Task.ContinueWith(t => tcs.TrySetResult(BuildResponse(id, t.Result)));
+                    stepTcs.Task.ContinueWith(t =>
+                        tcs.TrySetResult(t.IsFaulted
+                            ? BuildResponse(id, $"test_step error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                            : BuildResponse(id, t.Result)));
                     return;
                 }
 
@@ -205,7 +214,10 @@ namespace UnityMCP.Editor
                     if (timeout <= 0) timeout = 120f;
                     var runTcs = new TaskCompletionSource<string>();
                     PlaytestRunner.Run(script, timeout, runTcs);
-                    runTcs.Task.ContinueWith(t => tcs.TrySetResult(BuildResponse(id, t.Result)));
+                    runTcs.Task.ContinueWith(t =>
+                        tcs.TrySetResult(t.IsFaulted
+                            ? BuildResponse(id, $"run_playtest error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                            : BuildResponse(id, t.Result)));
                     return;
                 }
 
@@ -286,8 +298,7 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("fingerprint", args => FingerprintHelper.Fingerprint(
                 JsonHelper.ExtractString(args, "path"),
                 ExtractInt(args, "depth", 3)));
-            CommandRegistry.Register("scan_scene", args => ScanHelper.Scan(
-                JsonHelper.ExtractString(args, "bands")));
+            CommandRegistry.Register("scan_scene", _ => ScanHelper.Scan());
             CommandRegistry.Register("check_colliders", args => ColliderChecker.Check(
                 JsonHelper.ExtractString(args, "path")));
             CommandRegistry.Register("get_schema", args => SchemaHelper.GetSchema(

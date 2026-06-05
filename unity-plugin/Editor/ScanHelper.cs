@@ -5,7 +5,7 @@ namespace UnityMCP.Editor
 {
     internal static class ScanHelper
     {
-        public static string Scan(string bands)
+        public static string Scan()
         {
             var allGOs = Object.FindObjectsOfType<GameObject>();
             int total = allGOs.Length;
@@ -19,7 +19,11 @@ namespace UnityMCP.Editor
                     colliders++;
                     if (c.isTrigger) triggers++;
                 }
-                colliders += go.GetComponents<Collider2D>().Length;
+                foreach (var c2d in go.GetComponents<Collider2D>())
+                {
+                    colliders++;
+                    if (c2d.isTrigger) triggers++;
+                }
                 audio += go.GetComponents<AudioSource>().Length;
                 lights += go.GetComponents<Light>().Length;
                 rigidbodies += go.GetComponents<Rigidbody>().Length;

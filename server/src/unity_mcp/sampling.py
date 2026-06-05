@@ -117,7 +117,6 @@ class SamplingService:
         screenshot_path: Optional[str] = None,
         *,
         feature: str = "visual_verify",
-        max_tokens: int = 150,
     ) -> Optional[str]:
         if not self.enabled:
             return None
@@ -141,7 +140,6 @@ class SamplingService:
         prompt: str,
         *,
         feature: str = "do_intent",
-        max_tokens: int = 800,
     ) -> Optional[str]:
         """Raw text generation via claude CLI. No system prompt added."""
         if not self.enabled:
@@ -160,7 +158,6 @@ class SamplingService:
         image_path: str,
         *,
         feature: str = "screenshot_describe",
-        max_tokens: int = 150,
     ) -> Optional[str]:
         """Image -> text via Haiku. Pure description, no PASS/FAIL framing."""
         if not self.enabled or not os.path.isfile(image_path):
@@ -182,7 +179,6 @@ class SamplingService:
         prompt: str,
         *,
         feature: str = "visual_diff",
-        max_tokens: int = 300,
     ) -> Optional[str]:
         """Send TWO images + prompt to Haiku for semantic comparison."""
         if not self.enabled:
@@ -205,7 +201,6 @@ class SamplingService:
         instruction: str = "Summarize concisely",
         *,
         feature: str = "summarize",
-        max_tokens: int = 200,
     ) -> Optional[str]:
         if not self.enabled:
             return None

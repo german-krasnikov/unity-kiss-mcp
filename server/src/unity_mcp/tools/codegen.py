@@ -1,6 +1,7 @@
 """C# code execution, schema introspection, and sampling-backed error fixing."""
 import re
 from ._annotations import RO as _RO, RW as _RW
+from ..metrics import METRICS
 
 _send = None
 _args = None
@@ -46,6 +47,7 @@ async def auto_fix(ctx: _Context) -> str:
                 "text": f"Unity errors:\n{error_text}\n\nSuggest exact fix (file path + code change). Be specific."}}],
             max_tokens=500,
         )
+        METRICS.inc("codegen_calls")
         suggestion = response.content[0].text if response.content else "No suggestion"
         return f"ERRORS:\n{error_text}\n\nSUGGESTED FIX:\n{suggestion}"
     except Exception as e:
@@ -60,6 +62,7 @@ async def smart_build(description: str, ctx: _Context) -> str:
                 "text": f"Write Unity C# code (bare statements, no class) to: {description}\nUse: new GameObject(), AddComponent, transform.position, etc."}}],
             max_tokens=1000,
         )
+        METRICS.inc("codegen_calls")
         code = response.content[0].text if response.content else ""
         m = re.search(r"```(?:csharp|cs)?\n(.*?)```", code, re.DOTALL)
         if m:

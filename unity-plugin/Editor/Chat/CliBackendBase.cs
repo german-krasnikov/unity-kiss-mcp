@@ -62,6 +62,7 @@ namespace UnityMCP.Editor.Chat
             {
                 // Spawn-per-turn: dispose old, start fresh with prompt baked into argv.
                 if (_proc != null) { _proc.Dispose(); _proc = null; }
+                _accumulator.Reset();
                 Start();
                 CloseStdinOnProc();  // Codex hangs without this (spike fact #4)
             }
