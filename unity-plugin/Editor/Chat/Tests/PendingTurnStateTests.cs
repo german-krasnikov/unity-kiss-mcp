@@ -245,5 +245,21 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(1, rt.Value.KindKeys.Length);
             Assert.AreEqual("", rt.Value.KindKeys[0]);
         }
+
+        [Test]
+        public void RoundTrip_IdlePhase_ChipsAndTextPreserved()
+        {
+            var orig = new PendingTurnState(
+                sessionId: null, pendingText: "draft text",
+                chipPaths: new[] { "/Player", "/Enemy" },
+                agentMode: false, agentName: "", activityPhase: "Idle",
+                kindKeys: new[] { "hierarchy", "hierarchy" });
+            var rt = PendingTurnState.Deserialize(orig.Serialize());
+            Assert.IsNotNull(rt);
+            Assert.AreEqual("Idle",       rt.Value.ActivityPhase);
+            Assert.AreEqual("draft text", rt.Value.PendingText);
+            Assert.AreEqual(2,            rt.Value.ChipPaths.Length);
+            Assert.AreEqual("/Player",    rt.Value.ChipPaths[0]);
+        }
     }
 }

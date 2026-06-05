@@ -99,12 +99,6 @@
     color: var(--unity-colors-link-text);
 }
 
-.obj-chip-strip {
-    flex-direction: row;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-}
-
 /* ── Resize splitter (drag to grow the input panel) ──
    A slim bar with a centered grip pill that brightens on hover, so it reads
    clearly as draggable. Drag logic + 70..500px clamp live in C# (untouched). */
@@ -136,7 +130,7 @@
 }
 
 /* ── Input area (composer) ──
-   Vertical stack: [flowbar] → [obj-chips] → [text editor grows] → [footer-bar].
+   Vertical stack: [flowbar] → [InlineChipField: chips + text] → [footer-bar].
    Single top divider separates composer from transcript. Flush bg with window. */
 .input-area {
     flex-direction: column;
@@ -147,35 +141,52 @@
     padding: 0 6px 5px 6px;
 }
 
-/* The multiline editor. flex-grow:1 makes it absorb the panel's free height;
-   min-height keeps a comfortable single-line floor so it is never collapsed. */
+/* Outer container IS the visual field: border + background live here so chips
+   and text share one visible box. flex-column so pills sit above text;
+   align-items stretch for full-width children. */
 .chat-input {
+    flex-direction: column;
+    align-items: stretch;
     flex-grow: 1;
     flex-shrink: 1;
     min-height: 24px;
     margin: 0 0 5px 0;
     font-size: 12px;
-}
-
-/* Style the TextField's inner editable region (the element that actually paints
-   the background/border/text). Targeting #unity-text-input via the generated
-   .unity-base-text-field__input class — standard in 2021.3. This is what kills
-   the tall-empty-box + caret-pinned-top bug: the inner input flex-grows to fill. */
-.chat-input > .unity-base-text-field__input {
-    flex-grow: 1;
     background-color: var(--unity-colors-input_field-background);
     border-width: 1px;
     border-color: var(--unity-colors-input_field-border);
     border-radius: 6px;
-    color: var(--unity-colors-default-text);
-    font-size: 12px;
-    padding: 6px 8px;
-    white-space: normal;
-    -unity-text-align: upper-left;
+    padding: 3px 4px;
 }
 
-.chat-input:focus > .unity-base-text-field__input {
+/* Focus ring on the outer container, toggled by C# FocusIn/Out callbacks. */
+.chat-input--focused {
     border-color: var(--unity-colors-input_field-border-focus);
+}
+
+/* Inner TextField: transparent, no border, no margin — pure text cursor host.
+   Must flex-grow so it fills remaining row width after chips.
+   Padding handled by parent; inner padding zeroed to avoid double-indent. */
+.chat-input .unity-base-text-field {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 60px;
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.chat-input .unity-base-text-field__input {
+    flex-grow: 1;
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    border-radius: 0;
+    color: var(--unity-colors-default-text);
+    font-size: 12px;
+    padding: 3px 4px;
+    white-space: normal;
+    -unity-text-align: upper-left;
 }
 
 /* ── Footer bar ──

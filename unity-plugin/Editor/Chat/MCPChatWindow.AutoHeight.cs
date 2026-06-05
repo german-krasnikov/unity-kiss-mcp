@@ -22,8 +22,6 @@ namespace UnityMCP.Editor.Chat
                 InputHeightCalc.CountLines(_input.value),
                 position.height,
                 (_chipField?.Model?.Count ?? 0) > 0);
-            // flex-grow on .chat-input needs a DEFINITE parent height; minHeight is a floor
-            // and makes flex-grow a no-op — use height instead so the input fills to footer.
             _inputArea.style.height    = h;
             _inputArea.style.minHeight = StyleKeyword.Null;
             _inputArea.style.maxHeight = _heightCalc.ComputeMax(position.height);

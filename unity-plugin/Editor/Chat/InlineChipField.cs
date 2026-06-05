@@ -1,7 +1,7 @@
-// InlineChipField: composed VisualElement for chip-at-front input.
-// Layout: flex-row of [Pill0, Pill1, ..., TextField(flexGrow 1)].
-// Pills are real layout children — no overlay, no pixel positioning.
-// Eliminates P1 (misalignment) + P2 (vanish-on-type) by construction.
+// InlineChipField: composed VisualElement for chip-at-top input.
+// Layout: flex-column of [PillRow (hidden when empty), TextField(flexGrow 1)].
+// TextField is always full-width; chips appear in a row above it.
+// Eliminates P1 (misalignment) + P2 (vanish-on-type) + P3 (TextField shrink on chips).
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -10,12 +10,14 @@ using UnityEngine.UIElements;
 namespace UnityMCP.Editor.Chat
 {
     /// <summary>
-    /// Composed input control: leading chip pills followed by a text field.
+    /// Composed input control: chip pills row above a full-width text field.
+    /// TextField always occupies full width regardless of chip count.
     /// Public API: AddChip, RemoveChipAt, ClearChips, Text, Model.
     /// </summary>
     internal sealed class InlineChipField : VisualElement
     {
-        private readonly InlineChipModel _model = new InlineChipModel();
+        private readonly InlineChipModel _model    = new InlineChipModel();
+        private readonly VisualElement   _pillRow;
         private readonly TextField       _textField;
 
         internal InlineChipModel Model => _model;
@@ -28,11 +30,20 @@ namespace UnityMCP.Editor.Chat
 
         internal TextField TextField => _textField;
 
+        private const string FocusedClass = "chat-input--focused";
+
         internal InlineChipField()
         {
-            style.flexDirection = FlexDirection.Row;
-            style.flexWrap      = Wrap.Wrap;
-            style.alignItems    = Align.Center;
+            style.flexDirection = FlexDirection.Column;
+            style.alignItems    = Align.Stretch;  // full-width children in column
+
+            // Pill row: chips live here, above the text field. Hidden when empty.
+            _pillRow = new VisualElement();
+            _pillRow.style.flexDirection = FlexDirection.Row;
+            _pillRow.style.flexWrap      = Wrap.Wrap;
+            _pillRow.style.paddingBottom = 3;
+            _pillRow.style.display       = DisplayStyle.None;
+            Add(_pillRow);
 
             _textField = new TextField { multiline = true };
             _textField.style.flexGrow   = 1;
@@ -40,6 +51,11 @@ namespace UnityMCP.Editor.Chat
             Add(_textField);
 
             _textField.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
+
+            // Focus ring: toggle class on this outer container, not on __input.
+            // FocusInEvent bubbles from any child (including the inner text element).
+            _textField.RegisterCallback<FocusInEvent>(_ => AddToClassList(FocusedClass));
+            _textField.RegisterCallback<FocusOutEvent>(_ => RemoveFromClassList(FocusedClass));
         }
 
         // ── Public API ────────────────────────────────────────────────────────
@@ -60,7 +76,7 @@ namespace UnityMCP.Editor.Chat
         internal void ClearChips()
         {
             _model.Clear();
-            RemoveAllPills();
+            RebuildPills(); // also hides _pillRow
         }
 
         /// <summary>Rebuild pill VEs from model — used after domain-reload chip restore.</summary>
@@ -82,22 +98,21 @@ namespace UnityMCP.Editor.Chat
                 var pill = ChipPillFactory.Build(chip, onRemove: () => RemoveChipAt(captured));
                 pill.userData = captured; // pin model index; refreshed on every rebuild
                 AttachContextMenu(pill);
-                Insert(childCount - 1, pill); // insert before TextField
+                _pillRow.Add(pill);
             }
+            _pillRow.style.display = _model.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private void RemoveAllPills()
         {
-            // TextField is always the last child; remove everything before it.
-            while (childCount > 1)
-                RemoveAt(0);
+            _pillRow.Clear();
         }
 
         private void AttachContextMenu(VisualElement pill)
         {
             pill.AddManipulator(new ContextualMenuManipulator(evt =>
             {
-                int liveIndex = pill.userData is int idx ? idx : IndexOf(pill); // model index, not VE child order
+                int liveIndex = pill.userData is int idx ? idx : _pillRow.IndexOf(pill); // model index, not VE child order
 
                 evt.menu.AppendAction("Show LLM payload", _ =>
                 {

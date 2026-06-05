@@ -14,13 +14,8 @@ namespace UnityMCP.Editor.Chat
         // #1 Save turn state before domain reload so it can be resumed after.
         private void SaveStateBeforeReload()
         {
-            if (_activity.Phase == ActivityPhase.Idle) return;
-            // FIX A: read from _sentTextCache (set by DispatchTurn before input was cleared),
-            // NOT from _input.value which is already "" at this point.
-            var text  = _sentTextCache.Get();
-            // Serialize from InlineChipField.Model (v5: same ChipPaths/KindKeys arrays as v4).
             string[] chipPaths, kindKeys;
-            if (_chipField?.Model != null)
+            if (_chipField?.Model != null && _chipField.Model.Count > 0)
             {
                 var reload = _chipField.Model.SerializeForReload();
                 chipPaths  = reload.Paths;
@@ -31,14 +26,24 @@ namespace UnityMCP.Editor.Chat
                 chipPaths = System.Array.Empty<string>();
                 kindKeys  = System.Array.Empty<string>();
             }
+
+            var isIdle = _activity.Phase == ActivityPhase.Idle;
+
+            // Nothing to save: idle with no chips and no input text.
+            var inputText = isIdle
+                ? (_chipField?.Text ?? _input?.value ?? "").Trim()
+                : _sentTextCache.Get();
+            if (isIdle && chipPaths.Length == 0 && string.IsNullOrEmpty(inputText))
+                return;
+
             var state = new PendingTurnState(
-                _backend?.SessionId,
-                text,
+                isIdle ? null : _backend?.SessionId,
+                inputText,
                 chipPaths,
                 _agentMode,
                 _selectedAgent,
                 _activity.Phase.ToString(),
-                undoGroupId: _undoTracker.InflightGroupId,
+                undoGroupId: isIdle ? -1 : _undoTracker.InflightGroupId,
                 savedAtUtc:  DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 backendKind: _selectedKind,
                 kindKeys:    kindKeys);
@@ -56,19 +61,30 @@ namespace UnityMCP.Editor.Chat
 
             // #26 Staleness guard: discard state saved by a crash/restart older than threshold.
             // SavedAtUtc == 0 means legacy file (no timestamp) — allowed through.
+            // Idle saves are exempt: they represent user-composed (not in-flight) state.
             const long StalenessThresholdSec = 60;
-            if (p.SavedAtUtc > 0 && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - p.SavedAtUtc > StalenessThresholdSec)
+            if (p.ActivityPhase != "Idle" && p.SavedAtUtc > 0
+                && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - p.SavedAtUtc > StalenessThresholdSec)
                 return; // stale crash/restart artifact — file already cleared, silently discard
 
             _agentMode     = p.AgentMode;
             _selectedAgent = p.AgentName;
             _selectedKind  = p.BackendKind;
-            CreateBackendWithSession(p.SessionId);
 
             // Restore chips from PendingTurnState (v4/v5 format).
             if (_chipField?.Model != null && p.ChipPaths?.Length > 0)
                 _chipField.Model.RestoreFromReload(p.ChipPaths, p.KindKeys);
             _chipField?.RebuildFromModel();
+
+            // Idle save: restore chips + input text only, no turn dispatch.
+            if (p.ActivityPhase == "Idle")
+            {
+                if (!string.IsNullOrEmpty(p.PendingText) && _chipField != null)
+                    _chipField.Text = p.PendingText;
+                return;
+            }
+
+            CreateBackendWithSession(p.SessionId);
 
             var displayText = p.PendingText;
             if (!string.IsNullOrEmpty(displayText))

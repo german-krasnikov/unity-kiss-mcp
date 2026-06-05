@@ -28,34 +28,37 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── AddChip ───────────────────────────────────────────────────────────
 
         [Test]
-        public void AddChip_AddsPillBeforeTextField()
+        public void AddChip_AddsPillToInternalPillRow()
         {
             var field = new InlineChipField();
             field.AddChip(Chip("Assets/A.cs"));
 
-            // index 0 = pill VE, index 1 = TextField
+            // outer: [pillRow, textField] — always exactly 2 direct children
             Assert.AreEqual(2, field.childCount);
-            Assert.IsNotInstanceOf<TextField>(field[0], "first child must be pill, not TextField");
+            Assert.IsNotInstanceOf<TextField>(field[0], "first child must be pillRow, not TextField");
             Assert.IsInstanceOf<TextField>(field[1], "second child must be TextField");
+            // pill lives inside pillRow
+            Assert.AreEqual(1, field[0].childCount, "pillRow must contain 1 pill");
         }
 
         [Test]
-        public void AddTwoChips_PillsBeforeTextField()
+        public void AddTwoChips_PillsInsidePillRow()
         {
             var field = new InlineChipField();
             field.AddChip(Chip("Assets/A.cs"));
             field.AddChip(Chip("Assets/B.cs"));
 
-            Assert.AreEqual(3, field.childCount);
-            Assert.IsNotInstanceOf<TextField>(field[0]);
-            Assert.IsNotInstanceOf<TextField>(field[1]);
-            Assert.IsInstanceOf<TextField>(field[2]);
+            // outer structure unchanged — still 2 direct children
+            Assert.AreEqual(2, field.childCount);
+            Assert.IsInstanceOf<TextField>(field[1]);
+            // pills accumulate in pillRow
+            Assert.AreEqual(2, field[0].childCount, "pillRow must contain 2 pills");
         }
 
         // ── RemoveChipAt ──────────────────────────────────────────────────────
 
         [Test]
-        public void RemoveChip_RemovesPillFromTree()
+        public void RemoveChip_RemovesPillFromPillRow()
         {
             var field = new InlineChipField();
             field.AddChip(Chip("Assets/A.cs"));
@@ -63,8 +66,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             field.RemoveChipAt(0);
 
-            // 1 pill + 1 TextField = 2 children
-            Assert.AreEqual(2, field.childCount);
+            Assert.AreEqual(1, field[0].childCount, "pillRow must contain 1 remaining pill");
             Assert.IsInstanceOf<TextField>(field[1]);
         }
 
@@ -80,9 +82,10 @@ namespace UnityMCP.Editor.Chat.Tests
 
             field.ClearChips();
 
-            // Only the TextField must remain
-            Assert.AreEqual(1, field.childCount);
-            Assert.IsInstanceOf<TextField>(field[0]);
+            // outer structure: pillRow (empty) + TextField — 2 direct children
+            Assert.AreEqual(2, field.childCount);
+            Assert.AreEqual(0, field[0].childCount, "pillRow must be empty after clear");
+            Assert.IsInstanceOf<TextField>(field[1]);
         }
 
         // ── Text ──────────────────────────────────────────────────────────────
@@ -96,6 +99,32 @@ namespace UnityMCP.Editor.Chat.Tests
             tf.value = "hello world";
 
             Assert.AreEqual("hello world", field.Text);
+        }
+
+        // ── PillRow visibility ────────────────────────────────────────────────
+
+        [Test]
+        public void Constructor_PillRowStartsHidden()
+        {
+            var field = new InlineChipField();
+            Assert.AreEqual(DisplayStyle.None, field[0].style.display.value);
+        }
+
+        [Test]
+        public void AddChip_PillRowBecomesVisible()
+        {
+            var field = new InlineChipField();
+            field.AddChip(Chip("Assets/A.cs"));
+            Assert.AreEqual(DisplayStyle.Flex, field[0].style.display.value);
+        }
+
+        [Test]
+        public void ClearChips_PillRowBecomesHidden()
+        {
+            var field = new InlineChipField();
+            field.AddChip(Chip("Assets/A.cs"));
+            field.ClearChips();
+            Assert.AreEqual(DisplayStyle.None, field[0].style.display.value);
         }
 
         // ── Model sync ────────────────────────────────────────────────────────
