@@ -22,8 +22,23 @@ namespace UnityMCP.Editor.Chat
             var assetPath  = cap != null ? AssetDatabase.GetAssetPath(cap) : path;
             var kindKey    = ChipKindDetector.Detect(cap, assetPath ?? path);
             var instanceID = cap != null ? cap.GetInstanceID() : 0;
+
+            var tf     = _chipField?.TextField;
+            int cursor = tf != null
+                ? System.Math.Clamp(tf.cursorIndex, 0, (tf.value ?? "").Length) : 0;
+
             _chipField?.AddChip(new ChipData(kindKey, path, displayName, instanceID));
-            _chipField?.TextField?.Focus();
+
+            // Insert @name at cursor position so text reads naturally inline.
+            if (tf != null)
+            {
+                var mention = "@" + displayName + " ";
+                var current = tf.value ?? "";
+                tf.value = current.Insert(cursor, mention);
+                tf.selectIndex = tf.cursorIndex = cursor + mention.Length;
+                tf.Focus();
+            }
+
             UpdateAutoHeight();
         }
 

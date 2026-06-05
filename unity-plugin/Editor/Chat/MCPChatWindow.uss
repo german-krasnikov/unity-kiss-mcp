@@ -48,6 +48,12 @@
     border-bottom-right-radius: 2px;
 }
 
+.user-chip-strip {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 2px;
+}
+
 .msg-bubble--assistant {
     background-color: var(--unity-colors-helpbox-background);
     color: var(--unity-colors-default-text);

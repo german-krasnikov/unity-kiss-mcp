@@ -1,5 +1,6 @@
 // Transcript rendering helpers — extracted to keep MCPChatWindow under 200 lines.
 using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine.UIElements;
 
@@ -30,7 +31,8 @@ namespace UnityMCP.Editor.Chat
             _grouper   = new ToolChipGrouper(Append, () => _msgCount--);
         }
 
-        internal void AppendUserBubble(string text, string imagePath = null)
+        internal void AppendUserBubble(string text,
+            IReadOnlyList<ChipData> chips = null, string imagePath = null)
         {
             FinalizeAssistant(); // also closes any open tool group
             var row    = Row("msg-user");
@@ -39,13 +41,16 @@ namespace UnityMCP.Editor.Chat
             bubble.AddToClassList("msg-bubble--user");
             bubble.userData = text ?? "";
             CopyableText.Attach(bubble);
+            if (chips != null && chips.Count > 0)
+            {
+                var strip = new VisualElement(); strip.AddToClassList("user-chip-strip");
+                foreach (var c in chips) strip.Add(ChipPillFactory.Build(c));
+                bubble.Add(strip);
+            }
             if (!string.IsNullOrEmpty(text))
                 bubble.Add(MixedParagraphRenderer.InlineElement(text, "msg-text"));
             if (!string.IsNullOrEmpty(imagePath))
-            {
-                var img = MdBlock.Image(imagePath, "");
-                bubble.Add(_registry.RenderBlock(in img));
-            }
+            { var img = MdBlock.Image(imagePath, ""); bubble.Add(_registry.RenderBlock(in img)); }
             row.Add(bubble);
             Append(row);
         }

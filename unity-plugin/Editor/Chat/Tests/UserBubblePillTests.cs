@@ -1,5 +1,6 @@
 // TDD tests for P2: User bubble renders [kind:ref] tags as pills.
 // Calls MixedParagraphRenderer.InlineElement directly — same codepath as ChatTranscript.
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
@@ -50,6 +51,54 @@ namespace UnityMCP.Editor.Chat.Tests
                 var ve = MixedParagraphRenderer.InlineElement("", "msg-text");
                 Assert.IsNotNull(ve);
             });
+        }
+
+        // ── ChatTranscript.AppendUserBubble chip strip ────────────────────────
+
+        private static ChatTranscript MakeTranscript(out VisualElement container)
+        {
+            container = new VisualElement();
+            var registry = ChatBlockRendererFactory.CreateDefault(null, null);
+            return new ChatTranscript(container, registry);
+        }
+
+        [Test]
+        public void AppendUserBubble_WithChips_ShowsChipStrip()
+        {
+            var t = MakeTranscript(out var container);
+            var chips = new List<ChipData>
+            {
+                new ChipData(ChipKindKeys.Script, "Assets/Player.cs", "Player", 0),
+                new ChipData(ChipKindKeys.Hierarchy, "/Player", "Enemy", 0),
+            };
+
+            t.AppendUserBubble("analyze @Player", chips);
+
+            var strip = container.Q(className: "user-chip-strip");
+            Assert.IsNotNull(strip, "bubble must contain a .user-chip-strip element");
+            Assert.AreEqual(2, strip.childCount, "strip must contain one pill per chip");
+        }
+
+        [Test]
+        public void AppendUserBubble_NoChips_NoChipStrip()
+        {
+            var t = MakeTranscript(out var container);
+
+            t.AppendUserBubble("plain text");
+
+            var strip = container.Q(className: "user-chip-strip");
+            Assert.IsNull(strip, "no chips → no chip strip element");
+        }
+
+        [Test]
+        public void AppendUserBubble_EmptyChipList_NoChipStrip()
+        {
+            var t = MakeTranscript(out var container);
+
+            t.AppendUserBubble("plain text", new List<ChipData>());
+
+            var strip = container.Q(className: "user-chip-strip");
+            Assert.IsNull(strip, "empty chip list → no chip strip element");
         }
     }
 }

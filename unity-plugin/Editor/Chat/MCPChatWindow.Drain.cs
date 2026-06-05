@@ -108,7 +108,9 @@ namespace UnityMCP.Editor.Chat
                 // Cache the FULL sent text (with snapshot) so a re-reload can persist it.
                 _sentTextCache.Set(sentText);
                 // Show only the original user text in the bubble (no state dump).
-                _transcript?.AppendUserBubble(displayText);
+                var chipList = _chipField?.Model?.Chips is { Count: > 0 } c
+                    ? new System.Collections.Generic.List<ChipData>(c) : null;
+                _transcript?.AppendUserBubble(displayText, chipList);
                 _backend.SendTurn(UserTurnBuilder.Build(sentText));
                 if (_activity.Send()) OnActivityChanged();
             }
