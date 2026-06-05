@@ -35,9 +35,7 @@ namespace UnityMCP.Editor.Chat
         private static VisualElement RenderParagraph(in MdBlock b)
         {
             var text = b.Lines != null ? string.Join("\n", b.Lines) : "";
-            var lbl  = ChatLabel.Selectable(MarkdownInline.ToRichText(text), richText: true);
-            lbl.AddToClassList("md-para");
-            return lbl;
+            return MixedParagraphRenderer.InlineElement(text, "md-para");
         }
 
         private static VisualElement RenderHeading(in MdBlock b)

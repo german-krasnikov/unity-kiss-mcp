@@ -36,7 +36,8 @@ namespace UnityMCP.Editor.Chat
 
         public void Navigate(string reference)
         {
-            var go = ChatRefAction.FindGameObject(reference);
+            // RefParser strips " #id" so FindGameObject matches by clean path (bug fix P7).
+            var go = ChatRefAction.FindGameObject(RefParser.Parse(Key, reference).Path);
             if (go == null) { Debug.LogWarning("[MCP Chat] Reference stale: " + reference); return; }
             EditorGUIUtility.PingObject(go);
             Selection.activeObject = go;

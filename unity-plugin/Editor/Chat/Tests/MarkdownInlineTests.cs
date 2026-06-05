@@ -113,5 +113,17 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(result.StartsWith("<noparse><</noparse>noparse>"), $"Got: {result}");
             Assert.IsFalse(result.Contains("&lt;"), $"Got: {result}");
         }
+
+        [Test]
+        public void ToRichText_WithHierarchyTag_ContainsLink()
+        {
+            // Locks restored step-2b: [kind:ref] in non-paragraph contexts (headings, blockquotes,
+            // table cells) must produce a <link= rich-text anchor, NOT literal bracket text.
+            UnityMCP.Editor.Chat.ChipKindRegistry.ResetToBuiltIns();
+            var result = MarkdownInline.ToRichText("[hierarchy:/X #1]");
+            StringAssert.Contains("<link=", result, $"Expected <link= tag. Got: {result}");
+            StringAssert.DoesNotContain("[hierarchy:/X #1]", result,
+                $"Literal tag must not survive: {result}");
+        }
     }
 }

@@ -21,8 +21,7 @@ namespace UnityMCP.Editor.Chat
                 var marker = new Label(ordered ? $"{start + i}." : "•");
                 marker.AddToClassList("md-list-marker");
 
-                var content = ChatLabel.Selectable(MarkdownInline.ToRichText(b.Lines[i]), richText: true);
-                content.AddToClassList("md-list-content");
+                var content = MixedParagraphRenderer.InlineElement(b.Lines[i], "md-list-content");
 
                 row.Add(marker);
                 row.Add(content);

@@ -48,6 +48,37 @@ namespace UnityMCP.Editor.Chat
             return result;
         }
 
+        /// <summary>True if text contains at least one recognized [kind:ref] tag.</summary>
+        internal static bool HasTags(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            return GetOrRebuildRegex().IsMatch(text);
+        }
+
+        /// <summary>
+        /// Split text into ordered segments: literal text runs and parsed tags.
+        /// Adjacent tags produce no empty text segments between them.
+        /// </summary>
+        internal static IReadOnlyList<TagSegment> Split(string text)
+        {
+            var result = new List<TagSegment>();
+            if (string.IsNullOrEmpty(text)) return result;
+            var rx  = GetOrRebuildRegex();
+            int pos = 0;
+            foreach (Match m in rx.Matches(text))
+            {
+                if (m.Index > pos)
+                    result.Add(new TagSegment(text.Substring(pos, m.Index - pos)));
+                var kind  = m.Groups["kind"].Value.ToLowerInvariant();
+                var refer = m.Groups["ref"].Value;
+                result.Add(new TagSegment(kind, refer));
+                pos = m.Index + m.Length;
+            }
+            if (pos < text.Length)
+                result.Add(new TagSegment(text.Substring(pos)));
+            return result;
+        }
+
         // ── private ───────────────────────────────────────────────────────────
 
         private static Regex GetOrRebuildRegex()
@@ -63,6 +94,52 @@ namespace UnityMCP.Editor.Chat
             _cachedRegex    = new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
             _cachedVersion  = ChipKindRegistry.Version;
             return _cachedRegex;
+        }
+    }
+
+    // ── TagSegment ────────────────────────────────────────────────────────────
+
+    /// <summary>One segment of a Split result: either literal text or a parsed tag.</summary>
+    internal readonly struct TagSegment
+    {
+        internal readonly bool   IsTag;
+        internal readonly string Text;    // literal text when !IsTag; raw ref when IsTag
+        internal readonly string KindKey; // non-null only when IsTag
+
+        internal TagSegment(string text)                   { IsTag = false; Text = text;   KindKey = null; }
+        internal TagSegment(string kindKey, string rawRef) { IsTag = true;  Text = rawRef; KindKey = kindKey; }
+    }
+
+    // ── RefParser ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Parse a raw [kind:ref] reference into ChipData (Path, InstanceID, DisplayName).
+    /// Inverse of ChipContextResolver.FormatChipRef.
+    /// Hierarchy: "/Root/Child #-33506" -> Path="/Root/Child", ID=-33506, Display="Child".
+    /// Asset:     "Assets/Scripts/Foo.cs" -> Path=same, ID=0, Display="Foo.cs".
+    /// </summary>
+    internal static class RefParser
+    {
+        internal static ChipData Parse(string kindKey, string rawRef)
+        {
+            var path       = rawRef;
+            int instanceId = 0;
+
+            // Strip " #id" suffix (hierarchy refs). LastIndexOf handles nested # correctly.
+            int hashIdx = rawRef.LastIndexOf(" #");
+            if (hashIdx >= 0 && int.TryParse(rawRef.Substring(hashIdx + 2), out var id))
+            {
+                path       = rawRef.Substring(0, hashIdx);
+                instanceId = id;
+            }
+
+            // Leaf name: after last '/'
+            var leaf     = path;
+            int lastSlash = path.LastIndexOf('/');
+            if (lastSlash >= 0 && lastSlash < path.Length - 1)
+                leaf = path.Substring(lastSlash + 1);
+
+            return new ChipData(kindKey, path, leaf, instanceId);
         }
     }
 }

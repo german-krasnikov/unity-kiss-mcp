@@ -51,9 +51,10 @@ namespace UnityMCP.Editor.Chat
             // Step 2: escape HTML in the non-code text.
             withPlaceholders = Escape(withPlaceholders);
 
-            // Step 2b: replace AI response bracket tags [kind:ref] with rich-text pills.
-            // Must run after escape (so < inside refs is neutralized) and before bold/italic
-            // (so the emitted <color>/<link> tags are not processed as markdown).
+            // Step 2b: convert [kind:ref] tags to rich-text links (headings, blockquotes,
+            // table cells, and the plain-paragraph fallback path). In the pill path the text
+            // is Split first, so individual segments never reach here — Apply is a no-op on
+            // tagless runs, so no double-render is possible.
             withPlaceholders = ResponseTagInliner.Apply(withPlaceholders);
 
             // Step 3: apply bold, italic, links.
