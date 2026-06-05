@@ -119,7 +119,7 @@ async def vfx_intent(target: str, intent: str, kind: str = "auto", dry_run: bool
             kind = detect_kind(intent)
         from .intent_common import sanitize_intent
         prompt = _PROMPT_TEMPLATE.format(target=sanitize_intent(target), kind=sanitize_intent(kind), intent=sanitize_intent(intent))
-        dsl_raw = await _sampling.generate(prompt)
+        dsl_raw = await _sampling.generate(prompt, feature='vfx_intent')
         if not dsl_raw:
             return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
         data = parse_vfx_dsl(strip_fences(dsl_raw))

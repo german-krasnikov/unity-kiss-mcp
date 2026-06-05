@@ -98,7 +98,7 @@ async def animator_intent(target: str, intent: str, dry_run: bool = False) -> st
     """
     from .intent_common import sanitize_intent
     prompt = _PROMPT_TEMPLATE.format(target=sanitize_intent(target), intent=sanitize_intent(intent))
-    dsl_raw = await _sampling.generate(prompt)
+    dsl_raw = await _sampling.generate(prompt, feature='animator_intent')
     if not dsl_raw:
         return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
 

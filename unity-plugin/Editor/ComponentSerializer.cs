@@ -117,8 +117,8 @@ namespace UnityMCP.Editor
                 case SerializedPropertyType.Boolean:   return prop.boolValue ? "true" : "false";
                 case SerializedPropertyType.String:    return prop.stringValue;
                 case SerializedPropertyType.Enum:
-                    return (prop.enumValueIndex >= 0 && prop.enumValueIndex < prop.enumDisplayNames.Length)
-                        ? prop.enumDisplayNames[prop.enumValueIndex]
+                    return (prop.enumValueIndex >= 0 && prop.enumValueIndex < prop.enumNames.Length)
+                        ? prop.enumNames[prop.enumValueIndex]
                         : prop.intValue.ToString();
                 case SerializedPropertyType.Vector2:
                     var v2 = prop.vector2Value;

@@ -196,6 +196,7 @@ namespace UnityMCP.Editor.Chat
         // Only builds the message and dispatches the turn; cap chip is shown at TurnDone.
         private void InjectCompileErrors(string errors)
         {
+            if (!_activity.CanSend) return;
             var msg = $"Compile errors after your edit:\n{errors}\nFix them.";
             DispatchTurn(UserTurnBuilder.Build(msg), msg);
         }

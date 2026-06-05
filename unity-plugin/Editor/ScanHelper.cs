@@ -19,7 +19,11 @@ namespace UnityMCP.Editor
                     colliders++;
                     if (c.isTrigger) triggers++;
                 }
-                colliders += go.GetComponents<Collider2D>().Length;
+                foreach (var c2d in go.GetComponents<Collider2D>())
+                {
+                    colliders++;
+                    if (c2d.isTrigger) triggers++;
+                }
                 audio += go.GetComponents<AudioSource>().Length;
                 lights += go.GetComponents<Light>().Length;
                 rigidbodies += go.GetComponents<Rigidbody>().Length;

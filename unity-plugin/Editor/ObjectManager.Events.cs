@@ -79,7 +79,7 @@ namespace UnityMCP.Editor
             {
                 call.FindPropertyRelative("m_Mode").enumValueIndex = 6; // Bool
                 call.FindPropertyRelative("m_Arguments.m_BoolArgument").boolValue =
-                    argValue == "true";
+                    ValueParser.ParseBool(argValue);
             }
             else if (argType == "int")
             {

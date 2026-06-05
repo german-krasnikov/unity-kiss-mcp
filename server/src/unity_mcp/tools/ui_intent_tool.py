@@ -79,7 +79,9 @@ def parse_ui_dsl(dsl: str) -> list[dict]:
 def _node_path(node: dict, name_map: dict) -> str:
     parts = [node["name"]]
     parent = node.get("parent")
-    while parent and parent in name_map:
+    visited: set = set()
+    while parent and parent in name_map and parent not in visited:
+        visited.add(parent)
         parts.insert(0, parent)
         parent = name_map[parent].get("parent")
     return "/" + "/".join(parts)
@@ -138,7 +140,7 @@ async def ui_intent(intent: str, parent: Optional[str] = None, template: Optiona
     else:
         from .intent_common import sanitize_intent
         prompt = _PROMPT_TEMPLATE.format(parent=sanitize_intent(parent or "root"), intent=sanitize_intent(intent))
-        dsl_raw = await _sampling.generate(prompt)
+        dsl_raw = await _sampling.generate(prompt, feature='ui_intent')
         if not dsl_raw:
             return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
         dsl = strip_fences(dsl_raw)

@@ -308,9 +308,9 @@ namespace UnityMCP.Editor
             {
                 result.parameter = c.Substring(0, opIdx).Trim();
                 var valueStr = c.Substring(opIdx + op.Length).Trim().ToLower();
-                // Bool shorthand: Param==true → Greater 0.5, Param==false → Less 0.5
-                if (valueStr == "true")  { result.mode = AnimatorConditionMode.Greater; result.threshold = 0.5f; return result; }
-                if (valueStr == "false") { result.mode = AnimatorConditionMode.Less;    result.threshold = 0.5f; return result; }
+                // Bool shorthand: Param==true → If, Param==false → IfNot
+                if (valueStr == "true")  { result.mode = AnimatorConditionMode.If;    result.threshold = 0; return result; }
+                if (valueStr == "false") { result.mode = AnimatorConditionMode.IfNot; result.threshold = 0; return result; }
                 result.threshold = float.Parse(valueStr, CultureInfo.InvariantCulture);
                 result.mode = op switch
                 {

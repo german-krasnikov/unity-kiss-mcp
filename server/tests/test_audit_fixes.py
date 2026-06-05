@@ -373,21 +373,17 @@ def test_editor_tool_annotation_is_rw():
 
 # ── Fix 24: bridge.py preserve exception type ────────────────────────────────
 
-def test_bridge_connection_error_chains_original():
+@pytest.mark.asyncio
+async def test_bridge_connection_error_chains_original():
     """Fix 24: ConnectionError raised in bridge.send must chain the original exception."""
-    import asyncio
-    import pytest
     from unity_mcp.bridge import UnityBridge
 
-    async def _run():
-        bridge = UnityBridge("127.0.0.1", 19999)  # nothing listening
-        try:
-            await bridge.send("ping", {}, timeout=1.0)
-            pytest.fail("Expected ConnectionError")
-        except (ConnectionError, TimeoutError) as ce:
-            assert ce.__cause__ is not None, "Exception must chain original via 'from e'"
-
-    asyncio.get_event_loop().run_until_complete(_run())
+    bridge = UnityBridge("127.0.0.1", 19999)  # nothing listening
+    try:
+        await bridge.send("ping", {}, timeout=1.0)
+        pytest.fail("Expected ConnectionError")
+    except (ConnectionError, TimeoutError) as ce:
+        assert ce.__cause__ is not None, "Exception must chain original via 'from e'"
 
 
 # ── Fix 28: plugins PLUGIN_DIRS API version check ─────────────────────────────

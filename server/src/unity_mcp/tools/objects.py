@@ -93,12 +93,9 @@ async def delete_object(id: int | None = None, path: str | None = None, force: b
     return await _send("delete_object", args)
 
 
-async def manage_component(path: str, type: str, action: str, no_validate: bool = False) -> str:
+async def manage_component(path: str, type: str, action: str) -> str:
     """Add or remove a component. action: 'add' or 'remove' ONLY (no 'enable'/'disable' — use set_property with prop='m_Enabled' for that). type: full namespace required (e.g. 'UnityEngine.UI.Button', NOT 'Button')."""
-    args: dict = {"path": path, "type": type, "action": action}
-    if no_validate:
-        args["no_validate"] = True
-    return await _send("manage_component", args)
+    return await _send("manage_component", {"path": path, "type": type, "action": action})
 
 
 async def get_object_detail(id: int) -> str:

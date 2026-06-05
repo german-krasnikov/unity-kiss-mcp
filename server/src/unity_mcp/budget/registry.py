@@ -28,6 +28,7 @@ FEATURES: dict[str, FeatureMeta] = {
     "vfx_intent":          FeatureMeta("medium",   0.6, 800,  400, False),
     "ui_intent":           FeatureMeta("medium",   0.6, 800,  400, False),
     "som_visual":          FeatureMeta("medium",   0.9, 1700, 200, True),
+    "distiller":           FeatureMeta("medium",   0.5, 2000, 400, False),
 }
 
 DEFAULT_FEATURE = FeatureMeta("medium", 0.5, 500, 200, False)
