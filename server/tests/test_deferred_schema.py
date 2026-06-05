@@ -2,10 +2,11 @@
 import os
 import pytest
 from types import SimpleNamespace
+from typing import Optional
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
-def _tool(name: str, description: str = "desc", input_schema: dict | None = None):
+def _tool(name: str, description: str = "desc", input_schema: Optional[dict] = None):
     t = SimpleNamespace(
         name=name,
         description=description,
