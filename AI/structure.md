@@ -249,12 +249,13 @@ unity-kiss-mcp/
 │       │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
 │       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated
 │       │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators
-│       │   └── Tests/                     # 21 NUnit suites = ~240+ test cases (render + backend + interactivity + pure)
+│       │   └── Tests/                     # 24+ NUnit suites = ~550+ test cases (render + backend + chips + pure)
 │       │       │   # Render (66): MdBlockTests(5), MarkdownParserTests(16), MarkdownInlineTests(13), MermaidParserTests(17), MermaidLayoutTests(15)
 │       │       │   # Backend/parse (119): ChatStreamParserTests(24), CliBackendBaseTests(29), CodexArgBuilderTests(35), CodexStreamParserTests(26), ClaudeArgBuilderTests(8), ToolVerbMapTests(5)
 │       │       │   # Interactivity/input (43): EnterKeySendTests(7), InputHeightCalcTests(14), ChatActivityStateTests(13), CopyTextBuilderTests(9)
-│       │       │   # Pure/state (6+12): TokenFormatTests(6), PendingTurnStateTests(12, v3 + BackendKind)
-│       │       │   # Total: 1384 EditMode pass (5 pre-existing baseline reds, 0 new regressions)
+│       │       │   # Chips (320+): ChipSequenceTests, ChipSequenceExtraTests, ChipSendSequenceTests, ChipSendSequenceExtraTests, ChipTestHelpers (shared)
+│       │       │   # Pure/state (6+489): TokenFormatTests(6), PendingTurnStateTests(187), PendingTurnStateV4Tests(197), PendingTurnStateStalenessTests(105)
+│       │       │   # Total: ~1550+ EditMode (5 pre-existing baseline reds, 0 new regressions)
 │       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
 │       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs
