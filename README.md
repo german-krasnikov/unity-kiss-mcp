@@ -146,6 +146,13 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.17.0</b> — 2026-06-05 — full-project code review sprint — 12 waves of fixes across Python + C#</summary>
+
+**Full-Project Code Review Sprint (Server v0.8.0, Plugin v0.17.0)** (2026-06-05) — 12-wave autonomous review sprint covering all Python and C# subsyst …
+
+</details>
+
+<details>
 <summary><b>v0.16.0</b> — 2026-06-05 — F12 chat UX overhaul — composed inline-chip field + response pills + session clear</summary>
 
 **F12 Chat UX Overhaul (Plugin v0.16.0)** (2026-06-05) — Five production-ready pieces shipping together: (1) **W0 composed inline-chip field (P1+P2 re …
@@ -174,15 +181,9 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 </details>
 
 <details>
-<summary><b>v0.7.1</b> — 2026-06-04 — tech-debt sprint wave 1–3 (Python/C#/Chat) — pure quality</summary>
-
-**Tech-Debt Sprint: Python Tooling + C# Plugin + Chat Hardening (Server v0.7.1, Plugin v0.13.4, 6 commits)** (2026-06-04) — Six-wave quality sprint ad …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.7.1** — 2026-06-04 — tech-debt sprint wave 1–3 (Python/C#/Chat) — pure quality
 - **v0.7.0** — 2026-06-04 — Editor.log out-of-band corroboration — P0 compile-tool blindness fix
 - **v0.6.1** — 2026-06-04 — atomic batch rollback — transactional scene edits
 - **v0.5.0 / 0.12.0** — 2026-06-04 — scoped scene queries — search_scene root+limit + spatial center
