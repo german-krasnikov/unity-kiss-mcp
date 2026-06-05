@@ -19,12 +19,17 @@ def _safe_name(name: str) -> str:
     return name
 
 
+def _detect_kind(code: str) -> str:
+    return "csharp" if any(kw in code for kw in ("var ", "new ", "GameObject", "//", ";", "using ")) else "batch"
+
+
 async def save_skill(name: str, description: str, code: str) -> str:
     """Save a learned skill (C# code or batch commands) for reuse across sessions.
     name: skill identifier. description: what it does. code: C# or batch commands."""
     name = _safe_name(name)
     os.makedirs(_skills_dir(), exist_ok=True)
     skill = {"name": name, "description": description, "code": code,
+             "kind": _detect_kind(code),
              "created": time.strftime("%Y-%m-%d %H:%M"), "used_count": 0}
     with open(os.path.join(_skills_dir(), f"{name}.json"), "w") as f:
         json.dump(skill, f, indent=2)
@@ -50,7 +55,7 @@ async def use_skill(name: str, params: str | None = None) -> str:
     skill["last_used"] = time.strftime("%Y-%m-%d %H:%M")
     with open(path, "w") as f:
         json.dump(skill, f, indent=2)
-    if any(kw in code for kw in ("var ", "new ", "GameObject", "//")):
+    if skill.get("kind", _detect_kind(code)) == "csharp":
         return await _send("execute_code", {"code": code, "undo_label": f"skill:{name}"})
     return await _send("batch", {"commands": code})
 
@@ -65,7 +70,7 @@ async def list_skills() -> str:
             continue
         with open(os.path.join(_skills_dir(), fname)) as fh:
             s = json.load(fh)
-        skills.append(f"{s['name']}: {s['description']} (used {s.get('used_count', 0)}x)")
+        skills.append(f"{s['name']} [{s.get('kind', '?')}]: {s['description']} (used {s.get('used_count', 0)}x)")
     return "\n".join(skills) if skills else "No skills saved yet. Use save_skill to create one."
 
 

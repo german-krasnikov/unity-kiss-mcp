@@ -160,3 +160,33 @@ async def test_ui_intent_e2e_executes_batch():
             result = await ui_intent(intent="health bar HUD")
             mock_send.assert_called_once()
             assert mock_send.call_args[0][0] == "batch"
+
+
+# ---------------------------------------------------------------------------
+# 5. Nested path resolution — #23
+# ---------------------------------------------------------------------------
+
+def test_ui_builder_nested_set_rect_uses_full_path():
+    """set_rect for nested child must use full path, not just name."""
+    from unity_mcp.tools.ui_intent_tool import parse_ui_dsl, build_ui_batch
+    dsl = "canvas Canvas\n  panel HUD\n    image HealthBar anchor=top-left pos=20,-20 size=200,30"
+    nodes = parse_ui_dsl(dsl)
+    lines = build_ui_batch(nodes, parent=None)
+    set_rect_lines = [l for l in lines if "set_rect" in l and "HealthBar" in l]
+    assert set_rect_lines, "Expected a set_rect line for HealthBar"
+    assert "/Canvas/HUD/HealthBar" in set_rect_lines[0], (
+        f"Expected full path /Canvas/HUD/HealthBar, got: {set_rect_lines[0]}"
+    )
+
+
+def test_ui_builder_nested_manage_component_uses_full_path():
+    """manage_component for nested layout must use full path."""
+    from unity_mcp.tools.ui_intent_tool import parse_ui_dsl, build_ui_batch
+    dsl = "canvas Canvas\n  panel HUD\n    layout Menu dir=vertical spacing=10"
+    nodes = parse_ui_dsl(dsl)
+    lines = build_ui_batch(nodes, parent=None)
+    comp_lines = [l for l in lines if "manage_component" in l and "Menu" in l]
+    assert comp_lines, "Expected a manage_component line for Menu"
+    assert "/Canvas/HUD/Menu" in comp_lines[0], (
+        f"Expected full path /Canvas/HUD/Menu, got: {comp_lines[0]}"
+    )

@@ -52,7 +52,7 @@ class SchemaGuard:
             return None  # ObjectReference — skip
 
         # Component check
-        comps = self._mw._component_cache.get(path)
+        comps = self._mw.get_components_for_path(path)
         if comps is not None and component not in comps:
             best, lev = self._best_match(component, comps)
             if lev <= self.LEV_BLOCK:
@@ -101,7 +101,7 @@ class SchemaGuard:
         if not target_path or not target_comp:
             return None
 
-        comps = self._mw._component_cache.get(target_path)
+        comps = self._mw.get_components_for_path(target_path)
         if comps is not None and target_comp not in comps:
             best, lev = self._best_match(target_comp, comps)
             if lev <= self.LEV_BLOCK:
@@ -134,10 +134,7 @@ class SchemaGuard:
 
     def _known_types(self) -> set:
         """Flatten all component names from the component cache."""
-        types: set = set()
-        for comps in self._mw._component_cache.values():
-            types.update(comps)
-        return types
+        return self._mw.get_known_component_types()
 
     @staticmethod
     def _block_envelope(kind: str, bad: str, best: str, lev: int, where: str, known: str) -> str:

@@ -98,6 +98,15 @@ class Middleware(MiddlewareGuardsMixin, MiddlewareReadsMixin, MiddlewareAsyncMix
             self.schema_cache = SchemaCache()
             self.schema_guard = SchemaGuard(self, self.schema_cache)
 
+    def get_components_for_path(self, path: str):
+        return self._component_cache.get(path)
+
+    def get_known_component_types(self) -> set:
+        types: set = set()
+        for comps in self._component_cache.values():
+            types.update(comps)
+        return types
+
     def reset_session(self) -> None:
         """Drop volatile in-flight state on reconnect."""
         self._retry_cache.clear()

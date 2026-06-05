@@ -9,6 +9,17 @@ _send = None
 _args = None
 
 
+def _count_group(lines: list[str], i: int, regex, extra_check=None) -> tuple[str, int]:
+    """Count consecutive lines matching regex (with optional extra_check). Returns (indent, count)."""
+    indent = lines[i][:len(lines[i]) - len(lines[i].lstrip())]
+    count = 1
+    while i + count < len(lines) and regex.search(lines[i + count]):
+        if extra_check and not extra_check(lines[i + count]):
+            break
+        count += 1
+    return indent, count
+
+
 def compress_hierarchy(text: str) -> str:
     """Compress hierarchy output: group identical siblings, collapse visual-only subtrees."""
     lines = text.split('\n')
@@ -17,28 +28,17 @@ def compress_hierarchy(text: str) -> str:
     while i < len(lines):
         line = lines[i]
         if _RE_SLOT.search(line):
-            count = 1
-            indent = line[:len(line) - len(line.lstrip())]
-            while i + count < len(lines) and _RE_SLOT.search(lines[i + count]):
-                count += 1
+            indent, count = _count_group(lines, i, _RE_SLOT)
             result.append(f"{indent}[{count}x slot]")
             i += count
             continue
         if _RE_POINT.search(line):
-            count = 1
-            indent = line[:len(line) - len(line.lstrip())]
-            while i + count < len(lines) and _RE_POINT.search(lines[i + count]):
-                count += 1
+            indent, count = _count_group(lines, i, _RE_POINT)
             result.append(f"{indent}[{count}x point]")
             i += count
             continue
         if _RE_MESH.search(line) and '...' not in line:
-            count = 1
-            indent = line[:len(line) - len(line.lstrip())]
-            while (i + count < len(lines) and
-                   _RE_MESH.search(lines[i + count]) and
-                   '...' not in lines[i + count]):
-                count += 1
+            indent, count = _count_group(lines, i, _RE_MESH, lambda l: '...' not in l)
             if count >= 3:
                 result.append(f"{indent}[{count}x visual mesh]")
                 i += count

@@ -92,3 +92,41 @@ async def test_use_skill_param_substitution(skills_dir, mock_bridge):
     call_args = mock_bridge.send.call_args[0]
     assert "Player" in call_args[1]["code"]
     assert "${name}" not in call_args[1]["code"]
+
+
+@pytest.mark.asyncio
+async def test_save_skill_stores_kind_csharp(skills_dir):
+    await save_skill("cs_skill", "Does C#", "UnityEditor.AssetDatabase.Refresh();")
+    data = json.loads((skills_dir / "cs_skill.json").read_text())
+    assert data["kind"] == "csharp"
+
+
+@pytest.mark.asyncio
+async def test_save_skill_stores_kind_batch(skills_dir):
+    await save_skill("batch_skill2", "Does batch", "set_property path=Cube pos=1,2,3")
+    data = json.loads((skills_dir / "batch_skill2.json").read_text())
+    assert data["kind"] == "batch"
+
+
+@pytest.mark.asyncio
+async def test_use_skill_routes_by_stored_kind_not_heuristic(skills_dir, mock_bridge):
+    """C# skill with NO typical C# keywords must still route to execute_code via stored kind."""
+    mock_bridge.send.return_value = {"ok": True, "data": "ok"}
+    # Code has no var/new/GameObject// — heuristic would misroute to batch
+    skill_data = {
+        "name": "tricky", "description": "tricky", "kind": "csharp",
+        "code": "UnityEditor.AssetDatabase.Refresh();",
+        "created": "2026-01-01 00:00", "used_count": 0,
+    }
+    skills_dir.mkdir(exist_ok=True)
+    (skills_dir / "tricky.json").write_text(json.dumps(skill_data))
+    await use_skill("tricky")
+    call_args = mock_bridge.send.call_args[0]
+    assert call_args[0] == "execute_code"
+
+
+@pytest.mark.asyncio
+async def test_list_skills_includes_kind(skills_dir):
+    await save_skill("tagged", "Tagged skill", "var x = 1;")
+    result = await list_skills()
+    assert "csharp" in result
