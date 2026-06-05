@@ -603,6 +603,47 @@ AI responses can now mention scene object names (e.g., "see Player1 here") and C
 - **Code delta:** −83 net lines (removed dual-path legacy), +341 insertions (new features)
 - **plugin version:** 0.17.0 → 0.17.1
 
+### Feature F14 — Inline @DisplayName Insertion + Chip Pill Strip in Bubbles (v0.17.2)
+
+#### P1: Inline @DisplayName Insertion at Cursor
+
+`MCPChatWindow.InlineChips.cs` — `InsertInlineChip()` now captures the cursor position in the TextField and inserts `@DisplayName` directly at that caret point. Chip references flow naturally inline with user text.
+
+**Behavior:**
+- "Add Selection to Context" (context menu) captures cursor index
+- Inserts @DisplayName at caret → "analyze @Player and compare to @Enemy"
+- Chips appear as pills in the `_pillRow` above text (visual affordance)
+- Cursor clamped to prevent edge-case `ArgumentOutOfRangeException`
+
+**Files modified:** `MCPChatWindow.InlineChips.cs` (cursor capture + insertion logic)
+
+#### P2: Chip Pill Strip in Sent User Bubbles
+
+`MCPChatWindow.Send.cs` + `ChatTranscript.cs` — Send path now splits the user's text into two representations:
+
+- **rawText** — Display text with @names (e.g., "analyze @Player and compare to @Enemy")
+- **llmText** — LLM text with [kind:ref] tags (e.g., "analyze [hierarchy:/Player] and compare to [hierarchy:/Enemy]")
+
+Chip snapshot is copied before TextField clear, then passed to `AppendUserBubble()` which renders a `.user-chip-strip` row of visual pill elements above the message text. Pills are read-only (user-approved) and symmetric with AI-sent response pills.
+
+**Files modified:**
+- `MCPChatWindow.Send.cs` — Split rawText/llmText, snapshot chips, pass to bubble
+- `ChatTranscript.cs` — Accept chips param, render .user-chip-strip row
+- `MCPChatWindow.Drain.cs` — Restore path also passes chip snapshot (defensive copy)
+
+**Restore path:** Resumed turns also get chip snapshot (defensive copy), preserving visual feedback on domain reload.
+
+#### Test Coverage & Metrics
+
+- **New test suites:** UserBubblePillTests +3 additional pill strip rendering tests (UserBubbleChipStripTests)
+- **Test count:** 1562+/1567 EditMode pass (5 pre-existing reds, 0 new failures)
+- **Code delta:** +107 lines (inline insertion + pill strip rendering)
+- **plugin version:** 0.17.1 → 0.17.2
+
+**Note:** This release also includes two bugfixes from earlier in the same version sprint:
+- **BUG1:** InlineChipField layout changed flex-row → flex-column with dedicated _pillRow; USS align-items: center → stretch
+- **BUG2:** SaveStateBeforeReload() no longer skips ActivityPhase.Idle; chips survive domain reload even in idle state
+
 ### Binary Resolution on macOS
 
 **Problem:** Finder-launched Unity has a minimal PATH; `claude` binary may not be found.
