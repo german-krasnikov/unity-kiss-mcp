@@ -41,6 +41,12 @@
 - **Stop burning tokens on boilerplate.** Each `batch` call replaces 5–20 individual round-trips — **80–95% fewer tokens** on the same work.
 - **Stop writing glue code.** Registered tools cover scene CRUD, animation, VFX, UI, shaders, runtime control, and code intelligence — with a plugin seam for your own.
 
+### Two ways to work
+
+🖥️ **CLI Mode** — run from terminal via Claude Code or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 91 MCP tools with 80–95% token compression.
+
+💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. Spawns Claude or Codex CLI directly — no sidecar, no API key configuration. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one click rolls back everything the AI changed. Domain-reload safe.
+
 **Before / after — creating and configuring 3 objects:**
 
 ```python
@@ -123,7 +129,7 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 ## Features
 
-- 💸 **Token Optimization** — `batch` ops compress 5–20 calls into one (80–95% savings), deferred schemas, per-session analytics
+- 💸 **Token Optimization** — CLI mode's `batch` ops compress 5–20 calls into one (80–95% savings), deferred tool schemas, per-session cost analytics
 - 🎬 **PlayTest DSL** — 21-command runtime testing language: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
 - 🏗️ **Scene Management** — full CRUD, hierarchy inspection, Unity query syntax, diff tracking, checkpoint/restore
 - 🎞️ **Animation & Timeline** — clips with key management, Timeline assets, Animator controllers with states/transitions
@@ -131,7 +137,7 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 - 🎨 **Multi-View Screenshots** — 4-panel grid (Front/Left/Top/Iso), bounding-box overlay, visual regression baseline
 - 🔍 **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at` — no disk writes
 - 🎯 **Capability Gating** — TIER1 core always visible; 8 category toggles per-session (`SCENE_EDIT`, `ANIMATION`, `VFX`, `UI`, `ASSETS`)
-- 💬 **In-Unity Agent Chat** — `MCPChatWindow` spawns Claude/Codex CLI directly — domain-reload safe, typed context chips, per-turn undo
+- 💬 **In-Unity Agent Chat** — chat window spawns Claude/Codex CLI directly inside Unity. Multi-backend (Claude persistent-stdin, Codex spawn-per-turn), per-backend settings (model, permissions, extra args), typed context chips with kind detection (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo rollback, domain-reload survival, inline cursor chips, auto-scroll
 - 🔌 **Plugin Extensibility** — register your own tools in one file, no cross-imports
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
