@@ -41,7 +41,7 @@ namespace UnityMCP.Editor.Chat
             bool any = false;
             foreach (var seg in msg.Segments)
             {
-                if (!seg.IsChip) { if (!string.IsNullOrWhiteSpace(seg.Text)) { wrap.Add(ChatLabel.Selectable(seg.Text)); any = true; } }
+                if (!seg.IsChip) { if (!string.IsNullOrWhiteSpace(seg.Text)) { var lbl = ChatLabel.Selectable(seg.Text); lbl.AddToClassList("msg-text"); wrap.Add(lbl); any = true; } }
                 else { wrap.Add(ChipPillFactory.Build(seg.Chip)); any = true; }
             }
             if (any) bubble.Add(wrap);

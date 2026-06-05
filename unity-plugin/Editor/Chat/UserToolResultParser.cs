@@ -42,15 +42,30 @@ namespace UnityMCP.Editor.Chat
         {
             var toolUseId  = JsonHelper.ExtractString(obj, "tool_use_id") ?? "";
             var isErr      = JsonHelper.ExtractString(obj, "is_error") == "true";
-            var resultText = JsonHelper.ExtractString(obj, "content");
-            if (resultText == null)
-            {
-                var inner    = JsonHelper.ExtractArray(obj, "content");
-                var innerObj = JsonHelper.ExtractFirstArrayObject(inner);
-                if (innerObj != null)
-                    resultText = JsonHelper.ExtractString(innerObj, "text") ?? "";
-            }
+            var resultText = IsContentArray(obj)
+                ? ExtractNestedText(obj)
+                : JsonHelper.ExtractString(obj, "content");
             return ChatEvent.ToolResult(toolUseId, resultText ?? "", !isErr);
+        }
+
+        // Returns true when "content" value starts with '[' (array, not string).
+        private static bool IsContentArray(string obj)
+        {
+            var needle = "\"content\"";
+            var idx = obj.IndexOf(needle, System.StringComparison.Ordinal);
+            if (idx == -1) return false;
+            var colon = obj.IndexOf(':', idx + needle.Length);
+            if (colon == -1) return false;
+            var i = colon + 1;
+            while (i < obj.Length && obj[i] == ' ') i++;
+            return i < obj.Length && obj[i] == '[';
+        }
+
+        private static string ExtractNestedText(string obj)
+        {
+            var inner    = JsonHelper.ExtractArray(obj, "content");
+            var innerObj = JsonHelper.ExtractFirstArrayObject(inner);
+            return innerObj != null ? JsonHelper.ExtractString(innerObj, "text") ?? "" : "";
         }
     }
 }
