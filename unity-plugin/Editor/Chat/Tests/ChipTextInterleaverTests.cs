@@ -153,5 +153,80 @@ namespace UnityMCP.Editor.Chat.Tests
                 { PC(chipA, 0), PC(chipB, 1) });
             Assert.AreEqual(2, msg.Chips.Count);
         }
+
+        // ── Group U: User scenario regression tests ───────────────────────────
+
+        // U1: chip at 0, text "jhkjhkj", chip at 7 → [chip, text, chip] segments
+        [Test]
+        public void U1_ChipTextChip_InterleavedSegments()
+        {
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -99);
+            var positioned = new List<PositionedChip> { PC(chipA, 0), PC(chipB, 7) };
+            var msg = ChipTextInterleaver.Build("jhkjhkj", positioned);
+
+            Assert.AreEqual(3, msg.Segments.Count);
+            Assert.IsTrue(msg.Segments[0].IsChip);
+            Assert.AreEqual("/Main Camera", msg.Segments[0].Chip.Path);
+            Assert.IsFalse(msg.Segments[1].IsChip);
+            Assert.AreEqual("jhkjhkj", msg.Segments[1].Text);
+            Assert.IsTrue(msg.Segments[2].IsChip);
+            Assert.AreEqual("/Light", msg.Segments[2].Chip.Path);
+            Assert.AreEqual(2, msg.Chips.Count);
+        }
+
+        // U2: same as U1 but verify LLM payload contains chip context
+        [Test]
+        public void U2_ChipTextChip_LlmPayloadContainsChipContext()
+        {
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -99);
+            var positioned = new List<PositionedChip> { PC(chipA, 0), PC(chipB, 7) };
+            var msg = ChipTextInterleaver.Build("jhkjhkj", positioned);
+            var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
+
+            StringAssert.Contains("jhkjhkj", payload);
+            StringAssert.Contains("[hierarchy:", payload);
+            Assert.Greater(payload.Length, "jhkjhkj".Length);
+        }
+
+        // U3: both chips at offset 7 (end of text) — text first, then both chips.
+        // Regression: chips must NOT be lost even when offset equals text length.
+        [Test]
+        public void U3_BothChipsAtEnd_TextThenBothChips()
+        {
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -99);
+            var positioned = new List<PositionedChip> { PC(chipA, 7), PC(chipB, 7) };
+            var msg = ChipTextInterleaver.Build("jhkjhkj", positioned);
+
+            Assert.AreEqual(2, msg.Chips.Count);
+            var chipSegs = new List<MessageSegment>();
+            foreach (var s in msg.Segments) if (s.IsChip) chipSegs.Add(s);
+            Assert.AreEqual(2, chipSegs.Count);
+        }
+
+        // U4: chips at end — LLM payload still includes chip context
+        [Test]
+        public void U4_BothChipsAtEnd_PayloadIncludesChipContext()
+        {
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            var positioned = new List<PositionedChip> { PC(chipA, 7) };
+            var msg = ChipTextInterleaver.Build("jhkjhkj", positioned);
+            var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
+
+            StringAssert.Contains("[hierarchy:", payload);
+            StringAssert.Contains("jhkjhkj", payload);
+        }
+
+        // U5: display text excludes chip payloads — only raw text returned
+        [Test]
+        public void U5_DisplayText_ExcludesChipContext()
+        {
+            var chip = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            var msg = ChipTextInterleaver.Build("hello", new List<PositionedChip> { PC(chip, 5) });
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("hello", display);
+        }
     }
 }

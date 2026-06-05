@@ -55,7 +55,7 @@ namespace UnityMCP.Editor.Chat
             if (delta == 0) return;
             for (int i = 0; i < _chips.Count; i++)
             {
-                if (_chips[i].TextOffset >= changeAt)
+                if (_chips[i].TextOffset > changeAt)
                 {
                     // Skip sentinel offsets (int.MaxValue from Add() convenience) — adding delta overflows.
                     if (_chips[i].TextOffset == int.MaxValue) continue;

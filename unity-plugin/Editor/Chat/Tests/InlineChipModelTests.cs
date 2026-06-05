@@ -223,31 +223,32 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(5,   m.PositionedChips[0].TextOffset);
         }
 
-        // A5: AdjustOffsets — insert 3 chars at pos 5: chips at offset>=5 shift +3
+        // A5: AdjustOffsets — insert 3 chars at pos 5: only chips STRICTLY AFTER offset 5 shift.
+        // Chip AT offset 5 stays — standard text-editor bookmark semantic (> not >=).
         [Test]
-        public void A5_AdjustOffsets_Insert_ShiftsChipsAtOrAfterChangeAt()
+        public void A5_AdjustOffsets_Insert_ShiftsChipsStrictlyAfterChangeAt()
         {
             var m = new InlineChipModel();
             m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1)); // before 5 → unchanged
-            m.InsertAt(5,  new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2)); // at 5 → shifts
+            m.InsertAt(5,  new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2)); // AT 5 → stays (not >=)
             m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/C", "C", 3)); // after 5 → shifts
             m.AdjustOffsetsAfterTextChange(5, +3);
             Assert.AreEqual(3,  m.PositionedChips[0].TextOffset); // unchanged
-            Assert.AreEqual(8,  m.PositionedChips[1].TextOffset); // 5+3
+            Assert.AreEqual(5,  m.PositionedChips[1].TextOffset); // stays at 5, NOT 8
             Assert.AreEqual(13, m.PositionedChips[2].TextOffset); // 10+3
         }
 
-        // A6: AdjustOffsets — delete 2 chars at pos 3: chips at offset>=3 shift -2
+        // A6: AdjustOffsets — delete 2 chars at pos 3: chip AT pos 3 stays, chip after shifts.
         [Test]
-        public void A6_AdjustOffsets_Delete_ShiftsChipsAtOrAfterChangeAt()
+        public void A6_AdjustOffsets_Delete_ShiftsChipsStrictlyAfterChangeAt()
         {
             var m = new InlineChipModel();
             m.InsertAt(1,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1)); // before 3 → unchanged
-            m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2)); // at 3 → shifts
+            m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2)); // AT 3 → stays
             m.InsertAt(8,  new ChipData(ChipKindKeys.Hierarchy, "/C", "C", 3)); // after 3 → shifts
             m.AdjustOffsetsAfterTextChange(3, -2);
             Assert.AreEqual(1, m.PositionedChips[0].TextOffset); // unchanged
-            Assert.AreEqual(1, m.PositionedChips[1].TextOffset); // 3-2
+            Assert.AreEqual(3, m.PositionedChips[1].TextOffset); // stays at 3, NOT 1
             Assert.AreEqual(6, m.PositionedChips[2].TextOffset); // 8-2
         }
 
@@ -291,6 +292,123 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(2, m.Count);
             Assert.AreEqual(0, m.PositionedChips[0].TextOffset);
             Assert.AreEqual(0, m.PositionedChips[1].TextOffset);
+        }
+
+        // ── Group R: Regression — offset drift bug (>= vs >) ─────────────────
+
+        // R1: chip inserted at offset 0, then user types 7 chars one-by-one starting at 0.
+        // Each keystroke calls AdjustOffsetsAfterTextChange(cursorPos, 1).
+        // Cursor advances: 0,1,2,3,4,5,6. Chip must STAY at 0 (not drift to 7).
+        [Test]
+        public void R1_InsertAt0_Type7Chars_ChipStaysAtOffset0()
+        {
+            var m = new InlineChipModel();
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            m.InsertAt(0, chipA);
+
+            // Simulate typing 7 chars at cursor positions 0..6
+            for (int i = 0; i < 7; i++)
+                m.AdjustOffsetsAfterTextChange(i, 1);
+
+            Assert.AreEqual(0, m.PositionedChips[0].TextOffset);
+        }
+
+        // R2: chip at 0, type 7 chars, then insert second chip at offset 7.
+        // Result: chipA at 0, chipB at 7.
+        [Test]
+        public void R2_InsertAt0_Type7_InsertAt7_CorrectOffsets()
+        {
+            var m = new InlineChipModel();
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Directional Light", "Directional Light", -99);
+            m.InsertAt(0, chipA);
+
+            for (int i = 0; i < 7; i++)
+                m.AdjustOffsetsAfterTextChange(i, 1);
+
+            m.InsertAt(7, chipB);
+
+            Assert.AreEqual(2, m.Count);
+            Assert.AreEqual(0, m.PositionedChips[0].TextOffset);
+            Assert.AreEqual(7, m.PositionedChips[1].TextOffset);
+            Assert.AreEqual("/Main Camera",       m.PositionedChips[0].Chip.Path);
+            Assert.AreEqual("/Directional Light", m.PositionedChips[1].Chip.Path);
+        }
+
+        // R3: chip at 5, delete 1 char at pos 2 (before chip) → chip shifts to 4.
+        [Test]
+        public void R3_AdjustOffsets_DeleteBeforeChip_ShiftsLeft()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.AdjustOffsetsAfterTextChange(2, -1);
+            Assert.AreEqual(4, m.PositionedChips[0].TextOffset);
+        }
+
+        // R4: chip at 5, delete 1 char AT chip's position → chip stays at 5 (> not >=).
+        [Test]
+        public void R4_AdjustOffsets_DeleteAtChipPosition_ChipStays()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.AdjustOffsetsAfterTextChange(5, -1);
+            Assert.AreEqual(5, m.PositionedChips[0].TextOffset);
+        }
+
+        // R5: two duplicate chips (same display name) at different offsets after typing scenario.
+        // Simulate: insert chipA at 0, type 7 chars, insert chipB at 7.
+        // Then remove chipB (index 1). chipA at 0 must survive.
+        [Test]
+        public void R5_TwoDuplicateChips_RemoveSecond_FirstSurvivesAtOffset0()
+        {
+            var m = new InlineChipModel();
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
+            m.InsertAt(0, chipA);
+
+            for (int i = 0; i < 7; i++)
+                m.AdjustOffsetsAfterTextChange(i, 1);
+
+            m.InsertAt(7, chipB);
+
+            Assert.AreEqual(2, m.Count);
+            Assert.AreEqual(0, m.PositionedChips[0].TextOffset);
+            Assert.AreEqual(7, m.PositionedChips[1].TextOffset);
+
+            m.RemoveAt(1); // remove chipB
+
+            Assert.AreEqual(1, m.Count);
+            Assert.AreEqual(0, m.PositionedChips[0].TextOffset);
+            Assert.AreEqual("/Main Camera", m.PositionedChips[0].Chip.Path);
+        }
+
+        // R6: full scenario — chip, type "test", chip, build message, verify segment order.
+        [Test]
+        public void R6_FullScenario_ChipTypeChip_CorrectSegmentOrder()
+        {
+            var m = new InlineChipModel();
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2);
+
+            m.InsertAt(0, chipA);
+            // type "test" (4 chars), cursor advances 0→1→2→3
+            for (int i = 0; i < 4; i++)
+                m.AdjustOffsetsAfterTextChange(i, 1);
+            m.InsertAt(4, chipB);
+
+            Assert.AreEqual(0, m.PositionedChips[0].TextOffset);
+            Assert.AreEqual(4, m.PositionedChips[1].TextOffset);
+
+            var msg = ChipTextInterleaver.Build("test", m.PositionedChips);
+            // Expected segments: chip(A), text("test"), chip(B)
+            Assert.AreEqual(3, msg.Segments.Count);
+            Assert.IsTrue(msg.Segments[0].IsChip);
+            Assert.AreEqual("/A", msg.Segments[0].Chip.Path);
+            Assert.IsFalse(msg.Segments[1].IsChip);
+            Assert.AreEqual("test", msg.Segments[1].Text);
+            Assert.IsTrue(msg.Segments[2].IsChip);
+            Assert.AreEqual("/B", msg.Segments[2].Chip.Path);
+            Assert.AreEqual(2, msg.Chips.Count);
         }
     }
 }
