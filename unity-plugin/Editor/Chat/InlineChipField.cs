@@ -97,11 +97,13 @@ namespace UnityMCP.Editor.Chat
                 ? System.Math.Clamp(_lastCursorPos, 0, len)
                 : System.Math.Clamp(raw, 0, len);
 
+            string val = tf.value ?? "";
+            bool needsLeadingSpace = cursor > 0 && val.Length > 0 && val[cursor - 1] != ' ';
             // Shift existing chips at >= cursor to make room for @mention text.
-            int mentionLen = 1 + chip.DisplayName.Length + 1;
+            int mentionLen = 1 + chip.DisplayName.Length + 1 + (needsLeadingSpace ? 1 : 0);
             _model.AdjustOffsetsAfterTextChangeInclusive(cursor, mentionLen);
-            _model.InsertAt(cursor, chip);
-            InjectMentionAt(cursor, chip);
+            _model.InsertAt(cursor + (needsLeadingSpace ? 1 : 0), chip);
+            InjectMentionAt(cursor, chip, needsLeadingSpace);
             // Advance last-known cursor past the injected mention so the next
             // chip insertion appends after this one rather than prepending again.
             _lastCursorPos = cursor + mentionLen;
@@ -111,10 +113,12 @@ namespace UnityMCP.Editor.Chat
         /// <summary>Insert chip at an explicit text offset.</summary>
         internal void InsertChipAt(int textOffset, ChipData chip)
         {
-            int mentionLen = 1 + chip.DisplayName.Length + 1;
+            string val = _textField.value ?? "";
+            bool needsLeadingSpace = textOffset > 0 && val.Length > 0 && val[textOffset - 1] != ' ';
+            int mentionLen = 1 + chip.DisplayName.Length + 1 + (needsLeadingSpace ? 1 : 0);
             _model.AdjustOffsetsAfterTextChangeInclusive(textOffset, mentionLen);
-            _model.InsertAt(textOffset, chip);
-            InjectMentionAt(textOffset, chip);
+            _model.InsertAt(textOffset + (needsLeadingSpace ? 1 : 0), chip);
+            InjectMentionAt(textOffset, chip, needsLeadingSpace);
             RebuildPills();
         }
 
@@ -166,9 +170,10 @@ namespace UnityMCP.Editor.Chat
             _pillRow.Clear();
         }
 
-        private void InjectMentionAt(int insertAt, ChipData chip)
+        private void InjectMentionAt(int insertAt, ChipData chip, bool prependSpace)
         {
             string mention = "@" + chip.DisplayName + " ";
+            if (prependSpace) mention = " " + mention;
             _suppressOffsetUpdate = true;
             string val = _textField.value ?? "";
             insertAt   = System.Math.Clamp(insertAt, 0, val.Length);

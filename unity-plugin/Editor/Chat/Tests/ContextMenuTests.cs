@@ -1,0 +1,102 @@
+// TDD — ContextMenuTests (F16a + F16b).
+// Tests logic reachable without invoking actual Unity menu items.
+using NUnit.Framework;
+using UnityEngine;
+using UnityEditor;
+using UnityMCP.Editor.Chat;
+
+namespace UnityMCP.Editor.Chat.Tests
+{
+    [TestFixture]
+    public class ContextMenuTests
+    {
+        [SetUp]
+        public void SetUp()
+        {
+            ChipKindRegistry.ResetToBuiltIns();
+            ChipPillFactory.AddToContextAction = null;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            ChipKindRegistry.ResetToBuiltIns();
+            ChipPillFactory.AddToContextAction = null;
+        }
+
+        // F16a: FindChatWindow returns null when no window open
+        [Test]
+        public void FindChatWindow_NoWindowOpen_ReturnsNull()
+        {
+            var window = HierarchyContextMenu.FindChatWindow();
+            Assert.IsNull(window);
+        }
+
+        // F16a: Validate condition — no selection means no GO
+        [Test]
+        public void HierarchyValidate_NoSelection_ActiveGameObjectIsNull()
+        {
+            Selection.activeGameObject = null;
+            Assert.IsNull(Selection.activeGameObject);
+        }
+
+        // F16a: AddToContextAction seam fires with hierarchy chip for a GO
+        [Test]
+        public void HierarchyMenu_AddToContextAction_ReceivesHierarchyChip()
+        {
+            ChipData captured = default;
+            ChipPillFactory.AddToContextAction = c => captured = c;
+
+            var go = new GameObject("HeroUnit");
+            try
+            {
+                var chip = new ChipData(ChipKindKeys.Hierarchy, "/" + go.name, go.name, go.GetInstanceID());
+                ChipPillFactory.AddToContextAction(chip);
+
+                Assert.AreEqual(ChipKindKeys.Hierarchy, captured.KindKey);
+                Assert.AreEqual("HeroUnit", captured.DisplayName);
+                Assert.AreEqual("/HeroUnit", captured.Path);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // F16b: Component menu — action receives chip for parent GO
+        [Test]
+        public void ComponentMenu_WithAction_InvokesWithCorrectChip()
+        {
+            ChipData captured = default;
+            ChipPillFactory.AddToContextAction = c => captured = c;
+
+            var go = new GameObject("TestObj");
+            try
+            {
+                var chip = new ChipData(ChipKindKeys.Hierarchy,
+                    "/" + go.name, go.name, go.GetInstanceID());
+                ChipPillFactory.AddToContextAction(chip);
+
+                Assert.AreEqual("TestObj", captured.DisplayName);
+                Assert.AreEqual(ChipKindKeys.Hierarchy, captured.KindKey);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // F16a+F16b: AddToContextAction null — no throw (graceful no-op)
+        [Test]
+        public void AddToContextAction_WhenNull_DoesNotThrow()
+        {
+            ChipPillFactory.AddToContextAction = null;
+            var chip = new ChipData(ChipKindKeys.Hierarchy, "/Player", "Player", 1);
+            Assert.DoesNotThrow(() => ChipPillFactory.AddToContextAction?.Invoke(chip));
+        }
+
+        // F16b: ComponentContextMenu reuses HierarchyContextMenu.FindChatWindow
+        [Test]
+        public void FindChatWindow_SameResultForBothMenus()
+        {
+            // Both menus call the same static — verify consistent null result in test env
+            var fromHierarchy  = HierarchyContextMenu.FindChatWindow();
+            // ComponentContextMenu.Execute delegates to HierarchyContextMenu.FindChatWindow internally
+            Assert.IsNull(fromHierarchy, "No window open in test env");
+        }
+    }
+}

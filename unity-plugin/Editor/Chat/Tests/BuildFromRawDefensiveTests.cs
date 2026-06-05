@@ -1,6 +1,7 @@
 // BuildFromRaw defensive @mention stripping tests.
 using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -170,6 +171,70 @@ namespace UnityMCP.Editor.Chat.Tests
                 Assert.IsFalse(seg.Text.Contains("@Collectible_2"),
                     $"Segment contains @Collectible_2: '{seg.Text}'");
             }
+        }
+
+        // ── VE-tree: AppendUserBubble(UserMessage) label assertions ──────────
+
+        [Test]
+        public void R_Def_VE1_AppendUserBubble_ChipAndText_NoAtInLabels()
+        {
+            var container  = new VisualElement();
+            var transcript = new ChatTranscript(container,
+                ChatBlockRendererFactory.CreateDefault(null, null));
+
+            var chip = new ChipData(ChipKindKeys.Hierarchy, "/Player", "Player", 1);
+            var msg  = ChipTextInterleaver.Build("fix this",
+                new List<PositionedChip> { new PositionedChip(chip, 8) }); // chip after text
+            transcript.AppendUserBubble(msg);
+
+            foreach (var lbl in container.Query<Label>().ToList())
+                Assert.IsFalse(lbl.text.Contains("@Player"),
+                    $"Label must not contain @mention: '{lbl.text}'");
+        }
+
+        [Test]
+        public void R_Def_VE2_AppendUserBubble_PillPresent_TextPreserved()
+        {
+            var container  = new VisualElement();
+            var transcript = new ChatTranscript(container,
+                ChatBlockRendererFactory.CreateDefault(null, null));
+
+            var chip = new ChipData(ChipKindKeys.Hierarchy, "/Enemy", "Enemy", 2);
+            var msg  = ChipTextInterleaver.Build("check enemy",
+                new List<PositionedChip> { new PositionedChip(chip, 6) }); // after "check "
+            transcript.AppendUserBubble(msg);
+
+            var pill = container.Q(className: "inline-chip-pill");
+            Assert.IsNotNull(pill, "Chip must be rendered as pill");
+
+            bool hasText = false;
+            foreach (var lbl in container.Query<Label>().ToList())
+                if (lbl.text.Contains("check")) hasText = true;
+            Assert.IsTrue(hasText, "Text 'check' must appear in a label");
+        }
+
+        [Test]
+        public void R_Def_VE3_AppendUserBubble_TwoChips_NoBareAtSymbol()
+        {
+            var container  = new VisualElement();
+            var transcript = new ChatTranscript(container,
+                ChatBlockRendererFactory.CreateDefault(null, null));
+
+            var c1 = new ChipData(ChipKindKeys.Hierarchy, "/A", "Alpha", 1);
+            var c2 = new ChipData(ChipKindKeys.Hierarchy, "/B", "Beta",  2);
+            var msg = ChipTextInterleaver.Build("between",
+                new List<PositionedChip>
+                {
+                    new PositionedChip(c1, 0),
+                    new PositionedChip(c2, 7),
+                });
+            transcript.AppendUserBubble(msg);
+
+            foreach (var lbl in container.Query<Label>().ToList())
+                Assert.IsFalse(lbl.text.Contains("@"),
+                    $"Label must not contain bare @: '{lbl.text}'");
+            var pills = container.Query(className: "inline-chip-pill").ToList();
+            Assert.AreEqual(2, pills.Count, "Both chips must render as pills");
         }
 
         // ── Regression: exact user scenario ──────────────────────────────────

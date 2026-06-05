@@ -17,6 +17,7 @@ namespace UnityMCP.Editor.Chat
         private int           _committed, _msgCount;
         private bool          _dirty;
         private IReadOnlyList<ChipData> _lastTurnChips;
+        private SceneNameLinker         _savedLinker;
         internal Func<IReadOnlyDictionary<string, string>> SceneObjects;
         private const int MaxMessages = 200;
 
@@ -148,6 +149,7 @@ namespace UnityMCP.Editor.Chat
                     _committed = 0;
                 }
             }
+            MarkdownInline.Linker = _savedLinker; _savedLinker = null;
             RenderProgressive(final: true);
             _assistantBubble.userData = _assistantRaw.ToString();
             CopyableText.Attach(_assistantBubble);
@@ -168,6 +170,8 @@ namespace UnityMCP.Editor.Chat
         {
             _grouper.Close(); _assistantRaw.Clear();
             _committed = 0; _liveTail = null; _liveTailSrc = null;
+            _savedLinker         = MarkdownInline.Linker;
+            MarkdownInline.Linker = null;
             _assistantRow    = Row(null);
             _assistantBubble = new VisualElement();
             _assistantBubble.AddToClassList("msg-bubble");

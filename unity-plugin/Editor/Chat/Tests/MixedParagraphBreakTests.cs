@@ -102,6 +102,26 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(pill, "Pill must be present");
         }
 
+        // MP9: InlineElement with plain text containing \n → Label, no breaks (plain path)
+        [Test]
+        public void MP9_PlainTextNewline_InlineElement_HandledCorrectly()
+        {
+            // No tags → InlineElement returns a plain Label (not mixed container).
+            // The \n is part of the text content, not a break element.
+            var ve = MixedParagraphRenderer.InlineElement("hello\nworld", "md-para");
+            Assert.IsInstanceOf<Label>(ve,
+                "Plain text (no tags) must return a Label even with \\n");
+            Assert.IsTrue(ve.ClassListContains("md-para"));
+        }
+
+        // MP10: triple newline in tagged content → 3 break elements
+        [Test]
+        public void MP10_TripleNewline_ThreeBreaks()
+        {
+            var ve = MixedParagraphRenderer.Render("[hierarchy:/A #1]\n\n\n[hierarchy:/B #2]");
+            Assert.AreEqual(3, CountBreaks(ve), "\\n\\n\\n must produce 3 break elements");
+        }
+
         // MP8: newline immediately before tag → break element before pill
         [Test]
         public void MP8_NewlineBeforeTag_BreakBeforePill()

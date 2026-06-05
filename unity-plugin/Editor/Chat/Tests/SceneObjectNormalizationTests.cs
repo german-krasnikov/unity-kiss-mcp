@@ -16,13 +16,13 @@ namespace UnityMCP.Editor.Chat.Tests
         private static ChipData SceneChip(string name, string path)
             => new ChipData(ChipKindKeys.Hierarchy, path, name, 0);
 
-        // SN1: bare name matching scene object → converted to [hierarchy:path #0] tag
+        // SN1: bare name matching scene object → converted to [hierarchy:path] tag (instanceID=0 → no #id)
         [Test]
         public void SN1_BareSceneName_ConvertedToPillTag()
         {
             var chips  = new List<ChipData> { SceneChip("Grid", "/Grid") };
             var result = BareNameNormalizer.Normalize("The Grid is broken", chips);
-            StringAssert.Contains("[hierarchy:/Grid #0]", result);
+            StringAssert.Contains("[hierarchy:/Grid]", result);
         }
 
         // SN2: name not in scene → left as plain text
@@ -40,14 +40,14 @@ namespace UnityMCP.Editor.Chat.Tests
         public void SN3_AlreadyTagged_NotDoubleConverted()
         {
             var chips  = new List<ChipData> { SceneChip("Grid", "/Grid") };
-            var input  = "[hierarchy:/Grid #0] needs fixing";
+            var input  = "[hierarchy:/Grid] needs fixing";
             var result = BareNameNormalizer.Normalize(input, chips);
             Assert.IsFalse(result.Contains("[["), $"Should not double-tag: {result}");
-            var count = CountOccurrences(result, "[hierarchy:/Grid #0]");
+            var count = CountOccurrences(result, "[hierarchy:/Grid]");
             Assert.AreEqual(1, count, $"Expected exactly one tag: {result}");
         }
 
-        // SN4: multiple scene objects in response → all converted
+        // SN4: multiple scene objects in response → all converted (instanceID=0 → no #id suffix)
         [Test]
         public void SN4_MultipleSceneObjects_AllConverted()
         {
@@ -57,8 +57,8 @@ namespace UnityMCP.Editor.Chat.Tests
                 SceneChip("Player", "/Player"),
             };
             var result = BareNameNormalizer.Normalize("Grid and Player are selected", chips);
-            StringAssert.Contains("[hierarchy:/Grid #0]",   result);
-            StringAssert.Contains("[hierarchy:/Player #0]", result);
+            StringAssert.Contains("[hierarchy:/Grid]",   result);
+            StringAssert.Contains("[hierarchy:/Player]", result);
         }
 
         // SN5: single-char scene name → skipped by BareNameNormalizer
@@ -67,7 +67,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var chips  = new List<ChipData> { SceneChip("A", "/A") };
             var result = BareNameNormalizer.Normalize("A is here", chips);
-            StringAssert.DoesNotContain("[hierarchy:/A #0]", result);
+            StringAssert.DoesNotContain("[hierarchy:/A]", result);
         }
 
         // SN6: scene object name in code block → not converted
@@ -94,7 +94,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var afterScene = BareNameNormalizer.Normalize(afterSent, sceneChips);
             // The [hierarchy:/Grid #42] is in a protected range → id preserved
             StringAssert.Contains("[hierarchy:/Grid #42]", afterScene);
-            StringAssert.DoesNotContain("[hierarchy:/Grid #0]", afterScene);
+            StringAssert.DoesNotContain("[hierarchy:/Grid]", afterScene);
         }
 
         // ── helper ────────────────────────────────────────────────────────────
