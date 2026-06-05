@@ -1,6 +1,5 @@
 // Integration tests for OnSend data-flow pipeline.
 // Tests data transformation directly — no window instantiation required.
-using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
@@ -39,27 +38,8 @@ namespace UnityMCP.Editor.Chat.Tests
         private static ChipData ScriptChip(string path, string name)
             => new ChipData(ChipKindKeys.Script, path, name, 0);
 
-        // Replicates OnSend + AppendChipContext + DispatchTurn data flow.
         private (string turnJson, string rawText) SimulateSend()
-        {
-            var rawText      = (_chipField.Text ?? "").Trim();
-            var chipSnapshot = _chipField.Model.Count > 0
-                ? new List<ChipData>(_chipField.Model.Chips) : null;
-            var llmText = rawText;
-
-            if (_chipField.Model.Count > 0)
-            {
-                var context = _chipField.Model.SerializePayload(_cfg);
-                if (!string.IsNullOrEmpty(context)) llmText += "\n" + context;
-            }
-            if (string.IsNullOrEmpty(llmText)) return (null, rawText);
-
-            var turnJson = UserTurnBuilder.Build(llmText);
-            _transcript.AppendUserBubble(rawText, chipSnapshot);
-            _chipField.ClearChips();
-            _chipField.Text = "";
-            return (turnJson, rawText);
-        }
+            => ChipTestHelpers.SimulateSend(_chipField, _transcript, _cfg);
 
         [Test]
         public void TextOnly_TurnJsonContainsText()
@@ -191,6 +171,39 @@ namespace UnityMCP.Editor.Chat.Tests
             var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
             Assert.AreEqual(msg, bubble.userData as string,
                 "bubble.userData must equal rawText (not llmText with bracket expansion)");
+        }
+
+        [Test]
+        public void TextOnly_BubbleContentContainer_HasOneLabel()
+        {
+            _chipField.Text = "hello world";
+            SimulateSend();
+            var wrap = ChatWindowAssertions.GetUserBubble(_container, 0).Q(className: "msg-user-content");
+            Assert.IsNotNull(wrap, "F13 bubble must have .msg-user-content");
+            int labelCount = 0;
+            foreach (var child in wrap.Children())
+                if (child is UnityEngine.UIElements.Label) labelCount++;
+            Assert.AreEqual(1, labelCount);
+        }
+
+        [Test]
+        public void TextOnly_NoPillsInContent()
+        {
+            _chipField.Text = "hello world";
+            SimulateSend();
+            var wrap = ChatWindowAssertions.GetUserBubble(_container, 0).Q(className: "msg-user-content");
+            Assert.IsNotNull(wrap);
+            var pills = wrap.Query(className: "inline-chip-pill").ToList();
+            Assert.AreEqual(0, pills.Count, "Text-only message must have no pills");
+        }
+
+        [Test]
+        public void TextOnly_BubbleUserData_EqualsRawText()
+        {
+            _chipField.Text = "hello world";
+            SimulateSend();
+            var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
+            Assert.AreEqual("hello world", bubble.userData as string);
         }
     }
 }

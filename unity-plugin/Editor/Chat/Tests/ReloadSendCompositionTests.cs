@@ -37,7 +37,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
-        private void InsertChip(ChipData c, string n) => ChipTestHelpers.InsertChip(_chipField, c, n);
+        private void InsertChip(ChipData c) => ChipTestHelpers.InsertChip(_chipField, c);
         private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
         private void Type(string t) => ChipTestHelpers.Type(_chipField, t);
         private (string, string) SimulateSend() => ChipTestHelpers.SimulateSend(_chipField, _transcript, _cfg);
@@ -47,7 +47,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ReloadDuringComposition_RestoreThenSend()
         {
-            InsertChip(H("/Player", "Player", 1), "Player"); Type("fix this");
+            InsertChip(H("/Player", "Player", 1)); Type("fix this");
             var (paths, kindKeys) = _chipField.Model.SerializeForReload();
             var savedText = _chipField.Text;
 
@@ -64,7 +64,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ReloadDuringComposition_ChipsAndTextPreserved()
         {
-            InsertChip(H("/Player", "Player", 1), "Player"); Type("check");
+            InsertChip(H("/Player", "Player", 1)); Type("check");
             var (paths, kindKeys) = _chipField.Model.SerializeForReload();
             var savedText = _chipField.Text;
 
@@ -80,20 +80,21 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ReloadDuringComposition_ThenTwoSends_Independent()
         {
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             var (paths, kindKeys) = _chipField.Model.SerializeForReload();
 
             _chipField.ClearChips(); _chipField.Text = "";
             _chipField.Model.RestoreFromReload(paths, kindKeys);
             Type("first"); SimulateSend();
 
-            InsertChip(H("/Enemy", "Enemy", 2), "Enemy"); Type("second"); SimulateSend();
+            InsertChip(H("/Enemy", "Enemy", 2)); Type("second"); SimulateSend();
 
-            var pills0 = ChatWindowAssertions.GetUserBubble(_container, 0).Q(className: "user-chip-strip")
+            // F13: pills are in msg-user-content
+            var pills0 = ChatWindowAssertions.GetUserBubble(_container, 0).Q(className: "msg-user-content")
                 .Query(className: "inline-chip-pill").ToList();
             ChatWindowAssertions.AssertPillContent(pills0[0], ChipKindKeys.Hierarchy, "Player");
 
-            var pills1 = ChatWindowAssertions.GetUserBubble(_container, 1).Q(className: "user-chip-strip")
+            var pills1 = ChatWindowAssertions.GetUserBubble(_container, 1).Q(className: "msg-user-content")
                 .Query(className: "inline-chip-pill").ToList();
             ChatWindowAssertions.AssertPillContent(pills1[0], ChipKindKeys.Hierarchy, "Enemy");
         }

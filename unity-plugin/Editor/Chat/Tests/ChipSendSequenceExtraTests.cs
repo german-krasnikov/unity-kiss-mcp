@@ -30,7 +30,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         private static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
-        private void InsertChip(ChipData c, string n) => ChipTestHelpers.InsertChip(_chipField, c, n);
+        private void InsertChip(ChipData c) => ChipTestHelpers.InsertChip(_chipField, c);
         private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
         private void Type(string t) => ChipTestHelpers.Type(_chipField, t);
         private (string, string) SimulateSend() => ChipTestHelpers.SimulateSend(_chipField, _transcript, _cfg);
@@ -49,7 +49,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void Send_FiveChipsAllKinds_PayloadNewlineSeparated()
+        public void Send_FiveChipsAllKinds_PayloadHasAllChipBrackets()
         {
             _chipField.AddChip(new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
             _chipField.AddChip(new ChipData(ChipKindKeys.Script,    "Assets/B.cs",    "B", 0));
@@ -58,14 +58,17 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.AddChip(new ChipData(ChipKindKeys.Asset,     "Assets/E.fbx",   "E", 0));
             Type("go");
             var (tj, _) = SimulateSend();
-            var payloadSection = tj.Substring(tj.IndexOf('\n') + 1);
-            Assert.GreaterOrEqual(payloadSection.Split('\n').Length, 4);
+            StringAssert.Contains("[hierarchy:/A", tj);
+            StringAssert.Contains("[script:Assets/B.cs]", tj);
+            StringAssert.Contains("[prefab:Assets/C.prefab]", tj);
+            StringAssert.Contains("[material:Assets/D.mat]", tj);
+            StringAssert.Contains("[asset:Assets/E.fbx]", tj);
         }
 
         [Test]
         public void Send_PostSend_PillRowChildCountZero()
         {
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             SimulateSend();
             Assert.AreEqual(0, _chipField[0].Query(className: "inline-chip-pill").ToList().Count);
         }
@@ -73,7 +76,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Send_PostSend_TranscriptHasOneBubble()
         {
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             SimulateSend();
             ChatWindowAssertions.AssertUserBubbleCount(_container, 1);
         }

@@ -24,49 +24,40 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         private static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
-        private void InsertChip(ChipData c, string n) => ChipTestHelpers.InsertChip(_chipField, c, n);
+        private void InsertChip(ChipData c) => ChipTestHelpers.InsertChip(_chipField, c);
         private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
         private void Type(string t) => ChipTestHelpers.Type(_chipField, t);
 
         // ── Cursor placement ──────────────────────────────────────────────────
 
         [Test]
-        public void InsertChip_CursorBetweenWords_AtNameInMiddle()
+        public void InsertChip_CursorBetweenWords_ChipInModel()
         {
             _chipField.Text = "hello world"; SetCursor(6);
-            InsertChip(H("/Player", "Player"), "Player");
-            Assert.AreEqual("hello @Player world", _chipField.Text);
+            InsertChip(H("/Player", "Player"));
+            Assert.AreEqual(1, _chipField.Model.Count);
+            Assert.AreEqual("hello world", _chipField.Text);
         }
 
         [Test]
         public void InsertChip_AfterAnotherChip_BothPresent()
         {
-            InsertChip(H("/A", "A", 1), "A");
-            InsertChip(H("/B", "B", 2), "B");
-            StringAssert.Contains("@A", _chipField.Text);
-            StringAssert.Contains("@B", _chipField.Text);
+            InsertChip(H("/A", "A", 1));
+            InsertChip(H("/B", "B", 2));
             Assert.AreEqual(2, _chipField.Model.Count);
+            Assert.AreEqual("A", _chipField.Model.Chips[0].DisplayName);
+            Assert.AreEqual("B", _chipField.Model.Chips[1].DisplayName);
         }
 
         [Test]
         public void InsertChip_CursorClampedToTextLength()
         {
             _chipField.Text = "hi"; SetCursor(999);
-            Assert.DoesNotThrow(() => InsertChip(H("/X", "X"), "X"));
-            StringAssert.Contains("@X", _chipField.Text);
+            Assert.DoesNotThrow(() => InsertChip(H("/X", "X")));
+            Assert.AreEqual(1, _chipField.Model.Count);
         }
 
         // ── Multiple chips ────────────────────────────────────────────────────
-
-        [Test]
-        public void ChipChip_Consecutive_BothInModel()
-        {
-            InsertChip(H("/A", "A", 1), "A");
-            InsertChip(H("/B", "B", 2), "B");
-            Assert.AreEqual(2, _chipField.Model.Count);
-            Assert.AreEqual("A", _chipField.Model.Chips[0].DisplayName);
-            Assert.AreEqual("B", _chipField.Model.Chips[1].DisplayName);
-        }
 
         [Test]
         public void FiveChipsInterleaved_ModelOrder()
@@ -74,21 +65,10 @@ namespace UnityMCP.Editor.Chat.Tests
             for (int i = 1; i <= 5; i++)
             {
                 Type("t" + i + " ");
-                InsertChip(H("/N" + i, "N" + i, i), "N" + i);
+                InsertChip(H("/N" + i, "N" + i, i));
             }
             Assert.AreEqual(5, _chipField.Model.Count);
             for (int i = 0; i < 5; i++) Assert.AreEqual("N" + (i + 1), _chipField.Model.Chips[i].DisplayName);
-        }
-
-        [Test]
-        public void FiveChipsInterleaved_TextContainsAllAtNames()
-        {
-            for (int i = 1; i <= 5; i++)
-            {
-                Type("t" + i + " ");
-                InsertChip(H("/N" + i, "N" + i, i), "N" + i);
-            }
-            for (int i = 1; i <= 5; i++) StringAssert.Contains("@N" + i, _chipField.Text);
         }
 
         // ── No chips ──────────────────────────────────────────────────────────
@@ -105,19 +85,59 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ChipThenClear_ThenChipTextChip_FreshSequence()
         {
-            InsertChip(H("/A", "A", 1), "A");
+            InsertChip(H("/A", "A", 1));
             _chipField.ClearChips();
             _chipField.Text = "";
             SetCursor(0);
 
-            InsertChip(H("/B", "B", 2), "B");
+            InsertChip(H("/B", "B", 2));
             Type("mid ");
-            InsertChip(H("/C", "C", 3), "C");
+            InsertChip(H("/C", "C", 3));
 
             Assert.AreEqual(2, _chipField.Model.Count);
             Assert.AreEqual("B", _chipField.Model.Chips[0].DisplayName);
             Assert.AreEqual("C", _chipField.Model.Chips[1].DisplayName);
             StringAssert.DoesNotContain("@A", _chipField.Text);
+        }
+
+        // ── F13 regression: AddChip never injects @mention ──────────────────
+
+        [Test]
+        public void AddChip_TextFieldNeverContainsAtSign()
+        {
+            InsertChip(H("/Player", "Player", 1));
+            StringAssert.DoesNotContain("@", _chipField.Text);
+        }
+
+        [Test]
+        public void AddChip_OnExistingText_TextUnchangedAndNoAtSign()
+        {
+            _chipField.Text = "fix health";
+            SetCursor(3);
+            InsertChip(H("/Player", "Player", 1));
+            Assert.AreEqual("fix health", _chipField.Text);
+            StringAssert.DoesNotContain("@", _chipField.Text);
+        }
+
+        [Test]
+        public void MultipleAddChips_TextNeverAccumulatesAtSigns()
+        {
+            Type("hello ");
+            InsertChip(H("/A", "A", 1));
+            StringAssert.DoesNotContain("@", _chipField.Text);
+            Type("world ");
+            InsertChip(H("/B", "B", 2));
+            StringAssert.DoesNotContain("@", _chipField.Text);
+            InsertChip(H("/C", "C", 3));
+            StringAssert.DoesNotContain("@", _chipField.Text);
+        }
+
+        [Test]
+        public void AddChip_WithSpaceInName_NoAtMention()
+        {
+            InsertChip(H("/Player Controller", "Player Controller", 1));
+            StringAssert.DoesNotContain("@Player", _chipField.Text);
+            StringAssert.DoesNotContain("@", _chipField.Text);
         }
     }
 }

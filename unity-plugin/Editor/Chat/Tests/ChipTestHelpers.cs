@@ -12,20 +12,15 @@ namespace UnityMCP.Editor.Chat.Tests
         internal static ChipData S(string path, string name)
             => new ChipData(ChipKindKeys.Script, path, name, 0);
 
-        internal static void InsertChip(InlineChipField field, ChipData chip, string displayName)
-        {
-            var tf     = field.TextField;
-            int cursor = tf.cursorIndex;
-            field.AddChip(chip);
-            var mention = "@" + displayName + " ";
-            tf.value = (tf.value ?? "").Insert(cursor, mention);
-            tf.selectIndex = tf.cursorIndex = cursor + mention.Length;
-        }
+        // F13: no @mention injection — chips are position-tracked only.
+        internal static void InsertChip(InlineChipField field, ChipData chip)
+            => field.AddChip(chip);
 
         internal static void SetCursor(InlineChipField field, int pos)
         {
-            field.TextField.cursorIndex = pos;
-            field.TextField.selectIndex = pos;
+            int clamped = System.Math.Min(pos, (field.Text ?? "").Length);
+            field.TextField.cursorIndex = clamped;
+            field.TextField.selectIndex = clamped;
         }
 
         internal static void Type(InlineChipField field, string text)
@@ -34,22 +29,21 @@ namespace UnityMCP.Editor.Chat.Tests
             SetCursor(field, field.Text.Length);
         }
 
+        // F13: uses ChipTextInterleaver + AppendUserBubble(UserMessage).
         internal static (string turnJson, string rawText) SimulateSend(
             InlineChipField field, ChatTranscript transcript, ChipConfig cfg)
         {
-            var rawText  = (field.Text ?? "").Trim();
-            var snapshot = field.Model.Count > 0 ? new List<ChipData>(field.Model.Chips) : null;
-            var llmText  = rawText;
-            if (field.Model.Count > 0)
-            {
-                var ctx = field.Model.SerializePayload(cfg);
-                if (!string.IsNullOrEmpty(ctx)) llmText += "\n" + ctx;
-            }
+            var rawText    = (field.Text ?? "").Trim();
+            var positioned = new List<PositionedChip>(field.Model.PositionedChips);
+            var msg        = ChipTextInterleaver.Build(rawText, positioned);
+            var llmText    = ChipTextInterleaver.ToLlmPayload(msg, cfg);
             if (string.IsNullOrEmpty(llmText)) return (null, rawText);
             var turnJson = UserTurnBuilder.Build(llmText);
-            transcript.AppendUserBubble(rawText, snapshot);
+            transcript.SetLastTurnChips(msg.Chips);
+            transcript.AppendUserBubble(msg);
             field.ClearChips();
             field.Text = "";
+            SetCursor(field, 0);
             return (turnJson, rawText);
         }
     }

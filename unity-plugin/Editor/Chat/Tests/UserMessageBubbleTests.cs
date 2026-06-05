@@ -49,6 +49,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var labels = wrap.Query<Label>().ToList();
             Assert.AreEqual(1, labels.Count);
             Assert.AreEqual("hello world", labels[0].text);
+            Assert.IsTrue(labels[0].ClassListContains("msg-text"), "Text label must have msg-text class for correct USS styling");
         }
 
         // D2: chip-only UserMessage → no text labels, one pill
@@ -61,9 +62,11 @@ namespace UnityMCP.Editor.Chat.Tests
             var wrap  = Bubble().Q(className: "msg-user-content");
             Assert.IsNotNull(wrap);
             var pills  = wrap.Query(className: "inline-chip-pill").ToList();
-            var labels = wrap.Query<Label>().ToList();
+            int directLabels = 0;
+            foreach (var child in wrap.Children())
+                if (child is Label) directLabels++;
             Assert.AreEqual(1, pills.Count);
-            Assert.AreEqual(0, labels.Count);
+            Assert.AreEqual(0, directLabels);
         }
 
         // D3: text+chip+text → 3 children in order: Label, pill, Label
@@ -114,9 +117,11 @@ namespace UnityMCP.Editor.Chat.Tests
             var pos  = new List<PositionedChip> { PC(chip, 0) };
             var msg  = ChipTextInterleaver.Build("", pos);
             _transcript.AppendUserBubble(msg);
-            var wrap   = Bubble().Q(className: "msg-user-content");
-            var labels = wrap.Query<Label>().ToList();
-            Assert.AreEqual(0, labels.Count, "Empty text segments should not produce Labels");
+            var wrap = Bubble().Q(className: "msg-user-content");
+            int directLabels = 0;
+            foreach (var child in wrap.Children())
+                if (child is Label) directLabels++;
+            Assert.AreEqual(0, directLabels, "Empty text segments should not produce Labels");
         }
 
         // D6: userData on bubble = plain text only (no chip tokens)
@@ -143,5 +148,19 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(b.ClassListContains("msg-bubble"));
             Assert.IsTrue(b.ClassListContains("msg-bubble--user"));
         }
+
+        // D8: inline pill label matches chip display name
+        [Test]
+        public void D8_InlinePillLabel_MatchesDisplayName()
+        {
+            var chip = H("/Player", "Player", 1);
+            var msg = ChipTextInterleaver.Build("fix", new List<PositionedChip> { PC(chip, 3) });
+            _transcript.AppendUserBubble(msg);
+            var wrap = Bubble().Q(className: "msg-user-content");
+            var pill = wrap.Query(className: "inline-chip-pill").First();
+            Assert.IsNotNull(pill);
+            ChatWindowAssertions.AssertPillContent(pill, ChipKindKeys.Hierarchy, "Player");
+        }
+
     }
 }

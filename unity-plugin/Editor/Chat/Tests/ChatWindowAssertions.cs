@@ -45,31 +45,35 @@ namespace UnityMCP.Editor.Chat.Tests
             return bubbles[index];
         }
 
+        // F13 layout: pills in msg-user-content; legacy: pills in user-chip-strip
         internal static void AssertBubbleHasChipStrip(VisualElement bubble, int chipCount)
         {
-            var strip = bubble.Q(className: "user-chip-strip");
-            Assert.IsNotNull(strip, "User bubble must contain a .user-chip-strip element");
-            var pills = strip.Query(className: "inline-chip-pill").ToList();
+            var wrap = bubble.Q(className: "msg-user-content") ?? bubble.Q(className: "user-chip-strip");
+            Assert.IsNotNull(wrap, "User bubble must contain .msg-user-content or .user-chip-strip");
+            var pills = wrap.Query(className: "inline-chip-pill").ToList();
             Assert.AreEqual(chipCount, pills.Count,
-                $"Expected {chipCount} pill(s) in chip strip, found {pills.Count}");
+                $"Expected {chipCount} pill(s), found {pills.Count}");
         }
 
         internal static void AssertBubbleHasNoChipStrip(VisualElement bubble)
         {
-            var strip = bubble.Q(className: "user-chip-strip");
-            Assert.IsNull(strip, "User bubble must not contain a .user-chip-strip element");
+            var wrap = bubble.Q(className: "msg-user-content") ?? bubble.Q(className: "user-chip-strip");
+            if (wrap == null) return;
+            var pills = wrap.Query(className: "inline-chip-pill").ToList();
+            Assert.AreEqual(0, pills.Count,
+                $"User bubble must not contain chip pills, found {pills.Count}");
         }
 
         internal static void AssertBubbleText(VisualElement bubble, string expectedSubstring)
         {
-            var msgText = bubble.Q(className: "msg-text");
-            Assert.IsNotNull(msgText, "User bubble must contain a .msg-text element");
-            if (msgText is Label lbl)
+            var wrap = bubble.Q(className: "msg-text") ?? bubble.Q(className: "msg-user-content");
+            Assert.IsNotNull(wrap, "User bubble must contain .msg-text or .msg-user-content");
+            if (wrap is Label lbl)
             {
                 StringAssert.Contains(expectedSubstring, lbl.text);
                 return;
             }
-            var labels = msgText.Query<Label>().ToList();
+            var labels = wrap.Query<Label>().ToList();
             var sb = new StringBuilder();
             foreach (var l in labels) sb.Append(l.text);
             StringAssert.Contains(expectedSubstring, sb.ToString());

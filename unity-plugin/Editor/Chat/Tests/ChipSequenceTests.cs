@@ -26,55 +26,61 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         private static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
-        private void InsertChip(ChipData c, string n) => ChipTestHelpers.InsertChip(_chipField, c, n);
+        private void InsertChip(ChipData c) => ChipTestHelpers.InsertChip(_chipField, c);
         private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
         private void Type(string t) => ChipTestHelpers.Type(_chipField, t);
 
         // ── Single chip insertion ─────────────────────────────────────────────
 
         [Test]
-        public void InsertChip_AtEmptyField_TextHasAtName()
+        public void InsertChip_AtEmptyField_ChipInModel()
         {
-            InsertChip(H("/Player", "Player"), "Player");
-            Assert.AreEqual("@Player ", _chipField.Text);
+            InsertChip(H("/Player", "Player"));
+            Assert.AreEqual(1, _chipField.Model.Count);
+            Assert.AreEqual("/Player", _chipField.Model.Chips[0].Path);
+            Assert.AreEqual("", _chipField.Text);
         }
 
         [Test]
-        public void InsertChip_AtEndOfText_AtNameAppended()
+        public void InsertChip_AtEndOfText_ChipInModel()
         {
             _chipField.Text = "hello "; SetCursor(6);
-            InsertChip(H("/Player", "Player"), "Player");
-            Assert.AreEqual("hello @Player ", _chipField.Text);
+            InsertChip(H("/Player", "Player"));
+            Assert.AreEqual(1, _chipField.Model.Count);
+            Assert.AreEqual("hello ", _chipField.Text);
         }
 
         [Test]
-        public void InsertChip_AtBeginning_AtNamePrepended()
+        public void InsertChip_AtBeginning_ChipInModel()
         {
             _chipField.Text = "world"; SetCursor(0);
-            InsertChip(H("/Player", "Player"), "Player");
-            Assert.AreEqual("@Player world", _chipField.Text);
+            InsertChip(H("/Player", "Player"));
+            Assert.AreEqual(1, _chipField.Model.Count);
+            Assert.AreEqual("world", _chipField.Text);
         }
 
         [Test]
-        public void InsertChip_InMiddleOfText_AtNameInserted()
+        public void InsertChip_InMiddleOfText_ChipInModel()
         {
             _chipField.Text = "hello world"; SetCursor(6);
-            InsertChip(H("/Player", "Player"), "Player");
-            Assert.AreEqual("hello @Player world", _chipField.Text);
+            InsertChip(H("/Player", "Player"));
+            Assert.AreEqual(1, _chipField.Model.Count);
+            Assert.AreEqual("hello world", _chipField.Text);
         }
 
         [Test]
-        public void InsertChip_CursorAtZero_AtNameFirst()
+        public void InsertChip_CursorAtZero_ChipAtOffsetZero()
         {
             _chipField.Text = "tail"; SetCursor(0);
-            InsertChip(H("/Player", "Player"), "Player");
-            StringAssert.StartsWith("@Player ", _chipField.Text);
+            InsertChip(H("/Player", "Player"));
+            Assert.AreEqual(1, _chipField.Model.Count);
+            Assert.AreEqual("tail", _chipField.Text);
         }
 
         [Test]
         public void InsertChip_ThenModifyText_ChipStillInModel()
         {
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             _chipField.Text = "completely different text";
             Assert.AreEqual(1, _chipField.Model.Count);
         }
@@ -84,18 +90,20 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ChipTextChip_SequencePreserved()
         {
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             Type(" text ");
-            InsertChip(H("/Enemy", "Enemy", 2), "Enemy");
-            Assert.AreEqual("@Player  text @Enemy ", _chipField.Text);
+            InsertChip(H("/Enemy", "Enemy", 2));
+            // F13: no @mention text; text field holds only typed text
+            Assert.AreEqual(" text ", _chipField.Text);
+            Assert.AreEqual(2, _chipField.Model.Count);
         }
 
         [Test]
         public void ChipTextChip_ModelOrderMatchesInsertionOrder()
         {
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             Type(" text ");
-            InsertChip(H("/Enemy", "Enemy", 2), "Enemy");
+            InsertChip(H("/Enemy", "Enemy", 2));
             Assert.AreEqual("Player", _chipField.Model.Chips[0].DisplayName);
             Assert.AreEqual("Enemy",  _chipField.Model.Chips[1].DisplayName);
         }
@@ -103,9 +111,9 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ChipTextChip_PillRowHasTwoPills()
         {
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             Type(" text ");
-            InsertChip(H("/Enemy", "Enemy", 2), "Enemy");
+            InsertChip(H("/Enemy", "Enemy", 2));
             ChatWindowAssertions.AssertChipCount(_chipField, 2);
         }
 
@@ -115,11 +123,13 @@ namespace UnityMCP.Editor.Chat.Tests
         public void TextChipTextChipText_FullSequence()
         {
             Type("start ");
-            InsertChip(H("/Player", "Player", 1), "Player");
+            InsertChip(H("/Player", "Player", 1));
             Type(" middle ");
-            InsertChip(H("/Enemy", "Enemy", 2), "Enemy");
+            InsertChip(H("/Enemy", "Enemy", 2));
             Type(" end");
-            Assert.AreEqual("start @Player  middle @Enemy  end", _chipField.Text);
+            // F13: text field holds only typed text; chips are tracked by position
+            Assert.AreEqual("start  middle  end", _chipField.Text);
+            Assert.AreEqual(2, _chipField.Model.Count);
         }
     }
 }

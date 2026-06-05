@@ -38,7 +38,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
         static ChipData S(string path, string name) => ChipTestHelpers.S(path, name);
-        private void InsertChip(ChipData c, string n) => ChipTestHelpers.InsertChip(_chipField, c, n);
+        private void InsertChip(ChipData c) => ChipTestHelpers.InsertChip(_chipField, c);
         private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
         private void Type(string t) => ChipTestHelpers.Type(_chipField, t);
         private (string, string) SimulateSend() => ChipTestHelpers.SimulateSend(_chipField, _transcript, _cfg);
@@ -58,7 +58,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MultiSend_ChipsThenNoChips_FirstHasStripSecondNot()
         {
-            InsertChip(H("/Player", "Player", 1), "Player"); Type("text");
+            InsertChip(H("/Player", "Player", 1)); Type("text");
             SimulateSend();
             _chipField.Text = "plain"; SimulateSend();
             ChatWindowAssertions.AssertBubbleHasChipStrip(ChatWindowAssertions.GetUserBubble(_container, 0), 1);
@@ -68,14 +68,15 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MultiSend_DifferentChips_NoLeakage()
         {
-            InsertChip(H("/Player", "Player", 1), "Player"); SimulateSend();
-            InsertChip(S("Assets/Foo.cs", "Foo"), "Foo"); SimulateSend();
+            InsertChip(H("/Player", "Player", 1)); SimulateSend();
+            InsertChip(S("Assets/Foo.cs", "Foo")); SimulateSend();
 
-            var pills0 = ChatWindowAssertions.GetUserBubble(_container, 0).Q(className: "user-chip-strip")
+            // F13: pills are in msg-user-content
+            var pills0 = ChatWindowAssertions.GetUserBubble(_container, 0).Q(className: "msg-user-content")
                 .Query(className: "inline-chip-pill").ToList();
             ChatWindowAssertions.AssertPillContent(pills0[0], ChipKindKeys.Hierarchy, "Player");
 
-            var pills1 = ChatWindowAssertions.GetUserBubble(_container, 1).Q(className: "user-chip-strip")
+            var pills1 = ChatWindowAssertions.GetUserBubble(_container, 1).Q(className: "msg-user-content")
                 .Query(className: "inline-chip-pill").ToList();
             ChatWindowAssertions.AssertPillContent(pills1[0], ChipKindKeys.Script, "Foo");
         }
@@ -96,7 +97,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MultiSend_ChipsOnly_ThenTextOnly_DifferentStructure()
         {
-            InsertChip(H("/Player", "Player", 1), "Player"); SimulateSend();
+            InsertChip(H("/Player", "Player", 1)); SimulateSend();
             _chipField.Text = "hello"; SimulateSend();
             ChatWindowAssertions.AssertBubbleHasChipStrip(ChatWindowAssertions.GetUserBubble(_container, 0), 1);
             ChatWindowAssertions.AssertBubbleHasNoChipStrip(ChatWindowAssertions.GetUserBubble(_container, 1));
@@ -105,11 +106,11 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MultiSend_TwoBubbles_ChipStripCountsIndependent()
         {
-            InsertChip(H("/A", "A", 1), "A");
-            InsertChip(H("/B", "B", 2), "B");
-            InsertChip(H("/C", "C", 3), "C");
+            InsertChip(H("/A", "A", 1));
+            InsertChip(H("/B", "B", 2));
+            InsertChip(H("/C", "C", 3));
             SimulateSend();
-            InsertChip(H("/X", "X", 4), "X"); SimulateSend();
+            InsertChip(H("/X", "X", 4)); SimulateSend();
             ChatWindowAssertions.AssertBubbleHasChipStrip(ChatWindowAssertions.GetUserBubble(_container, 0), 3);
             ChatWindowAssertions.AssertBubbleHasChipStrip(ChatWindowAssertions.GetUserBubble(_container, 1), 1);
         }
@@ -117,9 +118,9 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MultiSend_ModelEmptyBetweenSends()
         {
-            InsertChip(H("/Player", "Player", 1), "Player"); SimulateSend();
+            InsertChip(H("/Player", "Player", 1)); SimulateSend();
             Assert.AreEqual(0, _chipField.Model.Count);
-            InsertChip(H("/Enemy", "Enemy", 2), "Enemy"); SimulateSend();
+            InsertChip(H("/Enemy", "Enemy", 2)); SimulateSend();
             Assert.AreEqual(0, _chipField.Model.Count);
         }
     }

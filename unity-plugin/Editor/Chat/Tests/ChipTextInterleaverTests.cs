@@ -228,5 +228,15 @@ namespace UnityMCP.Editor.Chat.Tests
             var display = ChipTextInterleaver.ToDisplayText(msg);
             Assert.AreEqual("hello", display);
         }
+
+        // D9 (moved from UserMessageBubbleTests): no @ in any text segment — Build internals
+        [Test]
+        public void D9_TextSegments_NoAtMentions()
+        {
+            var chip = H("/Player", "Player", 1);
+            var msg = ChipTextInterleaver.Build("fix this", new List<PositionedChip> { PC(chip, 4) });
+            foreach (var seg in msg.Segments)
+                if (!seg.IsChip) StringAssert.DoesNotContain("@", seg.Text);
+        }
     }
 }
