@@ -24,8 +24,11 @@ namespace UnityMCP.Editor.Chat
             var instanceID = cap != null ? cap.GetInstanceID() : 0;
 
             var tf     = _chipField?.TextField;
-            int cursor = tf != null
-                ? System.Math.Clamp(tf.cursorIndex, 0, (tf.value ?? "").Length) : 0;
+            int raw    = tf != null ? tf.cursorIndex : 0;
+            int len    = (tf?.value ?? "").Length;
+            int cursor = (raw == 0 && len > 0 && _chipField != null)
+                ? System.Math.Clamp(_chipField.LastCursorPos, 0, len)
+                : System.Math.Clamp(raw, 0, len);
 
             _chipField?.AddChip(new ChipData(kindKey, path, displayName, instanceID));
 

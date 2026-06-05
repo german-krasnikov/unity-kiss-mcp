@@ -19,8 +19,10 @@ namespace UnityMCP.Editor.Chat
         private readonly InlineChipModel _model    = new InlineChipModel();
         private readonly VisualElement   _pillRow;
         private readonly TextField       _textField;
+        private int _lastCursorPos;
 
         internal InlineChipModel Model => _model;
+        internal int LastCursorPos => _lastCursorPos;
 
         internal string Text
         {
@@ -55,7 +57,12 @@ namespace UnityMCP.Editor.Chat
             // Focus ring: toggle class on this outer container, not on __input.
             // FocusInEvent bubbles from any child (including the inner text element).
             _textField.RegisterCallback<FocusInEvent>(_ => AddToClassList(FocusedClass));
-            _textField.RegisterCallback<FocusOutEvent>(_ => RemoveFromClassList(FocusedClass));
+            _textField.RegisterCallback<FocusOutEvent>(_ =>
+            {
+                _lastCursorPos = System.Math.Clamp(
+                    _textField.cursorIndex, 0, (_textField.value ?? "").Length);
+                RemoveFromClassList(FocusedClass);
+            });
         }
 
         // ── Public API ────────────────────────────────────────────────────────
@@ -69,6 +76,7 @@ namespace UnityMCP.Editor.Chat
         internal void RemoveChipAt(int index)
         {
             if (index < 0 || index >= _model.Count) return;
+            RemoveMentionFromText("@" + _model.Chips[index].DisplayName);
             _model.RemoveAt(index);
             RebuildPills();
         }
@@ -76,6 +84,7 @@ namespace UnityMCP.Editor.Chat
         internal void ClearChips()
         {
             _model.Clear();
+            _lastCursorPos = 0;
             RebuildPills(); // also hides _pillRow
         }
 
@@ -135,6 +144,16 @@ namespace UnityMCP.Editor.Chat
                         RemoveChipAt(liveIndex);
                 });
             }));
+        }
+
+        private void RemoveMentionFromText(string mention)
+        {
+            var text = _textField.value ?? "";
+            var withSpace = mention + " ";
+            var idx = text.IndexOf(withSpace, System.StringComparison.Ordinal);
+            if (idx >= 0) { _textField.value = text.Remove(idx, withSpace.Length); return; }
+            idx = text.IndexOf(mention, System.StringComparison.Ordinal);
+            if (idx >= 0) _textField.value = text.Remove(idx, mention.Length);
         }
 
         // Backspace at TextField caret position 0 removes the last chip.

@@ -99,5 +99,42 @@ namespace UnityMCP.Editor.Chat.Tests
             var (tj, _) = SimulateSend();
             Assert.IsNull(tj);
         }
+
+        // ── Sent bubble text stripping ────────────────────────────────────────
+
+        [Test]
+        public void SentBubble_WithChips_TextStripped()
+        {
+            _chipField.Text = "fix @Player health";
+            _chipField.AddChip(HierarchyChip("/Player", "Player", 1));
+            SimulateSend();
+            var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
+            var msgText = bubble.Q(className: "msg-text");
+            Assert.IsNotNull(msgText, "msg-text must exist");
+            var label = msgText.Q<UnityEngine.UIElements.Label>();
+            Assert.IsNotNull(label);
+            StringAssert.DoesNotContain("@Player", label.text);
+            StringAssert.Contains("fix", label.text);
+        }
+
+        [Test]
+        public void SentBubble_WithChips_UserDataPreservesRaw()
+        {
+            _chipField.Text = "fix @Player health";
+            _chipField.AddChip(HierarchyChip("/Player", "Player", 1));
+            SimulateSend();
+            var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
+            Assert.AreEqual("fix @Player health", bubble.userData);
+        }
+
+        [Test]
+        public void SentBubble_ChipsOnly_NoMsgText()
+        {
+            _chipField.Text = "@Player";
+            _chipField.AddChip(HierarchyChip("/Player", "Player", 1));
+            SimulateSend();
+            var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
+            Assert.IsNull(bubble.Q(className: "msg-text"), "stripped to empty — no msg-text expected");
+        }
     }
 }

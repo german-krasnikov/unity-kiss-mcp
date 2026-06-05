@@ -18,6 +18,16 @@ namespace UnityMCP.Editor.Chat
                     if (!string.IsNullOrEmpty(text))
                         EditorGUIUtility.systemCopyBuffer = text;
                 });
+
+                if (el.ClassListContains("msg-bubble--user"))
+                {
+                    evt.menu.AppendAction("Show as text", _ =>
+                    {
+                        var raw = el.userData as string;
+                        if (!string.IsNullOrEmpty(raw))
+                            UnityEngine.Debug.Log($"[MCP Chat] Raw: {raw}");
+                    });
+                }
             }));
         }
 

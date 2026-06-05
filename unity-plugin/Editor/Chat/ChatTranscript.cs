@@ -34,25 +34,25 @@ namespace UnityMCP.Editor.Chat
         internal void AppendUserBubble(string text,
             IReadOnlyList<ChipData> chips = null, string imagePath = null)
         {
-            FinalizeAssistant(); // also closes any open tool group
-            var row    = Row("msg-user");
+            FinalizeAssistant();
+            var row = Row("msg-user");
             var bubble = new VisualElement();
-            bubble.AddToClassList("msg-bubble");
-            bubble.AddToClassList("msg-bubble--user");
+            bubble.AddToClassList("msg-bubble"); bubble.AddToClassList("msg-bubble--user");
             bubble.userData = text ?? "";
             CopyableText.Attach(bubble);
-            if (chips != null && chips.Count > 0)
+            bool hasChips = chips != null && chips.Count > 0;
+            if (hasChips)
             {
                 var strip = new VisualElement(); strip.AddToClassList("user-chip-strip");
                 foreach (var c in chips) strip.Add(ChipPillFactory.Build(c));
                 bubble.Add(strip);
             }
-            if (!string.IsNullOrEmpty(text))
-                bubble.Add(MixedParagraphRenderer.InlineElement(text, "msg-text"));
+            var dt = hasChips ? UserTextCleaner.Strip(text) : text;
+            if (!string.IsNullOrEmpty(dt))
+                bubble.Add(MixedParagraphRenderer.InlineElement(dt, "msg-text"));
             if (!string.IsNullOrEmpty(imagePath))
             { var img = MdBlock.Image(imagePath, ""); bubble.Add(_registry.RenderBlock(in img)); }
-            row.Add(bubble);
-            Append(row);
+            row.Add(bubble); Append(row);
         }
 
         internal void AppendOrExtendAssistant(string token)
