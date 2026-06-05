@@ -61,5 +61,25 @@ namespace UnityMCP.Editor.Tests
         public void FormatBusyResponse_EscapesQuoteInMessage()
             => Assert.AreEqual("{\"id\":\"x\",\"ok\":false,\"err\":\"a\\\"b\",\"retry\":100}",
                 JsonHelper.FormatBusyResponse("x", "a\"b", 100));
+
+        // ── ExtractObject / ExtractArray string-boundary tracking ─────────────
+
+        [Test]
+        public void ExtractObject_WithStringContainingBrace()
+        {
+            var json = "{\"a\":{\"code\":\"if (x) { }\",\"label\":\"y\"}}";
+            var obj = JsonHelper.ExtractObject(json, "a");
+            Assert.AreEqual("if (x) { }", JsonHelper.ExtractString(obj, "code"));
+            Assert.AreEqual("y", JsonHelper.ExtractString(obj, "label"));
+        }
+
+        [Test]
+        public void ExtractArray_WithStringContainingBracket()
+        {
+            var json = "{\"a\":[\"x[0]\",\"y\"]}";
+            var arr = JsonHelper.ExtractArray(json, "a");
+            // Array must end after both elements — not truncated at '[' inside string
+            Assert.AreEqual("[\"x[0]\",\"y\"]", arr);
+        }
     }
 }

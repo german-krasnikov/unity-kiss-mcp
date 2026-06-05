@@ -83,16 +83,17 @@ namespace UnityMCP.Editor
             var needle = $"\"{key}\"";
             var idx = FindKeyIndex(json, needle);
             if (idx == -1) return "{}";
-
             var braceStart = json.IndexOf('{', idx + needle.Length);
             if (braceStart == -1) return "{}";
-
-            int depth = 0;
+            int depth = 0; bool inStr = false, esc = false;
             for (int i = braceStart; i < json.Length; i++)
             {
-                if (json[i] == '{') depth++;
-                else if (json[i] == '}') depth--;
-                if (depth == 0) return json.Substring(braceStart, i - braceStart + 1);
+                char c = json[i];
+                if (esc) { esc = false; continue; }
+                if (inStr) { if (c == '\\') esc = true; else if (c == '"') inStr = false; continue; }
+                if (c == '"') { inStr = true; continue; }
+                if (c == '{') { depth++; continue; }
+                if (c == '}') { depth--; if (depth == 0) return json.Substring(braceStart, i - braceStart + 1); }
             }
             return "{}";
         }
@@ -105,12 +106,15 @@ namespace UnityMCP.Editor
             if (idx == -1) return "[]";
             var bracketStart = json.IndexOf('[', idx + needle.Length);
             if (bracketStart == -1) return "[]";
-            int depth = 0;
+            int depth = 0; bool inStr = false, esc = false;
             for (int i = bracketStart; i < json.Length; i++)
             {
-                if (json[i] == '[') depth++;
-                else if (json[i] == ']') depth--;
-                if (depth == 0) return json.Substring(bracketStart, i - bracketStart + 1);
+                char c = json[i];
+                if (esc) { esc = false; continue; }
+                if (inStr) { if (c == '\\') esc = true; else if (c == '"') inStr = false; continue; }
+                if (c == '"') { inStr = true; continue; }
+                if (c == '[') { depth++; continue; }
+                if (c == ']') { depth--; if (depth == 0) return json.Substring(bracketStart, i - bracketStart + 1); }
             }
             return "[]";
         }

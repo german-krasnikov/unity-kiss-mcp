@@ -1,8 +1,8 @@
 """SchemaGuard: pre-flight validator that blocks known typos before TCP send."""
-from typing import Optional, Callable, Awaitable
+from typing import Optional
 
 from .schema_cache import SchemaCache
-from .middleware import _levenshtein
+from .utils import _levenshtein
 
 
 class SchemaGuard:
