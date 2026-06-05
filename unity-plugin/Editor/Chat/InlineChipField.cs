@@ -2,6 +2,7 @@
 // Layout: flex-column of [PillRow (hidden when empty), TextField(flexGrow 1)].
 // TextField is always full-width; chips appear in a row above it.
 // Eliminates P1 (misalignment) + P2 (vanish-on-type) + P3 (TextField shrink on chips).
+// F13: chips are now position-tracked; no @mention injection.
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -20,6 +21,7 @@ namespace UnityMCP.Editor.Chat
         private readonly VisualElement   _pillRow;
         private readonly TextField       _textField;
         private int _lastCursorPos;
+        private bool _suppressOffsetUpdate;
 
         internal InlineChipModel Model => _model;
         internal int LastCursorPos => _lastCursorPos;
@@ -27,7 +29,12 @@ namespace UnityMCP.Editor.Chat
         internal string Text
         {
             get => _textField.value;
-            set => _textField.value = value;
+            set
+            {
+                _suppressOffsetUpdate = true;
+                _textField.value = value;
+                _suppressOffsetUpdate = false;
+            }
         }
 
         internal TextField TextField => _textField;
@@ -37,9 +44,8 @@ namespace UnityMCP.Editor.Chat
         internal InlineChipField()
         {
             style.flexDirection = FlexDirection.Column;
-            style.alignItems    = Align.Stretch;  // full-width children in column
+            style.alignItems    = Align.Stretch;
 
-            // Pill row: chips live here, above the text field. Hidden when empty.
             _pillRow = new VisualElement();
             _pillRow.style.flexDirection = FlexDirection.Row;
             _pillRow.style.flexWrap      = Wrap.Wrap;
@@ -54,8 +60,6 @@ namespace UnityMCP.Editor.Chat
 
             _textField.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
-            // Focus ring: toggle class on this outer container, not on __input.
-            // FocusInEvent bubbles from any child (including the inner text element).
             _textField.RegisterCallback<FocusInEvent>(_ => AddToClassList(FocusedClass));
             _textField.RegisterCallback<FocusOutEvent>(_ =>
             {
@@ -63,20 +67,50 @@ namespace UnityMCP.Editor.Chat
                     _textField.cursorIndex, 0, (_textField.value ?? "").Length);
                 RemoveFromClassList(FocusedClass);
             });
+
+            // Track text changes to keep chip positions valid.
+            _textField.RegisterValueChangedCallback(evt =>
+            {
+                if (_suppressOffsetUpdate) return;
+                var prev  = evt.previousValue ?? "";
+                var next  = evt.newValue      ?? "";
+                int delta = next.Length - prev.Length;
+                if (delta == 0) return;
+                // Heuristic: cursor after change reflects insertion point.
+                int changeAt = delta > 0
+                    ? _textField.cursorIndex - delta
+                    : _textField.cursorIndex;
+                changeAt = System.Math.Max(0, changeAt);
+                _model.AdjustOffsetsAfterTextChange(changeAt, delta);
+            });
         }
 
         // ── Public API ────────────────────────────────────────────────────────
 
+        /// <summary>Add chip at current cursor position (or last known cursor if field is unfocused).</summary>
         internal void AddChip(ChipData chip)
         {
-            _model.Add(chip);
-            RebuildPills(); // rebuild ensures all captured indices are correct
+            var tf     = _textField;
+            int raw    = tf.cursorIndex;
+            int len    = (tf.value ?? "").Length;
+            int cursor = (raw == 0 && len > 0)
+                ? System.Math.Clamp(_lastCursorPos, 0, len)
+                : System.Math.Clamp(raw, 0, len);
+
+            _model.InsertAt(cursor, chip);
+            RebuildPills();
+        }
+
+        /// <summary>Insert chip at an explicit text offset.</summary>
+        internal void InsertChipAt(int textOffset, ChipData chip)
+        {
+            _model.InsertAt(textOffset, chip);
+            RebuildPills();
         }
 
         internal void RemoveChipAt(int index)
         {
             if (index < 0 || index >= _model.Count) return;
-            RemoveMentionFromText("@" + _model.Chips[index].DisplayName);
             _model.RemoveAt(index);
             RebuildPills();
         }
@@ -85,7 +119,7 @@ namespace UnityMCP.Editor.Chat
         {
             _model.Clear();
             _lastCursorPos = 0;
-            RebuildPills(); // also hides _pillRow
+            RebuildPills();
         }
 
         /// <summary>Rebuild pill VEs from model — used after domain-reload chip restore.</summary>
@@ -96,16 +130,15 @@ namespace UnityMCP.Editor.Chat
 
         // ── private ───────────────────────────────────────────────────────────
 
-        /// <summary>Remove pill VEs (keep TextField), re-add from model with fresh closures.</summary>
         private void RebuildPills()
         {
             RemoveAllPills();
             for (int i = 0; i < _model.Count; i++)
             {
                 int captured = i;
-                var chip = _model.Chips[i];
+                var chip = _model.PositionedChips[i].Chip;
                 var pill = ChipPillFactory.Build(chip, onRemove: () => RemoveChipAt(captured));
-                pill.userData = captured; // pin model index; refreshed on every rebuild
+                pill.userData = captured;
                 AttachContextMenu(pill);
                 _pillRow.Add(pill);
             }
@@ -121,7 +154,7 @@ namespace UnityMCP.Editor.Chat
         {
             pill.AddManipulator(new ContextualMenuManipulator(evt =>
             {
-                int liveIndex = pill.userData is int idx ? idx : _pillRow.IndexOf(pill); // model index, not VE child order
+                int liveIndex = pill.userData is int idx ? idx : _pillRow.IndexOf(pill);
 
                 evt.menu.AppendAction("Show LLM payload", _ =>
                 {
@@ -144,16 +177,6 @@ namespace UnityMCP.Editor.Chat
                         RemoveChipAt(liveIndex);
                 });
             }));
-        }
-
-        private void RemoveMentionFromText(string mention)
-        {
-            var text = _textField.value ?? "";
-            var withSpace = mention + " ";
-            var idx = text.IndexOf(withSpace, System.StringComparison.Ordinal);
-            if (idx >= 0) { _textField.value = text.Remove(idx, withSpace.Length); return; }
-            idx = text.IndexOf(mention, System.StringComparison.Ordinal);
-            if (idx >= 0) _textField.value = text.Remove(idx, mention.Length);
         }
 
         // Backspace at TextField caret position 0 removes the last chip.

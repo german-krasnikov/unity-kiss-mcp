@@ -165,5 +165,132 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(m.Chips[0].KindKey);
             Assert.AreEqual("", m.Chips[0].KindKey);
         }
+
+        // ── Group A: PositionedChip + InsertAt + AdjustOffsets ────────────────
+
+        // A1: InsertAt stores chip with correct offset
+        [Test]
+        public void A1_InsertAt_StoresChipWithCorrectOffset()
+        {
+            var m = new InlineChipModel();
+            var chip = new ChipData(ChipKindKeys.Hierarchy, "/Player", "Player", 1);
+            m.InsertAt(7, chip);
+            Assert.AreEqual(1, m.Count);
+            Assert.AreEqual(7, m.PositionedChips[0].TextOffset);
+            Assert.AreEqual("/Player", m.PositionedChips[0].Chip.Path);
+        }
+
+        // A2: InsertAt multiple chips maintains sorted order by TextOffset
+        [Test]
+        public void A2_InsertAt_MultipleChips_SortedByOffset()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2));
+            m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.InsertAt(15, new ChipData(ChipKindKeys.Hierarchy, "/C", "C", 3));
+            Assert.AreEqual(3,  m.Count);
+            Assert.AreEqual(3,  m.PositionedChips[0].TextOffset);
+            Assert.AreEqual(10, m.PositionedChips[1].TextOffset);
+            Assert.AreEqual(15, m.PositionedChips[2].TextOffset);
+            Assert.AreEqual("/A", m.PositionedChips[0].Chip.Path);
+            Assert.AreEqual("/B", m.PositionedChips[1].Chip.Path);
+        }
+
+        // A3: RemoveAt(1) removes exactly chip at index 1 (not by name matching)
+        [Test]
+        public void A3_RemoveAt_ByIndex_NotByName()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(0,  new ChipData(ChipKindKeys.Hierarchy, "/A", "Same", 1));
+            m.InsertAt(5,  new ChipData(ChipKindKeys.Hierarchy, "/B", "Same", 2));
+            m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/C", "Same", 3));
+            m.RemoveAt(1);
+            Assert.AreEqual(2, m.Count);
+            Assert.AreEqual("/A", m.PositionedChips[0].Chip.Path);
+            Assert.AreEqual("/C", m.PositionedChips[1].Chip.Path);
+        }
+
+        // A4: Two chips with identical DisplayName — RemoveAt(0) removes chip 0, chip 1 remains
+        [Test]
+        public void A4_RemoveAt_DuplicateDisplayName_RemovesCorrectOne()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(0, new ChipData(ChipKindKeys.Hierarchy, "/A", "Camera", 1));
+            m.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/B", "Camera", 2));
+            m.RemoveAt(0);
+            Assert.AreEqual(1, m.Count);
+            Assert.AreEqual("/B", m.PositionedChips[0].Chip.Path);
+            Assert.AreEqual(5,   m.PositionedChips[0].TextOffset);
+        }
+
+        // A5: AdjustOffsets — insert 3 chars at pos 5: chips at offset>=5 shift +3
+        [Test]
+        public void A5_AdjustOffsets_Insert_ShiftsChipsAtOrAfterChangeAt()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1)); // before 5 → unchanged
+            m.InsertAt(5,  new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2)); // at 5 → shifts
+            m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/C", "C", 3)); // after 5 → shifts
+            m.AdjustOffsetsAfterTextChange(5, +3);
+            Assert.AreEqual(3,  m.PositionedChips[0].TextOffset); // unchanged
+            Assert.AreEqual(8,  m.PositionedChips[1].TextOffset); // 5+3
+            Assert.AreEqual(13, m.PositionedChips[2].TextOffset); // 10+3
+        }
+
+        // A6: AdjustOffsets — delete 2 chars at pos 3: chips at offset>=3 shift -2
+        [Test]
+        public void A6_AdjustOffsets_Delete_ShiftsChipsAtOrAfterChangeAt()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(1,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1)); // before 3 → unchanged
+            m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2)); // at 3 → shifts
+            m.InsertAt(8,  new ChipData(ChipKindKeys.Hierarchy, "/C", "C", 3)); // after 3 → shifts
+            m.AdjustOffsetsAfterTextChange(3, -2);
+            Assert.AreEqual(1, m.PositionedChips[0].TextOffset); // unchanged
+            Assert.AreEqual(1, m.PositionedChips[1].TextOffset); // 3-2
+            Assert.AreEqual(6, m.PositionedChips[2].TextOffset); // 8-2
+        }
+
+        // A7: change before first chip: chip offsets unchanged
+        [Test]
+        public void A7_AdjustOffsets_ChangeBeforeAllChips_NoChange()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.AdjustOffsetsAfterTextChange(0, +5);
+            Assert.AreEqual(15, m.PositionedChips[0].TextOffset);
+        }
+
+        // A8: SerializeForReload roundtrip includes TextOffsets via GetTextOffsets
+        [Test]
+        public void A8_SerializeForReload_Roundtrip_IncludesOffsets()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.InsertAt(10, new ChipData(ChipKindKeys.Script,    "B.cs", "B", 0));
+            var (paths, kindKeys) = m.SerializeForReload();
+            var offsets = m.GetTextOffsets();
+            Assert.AreEqual(2, offsets.Length);
+            Assert.AreEqual(3,  offsets[0]);
+            Assert.AreEqual(10, offsets[1]);
+            var m2 = new InlineChipModel();
+            m2.RestoreFromReload(paths, kindKeys, offsets);
+            Assert.AreEqual(3,  m2.PositionedChips[0].TextOffset);
+            Assert.AreEqual(10, m2.PositionedChips[1].TextOffset);
+        }
+
+        // A9: RestoreFromReload with null offsets — chips restored at offset 0, no throw
+        [Test]
+        public void A9_RestoreFromReload_NullOffsets_DefaultsToZero()
+        {
+            var m = new InlineChipModel();
+            Assert.DoesNotThrow(() =>
+                m.RestoreFromReload(new[] { "/A", "/B" },
+                    new[] { ChipKindKeys.Hierarchy, ChipKindKeys.Script },
+                    null));
+            Assert.AreEqual(2, m.Count);
+            Assert.AreEqual(0, m.PositionedChips[0].TextOffset);
+            Assert.AreEqual(0, m.PositionedChips[1].TextOffset);
+        }
     }
 }

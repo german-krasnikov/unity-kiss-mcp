@@ -15,16 +15,19 @@ namespace UnityMCP.Editor.Chat
         private void SaveStateBeforeReload()
         {
             string[] chipPaths, kindKeys;
+            int[]    chipOffsets;
             if (_chipField?.Model != null && _chipField.Model.Count > 0)
             {
-                var reload = _chipField.Model.SerializeForReload();
-                chipPaths  = reload.Paths;
-                kindKeys   = reload.KindKeys;
+                var reload  = _chipField.Model.SerializeForReload();
+                chipPaths   = reload.Paths;
+                kindKeys    = reload.KindKeys;
+                chipOffsets = _chipField.Model.GetTextOffsets();
             }
             else
             {
-                chipPaths = System.Array.Empty<string>();
-                kindKeys  = System.Array.Empty<string>();
+                chipPaths   = System.Array.Empty<string>();
+                kindKeys    = System.Array.Empty<string>();
+                chipOffsets = System.Array.Empty<int>();
             }
 
             var isIdle = _activity.Phase == ActivityPhase.Idle;
@@ -43,10 +46,11 @@ namespace UnityMCP.Editor.Chat
                 _agentMode,
                 _selectedAgent,
                 _activity.Phase.ToString(),
-                undoGroupId: isIdle ? -1 : _undoTracker.InflightGroupId,
-                savedAtUtc:  DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                backendKind: _selectedKind,
-                kindKeys:    kindKeys);
+                undoGroupId:      isIdle ? -1 : _undoTracker.InflightGroupId,
+                savedAtUtc:       DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                backendKind:      _selectedKind,
+                kindKeys:         kindKeys,
+                chipTextOffsets:  chipOffsets);
             ReloadGuard.SavePendingState(state);
         }
 
@@ -71,7 +75,7 @@ namespace UnityMCP.Editor.Chat
 
             // Restore chips from PendingTurnState (v4/v5 format).
             if (_chipField?.Model != null && p.ChipPaths?.Length > 0)
-                _chipField.Model.RestoreFromReload(p.ChipPaths, p.KindKeys);
+                _chipField.Model.RestoreFromReload(p.ChipPaths, p.KindKeys, p.ChipTextOffsets);
             _chipField?.RebuildFromModel();
 
             // Idle save: restore chips + input text only, no turn dispatch.
@@ -108,6 +112,7 @@ namespace UnityMCP.Editor.Chat
                 // Show only the original user text in the bubble (no state dump).
                 var chipList = _chipField?.Model?.Chips is { Count: > 0 } c
                     ? new System.Collections.Generic.List<ChipData>(c) : null;
+                _transcript?.SetLastTurnChips(chipList);
                 _transcript?.AppendUserBubble(displayText, chipList);
                 _backend.SendTurn(UserTurnBuilder.Build(sentText));
                 if (_activity.Send()) OnActivityChanged();
