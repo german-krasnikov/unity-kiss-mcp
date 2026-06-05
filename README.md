@@ -129,16 +129,16 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 ## Features
 
-- 💸 **Token Optimization** — CLI mode's `batch` ops compress 5–20 calls into one (80–95% savings), deferred tool schemas, per-session cost analytics
-- 🎬 **PlayTest DSL** — 21-command runtime testing language: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
-- 🏗️ **Scene Management** — full CRUD, hierarchy inspection, Unity query syntax, diff tracking, checkpoint/restore
-- 🎞️ **Animation & Timeline** — clips with key management, Timeline assets, Animator controllers with states/transitions
-- ✨ **VFX & Particles** — particle system CRUD with 11 module presets + shader graph integration
-- 🎨 **Multi-View Screenshots** — 4-panel grid (Front/Left/Top/Iso), bounding-box overlay, visual regression baseline
-- 🔍 **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at` — no disk writes
-- 🎯 **Capability Gating** — TIER1 core always visible; 8 category toggles per-session (`SCENE_EDIT`, `ANIMATION`, `VFX`, `UI`, `ASSETS`)
-- 💬 **In-Unity Agent Chat** — chat window spawns Claude/Codex CLI directly inside Unity. Multi-backend (Claude persistent-stdin, Codex spawn-per-turn), per-backend settings (model, permissions, extra args), typed context chips with kind detection (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo rollback, domain-reload survival, inline cursor chips, auto-scroll
-- 🔌 **Plugin Extensibility** — register your own tools in one file, no cross-imports
+- **Token Optimization** — `batch` compresses 5–20 calls into one (80–95% savings), deferred tool schemas, per-session cost analytics
+- **PlayTest DSL** — 21 commands: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
+- **Scene Management** — CRUD, hierarchy inspection, query syntax, diff tracking, checkpoint/restore
+- **Animation & Timeline** — clips, key management, Timeline assets, Animator states/transitions
+- **VFX & Particles** — particle system CRUD, 11 module presets, shader graph integration
+- **Multi-View Screenshots** — 4-panel grid (Front/Left/Top/Iso), bounding-box overlay, visual regression
+- **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at`
+- **Capability Gating** — TIER1 core always on; 8 category toggles per-session
+- **In-Unity Chat** — Claude/Codex backends, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
+- **Plugin Extensibility** — register your own tools in one file, no cross-imports
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
