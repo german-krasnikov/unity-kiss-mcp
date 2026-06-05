@@ -174,6 +174,7 @@ unity-kiss-mcp/
 │       │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
 │       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
 │       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates (partial class)
+│       │   ├── MCPChatWindow.Send.cs      # Send path: OnSend, rawText/llmText split, chip snapshot (partial class)
 │       │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (partial class)
 │       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons
 │       │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
