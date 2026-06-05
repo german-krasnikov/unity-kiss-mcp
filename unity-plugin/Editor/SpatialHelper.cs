@@ -47,7 +47,8 @@ namespace UnityMCP.Editor
 
             var dir = target - origin;
             float dist = dir.magnitude;
-            var hits = Physics.RaycastAll(origin, dir.normalized, dist);
+            int mask = layerMask != null && int.TryParse(layerMask, out var lm) ? lm : Physics.DefaultRaycastLayers;
+            var hits = Physics.RaycastAll(origin, dir.normalized, dist, mask);
             System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
             var sb = new StringBuilder();
@@ -66,7 +67,7 @@ namespace UnityMCP.Editor
             return sb.ToString();
         }
 
-        public static string SpatialMap(string root, float cellSize, float radius)
+        public static string SpatialMap(string root, float cellSize)
         {
             if (cellSize <= 0f) cellSize = 2f;
 
@@ -253,8 +254,7 @@ namespace UnityMCP.Editor
                     JsonHelper.ExtractString(args, "layer_mask")),
                 "spatial_map" => SpatialMap(
                     JsonHelper.ExtractString(args, "path"),
-                    ExtractFloat(args, "cell_size", 2f),
-                    ExtractFloat(args, "radius", 0f)),
+                    ExtractFloat(args, "cell_size", 2f)),
                 _ => throw new System.ArgumentException(ErrorHelper.InvalidAction(action,
                     new[] { "nearest", "in_front_of", "objects_in_radius", "bounds_info", "raycast", "spatial_map" }))
             };

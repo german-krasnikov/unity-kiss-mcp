@@ -5,7 +5,7 @@ namespace UnityMCP.Editor
 {
     internal static class ScanHelper
     {
-        public static string Scan(string bands)
+        public static string Scan()
         {
             var allGOs = Object.FindObjectsOfType<GameObject>();
             int total = allGOs.Length;

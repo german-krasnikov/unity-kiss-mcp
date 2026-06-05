@@ -23,6 +23,28 @@ namespace UnityMCP.Editor
         internal static Vector2 ParseVector2(string v) { var f = ParseFloats(v, 2); return new Vector2(f[0], f[1]); }
         internal static Vector3 ParseVector3(string v) { var f = ParseFloats(v, 3); return new Vector3(f[0], f[1], f[2]); }
         internal static Vector4 ParseVector4(string v) { var f = ParseFloats(v, 4); return new Vector4(f[0], f[1], f[2], f[3]); }
+
+        /// <summary>Flexible 2–4 component vector. Missing Z/W default to 0. Used for shader/material vector properties.</summary>
+        internal static Vector4 ParseVector4Lenient(string s)
+        {
+            s = s.Trim().Trim('(', ')');
+            var p = s.Split(',');
+            if (p.Length < 2) throw new ArgumentException($"Invalid vector '{s}'. Use (x,y,z,w)");
+            return new Vector4(
+                float.Parse(p[0].Trim(), CultureInfo.InvariantCulture),
+                float.Parse(p[1].Trim(), CultureInfo.InvariantCulture),
+                p.Length > 2 ? float.Parse(p[2].Trim(), CultureInfo.InvariantCulture) : 0f,
+                p.Length > 3 ? float.Parse(p[3].Trim(), CultureInfo.InvariantCulture) : 0f);
+        }
+
+        /// <summary>Parse "true"/"false"/"1"/"0" case-insensitively. Throws ArgumentException on invalid input.</summary>
+        internal static bool ParseBool(string value)
+        {
+            if (string.IsNullOrEmpty(value)) throw new ArgumentException($"Invalid bool: empty");
+            if (value.Equals("true",  StringComparison.OrdinalIgnoreCase) || value == "1") return true;
+            if (value.Equals("false", StringComparison.OrdinalIgnoreCase) || value == "0") return false;
+            throw new ArgumentException($"Invalid bool: '{value}'");
+        }
         internal static Quaternion ParseQuaternion(string v)
         {
             // ComponentSerializer emits 3-component Euler "(x, y, z)" — detect by count.
@@ -67,9 +89,12 @@ namespace UnityMCP.Editor
         {
             switch (property.propertyType)
             {
-                case SerializedPropertyType.Integer: property.intValue = int.Parse(value); break;
+                case SerializedPropertyType.Integer:
+                    if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal))
+                        throw new ArgumentException($"Invalid int: '{value}'");
+                    property.intValue = intVal; break;
                 case SerializedPropertyType.Float: property.floatValue = float.Parse(value, CultureInfo.InvariantCulture); break;
-                case SerializedPropertyType.Boolean: property.boolValue = bool.Parse(value); break;
+                case SerializedPropertyType.Boolean: property.boolValue = ParseBool(value); break;
                 case SerializedPropertyType.String: property.stringValue = value; break;
                 case SerializedPropertyType.Vector2: property.vector2Value = ParseVector2(value); break;
                 case SerializedPropertyType.Vector3: property.vector3Value = ParseVector3(value); break;
@@ -96,7 +121,10 @@ namespace UnityMCP.Editor
                         else throw new ArgumentException($"Invalid enum value: {value}");
                     }
                     break;
-                case SerializedPropertyType.ArraySize: property.arraySize = int.Parse(value); break;
+                case SerializedPropertyType.ArraySize:
+                    if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var arrSize))
+                        throw new ArgumentException($"Invalid int: '{value}'");
+                    property.arraySize = arrSize; break;
                 case SerializedPropertyType.ObjectReference: SetObjectReference(property, value); break;
                 default: throw new ArgumentException($"Unsupported property type: {property.propertyType}");
             }
@@ -107,7 +135,9 @@ namespace UnityMCP.Editor
             if (value == "null") { property.objectReferenceValue = null; return; }
             if (value.StartsWith("#"))
             {
-                var resolved = EditorUtility.InstanceIDToObject(int.Parse(value.Substring(1)));
+                if (!int.TryParse(value.Substring(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var instanceId))
+                    throw new ArgumentException($"Invalid instance ID: {value}");
+                var resolved = EditorUtility.InstanceIDToObject(instanceId);
                 if (resolved == null)
                     throw new ArgumentException($"No object found for instance ID: {value}");
                 property.objectReferenceValue = resolved;

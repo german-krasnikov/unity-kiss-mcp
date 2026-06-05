@@ -123,7 +123,7 @@ namespace UnityMCP.Editor
                     mat.SetColor(prop, ValueParser.ParseColor(value));
                     break;
                 case UnityEngine.Rendering.ShaderPropertyType.Vector:
-                    mat.SetVector(prop, ParseVector(value));
+                    mat.SetVector(prop, ValueParser.ParseVector4Lenient(value));
                     break;
                 case UnityEngine.Rendering.ShaderPropertyType.Texture:
                     var tex = AssetDatabase.LoadAssetAtPath<Texture>(value);
@@ -131,7 +131,9 @@ namespace UnityMCP.Editor
                     mat.SetTexture(prop, tex);
                     break;
                 case UnityEngine.Rendering.ShaderPropertyType.Int:
-                    mat.SetInt(prop, int.Parse(value));
+                    if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var matIntVal))
+                        throw new ArgumentException($"Invalid int: '{value}'");
+                    mat.SetInt(prop, matIntVal);
                     break;
             }
 
@@ -192,16 +194,5 @@ namespace UnityMCP.Editor
             return sb.ToString().TrimEnd();
         }
 
-        // Intentionally separate from ValueParser.ParseVector4 — material Vector properties accept 2-4 components with Z/W defaulting to 0.
-        private static Vector4 ParseVector(string s)
-        {
-            s = s.Trim('(', ')');
-            var p = s.Split(',');
-            return new Vector4(
-                float.Parse(p[0].Trim(), CultureInfo.InvariantCulture),
-                float.Parse(p[1].Trim(), CultureInfo.InvariantCulture),
-                p.Length > 2 ? float.Parse(p[2].Trim(), CultureInfo.InvariantCulture) : 0f,
-                p.Length > 3 ? float.Parse(p[3].Trim(), CultureInfo.InvariantCulture) : 0f);
-        }
     }
 }

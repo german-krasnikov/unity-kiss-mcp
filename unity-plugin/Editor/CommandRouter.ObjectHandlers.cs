@@ -87,35 +87,19 @@ namespace UnityMCP.Editor
         // so the read thread always sees a warm non-null value.
         internal static void InvalidateEnabledToolsCache() => _enabledToolsCache = ExecGetEnabledTools();
 
-        private static string ExecGetEnabledTools()
-        {
-            var sb = new StringBuilder();
-            bool first = true;
-            var allTools = new System.Collections.Generic.HashSet<string>(MCPSettings.GetToolNames());
-            foreach (var cmd in CommandRegistry.GetAllCommands())
-                allTools.Add(cmd);
-            foreach (var tool in allTools)
-            {
-                if (MCPSettings.IsToolEnabled(tool))
-                {
-                    if (!first) sb.Append(",");
-                    sb.Append(tool);
-                    first = false;
-                }
-            }
-            return sb.ToString();
-        }
+        private static string ExecGetEnabledTools()  => BuildToolList(enabled: true);
+        private static string ExecGetDisabledTools() => BuildToolList(enabled: false);
 
-        private static string ExecGetDisabledTools()
+        private static string BuildToolList(bool enabled)
         {
-            var sb = new StringBuilder();
-            bool first = true;
             var allTools = new System.Collections.Generic.HashSet<string>(MCPSettings.GetToolNames());
             foreach (var cmd in CommandRegistry.GetAllCommands())
                 allTools.Add(cmd);
+            var sb = new StringBuilder();
+            bool first = true;
             foreach (var tool in allTools)
             {
-                if (!MCPSettings.IsToolEnabled(tool))
+                if (MCPSettings.IsToolEnabled(tool) == enabled)
                 {
                     if (!first) sb.Append(",");
                     sb.Append(tool);

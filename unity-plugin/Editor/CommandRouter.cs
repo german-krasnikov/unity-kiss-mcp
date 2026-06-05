@@ -298,8 +298,7 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("fingerprint", args => FingerprintHelper.Fingerprint(
                 JsonHelper.ExtractString(args, "path"),
                 ExtractInt(args, "depth", 3)));
-            CommandRegistry.Register("scan_scene", args => ScanHelper.Scan(
-                JsonHelper.ExtractString(args, "bands")));
+            CommandRegistry.Register("scan_scene", _ => ScanHelper.Scan());
             CommandRegistry.Register("check_colliders", args => ColliderChecker.Check(
                 JsonHelper.ExtractString(args, "path")));
             CommandRegistry.Register("get_schema", args => SchemaHelper.GetSchema(
