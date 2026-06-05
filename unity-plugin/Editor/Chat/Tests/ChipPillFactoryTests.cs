@@ -100,5 +100,42 @@ namespace UnityMCP.Editor.Chat.Tests
             var kind2 = pill2.Q<Label>(className: "inline-chip-kind")?.text;
             Assert.AreEqual(kind1, kind2);
         }
+
+        // ── Additional content tests ──────────────────────────────────────────
+
+        [Test]
+        public void PillContent_ResponseMode_NoRemoveButton()
+        {
+            var chip = new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 0);
+            var pill = ChipPillFactory.Build(chip);
+            Assert.IsNull(pill.Q<Button>(className: "inline-chip-remove"),
+                "response mode pill must have no remove button");
+        }
+
+        [Test]
+        public void PillContent_ColorResolver_OverridesRegistry()
+        {
+            ChipPillFactory.ColorResolver = _ => "#ff0000";
+            var pill = ChipPillFactory.Build(ChipKindKeys.Script, "Foo.cs");
+            var bg = pill.style.backgroundColor;
+            Assert.Greater(bg.value.r, 0.9f, "ColorResolver #ff0000 must give red background");
+        }
+
+        [Test]
+        public void PillContent_EmptyDisplayName_StillRenders()
+        {
+            var pill = ChipPillFactory.Build(ChipKindKeys.Script, "");
+            var lbl = pill.Q<Label>(className: "inline-chip-label");
+            Assert.IsNotNull(lbl, "label must exist even with empty display name");
+            Assert.AreEqual("", lbl.text);
+        }
+
+        [Test]
+        public void PillContent_UnicodeDisplayName_Preserved()
+        {
+            const string name = "Игрок_01";
+            var pill = ChipPillFactory.Build(ChipKindKeys.Script, name);
+            Assert.AreEqual(name, pill.Q<Label>(className: "inline-chip-label").text);
+        }
     }
 }
