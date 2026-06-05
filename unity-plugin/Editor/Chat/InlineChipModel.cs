@@ -47,21 +47,32 @@ namespace UnityMCP.Editor.Chat
         }
 
         /// <summary>
-        /// Shift offsets of all chips at or after changeAt by delta.
+        /// Shift offsets of all chips strictly after changeAt by delta.
         /// Called from TextField valueChanged callback to keep positions valid.
         /// </summary>
         internal void AdjustOffsetsAfterTextChange(int changeAt, int delta)
+            => AdjustOffsets(changeAt, delta, inclusive: false);
+
+        /// <summary>
+        /// Shift offsets of all chips at or after changeAt by delta (inclusive).
+        /// Used when injecting @mention text to shift existing chips at the insertion point.
+        /// </summary>
+        internal void AdjustOffsetsAfterTextChangeInclusive(int changeAt, int delta)
+            => AdjustOffsets(changeAt, delta, inclusive: true);
+
+        private void AdjustOffsets(int changeAt, int delta, bool inclusive)
         {
             if (delta == 0) return;
             for (int i = 0; i < _chips.Count; i++)
             {
-                if (_chips[i].TextOffset > changeAt)
-                {
-                    // Skip sentinel offsets (int.MaxValue from Add() convenience) — adding delta overflows.
-                    if (_chips[i].TextOffset == int.MaxValue) continue;
-                    _chips[i] = new PositionedChip(_chips[i].Chip,
-                        System.Math.Max(0, _chips[i].TextOffset + delta));
-                }
+                bool should = inclusive
+                    ? _chips[i].TextOffset >= changeAt
+                    : _chips[i].TextOffset > changeAt;
+                if (!should) continue;
+                // Skip sentinel offsets (int.MaxValue from Add() convenience) — adding delta overflows.
+                if (_chips[i].TextOffset == int.MaxValue) continue;
+                _chips[i] = new PositionedChip(_chips[i].Chip,
+                    System.Math.Max(0, _chips[i].TextOffset + delta));
             }
         }
 

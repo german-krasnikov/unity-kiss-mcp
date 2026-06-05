@@ -2,7 +2,7 @@
 // Layout: flex-column of [PillRow (hidden when empty), TextField(flexGrow 1)].
 // TextField is always full-width; chips appear in a row above it.
 // Eliminates P1 (misalignment) + P2 (vanish-on-type) + P3 (TextField shrink on chips).
-// F13: chips are now position-tracked; no @mention injection.
+// Chips are position-tracked; @mention injected into TextField for visual display.
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -97,21 +97,37 @@ namespace UnityMCP.Editor.Chat
                 ? System.Math.Clamp(_lastCursorPos, 0, len)
                 : System.Math.Clamp(raw, 0, len);
 
+            // Shift existing chips at >= cursor to make room for @mention text.
+            int mentionLen = 1 + chip.DisplayName.Length + 1;
+            _model.AdjustOffsetsAfterTextChangeInclusive(cursor, mentionLen);
             _model.InsertAt(cursor, chip);
+            InjectMentionAt(cursor, chip);
+            // Advance last-known cursor past the injected mention so the next
+            // chip insertion appends after this one rather than prepending again.
+            _lastCursorPos = cursor + mentionLen;
             RebuildPills();
         }
 
         /// <summary>Insert chip at an explicit text offset.</summary>
         internal void InsertChipAt(int textOffset, ChipData chip)
         {
+            int mentionLen = 1 + chip.DisplayName.Length + 1;
+            _model.AdjustOffsetsAfterTextChangeInclusive(textOffset, mentionLen);
             _model.InsertAt(textOffset, chip);
+            InjectMentionAt(textOffset, chip);
             RebuildPills();
         }
 
         internal void RemoveChipAt(int index)
         {
             if (index < 0 || index >= _model.Count) return;
+            var pc         = _model.PositionedChips[index];
+            int offset     = pc.TextOffset;
+            string mention = "@" + pc.Chip.DisplayName + " ";
+            RemoveMentionText(offset, mention);
             _model.RemoveAt(index);
+            // Shift remaining chips that follow the removed mention.
+            _model.AdjustOffsetsAfterTextChange(offset + mention.Length - 1, -mention.Length);
             RebuildPills();
         }
 
@@ -148,6 +164,30 @@ namespace UnityMCP.Editor.Chat
         private void RemoveAllPills()
         {
             _pillRow.Clear();
+        }
+
+        private void InjectMentionAt(int insertAt, ChipData chip)
+        {
+            string mention = "@" + chip.DisplayName + " ";
+            _suppressOffsetUpdate = true;
+            string val = _textField.value ?? "";
+            insertAt   = System.Math.Clamp(insertAt, 0, val.Length);
+            _textField.value = val.Substring(0, insertAt) + mention + val.Substring(insertAt);
+            _suppressOffsetUpdate = false;
+        }
+
+        private void RemoveMentionText(int offset, string mention)
+        {
+            string val = _textField.value ?? "";
+            int clamped = System.Math.Clamp(offset, 0, val.Length);
+            if (clamped + mention.Length <= val.Length
+                && val.Substring(clamped, mention.Length) == mention)
+            {
+                _suppressOffsetUpdate = true;
+                _textField.value = val.Substring(0, clamped)
+                    + val.Substring(clamped + mention.Length);
+                _suppressOffsetUpdate = false;
+            }
         }
 
         private void AttachContextMenu(VisualElement pill)

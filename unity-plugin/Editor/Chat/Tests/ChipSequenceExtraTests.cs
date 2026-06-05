@@ -36,7 +36,8 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "hello world"; SetCursor(6);
             InsertChip(H("/Player", "Player"));
             Assert.AreEqual(1, _chipField.Model.Count);
-            Assert.AreEqual("hello world", _chipField.Text);
+            StringAssert.Contains("@Player", _chipField.Text);
+            StringAssert.Contains("hello", _chipField.Text);
         }
 
         [Test]
@@ -100,44 +101,44 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.DoesNotContain("@A", _chipField.Text);
         }
 
-        // ── F13 regression: AddChip never injects @mention ──────────────────
+        // ── @mention injection: AddChip injects @Name into TextField ────────
 
         [Test]
-        public void AddChip_TextFieldNeverContainsAtSign()
+        public void AddChip_TextFieldContainsAtMention()
         {
             InsertChip(H("/Player", "Player", 1));
-            StringAssert.DoesNotContain("@", _chipField.Text);
+            StringAssert.Contains("@Player", _chipField.Text);
         }
 
         [Test]
-        public void AddChip_OnExistingText_TextUnchangedAndNoAtSign()
+        public void AddChip_OnExistingText_InjectsAtMentionAtCursor()
         {
             _chipField.Text = "fix health";
             SetCursor(3);
             InsertChip(H("/Player", "Player", 1));
-            Assert.AreEqual("fix health", _chipField.Text);
-            StringAssert.DoesNotContain("@", _chipField.Text);
+            StringAssert.Contains("@Player", _chipField.Text);
+            StringAssert.Contains("fix", _chipField.Text);
         }
 
         [Test]
-        public void MultipleAddChips_TextNeverAccumulatesAtSigns()
+        public void MultipleAddChips_TextAccumulatesAtMentions()
         {
             Type("hello ");
             InsertChip(H("/A", "A", 1));
-            StringAssert.DoesNotContain("@", _chipField.Text);
+            StringAssert.Contains("@A", _chipField.Text);
             Type("world ");
             InsertChip(H("/B", "B", 2));
-            StringAssert.DoesNotContain("@", _chipField.Text);
+            StringAssert.Contains("@A", _chipField.Text);
+            StringAssert.Contains("@B", _chipField.Text);
             InsertChip(H("/C", "C", 3));
-            StringAssert.DoesNotContain("@", _chipField.Text);
+            StringAssert.Contains("@C", _chipField.Text);
         }
 
         [Test]
-        public void AddChip_WithSpaceInName_NoAtMention()
+        public void AddChip_WithSpaceInName_AtMentionPresent()
         {
             InsertChip(H("/Player Controller", "Player Controller", 1));
-            StringAssert.DoesNotContain("@Player", _chipField.Text);
-            StringAssert.DoesNotContain("@", _chipField.Text);
+            StringAssert.Contains("@Player Controller", _chipField.Text);
         }
     }
 }

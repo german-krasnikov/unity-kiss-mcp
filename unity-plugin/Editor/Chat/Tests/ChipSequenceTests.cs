@@ -38,7 +38,7 @@ namespace UnityMCP.Editor.Chat.Tests
             InsertChip(H("/Player", "Player"));
             Assert.AreEqual(1, _chipField.Model.Count);
             Assert.AreEqual("/Player", _chipField.Model.Chips[0].Path);
-            Assert.AreEqual("", _chipField.Text);
+            Assert.AreEqual("@Player ", _chipField.Text);
         }
 
         [Test]
@@ -47,7 +47,7 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "hello "; SetCursor(6);
             InsertChip(H("/Player", "Player"));
             Assert.AreEqual(1, _chipField.Model.Count);
-            Assert.AreEqual("hello ", _chipField.Text);
+            Assert.AreEqual("hello @Player ", _chipField.Text);
         }
 
         [Test]
@@ -56,7 +56,7 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "world"; SetCursor(0);
             InsertChip(H("/Player", "Player"));
             Assert.AreEqual(1, _chipField.Model.Count);
-            Assert.AreEqual("world", _chipField.Text);
+            Assert.AreEqual("@Player world", _chipField.Text);
         }
 
         [Test]
@@ -65,7 +65,7 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "hello world"; SetCursor(6);
             InsertChip(H("/Player", "Player"));
             Assert.AreEqual(1, _chipField.Model.Count);
-            Assert.AreEqual("hello world", _chipField.Text);
+            Assert.AreEqual("hello @Player world", _chipField.Text);
         }
 
         [Test]
@@ -74,7 +74,7 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "tail"; SetCursor(0);
             InsertChip(H("/Player", "Player"));
             Assert.AreEqual(1, _chipField.Model.Count);
-            Assert.AreEqual("tail", _chipField.Text);
+            Assert.AreEqual("@Player tail", _chipField.Text);
         }
 
         [Test]
@@ -93,9 +93,10 @@ namespace UnityMCP.Editor.Chat.Tests
             InsertChip(H("/Player", "Player", 1));
             Type(" text ");
             InsertChip(H("/Enemy", "Enemy", 2));
-            // F13: no @mention text; text field holds only typed text
-            Assert.AreEqual(" text ", _chipField.Text);
             Assert.AreEqual(2, _chipField.Model.Count);
+            StringAssert.Contains("@Player", _chipField.Text);
+            StringAssert.Contains("@Enemy", _chipField.Text);
+            StringAssert.Contains("text", _chipField.Text);
         }
 
         [Test]
@@ -127,9 +128,12 @@ namespace UnityMCP.Editor.Chat.Tests
             Type(" middle ");
             InsertChip(H("/Enemy", "Enemy", 2));
             Type(" end");
-            // F13: text field holds only typed text; chips are tracked by position
-            Assert.AreEqual("start  middle  end", _chipField.Text);
             Assert.AreEqual(2, _chipField.Model.Count);
+            StringAssert.Contains("start", _chipField.Text);
+            StringAssert.Contains("@Player", _chipField.Text);
+            StringAssert.Contains("middle", _chipField.Text);
+            StringAssert.Contains("@Enemy", _chipField.Text);
+            StringAssert.Contains("end", _chipField.Text);
         }
     }
 }

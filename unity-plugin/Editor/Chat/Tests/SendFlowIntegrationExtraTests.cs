@@ -122,9 +122,12 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             _chipField.Text = "fix @Player health";
             _chipField.AddChip(HierarchyChip("/Player", "Player", 1));
+            // AddChip injects "@Player " at cursor 0 → rawText includes injected mention
             SimulateSend();
             var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
-            Assert.AreEqual("fix @Player health", bubble.userData);
+            var userData = bubble.userData as string ?? "";
+            StringAssert.Contains("fix @Player health", userData);
+            StringAssert.Contains("@Player", userData);
         }
 
         [Test]

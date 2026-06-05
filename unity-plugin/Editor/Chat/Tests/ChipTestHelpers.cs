@@ -12,7 +12,7 @@ namespace UnityMCP.Editor.Chat.Tests
         internal static ChipData S(string path, string name)
             => new ChipData(ChipKindKeys.Script, path, name, 0);
 
-        // F13: no @mention injection — chips are position-tracked only.
+        // Delegates to AddChip — injects @DisplayName into TextField + tracks position.
         internal static void InsertChip(InlineChipField field, ChipData chip)
             => field.AddChip(chip);
 
@@ -29,13 +29,13 @@ namespace UnityMCP.Editor.Chat.Tests
             SetCursor(field, field.Text.Length);
         }
 
-        // F13: uses ChipTextInterleaver + AppendUserBubble(UserMessage).
+        // BuildFromRaw strips @mention text from TextField and remaps chip offsets.
         internal static (string turnJson, string rawText) SimulateSend(
             InlineChipField field, ChatTranscript transcript, ChipConfig cfg)
         {
             var rawText    = (field.Text ?? "").Trim();
             var positioned = new List<PositionedChip>(field.Model.PositionedChips);
-            var msg        = ChipTextInterleaver.Build(rawText, positioned);
+            var msg        = ChipTextInterleaver.BuildFromRaw(rawText, positioned);
             var llmText    = ChipTextInterleaver.ToLlmPayload(msg, cfg);
             if (string.IsNullOrEmpty(llmText)) return (null, rawText);
             var turnJson = UserTurnBuilder.Build(llmText);

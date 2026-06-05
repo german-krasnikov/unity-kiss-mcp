@@ -76,8 +76,60 @@ namespace UnityMCP.Editor.Chat
         {
             var sb = new StringBuilder();
             foreach (var seg in msg.Segments)
-                sb.Append(seg.IsChip ? "@" + seg.Chip.DisplayName : seg.Text);
+            {
+                if (seg.IsChip)
+                {
+                    if (sb.Length > 0 && sb[sb.Length - 1] != ' ')
+                        sb.Append(' ');
+                    sb.Append('@').Append(seg.Chip.DisplayName).Append(' ');
+                }
+                else
+                {
+                    sb.Append(seg.Text);
+                }
+            }
             return sb.ToString().Trim();
+        }
+
+        /// <summary>
+        /// Build UserMessage from raw text that contains @mentions (from InlineChipField),
+        /// stripping @mentions and remapping chip offsets to clean text positions.
+        /// </summary>
+        internal static UserMessage BuildFromRaw(string rawText,
+            IReadOnlyList<PositionedChip> positioned)
+        {
+            rawText = rawText ?? "";
+            if (positioned == null || positioned.Count == 0)
+                return Build(rawText, new List<PositionedChip>());
+
+            var sorted = new List<PositionedChip>(positioned);
+            sorted.Sort((a, b) => a.TextOffset.CompareTo(b.TextOffset));
+
+            var cleanText  = new StringBuilder();
+            var cleanChips = new List<PositionedChip>();
+            int rawPos     = 0;
+
+            foreach (var pc in sorted)
+            {
+                int chipRawOffset = System.Math.Clamp(pc.TextOffset, rawPos, rawText.Length);
+                // text before this chip (clean)
+                if (chipRawOffset > rawPos)
+                    cleanText.Append(rawText, rawPos, chipRawOffset - rawPos);
+                cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
+                // skip "@DisplayName " (or "@DisplayName" at end of string)
+                int mentionWithSpace    = chipRawOffset + 1 + pc.Chip.DisplayName.Length + 1;
+                int mentionWithoutSpace = mentionWithSpace - 1;
+                if (mentionWithSpace <= rawText.Length)
+                    rawPos = mentionWithSpace;
+                else if (mentionWithoutSpace <= rawText.Length)
+                    rawPos = mentionWithoutSpace;
+                else
+                    rawPos = chipRawOffset; // guard: don't skip if mention not found
+            }
+            if (rawPos < rawText.Length)
+                cleanText.Append(rawText, rawPos, rawText.Length - rawPos);
+
+            return Build(cleanText.ToString(), cleanChips);
         }
     }
 }

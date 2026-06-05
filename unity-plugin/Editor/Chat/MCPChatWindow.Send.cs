@@ -16,7 +16,7 @@ namespace UnityMCP.Editor.Chat
 
             var store    = BackendConfigStore.Load();
             var rawText  = (_chipField?.Text ?? _input?.value ?? "").Trim();
-            var msg      = ChipTextInterleaver.Build(rawText, _chipField?.Model?.PositionedChips);
+            var msg      = ChipTextInterleaver.BuildFromRaw(rawText, _chipField?.Model?.PositionedChips);
             var llmText  = ChipTextInterleaver.ToLlmPayload(msg, store.Chips);
             if (string.IsNullOrEmpty(llmText)) return;
 
@@ -33,7 +33,7 @@ namespace UnityMCP.Editor.Chat
             var bytes    = File.ReadAllBytes(capturePath);
             var store    = BackendConfigStore.Load();
             var rawText  = (_chipField?.Text ?? _input?.value ?? "").Trim();
-            var msg      = ChipTextInterleaver.Build(rawText, _chipField?.Model?.PositionedChips);
+            var msg      = ChipTextInterleaver.BuildFromRaw(rawText, _chipField?.Model?.PositionedChips);
             var llmText  = ChipTextInterleaver.ToLlmPayload(msg, store.Chips);
             DispatchTurn(UserTurnBuilder.Build(llmText, bytes), msg, screenshotPath: capturePath);
         }

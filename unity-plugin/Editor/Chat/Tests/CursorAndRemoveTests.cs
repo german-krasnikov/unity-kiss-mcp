@@ -1,4 +1,4 @@
-// F13: Tests updated — no @mention injection; RemoveChipAt is index-only (no text mutation).
+// Tests for cursor tracking and chip removal with @mention injection.
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
 
@@ -30,44 +30,45 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(0, field.LastCursorPos);
         }
 
-        // F13: RemoveChipAt removes model entry; does NOT mutate TextField text.
+        // RemoveChipAt removes @mention text from TextField when present.
         [Test]
-        public void RemoveChip_RemovesFromModel_DoesNotMutateText()
+        public void RemoveChip_RemovesAtMentionFromText()
         {
             var field = new InlineChipField();
             field.AddChip(Chip("Player"));
-            field.TextField.value = "some text";
+            // TextField now contains "@Player "
             field.RemoveChipAt(0);
             Assert.AreEqual(0, field.Model.Count);
-            Assert.AreEqual("some text", field.Text, "Text must be unchanged — no @mention to remove");
+            Assert.AreEqual("", field.Text);
         }
 
-        // F13: removing one of two chips leaves text unchanged, removes correct model entry.
+        // Removing one of two chips removes only that @mention.
         [Test]
-        public void RemoveChip_TwoChips_RemovesFirstFromModel()
+        public void RemoveChip_TwoChips_RemovesFirstMentionFromText()
         {
             var field = new InlineChipField();
             field.AddChip(Chip("A"));
             field.AddChip(Chip("B"));
-            field.TextField.value = "plain text";
+            // TextField: "@A @B "
             field.RemoveChipAt(0);
             Assert.AreEqual(1, field.Model.Count);
             Assert.AreEqual("/B", field.Model.Chips[0].Path);
-            Assert.AreEqual("plain text", field.Text, "Text must be unchanged");
+            StringAssert.DoesNotContain("@A", field.Text);
+            StringAssert.Contains("@B", field.Text);
         }
 
-        // F13: no @mention text to remove means text stays exactly as-is.
+        // Guard: if @mention not at stored offset (text was replaced), skip mutation.
         [Test]
-        public void RemoveChip_NoMentionInText_TextUnchanged()
+        public void RemoveChip_NoMentionAtOffset_TextUnchanged()
         {
             var field = new InlineChipField();
             field.AddChip(Chip("Player"));
-            field.TextField.value = "something else";
+            field.TextField.value = "something else"; // overwrite directly
             field.RemoveChipAt(0);
             Assert.AreEqual("something else", field.Text);
         }
 
-        // F13: duplicate-name chips removed by index — model entry at 0 is removed.
+        // Duplicate-name chips removed by index — correct entry removed.
         [Test]
         public void RemoveChip_DuplicateNames_RemovesModelEntry0()
         {
@@ -75,7 +76,6 @@ namespace UnityMCP.Editor.Chat.Tests
             field.AddChip(Chip("A"));
             field.AddChip(Chip("A"));
             field.RemoveChipAt(0);
-            // One chip should remain
             Assert.AreEqual(1, field.Model.Count);
         }
 
@@ -84,11 +84,9 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var field = new InlineChipField();
             field.AddChip(Chip("A"));
-            field.TextField.value = "text";
-            field.TextField.cursorIndex = 3;
-            field.TextField.selectIndex = 3;
-            // Without FocusOut, LastCursorPos is still 0 (stale)
-            Assert.AreEqual(0, field.LastCursorPos, "LastCursorPos stale without FocusOut");
+            // After AddChip, lastCursorPos is advanced past the injected @mention.
+            Assert.AreEqual("@A ".Length, field.LastCursorPos,
+                "LastCursorPos advanced past injected mention");
         }
     }
 }

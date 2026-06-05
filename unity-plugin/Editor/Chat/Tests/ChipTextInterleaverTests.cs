@@ -107,7 +107,8 @@ namespace UnityMCP.Editor.Chat.Tests
             var positioned = new List<PositionedChip> { PC(chip, 5) };
             var msg = ChipTextInterleaver.Build("fix it please", positioned);
             var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
-            StringAssert.Contains("fix i@Foo.cs t please", payload);
+            // "fix i" (ends in 'i') → space added before @Foo.cs → "fix i @Foo.cs t please"
+            StringAssert.Contains("fix i @Foo.cs t please", payload);
             StringAssert.Contains("[script:Assets/Foo.cs]", payload);
         }
 
