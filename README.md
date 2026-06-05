@@ -140,6 +140,34 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 <img src="docs/assets/changelog.svg" width="100%" alt="Animated changelog — release timeline with heartbeat trace">
 
+<details>
+<summary><b>v0.15.8</b> — Inline Chips + Extensible Chip-Kind Registry</summary>
+
+Production-ready extensible typed-context-chip system for in-Unity agent chat. ChipKindRegistry, ScriptableObject-based kind configs, drag-drop + context menu.
+
+</details>
+
+<details>
+<summary><b>v0.15.0</b> — Chat UX Sprint (10 Features + Review-Hardening)</summary>
+
+Six-wave polish: F1 token reset, F2 restore cascade, F3 approve-button filter, F4 status panel, F5 inline cursor chips, F6 auto-scroll, F7 hierarchy refs, F8 beta labels, F9 per-backend settings, F10 typed context tags. ArgTokenizer DRY, ChatBackendProbe reload-safety.
+
+</details>
+
+<details>
+<summary><b>v0.14.0</b> — Multi-Backend Agent Chat (Claude + Codex)</summary>
+
+DRY CliBackendBase: 4-axis strategy (BuildArgs, ParseLine, BinaryName, IsPersistentProcess). CodexStreamParser, CodexArgBuilder. PendingTurnState v3 for domain-reload. +23 lines net for a whole second backend.
+
+</details>
+
+<details>
+<summary><b>v0.7.1</b> — Tech-Debt Sprint (Python/C#/Chat)</summary>
+
+6-wave quality pass across server, plugin, and chat. Hardened TCP reconnect, dedup tool loading, compile-verification, editor-log corroboration.
+
+</details>
+
 <div align="center"><sub>See <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a> for full history</sub></div>
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
