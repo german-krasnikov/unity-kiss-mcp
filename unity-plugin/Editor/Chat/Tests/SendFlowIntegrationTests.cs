@@ -162,15 +162,16 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void SentBubble_UserDataMatchesRawText()
+        public void SentBubble_UserDataContainsAtMention()
         {
-            const string msg = "check the player";
-            _chipField.Text = msg;
+            _chipField.Text = "check the player";
             _chipField.AddChip(HierarchyChip("/Player", "Player", 99));
             SimulateSend();
-            var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
-            Assert.AreEqual(msg, bubble.userData as string,
-                "bubble.userData must equal rawText (not llmText with bracket expansion)");
+            var bubble   = ChatWindowAssertions.GetUserBubble(_container, 0);
+            var userData = bubble.userData as string ?? "";
+            StringAssert.Contains("check the player", userData);
+            StringAssert.Contains("@Player", userData);
+            Assert.IsFalse(userData.Contains("[hierarchy:"), "userData must not contain bracket expansion");
         }
 
         [Test]

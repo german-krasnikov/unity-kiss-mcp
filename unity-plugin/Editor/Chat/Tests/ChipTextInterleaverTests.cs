@@ -99,15 +99,15 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("/B", chipSegs[1].Chip.Path);
         }
 
-        // B7: ToLlmPayload — text segments concatenated, chip context appended
+        // B7: ToLlmPayload — text with @mention + chip context appended
         [Test]
-        public void B7_ToLlmPayload_TextPlusChipContext()
+        public void B7_ToLlmPayload_TextWithMentionPlusChipContext()
         {
             var chip = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo.cs", 0);
             var positioned = new List<PositionedChip> { PC(chip, 5) };
             var msg = ChipTextInterleaver.Build("fix it please", positioned);
             var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
-            StringAssert.Contains("fix it please", payload);
+            StringAssert.Contains("fix i@Foo.cs t please", payload);
             StringAssert.Contains("[script:Assets/Foo.cs]", payload);
         }
 
@@ -121,16 +121,16 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsFalse(payload.EndsWith("\n"));
         }
 
-        // B9: ToLlmPayload — chip with depth=none → excluded from payload
+        // B9: ToLlmPayload — chip with depth=none → context block excluded, @mention remains
         [Test]
-        public void B9_ToLlmPayload_NoneDepthChip_ExcludedFromPayload()
+        public void B9_ToLlmPayload_NoneDepthChip_ContextExcludedMentionRemains()
         {
             var chip = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo.cs", 0);
             var positioned = new List<PositionedChip> { PC(chip, 0) };
             var msg = ChipTextInterleaver.Build("fix", positioned);
             var cfg = new ChipConfig { ScriptDepth = "none" };
             var payload = ChipTextInterleaver.ToLlmPayload(msg, cfg);
-            Assert.AreEqual("fix", payload);
+            Assert.AreEqual("@Foo.cs fix", payload);
             Assert.IsFalse(payload.Contains("[script:"));
         }
 
@@ -219,14 +219,15 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains("jhkjhkj", payload);
         }
 
-        // U5: display text excludes chip payloads — only raw text returned
+        // U5: display text includes @mentions but no chip context blocks
         [Test]
-        public void U5_DisplayText_ExcludesChipContext()
+        public void U5_DisplayText_IncludesAtMentions()
         {
             var chip = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
             var msg = ChipTextInterleaver.Build("hello", new List<PositionedChip> { PC(chip, 5) });
             var display = ChipTextInterleaver.ToDisplayText(msg);
-            Assert.AreEqual("hello", display);
+            Assert.AreEqual("hello @Main Camera", display);
+            Assert.IsFalse(display.Contains("[hierarchy:"));
         }
 
         // D9 (moved from UserMessageBubbleTests): no @ in any text segment — Build internals
@@ -237,6 +238,114 @@ namespace UnityMCP.Editor.Chat.Tests
             var msg = ChipTextInterleaver.Build("fix this", new List<PositionedChip> { PC(chip, 4) });
             foreach (var seg in msg.Segments)
                 if (!seg.IsChip) StringAssert.DoesNotContain("@", seg.Text);
+        }
+
+        // ── Group M: @mention tests ──────────────────────────────────────────
+
+        // M1: chip at start → display text starts with @DisplayName
+        [Test]
+        public void M1_ChipAtStart_DisplayStartsWithAtMention()
+        {
+            var chip = H("/Player", "Player", 1);
+            var msg = ChipTextInterleaver.Build("do stuff", new List<PositionedChip> { PC(chip, 0) });
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("@Player do stuff", display);
+        }
+
+        // M2: chip at end → display text ends with @DisplayName
+        [Test]
+        public void M2_ChipAtEnd_DisplayEndsWithAtMention()
+        {
+            var chip = H("/Player", "Player", 1);
+            var msg = ChipTextInterleaver.Build("fix", new List<PositionedChip> { PC(chip, 3) });
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("fix @Player", display);
+        }
+
+        // M3: chip in middle → @DisplayName between text parts
+        [Test]
+        public void M3_ChipInMiddle_AtMentionBetweenText()
+        {
+            var chip = H("/Light", "Light", 2);
+            var msg = ChipTextInterleaver.Build("move to pos", new List<PositionedChip> { PC(chip, 5) });
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("move @Light to pos", display);
+        }
+
+        // M4: two chips at different positions → both @mentions present
+        [Test]
+        public void M4_TwoChips_BothAtMentionsInDisplayText()
+        {
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -200);
+            var positioned = new List<PositionedChip> { PC(chipA, 0), PC(chipB, 4) };
+            var msg = ChipTextInterleaver.Build("test", positioned);
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("@Main Camera test @Light", display);
+        }
+
+        // M5: consecutive chips (no text between) → @A @B adjacent
+        [Test]
+        public void M5_ConsecutiveChips_AdjacentAtMentions()
+        {
+            var chipA = H("/A", "Alpha", 1);
+            var chipB = H("/B", "Beta", 2);
+            var positioned = new List<PositionedChip> { PC(chipA, 0), PC(chipB, 0) };
+            var msg = ChipTextInterleaver.Build("go", positioned);
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("@Alpha @Beta go", display);
+        }
+
+        // M6: no chips → display text unchanged (no spurious @)
+        [Test]
+        public void M6_NoChips_DisplayTextUnchanged()
+        {
+            var msg = ChipTextInterleaver.Build("hello world", new List<PositionedChip>());
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("hello world", display);
+        }
+
+        // M7: empty text + chip → just @DisplayName
+        [Test]
+        public void M7_EmptyTextWithChip_JustAtMention()
+        {
+            var chip = H("/Cube", "Cube", 5);
+            var msg = ChipTextInterleaver.Build("", new List<PositionedChip> { PC(chip, 0) });
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("@Cube", display);
+        }
+
+        // M8: LLM payload includes @mentions in text part
+        [Test]
+        public void M8_LlmPayload_IncludesAtMentions()
+        {
+            var chip = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
+            var positioned = new List<PositionedChip> { PC(chip, 0) };
+            var msg = ChipTextInterleaver.Build("test", positioned);
+            var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
+            StringAssert.StartsWith("@Main Camera test", payload);
+        }
+
+        // M9: user scenario — "test" with two Main Camera chips at 0 and 5
+        [Test]
+        public void M9_UserScenario_TwoChipsAroundText()
+        {
+            var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
+            var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
+            var positioned = new List<PositionedChip> { PC(chipA, 0), PC(chipB, 4) };
+            var msg = ChipTextInterleaver.Build("test", positioned);
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("@Main Camera test @Main Camera", display);
+        }
+
+        // M10: script chip → @DisplayName uses DisplayName not Path
+        [Test]
+        public void M10_ScriptChip_UsesDisplayName()
+        {
+            var chip = new ChipData(ChipKindKeys.Script, "Assets/Scripts/Foo.cs", "Foo.cs", 0);
+            var msg = ChipTextInterleaver.Build("fix", new List<PositionedChip> { PC(chip, 3) });
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            Assert.AreEqual("fix @Foo.cs", display);
         }
     }
 }

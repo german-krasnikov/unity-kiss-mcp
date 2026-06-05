@@ -114,7 +114,15 @@ namespace UnityMCP.Editor.Chat
             {
                 var raw        = _assistantRaw.ToString();
                 var normalized = AtMentionNormalizer.Normalize(raw, _lastTurnChips);
-                if (normalized != raw) { _assistantRaw.Clear(); _assistantRaw.Append(normalized); }
+                if (normalized != raw)
+                {
+                    _assistantRaw.Clear(); _assistantRaw.Append(normalized);
+                    // Re-render all blocks since normalization changed text
+                    _assistantBubble.Clear();
+                    _committed = 0;
+                    _liveTail = null;
+                    _liveTailSrc = null;
+                }
             }
             RenderProgressive(final: true);
             _assistantBubble.userData = _assistantRaw.ToString();

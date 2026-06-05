@@ -180,5 +180,37 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsInstanceOf<UnityEngine.UIElements.Label>(wrap[2]);
             Assert.IsNotNull(wrap[3].Q(className: "inline-chip-pill"));
         }
+
+        // ── E2E: @mention in turnJson ─────────────────────────────────────────
+
+        // E2E_1: chip + text → turnJson text block includes @mention
+        [Test]
+        public void Send_ChipWithText_TurnJsonContainsAtMention()
+        {
+            InsertChip(H("/Player", "Player", 1));
+            Type(" fix health");
+            var (tj, _) = SimulateSend();
+            StringAssert.Contains("@Player", tj);
+            StringAssert.Contains("[hierarchy:/Player #1]", tj);
+        }
+
+        // E2E_2: chip-only message → turnJson starts with @Name
+        [Test]
+        public void Send_ChipOnly_TurnJsonContainsAtMention()
+        {
+            InsertChip(H("/Cube", "Cube", 5));
+            var (tj, _) = SimulateSend();
+            StringAssert.Contains("@Cube", tj);
+        }
+
+        // E2E_3: chip with spaces in display name → @mention preserves spaces
+        [Test]
+        public void Send_ChipWithSpaces_TurnJsonHasAtMentionWithSpaces()
+        {
+            _chipField.AddChip(new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -7));
+            Type("look");
+            var (tj, _) = SimulateSend();
+            StringAssert.Contains("@Main Camera", tj);
+        }
     }
 }

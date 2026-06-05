@@ -59,13 +59,10 @@ namespace UnityMCP.Editor.Chat
             return new UserMessage(segments, chips);
         }
 
-        /// <summary>Serialize to LLM: plain text + chip context block.</summary>
+        /// <summary>Serialize to LLM: text with @mentions + chip context block.</summary>
         internal static string ToLlmPayload(UserMessage msg, ChipConfig cfg)
         {
-            var sb = new StringBuilder();
-            foreach (var seg in msg.Segments)
-                if (!seg.IsChip) sb.Append(seg.Text);
-            var plainText = sb.ToString().Trim();
+            var plainText = ToDisplayText(msg);
 
             var chipCtx = ChipContextResolver.ResolveAllTyped(
                 new List<ChipData>(msg.Chips), cfg);
@@ -74,12 +71,12 @@ namespace UnityMCP.Editor.Chat
             return plainText + "\n" + chipCtx;
         }
 
-        /// <summary>Reconstruct display text (text segments only) from a UserMessage.</summary>
+        /// <summary>Reconstruct display text with @mentions from a UserMessage.</summary>
         internal static string ToDisplayText(UserMessage msg)
         {
             var sb = new StringBuilder();
             foreach (var seg in msg.Segments)
-                if (!seg.IsChip) sb.Append(seg.Text);
+                sb.Append(seg.IsChip ? "@" + seg.Chip.DisplayName : seg.Text);
             return sb.ToString().Trim();
         }
     }
