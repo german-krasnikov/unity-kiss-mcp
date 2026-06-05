@@ -120,6 +120,7 @@ namespace UnityMCP.Editor.Chat
             MarkdownInline.Linker = _linker;
             var registry = ChatBlockRendererFactory.CreateDefault(_resolver, AddRefToContext);
             _transcript = new ChatTranscript(inner, registry);
+            _transcript.SceneObjects = () => _resolver.Objects;
             root.Add(_scroll);
             _inputArea = BuildInputArea();
             ResetInputAreaHeight();

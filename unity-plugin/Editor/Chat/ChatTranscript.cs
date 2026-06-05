@@ -17,6 +17,7 @@ namespace UnityMCP.Editor.Chat
         private int           _committed, _msgCount;
         private bool          _dirty;
         private IReadOnlyList<ChipData> _lastTurnChips;
+        internal Func<IReadOnlyDictionary<string, string>> SceneObjects;
         private const int MaxMessages = 200;
 
         internal ChatTranscript(VisualElement container, ChatBlockRendererRegistry registry)
@@ -126,6 +127,23 @@ namespace UnityMCP.Editor.Chat
                 {
                     _assistantRaw.Clear(); _assistantRaw.Append(normalized);
                     // Re-render all blocks since normalization changed text
+                    _assistantBubble.Clear();
+                    _committed = 0;
+                }
+            }
+            // Scene object normalization: convert bare names even when no chips were sent.
+            var sceneMap = SceneObjects?.Invoke();
+            if (sceneMap != null && sceneMap.Count > 0)
+            {
+                var raw        = _assistantRaw.ToString();
+                var sceneChips = new List<ChipData>();
+                foreach (var kvp in sceneMap)
+                    if (kvp.Key.Length > 1)
+                        sceneChips.Add(new ChipData(ChipKindKeys.Hierarchy, kvp.Value, kvp.Key, 0));
+                var normalized = BareNameNormalizer.Normalize(raw, sceneChips);
+                if (normalized != raw)
+                {
+                    _assistantRaw.Clear(); _assistantRaw.Append(normalized);
                     _assistantBubble.Clear();
                     _committed = 0;
                 }
