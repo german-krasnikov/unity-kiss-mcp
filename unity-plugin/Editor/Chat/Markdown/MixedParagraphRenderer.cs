@@ -25,8 +25,22 @@ namespace UnityMCP.Editor.Chat
             {
                 if (!seg.IsTag)
                 {
-                    var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(seg.Text), richText: true);
-                    container.Add(lbl);
+                    var lines = seg.Text.Split('\n');
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        if (i > 0)
+                        {
+                            var br = new VisualElement();
+                            br.style.flexBasis = new StyleLength(Length.Percent(100));
+                            br.style.height = 0;
+                            container.Add(br);
+                        }
+                        if (!string.IsNullOrEmpty(lines[i]))
+                        {
+                            var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(lines[i]), richText: true);
+                            container.Add(lbl);
+                        }
+                    }
                 }
                 else
                 {

@@ -111,20 +111,51 @@ namespace UnityMCP.Editor.Chat
 
             foreach (var pc in sorted)
             {
+                string mention = "@" + pc.Chip.DisplayName;
                 int chipRawOffset = System.Math.Clamp(pc.TextOffset, rawPos, rawText.Length);
-                // text before this chip (clean)
-                if (chipRawOffset > rawPos)
-                    cleanText.Append(rawText, rawPos, chipRawOffset - rawPos);
-                cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
-                // skip "@DisplayName " (or "@DisplayName" at end of string)
-                int mentionWithSpace    = chipRawOffset + 1 + pc.Chip.DisplayName.Length + 1;
-                int mentionWithoutSpace = mentionWithSpace - 1;
-                if (mentionWithSpace <= rawText.Length)
-                    rawPos = mentionWithSpace;
-                else if (mentionWithoutSpace <= rawText.Length)
-                    rawPos = mentionWithoutSpace;
+
+                // Validate mention at expected offset; if misaligned, search nearby (handles off-by-one).
+                int foundAt = -1;
+                if (chipRawOffset + mention.Length <= rawText.Length
+                    && string.Compare(rawText, chipRawOffset, mention, 0, mention.Length,
+                        System.StringComparison.Ordinal) == 0)
+                {
+                    foundAt = chipRawOffset;
+                }
                 else
-                    rawPos = chipRawOffset; // guard: don't skip if mention not found
+                {
+                    int searchStart = System.Math.Max(rawPos, chipRawOffset - mention.Length);
+                    int searchLen   = System.Math.Min(chipRawOffset + mention.Length + 1, rawText.Length) - searchStart;
+                    if (searchLen > 0)
+                    {
+                        int idx = rawText.IndexOf(mention, searchStart, searchLen,
+                            System.StringComparison.Ordinal);
+                        if (idx >= 0) foundAt = idx;
+                    }
+                }
+
+                if (foundAt >= 0)
+                {
+                    if (foundAt > rawPos)
+                        cleanText.Append(rawText, rawPos, foundAt - rawPos);
+                    cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
+                    int mentionWithSpace    = foundAt + mention.Length + 1;
+                    int mentionWithoutSpace = foundAt + mention.Length;
+                    if (mentionWithSpace <= rawText.Length)
+                        rawPos = mentionWithSpace;
+                    else if (mentionWithoutSpace <= rawText.Length)
+                        rawPos = mentionWithoutSpace;
+                    else
+                        rawPos = foundAt + mention.Length;
+                }
+                else
+                {
+                    // Mention not found — include text as-is, chip still tracked.
+                    if (chipRawOffset > rawPos)
+                        cleanText.Append(rawText, rawPos, chipRawOffset - rawPos);
+                    cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
+                    rawPos = chipRawOffset;
+                }
             }
             if (rawPos < rawText.Length)
                 cleanText.Append(rawText, rawPos, rawText.Length - rawPos);
