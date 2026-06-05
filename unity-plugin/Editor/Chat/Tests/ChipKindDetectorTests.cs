@@ -1,4 +1,6 @@
 // TDD tests for ChipKindDetector — pure unit tests using EditMode Unity objects.
+// H6: ChipKind enum removed; assertions use ChipKindKeys string constants.
+// ShortPrefix removed — Key IS the prefix.
 using NUnit.Framework;
 using UnityEngine;
 using UnityEditor;
@@ -9,6 +11,9 @@ namespace UnityMCP.Editor.Chat.Tests
     [TestFixture]
     public class ChipKindDetectorTests
     {
+        [SetUp]  public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
+        [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();
+
         // ── Scene GameObject ──────────────────────────────────────────────────
 
         [Test]
@@ -17,9 +22,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var go = new GameObject("TestGO");
             try
             {
-                // Scene GO: not in AssetDatabase
-                var kind = ChipKindDetector.Detect(go, null);
-                Assert.AreEqual(ChipKind.Hierarchy, kind);
+                Assert.AreEqual(ChipKindKeys.Hierarchy, ChipKindDetector.Detect(go, null));
             }
             finally { Object.DestroyImmediate(go); }
         }
@@ -29,15 +32,12 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Detect_MonoScript_ReturnsScript()
         {
-            // Find any MonoScript in the project
             var guids = AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" });
             if (guids.Length == 0) Assert.Ignore("No MonoScript assets found");
             var path   = AssetDatabase.GUIDToAssetPath(guids[0]);
             var script = AssetDatabase.LoadAssetAtPath<MonoScript>(path);
             Assert.IsNotNull(script);
-
-            var kind = ChipKindDetector.Detect(script, path);
-            Assert.AreEqual(ChipKind.Script, kind);
+            Assert.AreEqual(ChipKindKeys.Script, ChipKindDetector.Detect(script, path));
         }
 
         // ── Scene asset ───────────────────────────────────────────────────────
@@ -45,17 +45,10 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Detect_SceneAsset_ReturnsScene()
         {
-            // Path-based detection — we don't need a real SceneAsset object
-            var kind = ChipKindDetector.Detect(null, "Assets/Scenes/Main.unity");
-            // null obj → falls to path suffix check → Asset (null obj returns Asset early)
-            // The real path suffix check requires non-null obj to get past the null guard.
-            // Test the path-suffix branch with a mock by using a plain Object.
-            // Use ScriptableObject as a stand-in non-null object with a .unity path.
             var so = ScriptableObject.CreateInstance<ScriptableObject>();
             try
             {
-                kind = ChipKindDetector.Detect(so, "Assets/Levels/Test.unity");
-                Assert.AreEqual(ChipKind.Scene, kind);
+                Assert.AreEqual(ChipKindKeys.Scene, ChipKindDetector.Detect(so, "Assets/Levels/Test.unity"));
             }
             finally { Object.DestroyImmediate(so); }
         }
@@ -68,8 +61,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var so = ScriptableObject.CreateInstance<ScriptableObject>();
             try
             {
-                var kind = ChipKindDetector.Detect(so, "Assets/Prefabs/Enemy.prefab");
-                Assert.AreEqual(ChipKind.Prefab, kind);
+                Assert.AreEqual(ChipKindKeys.Prefab, ChipKindDetector.Detect(so, "Assets/Prefabs/Enemy.prefab"));
             }
             finally { Object.DestroyImmediate(so); }
         }
@@ -82,8 +74,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var mat = new Material(Shader.Find("Standard") ?? Shader.Find("Sprites/Default"));
             try
             {
-                var kind = ChipKindDetector.Detect(mat, "Assets/Materials/Lava.mat");
-                Assert.AreEqual(ChipKind.Material, kind);
+                Assert.AreEqual(ChipKindKeys.Material, ChipKindDetector.Detect(mat, "Assets/Materials/Lava.mat"));
             }
             finally { Object.DestroyImmediate(mat); }
         }
@@ -96,8 +87,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var tex = new Texture2D(2, 2);
             try
             {
-                var kind = ChipKindDetector.Detect(tex, "Assets/Textures/Icon.png");
-                Assert.AreEqual(ChipKind.Texture, kind);
+                Assert.AreEqual(ChipKindKeys.Texture, ChipKindDetector.Detect(tex, "Assets/Textures/Icon.png"));
             }
             finally { Object.DestroyImmediate(tex); }
         }
@@ -110,9 +100,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var so = ScriptableObject.CreateInstance<ScriptableObject>();
             try
             {
-                // Use a path that isn't scene/prefab so those branches don't fire.
-                var kind = ChipKindDetector.Detect(so, "Assets/Data/Config.asset");
-                Assert.AreEqual(ChipKind.ScriptableObject, kind);
+                Assert.AreEqual(ChipKindKeys.ScriptableObject, ChipKindDetector.Detect(so, "Assets/Data/Config.asset"));
             }
             finally { Object.DestroyImmediate(so); }
         }
@@ -125,8 +113,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var mesh = new Mesh();
             try
             {
-                var kind = ChipKindDetector.Detect(mesh, "Assets/Models/Cube.fbx");
-                Assert.AreEqual(ChipKind.Asset, kind);
+                Assert.AreEqual(ChipKindKeys.Asset, ChipKindDetector.Detect(mesh, "Assets/Models/Cube.fbx"));
             }
             finally { Object.DestroyImmediate(mesh); }
         }
@@ -134,32 +121,32 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Detect_NullObject_ReturnsAsset()
         {
-            var kind = ChipKindDetector.Detect(null, "anything");
-            Assert.AreEqual(ChipKind.Asset, kind);
+            Assert.AreEqual(ChipKindKeys.Asset, ChipKindDetector.Detect(null, "anything"));
         }
 
-        // ── ShortPrefix ───────────────────────────────────────────────────────
+        // ── Key is the prefix ─────────────────────────────────────────────────
 
         [Test]
-        public void ShortPrefix_AllKinds_NotEmpty()
+        public void Detect_ReturnsNonEmptyKey()
         {
-            foreach (ChipKind k in System.Enum.GetValues(typeof(ChipKind)))
+            var go = new GameObject("TestGO");
+            try
             {
-                var prefix = ChipKindDetector.ShortPrefix(k);
-                Assert.IsFalse(string.IsNullOrEmpty(prefix), $"ShortPrefix({k}) must not be empty");
+                var key = ChipKindDetector.Detect(go, null);
+                Assert.IsFalse(string.IsNullOrEmpty(key), "Detect must return a non-empty key");
             }
+            finally { Object.DestroyImmediate(go); }
         }
 
         [Test]
-        public void ShortPrefix_Hierarchy_ReturnsHierarchy()
+        public void Detect_Hierarchy_KeyIsHierarchy()
         {
-            Assert.AreEqual("hierarchy", ChipKindDetector.ShortPrefix(ChipKind.Hierarchy));
-        }
-
-        [Test]
-        public void ShortPrefix_Script_ReturnsScript()
-        {
-            Assert.AreEqual("script", ChipKindDetector.ShortPrefix(ChipKind.Script));
+            var go = new GameObject("TestGO2");
+            try
+            {
+                Assert.AreEqual("hierarchy", ChipKindDetector.Detect(go, null));
+            }
+            finally { Object.DestroyImmediate(go); }
         }
     }
 }

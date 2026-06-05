@@ -1,4 +1,6 @@
 // TDD tests for BackendConfigStore. Pure unit — no Unity API, no I/O beyond temp files.
+// H15: HierarchyDepth default changed from "summary" to "path".
+// H5/H6: DepthFor takes string kindKey; custom key falls to provider.DefaultDepth.
 using System.IO;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
@@ -14,12 +16,14 @@ namespace UnityMCP.Editor.Chat.Tests
         public void SetUp()
         {
             _tempPath = Path.Combine(Path.GetTempPath(), $"BackendConfigTest_{System.Guid.NewGuid():N}.json");
+            ChipKindRegistry.ResetToBuiltIns();
         }
 
         [TearDown]
         public void TearDown()
         {
             if (File.Exists(_tempPath)) File.Delete(_tempPath);
+            ChipKindRegistry.ResetToBuiltIns();
         }
 
         [Test]
@@ -59,19 +63,19 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("--verbose",       loaded.Codex.ExtraArgs);
         }
 
-        // ── F10: ChipConfig ───────────────────────────────────────────────────
+        // ── ChipConfig defaults (H15: HierarchyDepth is now "path") ──────────
 
         [Test]
         public void ChipConfig_DefaultsOnLoad()
         {
-            // Load from missing file → defaults apply
             var store = BackendConfigStore.Load(_tempPath);
             Assert.IsNotNull(store.Chips);
-            Assert.AreEqual("summary", store.Chips.HierarchyDepth);
-            Assert.AreEqual("path",    store.Chips.ScriptDepth);
-            Assert.AreEqual("path",    store.Chips.SceneDepth);
-            Assert.AreEqual("path",    store.Chips.PrefabDepth);
-            Assert.AreEqual("path",    store.Chips.AssetDepth);
+            // H15: HierarchyDepth default changed from "summary" to "path"
+            Assert.AreEqual("path", store.Chips.HierarchyDepth);
+            Assert.AreEqual("path", store.Chips.ScriptDepth);
+            Assert.AreEqual("path", store.Chips.SceneDepth);
+            Assert.AreEqual("path", store.Chips.PrefabDepth);
+            Assert.AreEqual("path", store.Chips.AssetDepth);
         }
 
         [Test]
@@ -102,90 +106,118 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ChipConfig_MissingField_DefaultsFallback()
         {
-            // Write a JSON without the "Chips" field — simulates old file format.
-            // JsonUtility should leave Chips as default-constructed (not null).
             var oldJson = "{\"Claude\":{\"PermissionMode\":\"plan\",\"Model\":\"\",\"ExtraArgs\":\"\"},\"Codex\":{\"Model\":\"\",\"PermissionMode\":\"danger-full-access\",\"StartupTimeoutSec\":30,\"ExtraArgs\":\"\"}}";
             System.IO.File.WriteAllText(_tempPath, oldJson);
 
             var loaded = BackendConfigStore.Load(_tempPath);
 
-            // Chips must be non-null and have defaults
             Assert.IsNotNull(loaded.Chips);
-            Assert.AreEqual("summary", loaded.Chips.HierarchyDepth);
-            Assert.AreEqual("path",    loaded.Chips.ScriptDepth);
+            // H15: new default is "path"
+            Assert.AreEqual("path", loaded.Chips.HierarchyDepth);
+            Assert.AreEqual("path", loaded.Chips.ScriptDepth);
         }
 
-        // ── F10: ChipConfig.DepthFor ──────────────────────────────────────────
+        // ── ChipConfig.DepthFor — string kindKey (H6) ────────────────────────
 
         [Test]
         public void DepthFor_Hierarchy_ReturnsHierarchyDepth()
         {
             var cfg = new ChipConfig { HierarchyDepth = "full" };
-            Assert.AreEqual("full", cfg.DepthFor(ChipKind.Hierarchy));
+            Assert.AreEqual("full", cfg.DepthFor(ChipKindKeys.Hierarchy));
         }
 
         [Test]
         public void DepthFor_Script_ReturnsScriptDepth()
         {
             var cfg = new ChipConfig { ScriptDepth = "none" };
-            Assert.AreEqual("none", cfg.DepthFor(ChipKind.Script));
+            Assert.AreEqual("none", cfg.DepthFor(ChipKindKeys.Script));
         }
 
         [Test]
         public void DepthFor_Scene_ReturnsSceneDepth()
         {
             var cfg = new ChipConfig { SceneDepth = "summary" };
-            Assert.AreEqual("summary", cfg.DepthFor(ChipKind.Scene));
+            Assert.AreEqual("summary", cfg.DepthFor(ChipKindKeys.Scene));
         }
 
         [Test]
         public void DepthFor_Prefab_ReturnsPrefabDepth()
         {
             var cfg = new ChipConfig { PrefabDepth = "path" };
-            Assert.AreEqual("path", cfg.DepthFor(ChipKind.Prefab));
+            Assert.AreEqual("path", cfg.DepthFor(ChipKindKeys.Prefab));
         }
 
         [Test]
         public void DepthFor_Material_ReturnsAssetDepth()
         {
-            // Material/Texture/SO/Asset → all fall through to AssetDepth
             var cfg = new ChipConfig { AssetDepth = "none" };
-            Assert.AreEqual("none", cfg.DepthFor(ChipKind.Material));
+            Assert.AreEqual("none", cfg.DepthFor(ChipKindKeys.Material));
         }
 
         [Test]
         public void DepthFor_Texture_ReturnsAssetDepth()
         {
             var cfg = new ChipConfig { AssetDepth = "summary" };
-            Assert.AreEqual("summary", cfg.DepthFor(ChipKind.Texture));
+            Assert.AreEqual("summary", cfg.DepthFor(ChipKindKeys.Texture));
         }
 
         [Test]
         public void DepthFor_ScriptableObject_ReturnsAssetDepth()
         {
             var cfg = new ChipConfig { AssetDepth = "path" };
-            Assert.AreEqual("path", cfg.DepthFor(ChipKind.ScriptableObject));
+            Assert.AreEqual("path", cfg.DepthFor(ChipKindKeys.ScriptableObject));
         }
 
         [Test]
         public void DepthFor_Asset_ReturnsAssetDepth()
         {
             var cfg = new ChipConfig { AssetDepth = "none" };
-            Assert.AreEqual("none", cfg.DepthFor(ChipKind.Asset));
+            Assert.AreEqual("none", cfg.DepthFor(ChipKindKeys.Asset));
         }
 
+        // H15: renamed from DepthFor_Default_HierarchyIsSummary
         [Test]
-        public void DepthFor_Default_HierarchyIsSummary()
+        public void DepthFor_Default_HierarchyIsPath()
         {
             var cfg = new ChipConfig();
-            Assert.AreEqual("summary", cfg.DepthFor(ChipKind.Hierarchy));
+            Assert.AreEqual("path", cfg.DepthFor(ChipKindKeys.Hierarchy));
         }
 
         [Test]
         public void DepthFor_Default_ScriptIsPath()
         {
             var cfg = new ChipConfig();
-            Assert.AreEqual("path", cfg.DepthFor(ChipKind.Script));
+            Assert.AreEqual("path", cfg.DepthFor(ChipKindKeys.Script));
+        }
+
+        // H5: custom key falls to provider.DefaultDepth
+        [Test]
+        public void DepthFor_CustomKey_FallsToProviderDefaultDepth()
+        {
+            var fake = new FakeDepthProvider();
+            ChipKindRegistry.Register(fake);
+            var cfg = new ChipConfig();
+            Assert.AreEqual("summary", cfg.DepthFor("custom_depth_test"));
+        }
+
+        [Test]
+        public void DepthFor_UnregisteredCustomKey_FallsToPath()
+        {
+            var cfg = new ChipConfig();
+            Assert.AreEqual("path", cfg.DepthFor("completely_unknown_key"));
+        }
+
+        private sealed class FakeDepthProvider : IChipKindProvider
+        {
+            public string Key          => "custom_depth_test";
+            public int    Priority     => 10;
+            public string IconName     => "";
+            public string HexColor     => "#000";
+            public string DefaultDepth => "summary"; // non-path to verify the routing
+            public bool   CanHandle(UnityEngine.Object o, string p) => false;
+            public ChipData Create(UnityEngine.Object o, string p) => default;
+            public string FormatPayload(ChipData c, ChipPayloadContext x) => "";
+            public void   Navigate(string r) { }
         }
     }
 }

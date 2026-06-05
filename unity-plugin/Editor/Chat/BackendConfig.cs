@@ -1,5 +1,6 @@
 // Per-backend CLI config persisted to Library/MCP_ChatBackendConfig.json (gitignored).
 // JsonUtility requires [Serializable] + public fields.
+// H15: HierarchyDepth default changed from "summary" to "path" (BREAKING).
 using System;
 using System.IO;
 using UnityEngine;
@@ -29,22 +30,33 @@ namespace UnityMCP.Editor.Chat
     {
         // "path" = bracket format only. "summary" = SelectionSummary.
         // "full" = ComponentSerializer dump (hierarchy only). "none" = omit.
-        public string HierarchyDepth = "summary";
+        // BREAKING: HierarchyDepth default changed from "summary" to "path" (H15).
+        // Users can restore via F9 settings form.
+        public string HierarchyDepth = "path"; // BREAKING: default changed from summary to path (H15). Users restore via F9 settings.
         public string ScriptDepth    = "path";
         public string SceneDepth     = "path";
         public string PrefabDepth    = "path";
         public string AssetDepth     = "path";
 
-        /// <summary>Return the configured depth string for a given kind.</summary>
-        internal string DepthFor(ChipKind kind)
+        /// <summary>
+        /// Return the configured depth string for a given kind key.
+        /// Unknown keys fall back to ChipKindRegistry.ForKey(kindKey)?.DefaultDepth ?? "path" (H5).
+        /// </summary>
+        internal string DepthFor(string kindKey)
         {
-            switch (kind)
+            switch (kindKey)
             {
-                case ChipKind.Hierarchy: return HierarchyDepth;
-                case ChipKind.Script:    return ScriptDepth;
-                case ChipKind.Scene:     return SceneDepth;
-                case ChipKind.Prefab:    return PrefabDepth;
-                default:                 return AssetDepth; // Material/Texture/SO/Asset
+                case ChipKindKeys.Hierarchy: return HierarchyDepth;
+                case ChipKindKeys.Script:    return ScriptDepth;
+                case ChipKindKeys.Scene:     return SceneDepth;
+                case ChipKindKeys.Prefab:    return PrefabDepth;
+                // Material, Texture, SO, Asset → AssetDepth (built-in fallback)
+                case ChipKindKeys.Material:
+                case ChipKindKeys.Texture:
+                case ChipKindKeys.ScriptableObject:
+                case ChipKindKeys.Asset:     return AssetDepth;
+                // H5: unknown/custom keys fall to registry provider's DefaultDepth
+                default: return ChipKindRegistry.ForKey(kindKey)?.DefaultDepth ?? "path";
             }
         }
     }
@@ -59,10 +71,6 @@ namespace UnityMCP.Editor.Chat
         private static string DefaultPath =>
             Path.Combine(Application.dataPath, "..", "Library", "MCP_ChatBackendConfig.json");
 
-        /// <summary>
-        /// Load from path. Returns default instance when file absent or corrupt.
-        /// Optional path param for testability (avoids touching real Library/).
-        /// </summary>
         internal static BackendConfigStore Load(string path = null)
         {
             path = path ?? DefaultPath;
@@ -72,7 +80,6 @@ namespace UnityMCP.Editor.Chat
             {
                 var json  = File.ReadAllText(path);
                 var store = JsonUtility.FromJson<BackendConfigStore>(json);
-                // Null guard: JsonUtility can leave nested objects null if fields missing.
                 store.Claude = store.Claude ?? new ClaudeBackendConfig();
                 store.Codex  = store.Codex  ?? new CodexBackendConfig();
                 store.Chips  = store.Chips  ?? new ChipConfig();
@@ -84,9 +91,6 @@ namespace UnityMCP.Editor.Chat
             }
         }
 
-        /// <summary>
-        /// Persist to path. Optional path param for testability.
-        /// </summary>
         internal void Save(string path = null)
         {
             path = path ?? DefaultPath;

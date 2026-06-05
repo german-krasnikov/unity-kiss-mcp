@@ -1,29 +1,26 @@
 // InlineChipTracker: pure data model for inline chips embedded in TextField text.
 // U+FFFC (OBJECT REPLACEMENT CHARACTER '￼') is used as a placeholder in the text.
 // The i-th marker in the text corresponds to the i-th ChipData in the list.
+// H12: _expectedNbsp runs parallel to _chips (Wave 3 uses it; stored here for data integrity).
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace UnityMCP.Editor.Chat
 {
-    internal enum ChipKind
+    /// <summary>Identity + metadata for a single inline chip. KindKey is the string identity (H6).</summary>
+    public readonly struct ChipData
     {
-        Hierarchy, Scene, Script, Prefab, Material, Texture, ScriptableObject, Asset
-    }
+        public readonly string KindKey;
+        public readonly string Path;
+        public readonly string DisplayName;
+        public readonly int    InstanceID;
 
-    internal readonly struct ChipData
-    {
-        internal readonly ChipKind Kind;
-        internal readonly string   Path;
-        internal readonly string   DisplayName;
-        internal readonly int      InstanceID;
-
-        internal ChipData(ChipKind kind, string path, string displayName, int instanceID)
+        public ChipData(string kindKey, string path, string displayName, int instanceID)
         {
-            Kind        = kind;
-            Path        = path;
-            DisplayName = displayName;
+            KindKey     = kindKey     ?? ChipKindKeys.Asset;
+            Path        = path        ?? "";
+            DisplayName = displayName ?? "";
             InstanceID  = instanceID;
         }
     }
@@ -36,17 +33,34 @@ namespace UnityMCP.Editor.Chat
     {
         internal const char Marker = '￼'; // U+FFFC OBJECT REPLACEMENT CHARACTER
 
-        private readonly List<ChipData> _chips = new List<ChipData>();
+        private readonly List<ChipData> _chips        = new List<ChipData>();
+        private readonly List<int>      _expectedNbsp = new List<int>(); // H12: parallel to _chips
 
         internal int Count => _chips.Count;
 
         internal IEnumerable<string> Paths => _chips.Select(c => c.Path);
 
-        internal void Add(ChipData chip) => _chips.Add(chip);
+        // H12: expected NBSP counts accessor
+        internal IReadOnlyList<int> ExpectedNbspCounts => _expectedNbsp;
 
-        internal void RemoveAt(int index) => _chips.RemoveAt(index);
+        /// <summary>Add chip with optional expected NBSP count (H12).</summary>
+        internal void Add(ChipData chip, int nbspCount = 0)
+        {
+            _chips.Add(chip);
+            _expectedNbsp.Add(nbspCount);
+        }
 
-        internal void Clear() => _chips.Clear();
+        internal void RemoveAt(int index)
+        {
+            _chips.RemoveAt(index);
+            _expectedNbsp.RemoveAt(index);
+        }
+
+        internal void Clear()
+        {
+            _chips.Clear();
+            _expectedNbsp.Clear();
+        }
 
         internal ChipData this[int i] => _chips[i];
 
@@ -64,42 +78,41 @@ namespace UnityMCP.Editor.Chat
             int p = CommonPrefix(oldText, newText);
             int s = CommonSuffix(oldText, newText, p, p);
 
-            // Edited region in old text: [p, oldText.Length - s)
             int oldEditStart = p;
             int oldEditEnd   = oldText.Length - s;
 
-            // Find which chip indices had their marker inside the edited region
             var removedIndices = new List<int>();
             int markerPos = -1;
             for (int ci = 0; ci < _chips.Count; ci++)
             {
-                // Find the (ci+1)-th occurrence of Marker in oldText
                 markerPos = oldText.IndexOf(Marker, markerPos + 1);
-                if (markerPos < 0) break; // fewer markers than chips — shouldn't happen
+                if (markerPos < 0) break;
                 if (markerPos >= oldEditStart && markerPos < oldEditEnd)
                     removedIndices.Add(ci);
             }
 
-            // Remove in reverse order so indices stay valid
+            // Remove in reverse so indices stay valid
             for (int i = removedIndices.Count - 1; i >= 0; i--)
+            {
                 _chips.RemoveAt(removedIndices[i]);
+                _expectedNbsp.RemoveAt(removedIndices[i]);
+            }
 
-            // Reindex: count surviving markers in newText and reconcile
-            // (handles edge case where a paste added/removed text around markers)
             int newMarkerCount = 0;
             foreach (char c in newText)
                 if (c == Marker) newMarkerCount++;
 
-            // If mismatch (e.g. paste deleted extra chips), trim from end
             while (_chips.Count > newMarkerCount)
+            {
                 _chips.RemoveAt(_chips.Count - 1);
+                _expectedNbsp.RemoveAt(_expectedNbsp.Count - 1);
+            }
 
             return removedIndices;
         }
 
         // ── Pure static helpers ───────────────────────────────────────────────
 
-        /// <summary>Length of the longest common prefix of a and b.</summary>
         internal static int CommonPrefix(string a, string b)
         {
             int max = Math.Min(a.Length, b.Length);
@@ -108,11 +121,6 @@ namespace UnityMCP.Editor.Chat
             return i;
         }
 
-        /// <summary>
-        /// Length of the longest common suffix of a and b, given that the first
-        /// <paramref name="prefixA"/> / <paramref name="prefixB"/> chars are already
-        /// accounted for (so we don't overlap with the prefix).
-        /// </summary>
         internal static int CommonSuffix(string a, string b, int prefixA, int prefixB)
         {
             int ia = a.Length - 1;

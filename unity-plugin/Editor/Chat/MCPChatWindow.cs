@@ -130,22 +130,14 @@ namespace UnityMCP.Editor.Chat
             _input = new TextField { multiline = true }; _input.AddToClassList("chat-input");
             area.Add(_input);
 
-            // F5: inline chip overlay (absolute-positioned row of pills over the TextField)
+            // F5/H9: inline chip overlay — wiring extracted to MCPChatWindow.ChipInput.cs.
             _chipTracker = new InlineChipTracker();
             _chipOverlay = new InlineChipOverlay(_input, _chipTracker);
             _chipOverlay.SetRemoveCallback(RemoveInlineChipAt);
-            _chipOverlay.AttachTo(area);
             InlineChipKeyHandler.Attach(_input, _chipTracker, _chipOverlay);
-
-            // Context-menu: right-click the input → "Add Selection to Context"
-            _input.AddManipulator(new ContextualMenuManipulator(evt =>
-            {
-                evt.menu.AppendAction("Add Selection to Context",
-                    _ => InsertInlineChip(UnityEditor.Selection.activeGameObject),
-                    _ => UnityEditor.Selection.activeGameObject != null
-                        ? DropdownMenuAction.Status.Normal
-                        : DropdownMenuAction.Status.Disabled);
-            }));
+            InlineChipKeyHandler.AttachAtomicCaret(_input, _chipTracker);
+            // MF1 + context menu + dirty wiring all live in WireChipInput (H9).
+            WireChipInput();
 
             EnterKeySend.Attach(_input, OnSend);
             area.Add(BuildFooterBar());
@@ -186,89 +178,6 @@ namespace UnityMCP.Editor.Chat
                         store.Claude.Model, store.Claude.ExtraArgs);
                     break;
             }
-        }
-
-        private void OnSend()
-        {
-            if (!_activity.CanSend) return; // #6: no re-entrant send during active turn
-            _autoFix.Disarm(); // user manually sending — cancel any pending auto-fix
-
-            // Load once here — AppendChipContext and CreateBackendWithSession both need it.
-            var store = BackendConfigStore.Load();
-
-            // F5: strip U+FFFC markers from displayed text before trimming
-            var rawText = _input.value ?? "";
-            var text    = rawText.Replace(InlineChipTracker.Marker.ToString(), "").Trim();
-            AppendChipContext(ref text, store);
-            if (string.IsNullOrEmpty(text)) return;
-
-            DispatchTurn(UserTurnBuilder.Build(text), text);
-        }
-
-        private void AttachScreenshot()
-        {
-            if (!_activity.CanSend) return; // #6: guard second vector — SS button also dispatches a turn
-            var target = Selection.activeGameObject;
-            if (target == null) { Debug.LogWarning("[MCP Chat] Select a GameObject first"); return; }
-            var capturePath = MultiViewCapture.CaptureToFile(target);
-            if (string.IsNullOrEmpty(capturePath)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
-            var bytes = File.ReadAllBytes(capturePath);
-            var store = BackendConfigStore.Load();
-            // F5: strip markers from displayed text
-            var text = (_input.value ?? "").Replace(InlineChipTracker.Marker.ToString(), "").Trim();
-            AppendChipContext(ref text, store);
-            DispatchTurn(UserTurnBuilder.Build(text, bytes), text, screenshotPath: capturePath);
-        }
-
-        // F10: merge strip chips + inline chips, emit typed bracket format honouring ChipConfig.
-        // store is pre-loaded by the caller to avoid a double file-read per send.
-        private void AppendChipContext(ref string text, BackendConfigStore store = null)
-        {
-            // Start with strip chips (full ChipData).
-            var chips = CollectChipData();
-
-            // F5: merge inline chips — deduplicate by path.
-            for (int i = 0; i < _chipTracker.Count; i++)
-            {
-                var cd = _chipTracker[i];
-                if (!chips.Exists(x => x.Path == cd.Path)) chips.Add(cd);
-            }
-
-            // #3 Auto-include selection: prepend summary if not already a chip.
-            var selGo   = Selection.activeGameObject;
-            var chipSet = new HashSet<string>();
-            foreach (var c in chips) chipSet.Add(c.Path);
-            if (SelectionSummary.ShouldPrepend(selGo, chipSet))
-                text = SelectionSummary.Summarize(selGo) + "\n" + text;
-
-            if (chips.Count == 0) return;
-            // F10: typed emission — [kind:ref] bracket format, per-kind depth from config.
-            var cfg     = (store ?? BackendConfigStore.Load()).Chips;
-            var context = ChipContextResolver.ResolveAllTyped(chips, cfg);
-            if (!string.IsNullOrEmpty(context)) text += "\n" + context;
-        }
-
-        // Shared send sequence — OnSend and AttachScreenshot must not drift from each other.
-        private void DispatchTurn(string turnJson, string displayText, string screenshotPath = null)
-        {
-            // #1/#4 Lock reloads for the duration of this turn (symmetric for both send paths).
-            ReloadGuard.OnTurnStarted();
-            // F6: open a named undo group for the duration of this turn.
-            _undoTracker.OnTurnStart(displayText?.Length > 40
-                ? displayText.Substring(0, 40)
-                : displayText ?? "");
-            // FIX A: cache before clearing input so SaveStateBeforeReload can read the sent text.
-            _sentTextCache.Set(displayText);
-            _transcript.AppendUserBubble(displayText, screenshotPath);
-            _backend.SendTurn(turnJson);
-            _input.value = ""; _input.cursorIndex = _input.selectIndex = 0;
-            _objChipStrip.Clear();
-            // F5: clear inline chips
-            _chipTracker?.Clear();
-            _chipOverlay?.Refresh();
-            _heightCalc.Reset();
-            ResetInputAreaHeight();
-            if (_activity.Send()) OnActivityChanged();
         }
 
         private void ResetInputAreaHeight()

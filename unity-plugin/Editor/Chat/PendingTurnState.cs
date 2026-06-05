@@ -1,6 +1,8 @@
 // Plain-text persistence struct for domain-reload-safe turn resumption.
 // Serialized to Library/MCP_ChatPendingTurn.txt (gitignored, local).
 // Format: pipe-delimited lines. Newlines in text are base64-encoded to survive the line format.
+// v4: chip lines become "PathB64|KindKeyB64". Pipe-free B64 makes | a safe separator.
+//     Back-compat: v3 chip lines have no pipe → KindKey="" → re-detect via registry.
 using System;
 
 namespace UnityMCP.Editor.Chat
@@ -10,6 +12,7 @@ namespace UnityMCP.Editor.Chat
         public string      SessionId;
         public string      PendingText;
         public string[]    ChipPaths;
+        public string[]    KindKeys;     // v4: parallel to ChipPaths
         public bool        AgentMode;
         public string      AgentName;
         public string      ActivityPhase;
@@ -20,11 +23,13 @@ namespace UnityMCP.Editor.Chat
         internal PendingTurnState(string sessionId, string pendingText, string[] chipPaths,
             bool agentMode, string agentName, string activityPhase,
             int undoGroupId = -1, long savedAtUtc = 0,
-            BackendKind backendKind = BackendKind.Claude)
+            BackendKind backendKind = BackendKind.Claude,
+            string[] kindKeys = null)
         {
             SessionId     = sessionId     ?? "";
             PendingText   = pendingText   ?? "";
             ChipPaths     = chipPaths     ?? Array.Empty<string>();
+            KindKeys      = kindKeys      ?? Array.Empty<string>();
             AgentMode     = agentMode;
             AgentName     = agentName     ?? "";
             ActivityPhase = activityPhase ?? "";
@@ -37,8 +42,9 @@ namespace UnityMCP.Editor.Chat
         // v1 header: SessionId|PendingTextB64|AgentMode|AgentNameB64|ActivityPhaseB64|ChipCount
         // v2 header: ...same...|UndoGroupId|SavedAtUtc
         // v3 header: ...same...|BackendKind (int)
-        //            ChipPath0B64 ...
-        // ALL string fields are B64-encoded so pipes/newlines never corrupt the header.
+        //            chip lines: ChipPathB64
+        // v4 header: same as v3
+        //            chip lines: ChipPathB64|KindKeyB64  (pipe separator, B64 safe)
 
         internal string Serialize()
         {
@@ -56,7 +62,11 @@ namespace UnityMCP.Editor.Chat
                 SavedAtUtc.ToString(),
                 ((int)BackendKind).ToString());
             for (var i = 0; i < chipCount; i++)
-                lines[1 + i] = ToB64(ChipPaths[i] ?? "");
+            {
+                var kindKey = (KindKeys != null && i < KindKeys.Length) ? KindKeys[i] : "";
+                // v4: PathB64|KindKeyB64
+                lines[1 + i] = ToB64(ChipPaths[i] ?? "") + "|" + ToB64(kindKey ?? "");
+            }
             return string.Join("\n", lines);
         }
 
@@ -76,19 +86,35 @@ namespace UnityMCP.Editor.Chat
                 var activityPhase = FromB64(header[4]);
                 var chipCount     = int.Parse(header[5]);
 
-                // v2/v3 fields — length-based gate preserves back-compat.
                 var undoGroupId = header.Length > 6 ? int.Parse(header[6])  : -1;
                 var savedAtUtc  = header.Length > 7 ? long.Parse(header[7]) : 0L;
                 var backendKind = header.Length > 8
                     ? (BackendKind)int.Parse(header[8])
                     : BackendKind.Claude;
 
-                var chips = new string[chipCount];
+                var chips    = new string[chipCount];
+                var kindKeys = new string[chipCount];
                 for (var i = 0; i < chipCount; i++)
-                    chips[i] = (1 + i < lines.Length) ? FromB64(lines[1 + i]) : "";
+                {
+                    if (1 + i >= lines.Length) { chips[i] = ""; kindKeys[i] = ""; continue; }
+                    var chipLine = lines[1 + i];
+                    var pipeIdx  = chipLine.IndexOf('|');
+                    if (pipeIdx >= 0)
+                    {
+                        // v4: PathB64|KindKeyB64
+                        chips[i]    = FromB64(chipLine.Substring(0, pipeIdx));
+                        kindKeys[i] = FromB64(chipLine.Substring(pipeIdx + 1));
+                    }
+                    else
+                    {
+                        // v3 back-compat: line is just PathB64, no KindKey
+                        chips[i]    = FromB64(chipLine);
+                        kindKeys[i] = "";
+                    }
+                }
 
                 return new PendingTurnState(sessionId, pendingText, chips, agentMode, agentName,
-                    activityPhase, undoGroupId, savedAtUtc, backendKind);
+                    activityPhase, undoGroupId, savedAtUtc, backendKind, kindKeys);
             }
             catch
             {

@@ -1,5 +1,6 @@
 // TDD tests for ResponseTagInliner — pure unit, no Unity objects.
-// Focuses heavily on false-positive safety.
+// H6: ExtractTags returns (string KindKey, string Ref) — no ChipKind enum.
+// New: register custom kind → Apply matches with custom color + chip:KEY: linkId.
 using NUnit.Framework;
 using System.Collections.Generic;
 using UnityMCP.Editor.Chat;
@@ -9,6 +10,9 @@ namespace UnityMCP.Editor.Chat.Tests
     [TestFixture]
     public class ResponseTagInlinerTests
     {
+        [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
+        [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();
+
         // ── Basic: no tags ────────────────────────────────────────────────────
 
         [Test]
@@ -42,6 +46,13 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
+        public void Apply_HierarchyTag_LinkIdFormat_ChipPrefix()
+        {
+            var result = ResponseTagInliner.Apply("[hierarchy:/World/Player #1]");
+            StringAssert.Contains("chip:hierarchy:/World/Player #1", result);
+        }
+
+        [Test]
         public void Apply_ScriptTag_ReplacedWithPill()
         {
             var result = ResponseTagInliner.Apply("[script:PlayerController]");
@@ -63,10 +74,8 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var input  = "Check [hierarchy:/Player #1] and [script:Foo]";
             var result = ResponseTagInliner.Apply(input);
-            // Both original bracket forms gone
             StringAssert.DoesNotContain("[hierarchy:/Player #1]", result);
             StringAssert.DoesNotContain("[script:Foo]", result);
-            // Both refs present
             StringAssert.Contains("/Player #1", result);
             StringAssert.Contains("Foo", result);
         }
@@ -83,7 +92,6 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Apply_EmptyRef_NotMatched()
         {
-            // [hierarchy:] has empty ref — should NOT match (regex requires [^\]]+)
             const string text = "[hierarchy:]";
             Assert.AreEqual(text, ResponseTagInliner.Apply(text));
         }
@@ -91,7 +99,6 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Apply_PreservesNonTagBrackets()
         {
-            // Bare word in brackets without colon+kind → unchanged
             const string text = "[some text] and [another]";
             Assert.AreEqual(text, ResponseTagInliner.Apply(text));
         }
@@ -99,7 +106,6 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Apply_MarkdownLink_NotMatched()
         {
-            // Markdown [text](url) must NOT be eaten — different syntax
             const string text = "[Click here](https://example.com)";
             Assert.AreEqual(text, ResponseTagInliner.Apply(text));
         }
@@ -107,9 +113,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Apply_NestedBrackets_OnlyInnerKindMatched()
         {
-            // [[hierarchy:x]] — outer brackets are NOT part of the pattern; inner [hierarchy:x] is matched
             var result = ResponseTagInliner.Apply("[[hierarchy:x]]");
-            // The inner tag [hierarchy:x] should be replaced; the outer ] left as-is
             StringAssert.DoesNotContain("[hierarchy:x]", result);
             StringAssert.Contains("hierarchy", result);
         }
@@ -117,22 +121,21 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Apply_BracketWithoutColon_NotMatched()
         {
-            // [word] with no colon → not a kind:ref pattern
             const string text = "[word]";
             Assert.AreEqual(text, ResponseTagInliner.Apply(text));
         }
 
-        // ── ExtractTags ───────────────────────────────────────────────────────
+        // ── ExtractTags — string KindKey (H6) ────────────────────────────────
 
         [Test]
         public void ExtractTags_ReturnsParsedKindAndRef()
         {
             var tags = ResponseTagInliner.ExtractTags("[hierarchy:/Player #1] [script:Foo]");
             Assert.AreEqual(2, tags.Count);
-            Assert.AreEqual(ChipKind.Hierarchy, tags[0].Kind);
-            Assert.AreEqual("/Player #1",       tags[0].Ref);
-            Assert.AreEqual(ChipKind.Script,    tags[1].Kind);
-            Assert.AreEqual("Foo",              tags[1].Ref);
+            Assert.AreEqual(ChipKindKeys.Hierarchy, tags[0].KindKey);
+            Assert.AreEqual("/Player #1",           tags[0].Ref);
+            Assert.AreEqual(ChipKindKeys.Script,    tags[1].KindKey);
+            Assert.AreEqual("Foo",                  tags[1].Ref);
         }
 
         [Test]
@@ -148,14 +151,43 @@ namespace UnityMCP.Editor.Chat.Tests
             var input = "[hierarchy:h] [scene:s] [script:sc] [prefab:p] [material:m] [texture:t] [so:so] [asset:a]";
             var tags = ResponseTagInliner.ExtractTags(input);
             Assert.AreEqual(8, tags.Count);
-            Assert.AreEqual(ChipKind.Hierarchy,       tags[0].Kind);
-            Assert.AreEqual(ChipKind.Scene,            tags[1].Kind);
-            Assert.AreEqual(ChipKind.Script,           tags[2].Kind);
-            Assert.AreEqual(ChipKind.Prefab,           tags[3].Kind);
-            Assert.AreEqual(ChipKind.Material,         tags[4].Kind);
-            Assert.AreEqual(ChipKind.Texture,          tags[5].Kind);
-            Assert.AreEqual(ChipKind.ScriptableObject, tags[6].Kind);
-            Assert.AreEqual(ChipKind.Asset,            tags[7].Kind);
+            Assert.AreEqual(ChipKindKeys.Hierarchy,       tags[0].KindKey);
+            Assert.AreEqual(ChipKindKeys.Scene,            tags[1].KindKey);
+            Assert.AreEqual(ChipKindKeys.Script,           tags[2].KindKey);
+            Assert.AreEqual(ChipKindKeys.Prefab,           tags[3].KindKey);
+            Assert.AreEqual(ChipKindKeys.Material,         tags[4].KindKey);
+            Assert.AreEqual(ChipKindKeys.Texture,          tags[5].KindKey);
+            Assert.AreEqual(ChipKindKeys.ScriptableObject, tags[6].KindKey);
+            Assert.AreEqual(ChipKindKeys.Asset,            tags[7].KindKey);
+        }
+
+        // ── Custom kind via registry ──────────────────────────────────────────
+
+        [Test]
+        public void Apply_CustomKind_MatchesAfterRegister()
+        {
+            // Register fake provider with key "test_kind"
+            var fake = new TestKindProvider();
+            ChipKindRegistry.Register(fake);
+            var result = ResponseTagInliner.Apply("[test_kind:some/path]");
+            StringAssert.Contains("test_kind", result);
+            StringAssert.DoesNotContain("[test_kind:some/path]", result);
+            StringAssert.Contains("chip:test_kind:some/path", result);
+            StringAssert.Contains("#abcdef", result);
+        }
+
+        // Helper for above test
+        private sealed class TestKindProvider : IChipKindProvider
+        {
+            public string Key          => "test_kind";
+            public int    Priority     => 10;
+            public string IconName     => "d_DefaultAsset Icon";
+            public string HexColor     => "#abcdef";
+            public string DefaultDepth => "path";
+            public bool   CanHandle(UnityEngine.Object obj, string assetPath) => false;
+            public ChipData Create(UnityEngine.Object obj, string assetPath) => default;
+            public string FormatPayload(ChipData chip, ChipPayloadContext ctx) => $"[{Key}:{chip.Path}]";
+            public void   Navigate(string reference) { }
         }
     }
 }

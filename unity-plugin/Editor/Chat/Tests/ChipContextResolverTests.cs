@@ -1,5 +1,6 @@
-// TDD — RED first. Tests drive ChipContextResolver contract.
-// EditMode tests: can create GameObjects and call ComponentSerializer.
+// TDD — ChipContextResolver tests.
+// H6: ChipKind enum removed — FormatChipRef/EmitTyped take string kindKey.
+// New: custom kind through ResolveAllTyped pipeline.
 using NUnit.Framework;
 using System.Collections.Generic;
 using UnityEngine;
@@ -16,7 +17,8 @@ namespace UnityMCP.Editor.Chat.Tests
         public void SetUp()
         {
             _created = new List<GameObject>();
-            ChipContextResolver.FindObjectOverride = null; // reset seam
+            ChipContextResolver.FindObjectOverride = null;
+            ChipKindRegistry.ResetToBuiltIns();
         }
 
         [TearDown]
@@ -25,6 +27,7 @@ namespace UnityMCP.Editor.Chat.Tests
             foreach (var go in _created)
                 if (go != null) Object.DestroyImmediate(go);
             ChipContextResolver.FindObjectOverride = null;
+            ChipKindRegistry.ResetToBuiltIns();
         }
 
         private GameObject MakeGo(string name, GameObject parent = null)
@@ -51,7 +54,6 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = ChipContextResolver.ResolveOne("/Hero", ChipDepth.Summary);
 
-            // Must contain path and component type, enclosed in brackets, with correct tag
             StringAssert.StartsWith("[Context:", result);
             StringAssert.Contains("/Hero", result);
             StringAssert.Contains("BoxCollider", result);
@@ -61,9 +63,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void ResolveOne_Summary_NullObject_FallsBackToPathOnly()
         {
             ChipContextResolver.FindObjectOverride = _ => null;
-
             var result = ChipContextResolver.ResolveOne("/Missing/Object", ChipDepth.Summary);
-
             Assert.AreEqual("/Missing/Object", result);
         }
 
@@ -73,10 +73,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var go = MakeGo("Tank");
             go.AddComponent<BoxCollider>();
             ChipContextResolver.FindObjectOverride = _ => go;
-
             var result = ChipContextResolver.ResolveOne("/Tank", ChipDepth.Full);
-
-            // SerializeAll produces "name: Tank" + component sections
             StringAssert.Contains("Tank", result);
             StringAssert.Contains("BoxCollider", result);
         }
@@ -85,14 +82,9 @@ namespace UnityMCP.Editor.Chat.Tests
         public void ResolveOne_Full_ExceedsBudget_FallsToSummary()
         {
             var go = MakeGo("Fat");
-            // Add many components to inflate the output
             for (var i = 0; i < 10; i++) go.AddComponent<BoxCollider>();
             ChipContextResolver.FindObjectOverride = _ => go;
-
-            // Override budget to 1 char so anything exceeds it
             var result = ChipContextResolver.ResolveOne("/Fat", ChipDepth.Full, budgetOverride: 1);
-
-            // Falls back to Summary: should start with '[' and not be the full dump
             Assert.IsTrue(result.StartsWith("["), "Fallback should be summary format");
         }
 
@@ -109,10 +101,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var go = MakeGo("Solo");
             go.AddComponent<Rigidbody>();
             ChipContextResolver.FindObjectOverride = _ => go;
-
             var result = ChipContextResolver.ResolveAll(new List<string> { "/Solo" });
-
-            // Full includes serialized component data (not just a summary line)
             StringAssert.Contains("Solo", result);
         }
 
@@ -124,10 +113,7 @@ namespace UnityMCP.Editor.Chat.Tests
             go1.AddComponent<BoxCollider>();
             go2.AddComponent<Rigidbody>();
             ChipContextResolver.FindObjectOverride = p => p == "/A" ? go1 : go2;
-
             var result = ChipContextResolver.ResolveAll(new List<string> { "/A", "/B" });
-
-            // Summary format: contains both paths, starts with '[' lines
             StringAssert.Contains("/A", result);
             StringAssert.Contains("/B", result);
         }
@@ -135,8 +121,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ResolveAll_EmptyList_ReturnsEmpty()
         {
-            var result = ChipContextResolver.ResolveAll(new List<string>());
-            Assert.AreEqual("", result);
+            Assert.AreEqual("", ChipContextResolver.ResolveAll(new List<string>()));
         }
 
         [Test]
@@ -144,14 +129,8 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var go = MakeGo("Player");
             ChipContextResolver.FindObjectOverride = _ => go;
-            var chips = new List<string> { "/Player", "Assets/Scripts/Foo.cs" };
-
-            // 2 chips → Summary for scene, PathOnly for asset
-            var result = ChipContextResolver.ResolveAll(chips);
-
-            // Scene chip: summary brackets
+            var result = ChipContextResolver.ResolveAll(new List<string> { "/Player", "Assets/Scripts/Foo.cs" });
             StringAssert.Contains("/Player", result);
-            // Asset chip: path as-is
             StringAssert.Contains("Assets/Scripts/Foo.cs", result);
         }
 
@@ -161,10 +140,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var go = new GameObject("Dead");
             Object.DestroyImmediate(go);
             ChipContextResolver.FindObjectOverride = _ => go;
-
             var result = ChipContextResolver.ResolveOne("/Dead", ChipDepth.Summary);
-
-            // Destroyed object (Unity == null) → PathOnly
             Assert.AreEqual("/Dead", result);
         }
 
@@ -174,34 +150,26 @@ namespace UnityMCP.Editor.Chat.Tests
             var go = MakeGo("Check");
             go.AddComponent<BoxCollider>();
             ChipContextResolver.FindObjectOverride = _ => go;
-
-            var chip    = ChipContextResolver.ResolveOne("/Check", ChipDepth.Summary);
-            var sel     = SelectionSummary.Summarize(go);
-
-            // Both must: start with '[', contain path, contain component name, end with ']'
-            Assert.IsTrue(chip.StartsWith("["),  "chip must start with '['");
-            Assert.IsTrue(sel.StartsWith("["),   "sel must start with '['");
-            Assert.IsTrue(chip.EndsWith("]"),    "chip must end with ']'");
-            Assert.IsTrue(sel.EndsWith("]"),     "sel must end with ']'");
+            var chip = ChipContextResolver.ResolveOne("/Check", ChipDepth.Summary);
+            var sel  = SelectionSummary.Summarize(go);
+            Assert.IsTrue(chip.StartsWith("["));
+            Assert.IsTrue(sel.StartsWith("["));
+            Assert.IsTrue(chip.EndsWith("]"));
+            Assert.IsTrue(sel.EndsWith("]"));
             StringAssert.Contains("BoxCollider", chip);
             StringAssert.Contains("BoxCollider", sel);
         }
-
-        // ── F4: instance ID tests ─────────────────────────────────────────────
 
         [Test]
         public void ResolveOne_PathOnly_SceneObject_IncludesInstanceID()
         {
             var go = MakeGo("SceneObj");
             ChipContextResolver.FindObjectOverride = _ => go;
-
             var result = ChipContextResolver.ResolveOne("/SceneObj", ChipDepth.PathOnly);
-
-            // Must match "/SceneObj #<digits>"
             StringAssert.Contains("/SceneObj #", result);
             var parts = result.Split('#');
             Assert.AreEqual(2, parts.Length);
-            Assert.IsTrue(int.TryParse(parts[1].Trim(), out _), "suffix must be an integer instanceID");
+            Assert.IsTrue(int.TryParse(parts[1].Trim(), out _));
         }
 
         [Test]
@@ -209,7 +177,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var result = ChipContextResolver.ResolveOne("Assets/Foo.prefab", ChipDepth.PathOnly);
             Assert.AreEqual("Assets/Foo.prefab", result);
-            Assert.IsFalse(result.Contains("#"), "asset path must not contain instance ID");
+            Assert.IsFalse(result.Contains("#"));
         }
 
         [Test]
@@ -217,11 +185,8 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var go = MakeGo("SummaryObj");
             ChipContextResolver.FindObjectOverride = _ => go;
-
             var result = ChipContextResolver.ResolveOne("/SummaryObj", ChipDepth.Summary);
-
-            var idStr = go.GetInstanceID().ToString();
-            StringAssert.Contains($"#{idStr}", result);
+            StringAssert.Contains($"#{go.GetInstanceID()}", result);
         }
 
         [Test]
@@ -230,86 +195,82 @@ namespace UnityMCP.Editor.Chat.Tests
             var go1 = MakeGo("Multi1");
             var go2 = MakeGo("Multi2");
             ChipContextResolver.FindObjectOverride = p => p.Contains("Multi1") ? go1 : go2;
-
-            // 2 chips → Summary depth → each summary contains its instanceID
             var result = ChipContextResolver.ResolveAll(new List<string> { "/Multi1", "/Multi2" });
-
             StringAssert.Contains($"#{go1.GetInstanceID()}", result);
             StringAssert.Contains($"#{go2.GetInstanceID()}", result);
         }
 
-        // ── F10: FormatChipRef ─────────────────────────────────────────────────
+        // ── FormatChipRef — string kindKey (H6) ─────────────────────────────
 
         [Test]
         public void FormatChipRef_Hierarchy_BracketFormatWithInstanceID()
         {
-            var result = ChipContextResolver.FormatChipRef(ChipKind.Hierarchy, "/World/Player", 12345);
+            var result = ChipContextResolver.FormatChipRef(ChipKindKeys.Hierarchy, "/World/Player", 12345);
             Assert.AreEqual("[hierarchy:/World/Player #12345]", result);
         }
 
         [Test]
         public void FormatChipRef_Script_NameOnly_NoBracketID()
         {
-            var result = ChipContextResolver.FormatChipRef(ChipKind.Script, "PlayerController", 0);
+            var result = ChipContextResolver.FormatChipRef(ChipKindKeys.Script, "PlayerController", 0);
             Assert.AreEqual("[script:PlayerController]", result);
         }
 
         [Test]
         public void FormatChipRef_Scene_FullAssetPath()
         {
-            var result = ChipContextResolver.FormatChipRef(ChipKind.Scene, "Assets/Scenes/Main.unity", 0);
+            var result = ChipContextResolver.FormatChipRef(ChipKindKeys.Scene, "Assets/Scenes/Main.unity", 0);
             Assert.AreEqual("[scene:Assets/Scenes/Main.unity]", result);
         }
 
         [Test]
         public void FormatChipRef_Asset_AssetPath()
         {
-            var result = ChipContextResolver.FormatChipRef(ChipKind.Asset, "Assets/Fonts/Arial.ttf", 0);
+            var result = ChipContextResolver.FormatChipRef(ChipKindKeys.Asset, "Assets/Fonts/Arial.ttf", 0);
             Assert.AreEqual("[asset:Assets/Fonts/Arial.ttf]", result);
         }
 
         [Test]
         public void FormatChipRef_Hierarchy_ZeroInstanceID_OmitsHashSuffix()
         {
-            // instanceID 0 = no object found; should omit the # suffix
-            var result = ChipContextResolver.FormatChipRef(ChipKind.Hierarchy, "/Player", 0);
+            var result = ChipContextResolver.FormatChipRef(ChipKindKeys.Hierarchy, "/Player", 0);
             Assert.AreEqual("[hierarchy:/Player]", result);
         }
 
         [Test]
         public void FormatChipRef_ScriptableObject_UsesSoPrefix()
         {
-            var result = ChipContextResolver.FormatChipRef(ChipKind.ScriptableObject, "Assets/Data/Cfg.asset", 0);
+            var result = ChipContextResolver.FormatChipRef(ChipKindKeys.ScriptableObject, "Assets/Data/Cfg.asset", 0);
             Assert.AreEqual("[so:Assets/Data/Cfg.asset]", result);
         }
 
-        // ── F10: EmitTyped ────────────────────────────────────────────────────
+        // ── EmitTyped — string kindKey (H6) ─────────────────────────────────
 
         [Test]
         public void EmitTyped_DepthNone_ReturnsEmpty()
         {
-            var result = ChipContextResolver.EmitTyped(ChipKind.Script, "Assets/Foo.cs", 0, "none", (p, d) => "RESOLVED");
+            var result = ChipContextResolver.EmitTyped(ChipKindKeys.Script, "Assets/Foo.cs", 0, "none", (p, d) => "RESOLVED");
             Assert.AreEqual("", result);
         }
 
         [Test]
         public void EmitTyped_DepthPath_ReturnsBracketOnly()
         {
-            var result = ChipContextResolver.EmitTyped(ChipKind.Script, "Assets/Foo.cs", 0, "path", (p, d) => "RESOLVED");
+            var result = ChipContextResolver.EmitTyped(ChipKindKeys.Script, "Assets/Foo.cs", 0, "path", (p, d) => "RESOLVED");
             Assert.AreEqual("[script:Assets/Foo.cs]", result);
         }
 
         [Test]
         public void EmitTyped_DepthPath_Hierarchy_IncludesInstanceID()
         {
-            var result = ChipContextResolver.EmitTyped(ChipKind.Hierarchy, "/Player", 123, "path", (p, d) => "RESOLVED");
+            var result = ChipContextResolver.EmitTyped(ChipKindKeys.Hierarchy, "/Player", 123, "path", (p, d) => "RESOLVED");
             Assert.AreEqual("[hierarchy:/Player #123]", result);
         }
 
         [Test]
         public void EmitTyped_DepthSummary_StartsWithBracketThenResolved()
         {
-            var result = ChipContextResolver.EmitTyped(ChipKind.Hierarchy, "/Player", 123, "summary",
+            var result = ChipContextResolver.EmitTyped(ChipKindKeys.Hierarchy, "/Player", 123, "summary",
                 (p, d) => "summary-text");
             StringAssert.StartsWith("[hierarchy:/Player #123]", result);
             StringAssert.Contains("summary-text", result);
@@ -318,7 +279,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void EmitTyped_DepthFull_StartsWithBracketThenResolved()
         {
-            var result = ChipContextResolver.EmitTyped(ChipKind.Hierarchy, "/Player", 0, "full",
+            var result = ChipContextResolver.EmitTyped(ChipKindKeys.Hierarchy, "/Player", 0, "full",
                 (p, d) => "full-dump");
             StringAssert.StartsWith("[hierarchy:/Player]", result);
             StringAssert.Contains("full-dump", result);
@@ -327,18 +288,45 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void EmitTyped_DepthSummary_Asset_BracketAndAssetPath()
         {
-            // Assets don't have scene resolution; resolveFn still called but result may be path
-            var result = ChipContextResolver.EmitTyped(ChipKind.Script, "Assets/Foo.cs", 0, "summary",
-                (p, d) => p); // resolveFn returns path as-is for assets
+            var result = ChipContextResolver.EmitTyped(ChipKindKeys.Script, "Assets/Foo.cs", 0, "summary",
+                (p, d) => p);
             StringAssert.StartsWith("[script:Assets/Foo.cs]", result);
         }
 
         [Test]
         public void EmitTyped_UnknownDepth_TreatedAsPath()
         {
-            // Any unrecognized depth string → treat as "path" (safe fallback)
-            var result = ChipContextResolver.EmitTyped(ChipKind.Asset, "Assets/X.png", 0, "bogus", (p, d) => "R");
+            var result = ChipContextResolver.EmitTyped(ChipKindKeys.Asset, "Assets/X.png", 0, "bogus", (p, d) => "R");
             Assert.AreEqual("[asset:Assets/X.png]", result);
+        }
+
+        // ── Custom kind through ResolveAllTyped pipeline ─────────────────────
+
+        [Test]
+        public void ResolveAllTyped_CustomKind_RoutesToProvider()
+        {
+            var fake = new FakeCustomProvider();
+            ChipKindRegistry.Register(fake);
+            var chips = new List<ChipData>
+            {
+                new ChipData("fake_kind", "Assets/x.fbx", "X", 0)
+            };
+            var result = ChipContextResolver.ResolveAllTyped(chips, new ChipConfig());
+            StringAssert.Contains("[fake_kind:Assets/x.fbx]", result);
+        }
+
+        private sealed class FakeCustomProvider : IChipKindProvider
+        {
+            public string Key          => "fake_kind";
+            public int    Priority     => 10;
+            public string IconName     => "";
+            public string HexColor     => "#000000";
+            public string DefaultDepth => "path";
+            public bool   CanHandle(UnityEngine.Object obj, string assetPath) => false;
+            public ChipData Create(UnityEngine.Object obj, string assetPath) => default;
+            public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
+                => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
+            public void Navigate(string reference) { }
         }
     }
 }

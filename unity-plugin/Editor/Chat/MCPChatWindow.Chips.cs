@@ -1,4 +1,5 @@
 // Chip methods extracted to a partial to keep MCPChatWindow.cs under 200 lines.
+// H6: ChipKind → string kindKey throughout; ShortPrefix removed.
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -17,54 +18,51 @@ namespace UnityMCP.Editor.Chat
         private void OnDragPerform(DragPerformEvent e)
         {
             DragAndDrop.AcceptDrag();
-            // F5: if drop lands inside the text field → inline chip; else strip chip
             bool dropOnField = _input != null && _input.worldBound.Contains(e.mousePosition);
 
             foreach (var obj in DragAndDrop.objectReferences)
             {
                 if (obj == null) continue;
 
-                // Scene GameObject (not an asset).
                 if (obj is GameObject go && !AssetDatabase.Contains(go))
                 {
-                    var path = ComponentSerializer.GetPath(go);
-                    var kind = ChipKindDetector.Detect(go, null);
+                    var path    = ComponentSerializer.GetPath(go);
+                    var kindKey = ChipKindDetector.Detect(go, null);
                     if (dropOnField)
                         InsertInlineChip(go, path, go.name);
                     else
-                        AddChip(obj, path, go.name, kind, go.GetInstanceID());
+                        AddChip(obj, path, go.name, kindKey, go.GetInstanceID());
                     continue;
                 }
 
-                // Asset — check type allowlist first.
                 if (AssetDatabase.Contains(obj) && ChatChipPolicy.IsAllowedAssetType(obj.GetType()))
                 {
                     var assetPath = AssetDatabase.GetAssetPath(obj);
                     if (!string.IsNullOrEmpty(assetPath))
                     {
-                        var kind = ChipKindDetector.Detect(obj, assetPath);
+                        var kindKey = ChipKindDetector.Detect(obj, assetPath);
                         if (dropOnField)
                             InsertInlineChip(obj, assetPath, obj.name);
                         else
-                            AddChip(obj, assetPath, obj.name, kind, 0);
+                            AddChip(obj, assetPath, obj.name, kindKey, 0);
                     }
                 }
-                else if (!(obj is GameObject)) // not a scene GO, not an allowlisted asset
+                else if (!(obj is GameObject))
                     Debug.LogWarning($"[MCP Chat] {obj.GetType().Name} not supported as a context chip");
             }
         }
 
-        // Kept for call-sites that pass a scene GameObject directly.
         private void AddObjChip(GameObject go) =>
             AddChip(go, ComponentSerializer.GetPath(go), go.name, ChipKindDetector.Detect(go, null), go.GetInstanceID());
 
-        private void AddChip(Object cap, string payload, string displayName, ChipKind kind = ChipKind.Asset, int instanceID = 0)
+        private void AddChip(Object cap, string payload, string displayName, string kindKey = null, int instanceID = 0)
         {
+            kindKey = kindKey ?? ChipKindKeys.Asset;
             var chip = new VisualElement(); chip.AddToClassList("obj-chip");
-            // F10: store typed ref so CollectChipData can emit kind-aware context.
-            chip.userData = new ChipData(kind, payload, displayName, instanceID);
+            chip.userData = new ChipData(kindKey, payload, displayName, instanceID);
 
-            var kindLbl = new Label(ChipKindDetector.ShortPrefix(kind) + ":");
+            // kindKey IS the prefix — no ShortPrefix call (H6)
+            var kindLbl = new Label(kindKey + ":");
             kindLbl.AddToClassList("obj-chip-kind");
 
             var lbl = new Label(displayName); lbl.AddToClassList("obj-chip-label");
@@ -84,7 +82,6 @@ namespace UnityMCP.Editor.Chat
             UpdateAutoHeight();
         }
 
-        // F10: returns full ChipData (kind+path+instanceID) for all strip chips.
         private List<ChipData> CollectChipData()
         {
             var seen   = new HashSet<string>();
@@ -97,7 +94,6 @@ namespace UnityMCP.Editor.Chat
             return result;
         }
 
-        // Backward-compat shim for SaveStateBeforeReload (PendingTurnState stores string[]).
         private List<string> CollectChipPaths()
         {
             var result = new List<string>();

@@ -235,7 +235,19 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **Receive-side (response):** ResponseTagInliner.Apply() parses ONLY exact `[kind:ref]` format (conservative regex, no false positives on markdown/code/bare brackets); renders compact colored pills with `<link>` click-nav (symmetric with input)
 - **Tests:** ChipKindDetector 13/13, ResponseTagInliner 17/17 (false-positive guards), EmitTyped 7/7, DepthFor 10/10, ChipConfig 3/3
 
-### UX Features (v0.15.0 F1–F10)
+### Extensible Chip-Kind Registry + Inline Rendering (v0.15.8 F11)
+- **IChipKindProvider** — Public interface for third-party plugins: Key, Priority, CanHandle, Create, IconName, HexColor, FormatPayload, DefaultDepth, Navigate
+- **ChipKindRegistry** — Public static registry; plugins call `Register(provider)` from `[InitializeOnLoad]`. Detection: `Resolve(obj, assetPath)` returns first provider where `CanHandle` true (sorted by Priority). Supports dynamic Unregister + per-key lookup
+- **Priority Convention:** <100 overrides built-in type, 100–800 built-ins, >800 extends (new kinds). 8 built-in providers: Hierarchy/Scene/Script/Prefab/Material/Texture/ScriptableObject/Asset
+- **Inline Rendering:** Chips render at cursor (not row strip). `UitkCharRect.cs` uses PUBLIC `TextField.textSelection.GetCursorPositionFromStringIndex` API (confirmed live Unity 6000.3.0b7). H10 degradation: if API unavailable, falls back to row-layout
+- **Width Reservation:** `NbspReservation.cs` reserves pill space via U+FFFC + N×U+00A0 (non-breaking spaces), prevents layout reflow
+- **Atomic Caret:** `TokenSpan.cs` — caret skips whole chips (never mid-pill), backspace deletes entire chip (not char-by-char)
+- **Show LLM Payload:** Right-click context menu reveals exact byte-for-byte AI payload (symmetry test enforces match)
+- **Reload Survival:** `PendingTurnState v4` serializes `KindKeys[]` parallel to chip paths; on resume, re-binds by key (fallback: re-detect if provider not registered yet)
+- **Breaking Change (BUG B):** `ChipConfig` default depth `"summary"` → `"path"` (token-minimal). Restore via F9 settings form. Marked in-code: `// BREAKING (H15)`
+- **Tests:** ChipKindRegistryTests, ChipKindRegistryPipelineTests, NbspReservationTests, TokenSpanTests, UitkCharRectProbeTests, Wave4ChipInputTests — all suites 100% pass
+
+### UX Features (v0.15.0 F1–F10 + v0.15.8 F11)
 - **F1 (Token Reset):** TokenResetTests ensure counters reset on backend/model switch
 - **F2 (Cascade Restore):** TurnUndoTracker.RestoreFromIndex() reverts any earlier turn + all later turns (reverse order)
 - **F3 (Approve Gate):** Button shows only when turn has real tool calls (_turnHasToolCalls flag)
@@ -246,6 +258,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **F8 (No Beta Labels):** Removed "(Beta)" from chat toggle + settings foldout
 - **F9 (Settings Form):** Per-backend config form → own JSON → CLI args (see BackendConfig above)
 - **F10 (Typed Tags):** Kind-aware input/output chips with configurable depth (see Typed Context Tags above)
+- **F11 (Extensible Registry + Inline Render):** IChipKindProvider public interface + ChipKindRegistry for third-party chip kinds; inline-at-cursor rendering via UitkCharRect.GetCursorPositionFromStringIndex + NbspReservation; TokenSpan atomic-caret behavior; BUG B breaking change (see Extensible Chip-Kind Registry above)
 
 ### Editor UI Windows (C#: UIToolkit)
 - **MCPSettings Window** (MCPSettings.cs): Tool visibility toggles, organized by theme categories (CORE locked, others toggle/tri-state group masters), search bar, presets (Minimal/Full/No-visuals), dynamic Plugins section from PluginRegistry. Stylesheet: `MCPSettings.uss`.

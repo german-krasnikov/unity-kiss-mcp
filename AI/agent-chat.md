@@ -389,6 +389,79 @@ Verified: BackendConfigStoreTests 10/10, BackendSettingsFormTests integration pa
 
 Verified: ChipKindDetector 13/13, ResponseTagInliner 17/17 (false-positive guards), EmitTyped 7/7, ChipConfig 3/3.
 
+### Feature F11 — Inline Chips + Extensible Chip-Kind Registry (v0.15.8)
+
+#### Extensibility: IChipKindProvider & ChipKindRegistry
+
+**Core Innovation:** Third-party plugins (in separate asmdefs referencing `UnityMCP.Editor.Chat` + defining `UNITY_MCP_CHAT`) register custom chip kinds via the public `ChipKindRegistry` with ZERO core edits.
+
+**Public Interface:**
+```csharp
+public interface IChipKindProvider
+{
+    string Key { get; }                    // Unique lowercase key, e.g. "hierarchy"
+    int Priority { get; }                  // Lower = checked first
+    bool CanHandle(Object obj, string assetPath);
+    ChipData Create(Object obj, string assetPath);
+    string IconName { get; }               // EditorGUIUtility.IconContent key
+    string HexColor { get; }               // Pill + response tag color
+    string FormatPayload(ChipData chip, ChipPayloadContext ctx);
+    string DefaultDepth { get; }           // Fallback when no config entry
+    void Navigate(string reference);       // Handle click on chip link
+}
+```
+
+**Public Registry:**
+```csharp
+public static class ChipKindRegistry
+{
+    public static bool Register(IChipKindProvider p);
+    public static bool Unregister(string key);
+    public static IChipKindProvider Resolve(Object obj, string assetPath);
+    public static IChipKindProvider ForKey(string key);
+}
+```
+
+**Built-in Providers (8 total, Priority 100–800):**
+- HierarchyChipProvider (100): GameObjects not in assets
+- SceneChipProvider (200): .unity scene files
+- ScriptChipProvider (300): MonoScript C# files
+- PrefabChipProvider (400): .prefab files
+- MaterialChipProvider (500): .mat material files
+- TextureChipProvider (600): .png/.jpg image files
+- ScriptableObjectChipProvider (700): .asset SO files
+- AssetChipProvider (800): generic fallback for unlisted asset types
+
+**Priority Convention:**
+- <100: Plugin providers override a built-in type
+- 100–800: Built-ins (default)
+- >800: Plugin providers extend (new kinds)
+
+**Reload Survival (PendingTurnState v4):** Serializes `KindKeys[]` parallel to chip paths; on resume, re-binds by key. Falls back to re-detection if provider not yet registered.
+
+#### Inline Rendering at Cursor
+
+**Positioning (UitkCharRect.cs):** Uses PUBLIC `TextField.textSelection.GetCursorPositionFromStringIndex` API — confirmed working live on Unity 6000.3.0b7. H10 degradation: if API unavailable, falls back to row-layout strip (current behavior).
+
+**Width Reservation (NbspReservation.cs):** Reserves pill width via U+FFFC marker + N×U+00A0 (non-breaking spaces), ensuring layout won't reflow when pill moves.
+
+**Atomic Caret (TokenSpan.cs):** Caret skips whole chips (never lands mid-pill). Backspace on chip deletes entire chip (not character-by-character). Press arrow → moves caret before/after chip boundary.
+
+**"Show LLM Payload" Context Menu:** Right-click on chip → reveals exact byte-for-byte payload sent to AI (symmetry test enforces match).
+
+**Breaking Change — BUG B:** `ChipConfig` default depth `"summary"` → `"path"` (token-minimal). Restore via F9 settings form (per-kind dropdown). Marked in-code: `// BREAKING (H15)`.
+
+#### Test Coverage
+
+- **ChipKindRegistryTests:** Register, Unregister, Resolve, ForKey, priority ordering, version bumping
+- **ChipKindRegistryPipelineTests:** End-to-end: detect → resolve → format → render
+- **NbspReservationTests:** Width prediction, marker insertion/cleanup
+- **TokenSpanTests:** Atomic caret boundaries, backspace/arrow behavior
+- **UitkCharRectProbeTests:** Positioning API availability detection, H10 fallback
+- **Wave4ChipInputTests:** Integration: drag-drop, context menu, serialization
+
+All suites: 100% pass, zero new failures (5 pre-existing reds unrelated to F11).
+
 ### Review-Hardening Pass (v0.14.6)
 
 **ArgTokenizer Quote-Awareness:** Fixes silent corruption of quoted multi-word ExtraArgs values (e.g., `--append-system-prompt "be terse"`). Shell-style: double+single quotes, unbalanced trailing tolerated. DRY across both Claude/CodexArgBuilder. +11 tests.

@@ -1,5 +1,6 @@
 // Handles click-navigation and "Add to context" for <link> tags in chat labels.
-// Installs PointerUpLinkTagEvent + PointerOverLinkTagEvent + ContextualMenuManipulator.
+// H2: new linkId format "chip:KEY:REF". Legacy "obj:"/"script:"/"asset:" kept for cached labels.
+// FindGameObject made internal so HierarchyChipProvider.Navigate can reuse it.
 using System;
 using UnityEditor;
 using UnityEngine;
@@ -18,7 +19,6 @@ namespace UnityMCP.Editor.Chat
         {
             if (label == null) return;
 
-            // Track last hovered link for context menu targeting.
             string lastHoveredLink = null;
 
             label.RegisterCallback<PointerOverLinkTagEvent>(evt =>
@@ -38,7 +38,6 @@ namespace UnityMCP.Editor.Chat
                 var linkId = evt.linkID;
                 if (string.IsNullOrEmpty(linkId)) return;
 
-                // Alt+click -> add to context instead of navigate.
                 if (evt.altKey)
                 {
                     AddToContext(linkId, addToContext);
@@ -58,6 +57,20 @@ namespace UnityMCP.Editor.Chat
 
         private static void Navigate(string linkId)
         {
+            // H2: new format "chip:KEY:REF"
+            if (linkId.StartsWith("chip:"))
+            {
+                int secondColon = linkId.IndexOf(':', 5);
+                if (secondColon < 0) return;
+                var key       = linkId.Substring(5, secondColon - 5);
+                var reference = linkId.Substring(secondColon + 1);
+                var provider  = ChipKindRegistry.ForKey(key);
+                if (provider != null) provider.Navigate(reference);
+                else DefaultNavigate(reference);
+                return;
+            }
+
+            // Legacy fallbacks for cached labels
             if (linkId.StartsWith("obj:"))
             {
                 var path = linkId.Substring(4);
@@ -75,30 +88,39 @@ namespace UnityMCP.Editor.Chat
             }
             else if (linkId.StartsWith("asset:"))
             {
-                var assetPath = linkId.Substring(6);
-                var obj       = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
-                if (obj == null) { Debug.LogWarning("[MCP Chat] Asset not found: " + assetPath); return; }
-                EditorGUIUtility.PingObject(obj);
-                Selection.activeObject = obj;
+                DefaultNavigate(linkId.Substring(6));
             }
+        }
+
+        private static void DefaultNavigate(string assetPath)
+        {
+            var obj = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+            if (obj == null) { Debug.LogWarning("[MCP Chat] Asset not found: " + assetPath); return; }
+            EditorGUIUtility.PingObject(obj);
+            Selection.activeObject = obj;
         }
 
         private static void AddToContext(string linkId, Action<string> addToContext)
         {
             if (addToContext == null) return;
             string payload;
-            if (linkId.StartsWith("obj:"))         payload = linkId.Substring(4);
+            if (linkId.StartsWith("chip:"))
+            {
+                int secondColon = linkId.IndexOf(':', 5);
+                payload = secondColon >= 0 ? linkId.Substring(secondColon + 1) : linkId;
+            }
+            else if (linkId.StartsWith("obj:"))         payload = linkId.Substring(4);
             else if (linkId.StartsWith("script:")) payload = linkId.Substring(7);
             else if (linkId.StartsWith("asset:"))  payload = linkId.Substring(6);
             else                                   payload = linkId;
             addToContext(payload);
         }
 
+        // Made internal so HierarchyChipProvider.Navigate can reuse it (CRITIC NOTE).
         // Finds a GameObject by hierarchy path "/Root/Child/..." in loaded scenes.
-        private static GameObject FindGameObject(string path)
+        internal static GameObject FindGameObject(string path)
         {
             if (string.IsNullOrEmpty(path)) return null;
-            // Strip leading slash and split by /
             var parts = path.TrimStart('/').Split('/');
             if (parts.Length == 0) return null;
 
