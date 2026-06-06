@@ -123,7 +123,7 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 1136 Tests · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="89 MCP Tools · 2963 Tests (1723 Python · 1187 Unity · 53 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
