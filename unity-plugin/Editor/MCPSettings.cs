@@ -3,12 +3,11 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor
 {
     [InitializeOnLoad]
-    public class MCPSettings : EditorWindow
+    public static class MCPSettings
     {
         // ── EditorPrefs API (P0 — must stay intact) ──────────────────────────
         internal const string KeyPrefix      = "UnityMCP_Tool_";
@@ -87,20 +86,6 @@ namespace UnityMCP.Editor
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             }
             return true;
-        }
-
-        [MenuItem("MCP/Settings", priority = 2)]
-        [MenuItem("Tools/MCP/Settings")]
-        public static void ShowWindow()
-        {
-            var window = GetWindow<MCPSettings>("MCP Settings");
-            window.minSize = new Vector2(320, 480);
-        }
-
-        // ── UIToolkit entry point ─────────────────────────────────────────────
-        public void CreateGUI()
-        {
-            MCPSettingsUI.Build(rootVisualElement);
         }
     }
 }

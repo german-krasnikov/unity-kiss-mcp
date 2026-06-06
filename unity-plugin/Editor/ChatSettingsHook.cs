@@ -18,9 +18,11 @@ namespace UnityMCP.Editor
     {
         public const string ChatDefine = "UNITY_MCP_CHAT";
 
-        public static event Action<VisualElement> OnBuild;
+        public static event Action<VisualElement> OnBuildConnection;
 
-        internal static void Invoke(VisualElement root) => OnBuild?.Invoke(root);
+        internal static void InvokeConnection(VisualElement root) => OnBuildConnection?.Invoke(root);
+        internal static bool HasConnectionSubscribers => OnBuildConnection != null;
+        internal static void ResetConnectionEvent() => OnBuildConnection = null;
 
         public static bool IsChatEnabled()
         {

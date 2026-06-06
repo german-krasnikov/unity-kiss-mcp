@@ -69,11 +69,6 @@ namespace UnityMCP.Editor
                 foreach (var g in allGroups) g.Filter(q);
             });
 
-            // Agent Tool Permissions foldout — always visible (no #if guard)
-            root.Add(MCPSettingsPermUI.BuildSection());
-
-            // Let optional modules (Chat, etc.) inject their own settings section
-            ChatSettingsHook.Invoke(root);
         }
 
         // ── Header ───────────────────────────────────────────────────────────

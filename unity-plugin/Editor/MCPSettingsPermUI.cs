@@ -47,9 +47,47 @@ namespace UnityMCP.Editor
             return foldout;
         }
 
-        private static void RebuildScroll(Foldout foldout, PermissionConfig config, List<PermCategoryGroup> groups)
+        /// <summary>
+        /// Standalone version without outer Foldout — for MCPPermissionsWindow.
+        /// </summary>
+        public static VisualElement BuildContent(PermissionConfig config)
         {
-            var scroll = foldout.Q<ScrollView>();
+            var groups = new List<PermCategoryGroup>();
+
+            var container = new VisualElement();
+            container.style.flexGrow = 1;
+
+            // Preset row: Allow All / Deny All
+            var presetRow = new VisualElement();
+            presetRow.AddToClassList("preset-row");
+            AddPresetBtn(presetRow, "Allow All", () => { config.AllowAll();  RebuildScroll(container, config, groups); });
+            AddPresetBtn(presetRow, "Deny All",  () => { config.DenyAll();   RebuildScroll(container, config, groups); });
+            container.Add(presetRow);
+
+            // Search field
+            var search = new TextField { tooltip = "Filter tools by name" };
+            search.AddToClassList("search-field");
+            container.Add(search);
+
+            // Scroll area
+            var scroll = new ScrollView(ScrollViewMode.Vertical);
+            scroll.AddToClassList("tool-scroll");
+            container.Add(scroll);
+
+            BuildGroups(scroll, config, groups);
+
+            search.RegisterValueChangedCallback(evt =>
+            {
+                var q = evt.newValue.Trim();
+                foreach (var g in groups) g.Filter(q);
+            });
+
+            return container;
+        }
+
+        private static void RebuildScroll(VisualElement root, PermissionConfig config, List<PermCategoryGroup> groups)
+        {
+            var scroll = root.Q<ScrollView>();
             if (scroll == null) return;
             scroll.Clear();
             groups.Clear();
