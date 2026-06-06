@@ -1,9 +1,11 @@
+# Unity MCP — Control Unity Editor from Claude Code
+
 <div align="center">
 
 <img src="docs/assets/hero.svg" width="100%" alt="Unity MCP — control Unity from Claude, a live heartbeat status window with a breathing mint-green orb, ECG trace, and TCP packet field">
 
 <a href="https://github.com/german-krasnikov/unity-kiss-mcp">
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=900&color=3AD29F&center=true&vCenter=true&width=760&lines=Control+Unity+from+Claude.;Token-minimized+MCP+tools.;80-95%25+batch+token+savings.;The+editor's+heartbeat%2C+made+visible." alt="Control Unity from Claude — token-minimized MCP tools — 80-95% batch token savings">
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=900&color=3AD29F&center=true&vCenter=true&width=760&lines=The+editor's+heartbeat%2C+made+visible.;Control+Unity+from+Claude.;80-95%25+batch+token+savings.;Scene+CRUD+%C2%B7+Animation+%C2%B7+VFX+%C2%B7+PlayTest+DSL." alt="Control Unity from Claude — token-minimized MCP tools — 80-95% batch token savings">
 </a>
 
 </div>
@@ -31,7 +33,9 @@
 
 </div>
 
-> **MCP server bridging Claude Code to the Unity Editor over a binary protocol** — 10–15× token compression, capability gating, and a live status window whose heartbeat the banner above mirrors beat-for-beat.
+> **Let Claude Code control your Unity Editor** — inspect scenes, edit GameObjects, run playtests, and capture screenshots without leaving the chat. Binary TCP protocol with 10–15× token compression and 80–95% batch savings.
+
+<sub>MCP (Model Context Protocol) is Anthropic's open standard for giving AI assistants structured tool access.</sub>
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
@@ -45,7 +49,7 @@
 
 🖥️ **CLI Mode** — run from terminal via Claude Code or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 91 MCP tools with 80–95% token compression.
 
-💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. Spawns Claude or Codex CLI directly — no sidecar, no API key configuration. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one click rolls back everything the AI changed. Domain-reload safe.
+💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the Claude or Codex CLI directly. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
 **Before / after — creating and configuring 3 objects:**
 
@@ -68,7 +72,11 @@ batch([
 ])
 ```
 
-<img src="docs/assets/divider.svg" width="100%" alt="">
+<img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
+
+### Architecture
+
+<img src="docs/assets/architecture.svg" width="100%" alt="Architecture: Claude Code → Python MCP Server → TCP :9500 → Unity Editor Plugin">
 
 ## Quick Start
 
@@ -120,69 +128,94 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 - **"Connection refused"** — Unity must be open with the plugin. Server auto-retries on reconnect.
 - **Tools don't appear** — Verify path in `mcp_settings.json`. Restart Claude Code. `pip show unity-mcp`.
 - **C# changes not reflected** — Click Unity window or `open -a Unity` (macOS) to trigger recompile.
+- **Security** — TCP server binds to `localhost` only. Do not expose port 9500 to the network.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="89 MCP Tools · 2963 Tests (1723 Python · 1187 Unity · 53 Live) · 80-95% Batch Savings">
+<details>
+<summary><b>Compatibility</b></summary>
 
-<img src="docs/assets/divider.svg" width="100%" alt="">
+| Component | Tested | Minimum |
+|-----------|--------|---------|
+| Unity | 6000.0 (Unity 6) | 2021.3 LTS |
+| Python | 3.12, 3.11, 3.10 | 3.10 |
+| OS | macOS (primary), Windows, Linux | — |
+| Claude Code | latest | any with MCP support |
+
+</details>
+
+<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 2963 Tests (1723 Python · 1187 Unity · 53 Live) · 80-95% Batch Savings">
+
+<img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
 ## Features
 
 - **Token Optimization** — `batch` compresses 5–20 calls into one (80–95% savings), deferred tool schemas, per-session cost analytics
+- **In-Unity Chat** — Claude/Codex backends, no API key needed, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
+- **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at`
 - **PlayTest DSL** — 21 commands: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
 - **Scene Management** — CRUD, hierarchy inspection, query syntax, diff tracking, checkpoint/restore
 - **Animation & Timeline** — clips, key management, Timeline assets, Animator states/transitions
 - **VFX & Particles** — particle system CRUD, 11 module presets, shader graph integration
 - **Multi-View Screenshots** — 4-panel grid (Front/Left/Top/Iso), bounding-box overlay, visual regression
-- **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at`
 - **Capability Gating** — TIER1 core always on; 8 category toggles per-session
-- **In-Unity Chat** — Claude/Codex backends, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
 - **Plugin Extensibility** — register your own tools in one file, no cross-imports
 
-<img src="docs/assets/divider.svg" width="100%" alt="">
+<details>
+<summary><b>PlayTest DSL example</b></summary>
+
+```
+run_playtest(script="""
+MOVE /Player TO 5,0,3
+WAIT_UNTIL /Enemy|Health|hp <= 0 timeout=5
+ASSERT /Player|Health|hp > 0
+ASSERT_CONSOLE_CLEAN
+SNAPSHOT /Player /Enemy
+""")
+```
+
+</details>
+
+<details>
+<summary><b>Add your own tool</b> — one file, zero cross-imports</summary>
+
+```python
+# server/src/unity_mcp/tools/my_tool.py
+def register(mcp, send, args):
+    @mcp.tool()
+    async def find_inactive(path: str = "/") -> str:
+        """Find all inactive GameObjects under path."""
+        return await send("find_objects", args(path=path, active="false"))
+```
+
+Drop the file in `tools/` — it's auto-discovered on next server start.
+
+</details>
+
+<img src="docs/assets/divider-pulse.svg" width="100%" alt="">
 
 ## Recent Changes
+
+<div><sub>Full history: <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a></sub></div>
 
 <!-- CHANGELOG_START -->
 <details>
 <summary><b>v0.17.0</b> — 2026-06-05 — full-project code review sprint — 12 waves of fixes across Python + C#</summary>
-
-**Full-Project Code Review Sprint (Server v0.8.0, Plugin v0.17.0)** (2026-06-05) — 12-wave autonomous review sprint covering all Python and C# subsyst …
-
 </details>
 
 <details>
 <summary><b>v0.16.0</b> — 2026-06-05 — F12 chat UX overhaul — composed inline-chip field + response pills + session clear</summary>
-
-**F12 Chat UX Overhaul (Plugin v0.16.0)** (2026-06-05) — Five production-ready pieces shipping together: (1) **W0 composed inline-chip field (P1+P2 re …
-
 </details>
 
 <details>
 <summary><b>v0.15.8</b> — 2026-06-05 — inline-chips + extensible chip-kind registry — F11</summary>
-
-**Inline Chips + Extensible Chip-Kind Registry (Plugin v0.15.8, F11)** (2026-06-05) — Production-ready extensible typed-context-chip system for in-Uni …
-
-</details>
-
-<details>
-<summary><b>v0.15.0</b> — 2026-06-04 — chat UX polish sprint — F1–F10 + review-hardening</summary>
-
-**Chat UX Sprint: 10 Features + Review-Hardening (Plugin v0.15.0)** (2026-06-04) — Six-wave comprehensive UX polish for in-Unity agent chat.
-
-</details>
-
-<details>
-<summary><b>v0.14.0</b> — 2026-06-04 — multi-backend agent chat — Claude + Codex via DRY CliBackendBase</summary>
-
-**Multi-Backend Agent Chat: Codex Support via DRY CliBackendBase (Plugin v0.14.0)** (2026-06-04) — Added OpenAI Codex as a sibling backend alongside C …
-
 </details>
 
 <details>
 <summary>Older releases</summary>
 
+- **v0.15.0** — 2026-06-04 — chat UX polish sprint — F1–F10 + review-hardening
+- **v0.14.0** — 2026-06-04 — multi-backend agent chat — Claude + Codex via DRY CliBackendBase
 - **v0.7.1** — 2026-06-04 — tech-debt sprint wave 1–3 (Python/C#/Chat) — pure quality
 - **v0.7.0** — 2026-06-04 — Editor.log out-of-band corroboration — P0 compile-tool blindness fix
 - **v0.6.1** — 2026-06-04 — atomic batch rollback — transactional scene edits
@@ -191,7 +224,6 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 - **v0.10.0** — 2026-06-04 — chat plan/act approve & execute + slash templates
 - **v0.9.0** — 2026-06-04 — chat context resolution + compile gating tool
 - **v0.8.0** — 2026-06-04 — compile auto-fix + editor-state injection + tool ping
-- **v0.7.0** — 2026-06-04 — F4 deferred schema + reload-survival + auto-selection
 - **v0.6.0** — 2026-06-03 — Aura pill + native theme + perms gating
 - **v0.5.0** — 2026-06-03 — chat UX polish — refs, grouping, scroll
 - **v0.4.0** — 2026-06-03 — extensible render: md + mermaid + img
@@ -201,7 +233,21 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 </details>
 <!-- CHANGELOG_END -->
 
-<div align="center"><sub>See <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a> for full history</sub></div>
+<img src="docs/assets/divider.svg" width="100%" alt="">
+
+## Contributing
+
+```bash
+# Python tests (no Unity needed)
+cd server && pytest -m "not live" -v
+
+# With Unity running on :9500
+pytest -m "live"
+
+# C# tests — Unity Test Runner → EditMode
+```
+
+Architecture overview: [`AI/architecture.md`](AI/architecture.md) · Full tool catalog: [`AI/mcp-server.md`](AI/mcp-server.md)
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
