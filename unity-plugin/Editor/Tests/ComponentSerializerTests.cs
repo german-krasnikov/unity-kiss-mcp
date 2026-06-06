@@ -29,13 +29,13 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Integer_ReturnsDecimalString()
         {
-            var light = _go.AddComponent<Light>();
-            light.cullingMask = 42;
-            var so = new SerializedObject(light);
+            var mr = _go.AddComponent<MeshRenderer>();
+            mr.sortingOrder = 7;
+            var so = new SerializedObject(mr);
             so.Update();
-            var prop = so.FindProperty("m_CullingMask");
-            Assert.IsNotNull(prop, "m_CullingMask not found on Light");
-            Assert.AreEqual("42", ComponentSerializer.GetPropertyValueString(prop));
+            var prop = so.FindProperty("m_SortingOrder");
+            Assert.IsNotNull(prop, "m_SortingOrder not found on MeshRenderer");
+            Assert.AreEqual("7", ComponentSerializer.GetPropertyValueString(prop));
         }
 
         // ── Float branch ──────────────────────────────────────────────────────
