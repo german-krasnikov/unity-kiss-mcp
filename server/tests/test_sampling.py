@@ -1,6 +1,8 @@
-"""Tests for MCP sampling tools: auto_fix and smart_build."""
+"""Tests for MCP sampling tools: auto_fix, smart_build, SamplingService.generate."""
+import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from unity_mcp.sampling import SamplingService
 from unity_mcp.tools.codegen import auto_fix, smart_build
 
 
@@ -14,6 +16,16 @@ def _make_ctx(sampling_result=None, sampling_error=None):
         msg.content = [MagicMock(text=sampling_result or "Fix the code")]
         ctx.session.create_message = AsyncMock(return_value=msg)
     return ctx
+
+
+@pytest.mark.asyncio
+async def test_generate_returns_text_on_success(monkeypatch):
+    """P1-10: SamplingService.generate happy path — returns text from _run."""
+    monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
+    svc = SamplingService()
+    with patch.object(svc, "_run", new=AsyncMock(return_value="generated text")):
+        result = await svc.generate("write a hello world script")
+    assert result == "generated text"
 
 
 @pytest.mark.asyncio

@@ -282,3 +282,33 @@ async def test_do_dry_run_e2e():
         result = await do("add a cube", dry_run=True)
         mock_send.assert_not_called()
         assert "create_object" in result or "dry" in result.lower() or "plan" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# 13. Executor — no retry when >5 failures (P1-7)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_executor_no_retry_above_5_failures():
+    """When >5 lines fail, executor returns raw result without retrying."""
+    from unity_mcp.do_intent.executor import Executor
+
+    # 6 error lines → above the ≤5 threshold
+    raw_result = "\n".join(
+        f"[{i}] err: set_property path=/Obj{i} component=T prop=x value=1: not found"
+        for i in range(1, 7)
+    )
+    send = AsyncMock(return_value=raw_result)
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(return_value="create_object name=Cube")  # would be called on retry
+
+    ex = Executor(send, sampling=svc)
+    result = await ex.execute("some_plan")
+
+    # send called exactly once — no retry
+    send.assert_called_once()
+    # result equals raw (no retry result substituted)
+    assert result == raw_result
+    # sampling service never called
+    svc.generate.assert_not_called()

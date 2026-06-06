@@ -1,4 +1,4 @@
-"""TDD tests: codegen.auto_fix corroboration via editor_log.corroborate."""
+"""TDD tests: codegen.auto_fix corroboration via editor_log.corroborate + smart_build branches."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -44,3 +44,72 @@ async def test_auto_fix_no_errors_returns_no_errors_to_fix(monkeypatch):
         result = await codegen.auto_fix(ctx)
 
     assert result == "No errors to fix."
+
+
+# ---------------------------------------------------------------------------
+# smart_build branch coverage
+# ---------------------------------------------------------------------------
+
+def _make_ctx(text: str) -> MagicMock:
+    """Build a mock ctx whose session.create_message returns text."""
+    content = MagicMock()
+    content.text = text
+    response = MagicMock()
+    response.content = [content]
+    ctx = MagicMock()
+    ctx.session.create_message = AsyncMock(return_value=response)
+    return ctx
+
+
+@pytest.mark.asyncio
+async def test_smart_build_fenced_csharp_extracted(monkeypatch):
+    """smart_build strips ```csharp fences and passes inner code to execute_code."""
+    import unity_mcp.tools.codegen as codegen
+
+    inner = "var go = new GameObject(\"Test\");"
+    llm_text = f"Here you go:\n```csharp\n{inner}\n```"
+    ctx = _make_ctx(llm_text)
+
+    send_mock = AsyncMock(return_value="ok")
+    monkeypatch.setattr(codegen, "_send", send_mock)
+
+    await codegen.smart_build("create a cube", ctx)
+
+    send_mock.assert_called_once()
+    # _send("execute_code", {"code": ...}) — second positional arg is the dict
+    called_code = send_mock.call_args[0][1]["code"]
+    assert called_code == inner
+
+
+@pytest.mark.asyncio
+async def test_smart_build_unfenced_windows_line_endings(monkeypatch):
+    """smart_build handles Windows \\r\\n unfenced response correctly."""
+    import unity_mcp.tools.codegen as codegen
+
+    inner = "var go = new GameObject(\"Test\");\r\nreturn go.name;"
+    ctx = _make_ctx(inner)
+
+    send_mock = AsyncMock(return_value="ok")
+    monkeypatch.setattr(codegen, "_send", send_mock)
+
+    await codegen.smart_build("create a cube", ctx)
+
+    send_mock.assert_called_once()
+    called_code = send_mock.call_args[0][1]["code"]
+    assert "GameObject" in called_code
+
+
+@pytest.mark.asyncio
+async def test_smart_build_empty_response_returns_early(monkeypatch):
+    """smart_build with empty LLM response returns without calling execute_code."""
+    import unity_mcp.tools.codegen as codegen
+
+    ctx = _make_ctx("   ")  # whitespace-only
+
+    send_mock = AsyncMock(return_value="ok")
+    monkeypatch.setattr(codegen, "_send", send_mock)
+
+    result = await codegen.smart_build("create a cube", ctx)
+
+    send_mock.assert_not_called()
+    assert "empty" in result.lower()

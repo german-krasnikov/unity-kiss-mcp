@@ -64,7 +64,7 @@ class CostTracker:
         today = self._today()
         if self._daily_state.get("date") != today:
             self._daily_state = {"date": today, "spent": 0.0}
-        self._daily_state["spent"] = self._daily_state.get("spent", 0.0) + usd
+        self._daily_state["spent"] = (self._daily_state.get("spent") or 0.0) + usd
         success, reason = self._save()
         if not success:
             from ..metrics import METRICS

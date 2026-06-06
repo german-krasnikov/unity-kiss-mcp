@@ -134,6 +134,16 @@ def test_budget_save_failure_emits_event(tmp_path, monkeypatch):
         METRICS.event = original_event
 
 
+def test_null_spent_in_file_does_not_crash(tmp_path):
+    """P0-4: persisted null spent must not cause TypeError on record()."""
+    from datetime import date
+    f = tmp_path / "budget.json"
+    f.write_text('{"date": "' + date.today().isoformat() + '", "spent": null}')
+    tracker = CostTracker(path=f)
+    tracker.record("screenshot_describe", in_tok=100, out_tok=50, has_image=False)
+    assert tracker.day_spent() >= 0
+
+
 def test_budget_save_failure_increments_metric(tmp_path, monkeypatch):
     """os.replace raises OSError → record() completes, degraded.budget_save==1."""
     from unity_mcp.metrics import METRICS

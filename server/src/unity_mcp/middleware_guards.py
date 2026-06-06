@@ -155,7 +155,14 @@ class MiddlewareGuardsMixin:
                 name = path.split("/")[-1] if path else ""
                 if name in created_names:
                     warnings.append(f"⚠ BATCH: create+delete '{name}' is a no-op")
+                if path in deleted_paths:
+                    warnings.append(f"⚠ BATCH: double-delete on '{path}'")
                 deleted_paths.add(path)
+
+            elif cmd == "manage_component":
+                path = kv.get("path", "")
+                if path in deleted_paths:
+                    warnings.append(f"⚠ BATCH: referencing deleted object '{path}'")
 
         return "\n".join(warnings) if warnings else None
 

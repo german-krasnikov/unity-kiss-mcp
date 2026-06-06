@@ -261,3 +261,52 @@ def test_is_process_dead_returns_true_when_pid_dead():
         assert probe.is_process_dead() is True
 
 
+# ---------------------------------------------------------------------------
+# has_strong_busy_signal — state-file branches (P1-14)
+# ---------------------------------------------------------------------------
+
+def _make_state(is_stale: bool, is_busy: bool):
+    from unittest.mock import MagicMock
+    from unity_mcp.unity_state import UnityState
+    m = MagicMock(spec=UnityState)
+    m.is_stale = is_stale
+    m.is_busy = is_busy
+    return m
+
+
+def test_has_strong_busy_signal_state_not_stale_is_busy():
+    """state file: not stale, is_busy=True → True"""
+    state = _make_state(is_stale=False, is_busy=True)
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state):
+        probe = CompileStateProbe(port=9500)
+        assert probe.has_strong_busy_signal() is True
+
+
+def test_has_strong_busy_signal_state_not_stale_not_busy():
+    """state file: not stale, is_busy=False → False (falls through to lock file which is absent)"""
+    state = _make_state(is_stale=False, is_busy=False)
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state):
+        probe = CompileStateProbe(port=9500)
+        assert probe.has_strong_busy_signal() is False
+
+
+def test_has_strong_busy_signal_state_none_process_dead():
+    """state=None (stale/missing) + process dead → False (not lock file check)"""
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=None), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=999999), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=False):
+        probe = CompileStateProbe(port=9500)
+        assert probe.has_strong_busy_signal() is False
+
+
+def test_has_strong_busy_signal_state_none_process_alive_falls_to_lock(tmp_path):
+    """state=None + process alive → fallthrough to lock file"""
+    (tmp_path / "Library" / "BeeDriver").mkdir(parents=True)
+    (tmp_path / "Library" / "BeeDriver" / "Lock").touch()
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=None), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=12345), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True):
+        probe = CompileStateProbe(unity_project_path=tmp_path, port=9500)
+        assert probe.has_strong_busy_signal() is True
+
+

@@ -295,3 +295,42 @@ async def test_executor_does_not_corroborate_other_tools():
 
     mock_cor.assert_not_called()
     assert results[0] == "scan ok"
+
+
+# ---------------------------------------------------------------------------
+# 14. Router — route() returns None for mutating question (P2)
+# ---------------------------------------------------------------------------
+
+def test_router_route_returns_none_for_mutating_question():
+    """route() must return None when question starts with a mutating verb."""
+    from unity_mcp.ask.router import route
+    result = route("delete all objects in scene")
+    assert result is None
+
+
+def test_router_route_returns_none_for_set_verb():
+    from unity_mcp.ask.router import route
+    result = route("set the health to 100 on Player")
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# 15. Summarizer — multi_result always triggers haiku (P2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_summarizer_multi_result_short_total_still_calls_haiku():
+    """Two short results totalling <200 chars must still call Haiku (multi_result path)."""
+    from unity_mcp.ask.summarizer import Summarizer
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(return_value="summary from haiku")
+
+    s = Summarizer(svc)
+    # Two results, each short, combined well under 200 chars
+    raw = ["ok: no refs", "ok: no errors"]
+    assert sum(len(r) for r in raw) < 200
+
+    result = await s.summarize("any issues?", raw, hint="scene health")
+    svc.generate.assert_called_once()
+    assert result == "summary from haiku"

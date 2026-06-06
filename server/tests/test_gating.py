@@ -271,3 +271,53 @@ def test_is_deferred_returns_false_for_unknown_plugin_tool():
     """Unknown tools (not in _ALL_KNOWN) pass through — not deferred."""
     from unity_mcp.tools.gating import is_deferred
     assert is_deferred("my_totally_unknown_plugin_tool_xyz") is False
+
+
+# --- P1-2: connection tools survive filter_by_tier ---
+
+def test_reconnect_unity_in_force_visible():
+    """reconnect_unity is FORCE_VISIBLE — must be in FORCE_VISIBLE set."""
+    from unity_mcp.tools.gating import FORCE_VISIBLE
+    assert "reconnect_unity" in FORCE_VISIBLE
+
+
+def test_list_connections_in_force_visible():
+    """list_connections is FORCE_VISIBLE — must be in FORCE_VISIBLE set."""
+    from unity_mcp.tools.gating import FORCE_VISIBLE
+    assert "list_connections" in FORCE_VISIBLE
+
+
+def test_reconnect_unity_in_core_tools():
+    """reconnect_unity is in _CORE_TOOLS (controls is_deferred, not visibility)."""
+    from unity_mcp.tools.gating import _CORE_TOOLS
+    assert "reconnect_unity" in _CORE_TOOLS
+
+
+def test_list_connections_in_core_tools():
+    """list_connections is in _CORE_TOOLS (controls is_deferred, not visibility)."""
+    from unity_mcp.tools.gating import _CORE_TOOLS
+    assert "list_connections" in _CORE_TOOLS
+
+
+def test_reconnect_unity_survives_filter_when_disabled_cache_cold():
+    """reconnect_unity is NOT in TIER1, so it would vanish unless _CORE_TOOLS saves it.
+
+    filter_by_tier keeps a tool when: in TIER1, session-enabled, OR unknown.
+    reconnect_unity is known (_ALL_KNOWN via CATEGORIES["connection"] or _CORE_TOOLS)
+    but absent from TIER1. This test verifies it still passes through because
+    is_visible() must return True via FORCE_VISIBLE / _CORE_TOOLS path.
+    """
+    from unity_mcp.tools import gating
+    gating.reset()
+    tool = _make_tool("reconnect_unity")
+    result = gating.filter_by_tier([tool])
+    assert result == [tool], "reconnect_unity must survive filter_by_tier with cold session"
+
+
+def test_list_connections_survives_filter_when_disabled_cache_cold():
+    """list_connections is NOT in TIER1 but must survive filter_by_tier."""
+    from unity_mcp.tools import gating
+    gating.reset()
+    tool = _make_tool("list_connections")
+    result = gating.filter_by_tier([tool])
+    assert result == [tool], "list_connections must survive filter_by_tier with cold session"

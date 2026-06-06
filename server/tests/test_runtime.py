@@ -1,7 +1,11 @@
 """Tests for runtime Play Mode tools."""
 import pytest
 from unittest.mock import AsyncMock, patch
-from unity_mcp.server import invoke_method, set_runtime_property, wait_until, query_state
+from mcp.server.fastmcp.exceptions import ToolError
+from unity_mcp.server import (
+    invoke_method, set_runtime_property, wait_until, query_state, move_to, fuzz_playtest,
+    set_active, wire_event, unwire_event,
+)
 
 
 @pytest.mark.asyncio
@@ -86,3 +90,82 @@ async def test_query_state_multiple_objects(mock_bridge):
     sent = mock_bridge.send.call_args[0][1]
     assert sent["queries"] == "/Player|Health|hp,/Player|Ammo|count"
     assert result == "Health.hp=80\nAmmo.count=5"
+
+
+# --- P1-4: move_to bridge call shape ---
+
+@pytest.mark.asyncio
+async def test_move_to_sends_correct_command(mock_bridge):
+    """move_to sends cmd='move_to' with timeout as str and python timeout = timeout+5."""
+    mock_bridge.send.return_value = {"ok": True, "data": "arrived"}
+    await move_to("/Player", "5,0,-3")
+    call_args = mock_bridge.send.call_args
+    assert call_args[0][0] == "move_to"
+    sent = call_args[0][1]
+    assert sent["path"] == "/Player"
+    assert sent["position"] == "5,0,-3"
+    assert sent["timeout"] == "15.0"          # str(float(default=15.0))
+    assert call_args[1]["timeout"] == 20.0    # timeout + 5.0
+
+
+@pytest.mark.asyncio
+async def test_move_to_custom_timeout_offset(mock_bridge):
+    """Python-level timeout is always unity timeout + 5.0."""
+    mock_bridge.send.return_value = {"ok": True, "data": "arrived"}
+    await move_to("/Enemy", "0,0,0", timeout=30.0)
+    call_args = mock_bridge.send.call_args
+    sent = call_args[0][1]
+    assert sent["timeout"] == "30.0"
+    assert call_args[1]["timeout"] == 35.0    # 30 + 5
+
+
+# --- P1-4: fuzz_playtest hardcoded timeout ---
+
+@pytest.mark.asyncio
+async def test_fuzz_playtest_sends_run_playtest_cmd(mock_bridge):
+    """fuzz_playtest delegates to run_playtest command on the bridge."""
+    mock_bridge.send.return_value = {"ok": True, "data": "fuzz ok"}
+    await fuzz_playtest(steps=3, seed=42)
+    call_args = mock_bridge.send.call_args
+    assert call_args[0][0] == "run_playtest"
+
+
+@pytest.mark.asyncio
+async def test_fuzz_playtest_hardcoded_timeout_string(mock_bridge):
+    """fuzz_playtest passes args['timeout']='30' (string, not float) to bridge."""
+    mock_bridge.send.return_value = {"ok": True, "data": "fuzz ok"}
+    await fuzz_playtest(steps=3, seed=42)
+    call_args = mock_bridge.send.call_args
+    sent = call_args[0][1]
+    assert sent["timeout"] == "30"            # hardcoded string, not float
+    assert call_args[1]["timeout"] == 40.0    # Python-level timeout=40.0
+
+
+# ─── ok=False → ToolError (write tools) ──────────────────────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("active,err_msg", [
+    (True,  "Object not found"),
+    (False, "Scene path invalid"),
+])
+async def test_set_active_error_raises_tool_error(mock_bridge, active, err_msg):
+    """set_active raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": err_msg})
+    with pytest.raises(ToolError, match=err_msg):
+        await set_active("/Missing", active)
+
+
+@pytest.mark.asyncio
+async def test_wire_event_error_raises_tool_error(mock_bridge):
+    """wire_event raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Event field not found"})
+    with pytest.raises(ToolError, match="Event field not found"):
+        await wire_event("/Btn", "Button", "onClick", "/Target", "SetActive")
+
+
+@pytest.mark.asyncio
+async def test_unwire_event_error_raises_tool_error(mock_bridge):
+    """unwire_event raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "No listeners to remove"})
+    with pytest.raises(ToolError, match="No listeners to remove"):
+        await unwire_event("/Btn", "Button", "onClick")

@@ -387,3 +387,18 @@ def test_format_report_includes_suppressed():
     h.observe("get_component", {"path": "/Y"})
     report = METRICS.format_report()
     assert "suppressed=" in report
+
+
+# ── Test 18: screenshot-spam fires on third consecutive ──────────────────────
+
+def test_screenshot_spam_fires():
+    """3 consecutive screenshots with no writes → third returns hint containing 'fingerprint'."""
+    h = make_hinter()
+    r1 = h.observe("screenshot", {})
+    r2 = h.observe("screenshot", {})
+    r3 = h.observe("screenshot", {})
+    assert r1 is None
+    assert r2 is None
+    assert r3 is not None
+    assert "[HINT:" in r3
+    assert "fingerprint" in r3

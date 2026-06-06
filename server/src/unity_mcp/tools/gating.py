@@ -171,7 +171,7 @@ def get_categories() -> dict[str, set[str]]:
 
 
 def is_visible(name: str) -> bool:
-    if name in TIER1:
+    if name in TIER1 or name in FORCE_VISIBLE:
         return True
     return name in _session_enabled
 

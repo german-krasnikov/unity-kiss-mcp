@@ -188,3 +188,18 @@ async def test_animator_intent_e2e_executes_batch():
             call_args = mock_send.call_args
             assert call_args[0][0] == "batch"
             assert "ok" in result
+
+
+@pytest.mark.asyncio
+async def test_animator_intent_invalid_dsl_no_batch():
+    """LLM returns DSL with undeclared state in TRANS → result starts with 'INVALID DSL:', _send never called."""
+    from unity_mcp.tools.animator_intent_tool import animator_intent
+    # Walk state is referenced in TRANS but never declared with STATE
+    bad_dsl = "PARAM Speed float 0\nSTATE Idle Idle.anim\nDEFAULT Idle\nTRANS Idle -> Walk dur=0.15 if Speed>0.1"
+    with patch("unity_mcp.tools.animator_intent_tool._send", new_callable=AsyncMock) as mock_send:
+        with patch("unity_mcp.tools.animator_intent_tool._sampling") as mock_svc:
+            mock_svc.generate = AsyncMock(return_value=bad_dsl)
+            result = await animator_intent(target="/Player", intent="basic walk cycle")
+
+    assert result.startswith("INVALID DSL:"), f"Expected 'INVALID DSL:' prefix, got: {result!r}"
+    mock_send.assert_not_called()

@@ -402,3 +402,30 @@ async def test_mismatch_msg_with_bracket(monkeypatch):
         close = inner.index("]")
         msg_content = inner[:close]
         assert "]" not in msg_content
+
+
+# ── 27. wire_event — no confirmation → mismatch ──────────────────────────────
+
+@pytest.mark.asyncio
+async def test_wire_event_no_confirmation_mismatch():
+    result = await reflect("wire_event", {"event": "OnClick", "target": "/Btn"}, "Failed: target not found", _dummy_send)
+    assert isinstance(result, Mismatch)
+    assert "wire_event" in result.msg.lower()
+
+
+@pytest.mark.asyncio
+async def test_wire_event_wired_confirmation_passes():
+    result = await reflect("wire_event", {"event": "OnClick", "target": "/Btn"}, "Wired: OnClick → /Btn.OnPress", _dummy_send)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_wire_event_connected_confirmation_passes():
+    result = await reflect("wire_event", {"event": "OnValueChanged", "target": "/Slider"}, "Connected: OnValueChanged to /Slider.Handle", _dummy_send)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_wire_event_empty_response_mismatch():
+    result = await reflect("wire_event", {"event": "OnClick"}, "", _dummy_send)
+    assert isinstance(result, Mismatch)
