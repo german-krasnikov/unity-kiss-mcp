@@ -146,7 +146,12 @@ unity-kiss-mcp/
 │       ├── ConsoleCapture.cs + CompileErrorCapture.cs + CompileNotifier.cs
 │       ├── FingerprintHelper.cs + ScanHelper.cs + SceneDiffHelper.cs
 │       ├── ChangeWatcher.cs + ColliderChecker.cs + SchemaHelper.cs
-│       ├── MCPSettings.cs + MCPStatusWindow.cs
+│       ├── MCPSettings.cs                 # Pure static data class (catalog, EnabledTools, no EditorWindow)
+│       ├── MCPToolSettingsWindow.cs       # MCP/Tool Settings window (toggles + presets + plugins)
+│       ├── MCPPermissionsWindow.cs        # MCP/Permissions window (deny-set config)
+│       ├── MCPConnectionWindow.cs         # MCP/Connection window (CLI binary + auth + backends + chips)
+│       ├── ChatSettingsHook.cs            # Event hook: OnBuildConnection fired when Connection window builds
+│       ├── MCPStatusWindow.cs             # Connection status monitor (heartbeat animation)
 │       ├── MCPActions.cs                  # Shared actions (Restart, Kill, Reimport)
 │       ├── MCPStatusModel.cs              # Pure state logic (no deps) — maps connection state → display
 │       ├── MCPStatusBarWidget.cs          # Injects MCP pill into AppStatusBar via reflection
@@ -182,7 +187,8 @@ unity-kiss-mcp/
 │       │   ├── MCPChatWindow.Resize.cs    # Window resize logic
 │       │   ├── TokenFormat.cs             # Pure Abbr(n) helper — "1.2k" / "840" token display
 │       │   ├── EnterKeySend.cs            # Enter-to-send + Alt+Enter newline logic (pure testable)
-│       │   ├── ChatSettingsSection.cs     # Settings foldout in MCPSettings (F8 Beta removed)
+│       │   ├── ChatSettingsSection.cs     # Delegate class for ChatConnectionSection (F23 refactored)
+│       │   ├── ChatConnectionSection.cs   # [InitializeOnLoad] subscriber to ChatSettingsHook.OnBuildConnection (F23)
 │       │   ├── ChatActivityState.cs       # Activity state tracking for grouping
 │       │   ├── ChatLabel.cs               # Label customization + UI behavior
 │       │   ├── ChatRefAction.cs           # Click-navigate + context-menu for interactive refs
