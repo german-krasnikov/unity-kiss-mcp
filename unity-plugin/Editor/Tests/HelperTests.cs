@@ -36,7 +36,7 @@ namespace UnityMCP.Editor.Tests
         }
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_mat);
+        public void TearDown() => UnityEngine.Object.DestroyImmediate(_mat);
 
         // Color branch
         [Test]
@@ -213,7 +213,7 @@ namespace UnityMCP.Editor.Tests
         public void TearDown()
         {
             foreach (var go in _created)
-                if (go != null) Object.DestroyImmediate(go);
+                if (go != null) UnityEngine.Object.DestroyImmediate(go);
             _created.Clear();
         }
 

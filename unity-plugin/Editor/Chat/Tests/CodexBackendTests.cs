@@ -15,6 +15,8 @@ namespace UnityMCP.Editor.Chat.Tests
     {
         internal string[] LastArgs;
 
+        internal void SetSessionId(string id) => SessionId = id;
+
         // Reuse persistent=false so spawn-per-turn path fires in SendTurn.
         protected override bool   IsPersistentProcess => false;
         protected override string BinaryName          => "codex";
@@ -93,7 +95,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ResumeTurn_NoSnapshot_PromptArgIsRaw()
         {
-            _b.SessionId = "sess-resume-123";
+            _b.SetSessionId("sess-resume-123");
             _b.SendTurn(TurnJson("follow-up question"));
 
             var lastArg = _b.LastArgs[_b.LastArgs.Length - 1];
