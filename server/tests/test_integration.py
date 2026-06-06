@@ -6,6 +6,8 @@ import asyncio
 import json
 import struct
 import pytest
+from unittest.mock import AsyncMock
+from mcp.server.fastmcp.exceptions import ToolError
 
 from unity_mcp.bridge import UnityBridge
 
@@ -100,3 +102,41 @@ async def test_large_payload(mock_unity_server):
     assert len(json.dumps(response["data"])) > 10000
 
     await bridge.close()
+
+
+# ─── write-tool ok=False → ToolError ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_set_active_error_raises_tool_error(mock_bridge):
+    """set_active raises ToolError when Unity returns ok=False."""
+    from unity_mcp.tools.objects import set_active
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
+    with pytest.raises(ToolError, match="Object not found"):
+        await set_active("/Missing", True)
+
+
+@pytest.mark.asyncio
+async def test_wire_event_error_raises_tool_error(mock_bridge):
+    """wire_event raises ToolError when Unity returns ok=False."""
+    from unity_mcp.tools.objects import wire_event
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Event field not found"})
+    with pytest.raises(ToolError, match="Event field not found"):
+        await wire_event("/Btn", "Button", "onClick", "/Target", "SetActive")
+
+
+@pytest.mark.asyncio
+async def test_unwire_event_error_raises_tool_error(mock_bridge):
+    """unwire_event raises ToolError when Unity returns ok=False."""
+    from unity_mcp.tools.objects import unwire_event
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "No listeners found"})
+    with pytest.raises(ToolError, match="No listeners found"):
+        await unwire_event("/Btn", "Button", "onClick")
+
+
+@pytest.mark.asyncio
+async def test_set_material_error_raises_tool_error(mock_bridge):
+    """set_material raises ToolError when Unity returns ok=False."""
+    from unity_mcp.tools.objects import set_material
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Renderer not found"})
+    with pytest.raises(ToolError, match="Renderer not found"):
+        await set_material("/Missing", "#FF0000")

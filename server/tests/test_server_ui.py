@@ -99,3 +99,11 @@ async def test_set_material_with_shader(mock_bridge):
     assert args["path"] == "/Cube"
     assert args["color"] == "#00FF00"
     assert args["shader"] == "Standard"
+
+
+@pytest.mark.asyncio
+async def test_set_material_error_raises_tool_error(mock_bridge):
+    """set_material raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
+    with pytest.raises(ToolError, match="Object not found"):
+        await set_material(path="/Missing", color="#FF0000")

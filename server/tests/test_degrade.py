@@ -263,6 +263,49 @@ async def test_disabled_mode_propagates_exception_raw(monkeypatch):
         await degrade("feat", [("boom", explode), ("fallback", lambda: "safe")])
 
 
+# ── Test 15: disabled mode → METRICS.event NOT fired ─────────────────────────
+
+@pytest.mark.asyncio
+async def test_disabled_mode_no_metrics_event(monkeypatch):
+    """Pattern E: UNITY_MCP_DEGRADE_DISABLED=1 → METRICS.event is never called,
+    even when a step falls (returns None)."""
+    from unity_mcp.degrade import degrade
+    from unity_mcp.metrics import METRICS
+    METRICS.reset()
+
+    monkeypatch.setenv("UNITY_MCP_DEGRADE_DISABLED", "1")
+
+    events = []
+    monkeypatch.setattr(METRICS, "event", lambda kind, **fields: events.append({"kind": kind, **fields}))
+
+    await degrade("dis_feat", [
+        ("s1", lambda: None),   # falls
+        ("s2", lambda: "ok"),   # succeeds
+    ])
+
+    assert events == [], f"Expected no events, got {events}"
+
+
+@pytest.mark.asyncio
+async def test_disabled_mode_no_metrics_event_all_fail(monkeypatch):
+    """Pattern E: all steps fail in disabled mode → still no METRICS.event."""
+    from unity_mcp.degrade import degrade
+    from unity_mcp.metrics import METRICS
+    METRICS.reset()
+
+    monkeypatch.setenv("UNITY_MCP_DEGRADE_DISABLED", "1")
+
+    events = []
+    monkeypatch.setattr(METRICS, "event", lambda kind, **fields: events.append({"kind": kind, **fields}))
+
+    await degrade("dis_all_fail", [
+        ("s1", lambda: None),
+        ("s2", lambda: None),
+    ])
+
+    assert events == [], f"Expected no events, got {events}"
+
+
 # ── Test 12: all steps raise → last step name returned, counter=1 ─────────────
 
 @pytest.mark.asyncio

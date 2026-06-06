@@ -321,6 +321,21 @@ async def test_no_validate_arg_bypass_calls_bridge():
     assert "[INVALID:" not in result
 
 
+# ─── LRU eviction ORDER: SchemaCache ─────────────────────────────────────────
+
+def test_schema_cache_evicts_oldest_not_newest():
+    """Fill SchemaCache to max_size=3, add 4th; oldest type evicted, newest kept."""
+    cache = SchemaCache(max_size=3)
+    cache.put("TypeA", frozenset({"a"}))
+    cache.put("TypeB", frozenset({"b"}))
+    cache.put("TypeC", frozenset({"c"}))
+    cache.put("TypeD", frozenset({"d"}))  # overflow — TypeA is oldest
+    assert cache.get("TypeA") is None          # oldest evicted
+    assert cache.get("TypeB") == frozenset({"b"})
+    assert cache.get("TypeC") == frozenset({"c"})
+    assert cache.get("TypeD") == frozenset({"d"})  # newest kept
+
+
 # ── 10. Exception in send_fn → fail-open ─────────────────────────────────────
 
 @pytest.mark.asyncio

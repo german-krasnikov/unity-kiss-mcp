@@ -1,6 +1,8 @@
 """TDD tests for spatial_query raycast and spatial_map actions."""
 import pytest
-from unity_mcp.tools.spatial import spatial_query
+from unittest.mock import AsyncMock
+from mcp.server.fastmcp.exceptions import ToolError
+from unity_mcp.tools.spatial import spatial_query, scan_scene
 
 
 @pytest.mark.asyncio
@@ -32,3 +34,21 @@ async def test_spatial_raycast_with_layer_mask(mock_bridge):
     sent = mock_bridge.send.call_args[0][1]
     assert sent["layer_mask"] == "Default"
     assert "BLOCKED" in result
+
+
+# ─── error paths ──────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_spatial_query_error_raises_tool_error(mock_bridge):
+    """spatial_query raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
+    with pytest.raises(ToolError, match="Object not found"):
+        await spatial_query(action="nearest", path="/Missing")
+
+
+@pytest.mark.asyncio
+async def test_scan_scene_error_raises_tool_error(mock_bridge):
+    """scan_scene raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Scene not loaded"})
+    with pytest.raises(ToolError, match="Scene not loaded"):
+        await scan_scene()

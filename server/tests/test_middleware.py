@@ -511,3 +511,20 @@ def test_last_writes_bounded():
     for i in range(200):
         mw.check_dead_write("set_property", {"path": f"/Obj{i}", "component": "T", "prop": f"p{i}", "value": "v"})
     assert len(mw._last_writes) <= 128
+
+
+# ─── LRU eviction ORDER: component cache ─────────────────────────────────────
+
+def test_component_cache_evicts_oldest_not_newest():
+    """Fill _component_cache to max+1; oldest path evicted, newest kept."""
+    mw = Middleware()
+    mw._MAX_COMPONENTS = 3
+    mw._component_cache.clear()
+    mw._lru_add_component("/a", "C")
+    mw._lru_add_component("/b", "C")
+    mw._lru_add_component("/c", "C")
+    mw._lru_add_component("/d", "C")  # overflow — /a is oldest
+    assert "/a" not in mw._component_cache
+    assert "/b" in mw._component_cache
+    assert "/c" in mw._component_cache
+    assert "/d" in mw._component_cache

@@ -109,3 +109,19 @@ def test_reset_session_clears_response_hashes_and_last_writes(mw):
 
     assert len(mw._response_hashes) == 0
     assert len(mw._last_writes) == 0
+
+
+# ── LRU eviction ORDER: retry cache ──────────────────────────────────────────
+
+def test_retry_cache_evicts_oldest_not_newest(mw):
+    """Fill _retry_cache to max+1 via check_retry; oldest entry evicted."""
+    mw._RETRY_MAX = 3
+    mw._retry_cache.clear()
+    mw.check_retry("cmd_a", {"p": "a"})
+    mw.check_retry("cmd_b", {"p": "b"})
+    mw.check_retry("cmd_c", {"p": "c"})
+    assert len(mw._retry_cache) == 3
+    oldest_key = next(iter(mw._retry_cache))
+    mw.check_retry("cmd_d", {"p": "d"})
+    assert len(mw._retry_cache) == 3
+    assert oldest_key not in mw._retry_cache

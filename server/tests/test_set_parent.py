@@ -1,6 +1,7 @@
 """Tests for set_parent tool."""
 import pytest
 from unittest.mock import AsyncMock
+from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.tools import objects
 
 
@@ -53,6 +54,24 @@ async def test_delete_object_omits_force_when_false(mock_bridge, bridge_response
     await delete_object(path="/A", force=False)
     args = mock_bridge.send.call_args[0][1]
     assert "force" not in args
+
+
+@pytest.mark.asyncio
+async def test_set_parent_error_raises_tool_error(mock_bridge):
+    """set_parent raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
+    from unity_mcp.tools.objects import set_parent
+    with pytest.raises(ToolError, match="Object not found"):
+        await set_parent(path="/Missing", parent="/Root")
+
+
+@pytest.mark.asyncio
+async def test_delete_object_error_raises_tool_error(mock_bridge):
+    """delete_object raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
+    from unity_mcp.tools.objects import delete_object
+    with pytest.raises(ToolError, match="Object not found"):
+        await delete_object(path="/Missing")
 
 
 def test_set_parent_registered_as_rw_idem_tool():

@@ -99,3 +99,27 @@ async def test_asset_error_from_unity(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Asset not found: Assets/Missing.mat"})
     with pytest.raises(ToolError, match="Asset not found"):
         await asset(action="get_info", path="Assets/Missing.mat")
+
+
+@pytest.mark.asyncio
+async def test_asset_create_error_raises_tool_error(mock_bridge):
+    """asset create raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Folder already exists"})
+    with pytest.raises(ToolError, match="Folder already exists"):
+        await asset(action="create", type="Folder", path="Assets/Existing")
+
+
+@pytest.mark.asyncio
+async def test_asset_move_error_raises_tool_error(mock_bridge):
+    """asset move raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Source asset not found"})
+    with pytest.raises(ToolError, match="Source asset not found"):
+        await asset(action="move", source="Assets/Missing.mat", dest="Assets/B.mat")
+
+
+@pytest.mark.asyncio
+async def test_asset_delete_error_raises_tool_error(mock_bridge):
+    """asset delete raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Cannot delete read-only asset"})
+    with pytest.raises(ToolError, match="Cannot delete read-only asset"):
+        await asset(action="delete", path="Assets/ReadOnly.mat")

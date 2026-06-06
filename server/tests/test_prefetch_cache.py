@@ -128,3 +128,18 @@ def test_cache_survives_5s_window(monkeypatch):
     base = time.monotonic()
     monkeypatch.setattr("unity_mcp.prefetch_cache.time.monotonic", lambda: base + 5.0)
     assert c.get("get_component", {"path": "/A"}) == "val"
+
+
+# ─── LRU eviction ORDER ───────────────────────────────────────────────────────
+
+def test_prefetch_cache_evicts_oldest_not_newest():
+    """Fill to max_size=3, add 4th; oldest entry evicted, newest kept."""
+    c = PrefetchCache(max_size=3)
+    c.put("cmd", {"k": "a"}, "r_a")
+    c.put("cmd", {"k": "b"}, "r_b")
+    c.put("cmd", {"k": "c"}, "r_c")
+    c.put("cmd", {"k": "d"}, "r_d")  # overflow — ("cmd",k=a) is oldest
+    assert c.get("cmd", {"k": "a"}) is None   # oldest evicted
+    assert c.get("cmd", {"k": "b"}) == "r_b"
+    assert c.get("cmd", {"k": "c"}) == "r_c"
+    assert c.get("cmd", {"k": "d"}) == "r_d"  # newest kept
