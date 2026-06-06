@@ -15,7 +15,6 @@
 <div align="center">
 
 <sub>**STATUS**</sub><br>
-<img src="https://img.shields.io/github/actions/workflow/status/german-krasnikov/unity-kiss-mcp/update-readme.yml?style=for-the-badge&labelColor=1a1a2e&color=3ad29f&logo=githubactions&logoColor=white&label=build" alt="Build">
 <img src="https://img.shields.io/github/license/german-krasnikov/unity-kiss-mcp?style=for-the-badge&labelColor=1a1a2e&color=3ad29f&logo=opensourceinitiative&logoColor=white" alt="License">
 <img src="https://img.shields.io/github/stars/german-krasnikov/unity-kiss-mcp?style=for-the-badge&labelColor=1a1a2e&color=3ad29f&logo=github&logoColor=white" alt="Stars">
 <img src="https://img.shields.io/github/last-commit/german-krasnikov/unity-kiss-mcp?style=for-the-badge&labelColor=1a1a2e&color=3ad29f&logo=git&logoColor=white" alt="Last Commit">
@@ -144,7 +143,7 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 2963 Tests (1723 Python · 1187 Unity · 53 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 3432 Tests (1904 Python · 1475 Unity · 53 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -199,6 +198,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 <div><sub>Full history: <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a></sub></div>
 
 <!-- CHANGELOG_START -->
+<details>
+<summary><b>v0.17.25</b> — 2026-06-06 — 40-architect test audit — 469 new tests, test restructure, 3 bug fixes</summary>
+
+40-architect parallel test audit across Python + C#. Round 1: 122 tests + 3 bug fixes (thread-safe `ScreenshotCapture`, `EditorCoroutineRunner` double-stop, guarded `query_state` error path). Round 2: 177 tests (error paths, LRU order, serializers). Round 3: 170 tests (edge cases, security, batch guards). Test assembly renamed `Tests` → `UnityMCP.TestProject`. Test project restructured into 10 domain folders. Plugin version 0.17.25.
+
+</details>
+
 <details>
 <summary><b>v0.17.0</b> — 2026-06-05 — full-project code review sprint — 12 waves of fixes across Python + C#</summary>
 
