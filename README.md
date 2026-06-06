@@ -201,14 +201,23 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 <!-- CHANGELOG_START -->
 <details>
 <summary><b>v0.17.0</b> — 2026-06-05 — full-project code review sprint — 12 waves of fixes across Python + C#</summary>
+
+12-wave autonomous review sprint. 7 critical Python bug fixes, middleware split (941→120 lines), C# thread safety, chat TOCTOU fix, 16-architect final review found 12 additional bugs. All subsystems graded B (up from C/D). Server v0.8.0.
+
 </details>
 
 <details>
 <summary><b>v0.16.0</b> — 2026-06-05 — F12 chat UX overhaul — composed inline-chip field + response pills + session clear</summary>
+
+Replaced 466-line overlay stack with composed `InlineChipField` (−806 net lines). Response `[kind:ref]` tags render as pills. Per-kind chip display settings (depth + color). New-session/clear dropdown. +23 tests.
+
 </details>
 
 <details>
 <summary><b>v0.15.8</b> — 2026-06-05 — inline-chips + extensible chip-kind registry — F11</summary>
+
+`IChipKindProvider` + `ChipKindRegistry` — third-party plugins register own chip kinds (display, payload, navigate) with zero core edits. 8 built-in providers. `ChipKind` enum removed → `KindKey` string identity. PendingTurnState v4 reload survival. 1562 EditMode tests.
+
 </details>
 
 <details>
