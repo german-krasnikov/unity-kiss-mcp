@@ -1,6 +1,6 @@
-// TDD — PendingTurnState serialization contract.
+// TDD — PendingTurnState core contract, v1/v2/v3 backward compat.
 // Zero Unity deps: System only. Pure NUnit.
-// v4: KindKeys[] parallel to ChipPaths, interleaved B64 in chip lines.
+using System;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
 
@@ -182,68 +182,6 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(BackendKind.Claude, rt.Value.BackendKind);
             Assert.AreEqual(-1, rt.Value.UndoGroupId);
             Assert.AreEqual(0L, rt.Value.SavedAtUtc);
-        }
-
-        // ── v4 KindKeys roundtrip ─────────────────────────────────────────────
-
-        [Test]
-        public void RoundTrip_V4_KindKeys_Preserved()
-        {
-            var orig = new PendingTurnState(
-                sessionId: "s", pendingText: "t",
-                chipPaths: new[] { "/Player", "Assets/Script.cs" },
-                agentMode: false, agentName: "", activityPhase: "Idle",
-                kindKeys: new[] { ChipKindKeys.Hierarchy, ChipKindKeys.Script });
-
-            var rt = PendingTurnState.Deserialize(orig.Serialize());
-
-            Assert.IsNotNull(rt);
-            Assert.AreEqual(2,                       rt.Value.KindKeys.Length);
-            Assert.AreEqual(ChipKindKeys.Hierarchy,  rt.Value.KindKeys[0]);
-            Assert.AreEqual(ChipKindKeys.Script,     rt.Value.KindKeys[1]);
-        }
-
-        [Test]
-        public void RoundTrip_V4_ChipPaths_AlsoPreserved()
-        {
-            var orig = new PendingTurnState(
-                sessionId: "s", pendingText: "t",
-                chipPaths: new[] { "/Enemy" },
-                agentMode: false, agentName: "", activityPhase: "Idle",
-                kindKeys: new[] { ChipKindKeys.Hierarchy });
-
-            var rt = PendingTurnState.Deserialize(orig.Serialize());
-
-            Assert.IsNotNull(rt);
-            Assert.AreEqual("/Enemy", rt.Value.ChipPaths[0]);
-        }
-
-        [Test]
-        public void V4_BackwardCompat_V3ChipLine_EmptyKindKey()
-        {
-            // Simulate a v3 chip line (just PathB64, no pipe separator)
-            var pathB64 = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Assets/foo.fbx"));
-            var textB64 = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("t"));
-            var actB64  = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Idle"));
-            var raw     = $"sess|{textB64}|0||{actB64}|1|5|100|0\n{pathB64}";
-
-            var rt = PendingTurnState.Deserialize(raw);
-
-            Assert.IsNotNull(rt);
-            Assert.AreEqual("Assets/foo.fbx", rt.Value.ChipPaths[0]);
-            Assert.AreEqual("",               rt.Value.KindKeys[0], "v3 chip line → empty KindKey (re-detect)");
-        }
-
-        [Test]
-        public void V4_NoKindKeys_DefaultsToEmptyArray()
-        {
-            // PendingTurnState without kindKeys param → empty array
-            var orig = new PendingTurnState("s", "t", new[] { "/P" }, false, "", "Idle");
-            var rt = PendingTurnState.Deserialize(orig.Serialize());
-            Assert.IsNotNull(rt);
-            // v4 serialize always writes B64|B64; empty kindKey = "" encoded
-            Assert.AreEqual(1, rt.Value.KindKeys.Length);
-            Assert.AreEqual("", rt.Value.KindKeys[0]);
         }
     }
 }

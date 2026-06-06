@@ -174,6 +174,7 @@ unity-kiss-mcp/
 │       │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
 │       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
 │       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates (partial class)
+│       │   ├── MCPChatWindow.Send.cs      # Send path: OnSend, rawText/llmText split, chip snapshot (partial class)
 │       │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (partial class)
 │       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons
 │       │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
@@ -203,6 +204,8 @@ unity-kiss-mcp/
 │       │   ├── CompileAutoFix.cs          # Auto-retry on compile
 │       │   ├── EditorStateSnapshot.cs     # Context block injection
 │       │   ├── ToolPing.cs                # Flash object on tool-call
+│       │   ├── HierarchyContextMenu.cs    # Right-click Hierarchy GameObject → Add to Chat Context (F16a)
+│       │   ├── ComponentContextMenu.cs    # Right-click Component → Add to Chat Context (F16b)
 │       │   ├── ChipContextResolver.cs     # Resolve chips + emit typed (F10)
 │       │   ├── MCPChatWindow.Approve.cs   # Event handler (F3 gate)
 │       │   ├── ApproveHelper.cs           # Session management
@@ -248,12 +251,13 @@ unity-kiss-mcp/
 │       │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
 │       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated
 │       │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators
-│       │   └── Tests/                     # 21 NUnit suites = ~240+ test cases (render + backend + interactivity + pure)
+│       │   └── Tests/                     # 24+ NUnit suites = ~550+ test cases (render + backend + chips + pure)
 │       │       │   # Render (66): MdBlockTests(5), MarkdownParserTests(16), MarkdownInlineTests(13), MermaidParserTests(17), MermaidLayoutTests(15)
 │       │       │   # Backend/parse (119): ChatStreamParserTests(24), CliBackendBaseTests(29), CodexArgBuilderTests(35), CodexStreamParserTests(26), ClaudeArgBuilderTests(8), ToolVerbMapTests(5)
 │       │       │   # Interactivity/input (43): EnterKeySendTests(7), InputHeightCalcTests(14), ChatActivityStateTests(13), CopyTextBuilderTests(9)
-│       │       │   # Pure/state (6+12): TokenFormatTests(6), PendingTurnStateTests(12, v3 + BackendKind)
-│       │       │   # Total: 1384 EditMode pass (5 pre-existing baseline reds, 0 new regressions)
+│       │       │   # Chips (320+): ChipSequenceTests, ChipSequenceExtraTests, ChipSendSequenceTests, ChipSendSequenceExtraTests, ChipTestHelpers (shared)
+│       │       │   # Pure/state (6+489): TokenFormatTests(6), PendingTurnStateTests(187), PendingTurnStateV4Tests(197), PendingTurnStateStalenessTests(105)
+│       │       │   # Total: ~1550+ EditMode (5 pre-existing baseline reds, 0 new regressions)
 │       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
 │       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs

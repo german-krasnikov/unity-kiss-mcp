@@ -25,8 +25,23 @@ namespace UnityMCP.Editor.Chat
             {
                 if (!seg.IsTag)
                 {
-                    var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(seg.Text), richText: true);
-                    container.Add(lbl);
+                    var lines = seg.Text.Split('\n');
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        if (i > 0)
+                        {
+                            var br = new VisualElement();
+                            br.style.flexBasis = new StyleLength(Length.Percent(100));
+                            br.style.height = 0;
+                            container.Add(br);
+                        }
+                        var stripped = StripOrphanBold(lines[i]);
+                        if (!string.IsNullOrEmpty(stripped))
+                        {
+                            var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(stripped), richText: true);
+                            container.Add(lbl);
+                        }
+                    }
                 }
                 else
                 {
@@ -51,6 +66,17 @@ namespace UnityMCP.Editor.Chat
 
         // ── private ───────────────────────────────────────────────────────────
 
+        /// <summary>Strip orphan leading/trailing ** from text segments adjacent to pills.</summary>
+        internal static string StripOrphanBold(string text)
+        {
+            var t = text.Trim();
+            bool startsDouble = t.StartsWith("**");
+            bool endsDouble   = t.EndsWith("**") && t.Length >= 4;
+            if (startsDouble && !endsDouble) t = t.Substring(2).TrimStart();
+            if (endsDouble   && !startsDouble) t = t.Substring(0, t.Length - 2).TrimEnd();
+            return t;
+        }
+
         private static VisualElement BuildPill(string kindKey, string rawRef)
         {
             var chip = RefParser.Parse(kindKey, rawRef);
@@ -65,6 +91,7 @@ namespace UnityMCP.Editor.Chat
                 provider?.Navigate(capturedRef);
             });
 
+            ChipPillFactory.AttachAddToContextMenu(pill, chip);
             return pill;
         }
     }

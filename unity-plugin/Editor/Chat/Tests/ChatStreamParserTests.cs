@@ -300,5 +300,20 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(1, sink.Count);
             Assert.AreEqual("toolu_xyz", sink[0].ToolId);
         }
+
+        // ── string content starting with '[' must NOT be parsed as array ─────────
+
+        [Test]
+        public void ParseLine_UserToolResult_StringContentStartingWithBracket_ExtractsString()
+        {
+            // content is a quoted string that starts with '[' — must return the full string,
+            // not fall through to ExtractArray which would silently return empty.
+            const string line = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"toolu_br\",\"content\":\"[Player, Enemy]\"}]}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNotNull(result);
+            Assert.AreEqual(ChatEventKind.ToolResult, result.Value.Kind);
+            Assert.AreEqual("[Player, Enemy]", result.Value.Text,
+                "String content starting with '[' must be returned as-is, not parsed as array");
+        }
     }
 }

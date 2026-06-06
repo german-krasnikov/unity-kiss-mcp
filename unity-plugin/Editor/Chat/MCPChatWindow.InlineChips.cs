@@ -1,5 +1,5 @@
 // Partial: inline chip methods — simplified with InlineChipField (Wave 0).
-// No FFFC/NBSP markers. Clean text by construction.
+// F13→F14: @mention injected into TextField for visual display.
 using UnityEditor;
 using UnityEngine;
 
@@ -22,8 +22,9 @@ namespace UnityMCP.Editor.Chat
             var assetPath  = cap != null ? AssetDatabase.GetAssetPath(cap) : path;
             var kindKey    = ChipKindDetector.Detect(cap, assetPath ?? path);
             var instanceID = cap != null ? cap.GetInstanceID() : 0;
+
             _chipField?.AddChip(new ChipData(kindKey, path, displayName, instanceID));
-            _chipField?.TextField?.Focus();
+
             UpdateAutoHeight();
         }
 

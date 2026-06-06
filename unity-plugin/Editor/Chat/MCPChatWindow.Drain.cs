@@ -14,34 +14,43 @@ namespace UnityMCP.Editor.Chat
         // #1 Save turn state before domain reload so it can be resumed after.
         private void SaveStateBeforeReload()
         {
-            if (_activity.Phase == ActivityPhase.Idle) return;
-            // FIX A: read from _sentTextCache (set by DispatchTurn before input was cleared),
-            // NOT from _input.value which is already "" at this point.
-            var text  = _sentTextCache.Get();
-            // Serialize from InlineChipField.Model (v5: same ChipPaths/KindKeys arrays as v4).
             string[] chipPaths, kindKeys;
-            if (_chipField?.Model != null)
+            int[]    chipOffsets;
+            if (_chipField?.Model != null && _chipField.Model.Count > 0)
             {
-                var reload = _chipField.Model.SerializeForReload();
-                chipPaths  = reload.Paths;
-                kindKeys   = reload.KindKeys;
+                var reload  = _chipField.Model.SerializeForReload();
+                chipPaths   = reload.Paths;
+                kindKeys    = reload.KindKeys;
+                chipOffsets = _chipField.Model.GetTextOffsets();
             }
             else
             {
-                chipPaths = System.Array.Empty<string>();
-                kindKeys  = System.Array.Empty<string>();
+                chipPaths   = System.Array.Empty<string>();
+                kindKeys    = System.Array.Empty<string>();
+                chipOffsets = System.Array.Empty<int>();
             }
+
+            var isIdle = _activity.Phase == ActivityPhase.Idle;
+
+            // Nothing to save: idle with no chips and no input text.
+            var inputText = isIdle
+                ? (_chipField?.Text ?? _input?.value ?? "").Trim()
+                : _sentTextCache.Get();
+            if (isIdle && chipPaths.Length == 0 && string.IsNullOrEmpty(inputText))
+                return;
+
             var state = new PendingTurnState(
-                _backend?.SessionId,
-                text,
+                isIdle ? null : _backend?.SessionId,
+                inputText,
                 chipPaths,
                 _agentMode,
                 _selectedAgent,
                 _activity.Phase.ToString(),
-                undoGroupId: _undoTracker.InflightGroupId,
-                savedAtUtc:  DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                backendKind: _selectedKind,
-                kindKeys:    kindKeys);
+                undoGroupId:      isIdle ? -1 : _undoTracker.InflightGroupId,
+                savedAtUtc:       DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                backendKind:      _selectedKind,
+                kindKeys:         kindKeys,
+                chipTextOffsets:  chipOffsets);
             ReloadGuard.SavePendingState(state);
         }
 
@@ -56,19 +65,28 @@ namespace UnityMCP.Editor.Chat
 
             // #26 Staleness guard: discard state saved by a crash/restart older than threshold.
             // SavedAtUtc == 0 means legacy file (no timestamp) — allowed through.
-            const long StalenessThresholdSec = 60;
-            if (p.SavedAtUtc > 0 && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - p.SavedAtUtc > StalenessThresholdSec)
+            // Idle saves are exempt: they represent user-composed (not in-flight) state.
+            if (PendingTurnState.IsStale(p, DateTimeOffset.UtcNow.ToUnixTimeSeconds()))
                 return; // stale crash/restart artifact — file already cleared, silently discard
 
             _agentMode     = p.AgentMode;
             _selectedAgent = p.AgentName;
             _selectedKind  = p.BackendKind;
-            CreateBackendWithSession(p.SessionId);
 
             // Restore chips from PendingTurnState (v4/v5 format).
             if (_chipField?.Model != null && p.ChipPaths?.Length > 0)
-                _chipField.Model.RestoreFromReload(p.ChipPaths, p.KindKeys);
+                _chipField.Model.RestoreFromReload(p.ChipPaths, p.KindKeys, p.ChipTextOffsets);
             _chipField?.RebuildFromModel();
+
+            // Idle save: restore chips + input text only, no turn dispatch.
+            if (p.ActivityPhase == "Idle")
+            {
+                if (!string.IsNullOrEmpty(p.PendingText) && _chipField != null)
+                    _chipField.Text = p.PendingText;
+                return;
+            }
+
+            CreateBackendWithSession(p.SessionId);
 
             var displayText = p.PendingText;
             if (!string.IsNullOrEmpty(displayText))
@@ -92,7 +110,10 @@ namespace UnityMCP.Editor.Chat
                 // Cache the FULL sent text (with snapshot) so a re-reload can persist it.
                 _sentTextCache.Set(sentText);
                 // Show only the original user text in the bubble (no state dump).
-                _transcript?.AppendUserBubble(displayText);
+                var chipList = _chipField?.Model?.Chips is { Count: > 0 } c
+                    ? new System.Collections.Generic.List<ChipData>(c) : null;
+                _transcript?.SetLastTurnChips(chipList);
+                _transcript?.AppendUserBubble(displayText, chipList);
                 _backend.SendTurn(UserTurnBuilder.Build(sentText));
                 if (_activity.Send()) OnActivityChanged();
             }

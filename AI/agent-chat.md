@@ -539,6 +539,111 @@ Dropdown button with confirm dialog. Clicking "Clear" tears down the current cha
 
 `package.json` unity min bumped **2022.3 → 6000.0**. Rationale: The editor is already running 6000.3.0b7; the old minimum was a lie. Per META mandate: "If a limitation forces raising the Unity minimum to 6.0, DO IT." Migration cost: one line. Risk: Users on 2022.3 lose access — but they never had the full chip feature anyway (text APIs differ).
 
+### Feature F13 — Inline Context Chips + Auto-Linking (v0.17.1)
+
+**Three production-ready UX improvements shipped together (P1–P3):**
+
+#### P1: Consolidated Chip Input (Removed _objChipStrip Dual-Path)
+
+F12 left a legacy path (`_objChipStrip`) for backward-compat; F13 removes it entirely. All context chips now route **exclusively through `InlineChipField` + `InlineChipModel`**:
+
+**Architecture:**
+- `InlineChipModel` — Pure headless data (add/remove/clear/serialize/restore). No UI deps.
+- `AppendChipContext()` — Single source of truth: calls `m.SerializePayload()` directly (removed legacy `AddChip` branch)
+- `MCPChatWindow.cs` — Removed `_objChipStrip` field + `ClearChips()` call in Session cleanup
+
+**Files modified:**
+- `MCPChatWindow.Chips.cs` — Removed `AddChip()`, `CollectChipData()` methods (71 lines deleted). Drag-drop now adds directly to model.
+- `MCPChatWindow.Send.cs` — Single `AppendChipContext()` call (−17 lines net)
+- `MCPChatWindow.cs`, `MCPChatWindow.AutoHeight.cs`, `MCPChatWindow.Session.cs` — Wired to use `_chipField.Model.Count` instead of `_objChipStrip.Count`
+
+**Tests:** ChipConsolidationTests (3 cases) — verify SerializePayload format matches send-path contract.
+
+#### P2: Rich User Bubbles (User-Sent Chips as Pills)
+
+User-sent messages now render `[kind:ref]` tags as clickable pills — identical visual/interactive style to AI-sent response pills.
+
+**Mechanism:**
+- `ChatTranscript.cs` — calls `MixedParagraphRenderer.InlineElement()` on user bubble text
+- `MixedParagraphRenderer.InlineElement()` — splits text on `ResponseTagInliner` regex, builds mixed container (text labels + inline pill children)
+- Pills have **no remove button** (read-only, user-approved), click → navigate via chip provider
+
+**Symmetry:** User bubbles now render via the same code path as AI responses (P7 from F12).
+
+**Tests:** UserBubblePillTests (4 cases) — plain text, single tag, mixed content, empty text.
+
+#### P3: AI Response Auto-Linking (SceneNameLinker)
+
+AI responses can now mention scene object names (e.g., "see Player1 here") and Claude Code auto-converts them to clickable `<link>` references without explicit `[kind:ref]` tags.
+
+**Logic:** `SceneNameLinker.Linkify()` scans response text and wraps known object names with `<link="chip:hierarchy:<path>">`. **Filters aggressively:**
+- Requires name length ≥3 chars
+- Skips generics: Canvas, Camera, Light, Image, Text, Button, Panel, Slider, Toggle, Grid, Manager, Controller, System, Default, Global, World, Event, Debug, Player
+- Requires **signature traits:** digit (e.g., Player1), underscore (e.g., Main_Camera), or consecutive uppercase (e.g., NPCSpawner)
+
+**Regex safety:** Uses `\b` word boundaries and avoids re-linking names inside existing `<link>` tags (counts open/close balance).
+
+**Integration:**
+- `MarkdownInline.cs` — Added `SceneNameLinker Linker` seam (injectable for tests, set once in window)
+- Response processing chain: escape → linkify → bold/italic
+
+**Refresh cycle:** When scene hierarchy changes (`hierarchyChanged` callback), `ChatTranscript` calls `linker.Refresh(chatRefResolver.Objects)` (map of known object paths).
+
+**Files modified:**
+- `MarkdownInline.cs` — Added seam (7 lines)
+- `ChatRefResolver.cs` — Exposed `Objects` property (read-only dict)
+- `MCPChatWindow.cs` — Wired `hierarchyChanged` → refresh linker
+
+**Tests:** SceneNameLinkerTests (13 cases) — ShouldAutoLink filter logic (6 cases), Linkify rendering (7 cases including nesting/multi-name safety).
+
+#### Test Coverage & Metrics
+
+- **New test suites:** UserBubblePillTests (4), ChipConsolidationTests (3), SceneNameLinkerTests (13)
+- **Test count:** 1600+/1605 EditMode pass (5 pre-existing reds, 0 new failures, 20 new tests)
+- **Code delta:** −83 net lines (removed dual-path legacy), +341 insertions (new features)
+- **plugin version:** 0.17.0 → 0.17.1
+
+### Feature F14 — Inline @DisplayName Insertion + Chip Pill Strip in Bubbles (v0.17.2)
+
+#### P1: Inline @DisplayName Insertion at Cursor
+
+`MCPChatWindow.InlineChips.cs` — `InsertInlineChip()` now captures the cursor position in the TextField and inserts `@DisplayName` directly at that caret point. Chip references flow naturally inline with user text.
+
+**Behavior:**
+- "Add Selection to Context" (context menu) captures cursor index
+- Inserts @DisplayName at caret → "analyze @Player and compare to @Enemy"
+- Chips appear as pills in the `_pillRow` above text (visual affordance)
+- Cursor clamped to prevent edge-case `ArgumentOutOfRangeException`
+
+**Files modified:** `MCPChatWindow.InlineChips.cs` (cursor capture + insertion logic)
+
+#### P2: Chip Pill Strip in Sent User Bubbles
+
+`MCPChatWindow.Send.cs` + `ChatTranscript.cs` — Send path now splits the user's text into two representations:
+
+- **rawText** — Display text with @names (e.g., "analyze @Player and compare to @Enemy")
+- **llmText** — LLM text with [kind:ref] tags (e.g., "analyze [hierarchy:/Player] and compare to [hierarchy:/Enemy]")
+
+Chip snapshot is copied before TextField clear, then passed to `AppendUserBubble()` which renders a `.user-chip-strip` row of visual pill elements above the message text. Pills are read-only (user-approved) and symmetric with AI-sent response pills.
+
+**Files modified:**
+- `MCPChatWindow.Send.cs` — Split rawText/llmText, snapshot chips, pass to bubble
+- `ChatTranscript.cs` — Accept chips param, render .user-chip-strip row
+- `MCPChatWindow.Drain.cs` — Restore path also passes chip snapshot (defensive copy)
+
+**Restore path:** Resumed turns also get chip snapshot (defensive copy), preserving visual feedback on domain reload.
+
+#### Test Coverage & Metrics
+
+- **New test suites:** UserBubblePillTests +3 additional pill strip rendering tests (UserBubbleChipStripTests)
+- **Test count:** 1562+/1567 EditMode pass (5 pre-existing reds, 0 new failures)
+- **Code delta:** +107 lines (inline insertion + pill strip rendering)
+- **plugin version:** 0.17.1 → 0.17.2
+
+**Note:** This release also includes two bugfixes from earlier in the same version sprint:
+- **BUG1:** InlineChipField layout changed flex-row → flex-column with dedicated _pillRow; USS align-items: center → stretch
+- **BUG2:** SaveStateBeforeReload() no longer skips ActivityPhase.Idle; chips survive domain reload even in idle state
+
 ### Binary Resolution on macOS
 
 **Problem:** Finder-launched Unity has a minimal PATH; `claude` binary may not be found.
@@ -600,6 +705,7 @@ unity-plugin/Editor/
 │   ├── SlashRegistry.cs              # Template registry: Builtins, Match, Resolve
 │   ├── SlashPopup.cs                 # UIToolkit popup: 5 visible, arrow nav
 │   ├── MCPChatWindow.Slash.cs        # Slash setup: KeyDown + ChangeEvent on parent
+│   ├── SceneNameLinker.cs            # Auto-link scene object names in responses (injectable, NUnit-testable)
 │   ├── UnityMCP.Editor.Chat.asmdef   # Assembly definition (references Core)
 │   └── Tests/
 │       ├── ChatStreamParserTests.cs
@@ -616,6 +722,9 @@ unity-plugin/Editor/
 │       ├── ApproveFlowTests.cs
 │       ├── SlashRegistryTests.cs
 │       ├── SlashPopupTests.cs
+│       ├── UserBubblePillTests.cs             # User bubbles render [kind:ref] chips as pills (4 cases)
+│       ├── ChipConsolidationTests.cs          # Verify chip serialization format (3 cases)
+│       ├── SceneNameLinkerTests.cs            # Auto-link logic + regex safety (13 cases)
 │       └── UnityMCP.Editor.Chat.Tests.asmdef
 ├── ChatSettingsHook.cs               # Event hook for settings updates
 ├── MCPSettingsUI.cs                  # Modified: fires ChatSettingsHook.Invoke

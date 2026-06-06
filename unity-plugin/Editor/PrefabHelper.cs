@@ -73,7 +73,6 @@ namespace UnityMCP.Editor
         private static string Revert(string args)
         {
             var go = RequirePrefabInstance(args);
-            Undo.RegisterFullObjectHierarchyUndo(go, "Revert Prefab");
             PrefabUtility.RevertPrefabInstance(go, InteractionMode.AutomatedAction);
             return $"Reverted: {go.name}";
         }

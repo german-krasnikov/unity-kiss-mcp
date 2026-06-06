@@ -1,26 +1,24 @@
-// Transcript rendering helpers — extracted to keep MCPChatWindow under 200 lines.
+// Transcript rendering. F13: AppendUserBubble(UserMessage) + AtMentionNormalizer wired.
 using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
 {
-    /// <summary>Manages the scroll + transcript VisualElement tree.
-    /// Assistant messages render markdown progressively: a block is committed (frozen)
-    /// once a later block follows it; only the trailing in-progress block re-renders.</summary>
     internal sealed class ChatTranscript
     {
         private readonly VisualElement             _container;
         private readonly ChatBlockRendererRegistry _registry;
         private readonly StringBuilder             _assistantRaw = new StringBuilder();
         private readonly ToolChipGrouper           _grouper;
-        private VisualElement _assistantBubble;
-        private VisualElement _assistantRow;
-        private VisualElement _liveTail;
+        private VisualElement _assistantBubble, _assistantRow, _liveTail;
         private string        _liveTailSrc;
-        private int           _committed;
+        private int           _committed, _msgCount;
         private bool          _dirty;
-        private int           _msgCount;
+        private IReadOnlyList<ChipData> _lastTurnChips;
+        private SceneNameLinker         _savedLinker;
+        internal Func<IReadOnlyDictionary<string, string>> SceneObjects;
         private const int MaxMessages = 200;
 
         internal ChatTranscript(VisualElement container, ChatBlockRendererRegistry registry)
@@ -30,54 +28,78 @@ namespace UnityMCP.Editor.Chat
             _grouper   = new ToolChipGrouper(Append, () => _msgCount--);
         }
 
-        internal void AppendUserBubble(string text, string imagePath = null)
+        /// <summary>F13 Bug 2: set chips for @mention normalization in response.</summary>
+        internal void SetLastTurnChips(IReadOnlyList<ChipData> chips) => _lastTurnChips = chips;
+
+        /// <summary>F13: render an interleaved UserMessage (fixes Bug 1 double display).</summary>
+        internal void AppendUserBubble(UserMessage msg, string imagePath = null)
         {
-            FinalizeAssistant(); // also closes any open tool group
+            FinalizeAssistant();
+            var bubble = MakeBubble(ChipTextInterleaver.ToDisplayText(msg));
             var row    = Row("msg-user");
-            var bubble = new VisualElement();
-            bubble.AddToClassList("msg-bubble");
-            bubble.AddToClassList("msg-bubble--user");
-            bubble.userData = text ?? "";
-            CopyableText.Attach(bubble);
-            if (!string.IsNullOrEmpty(text))
+            var wrap   = new VisualElement(); wrap.AddToClassList("msg-user-content");
+            wrap.style.flexDirection = FlexDirection.Row;
+            wrap.style.flexWrap = Wrap.Wrap; wrap.style.alignItems = Align.Center;
+            bool any = false;
+            foreach (var seg in msg.Segments)
             {
-                var lbl = ChatLabel.Selectable(text); lbl.AddToClassList("msg-text");
-                bubble.Add(lbl);
+                if (seg.IsChip)
+                {
+                    var pill = ChipPillFactory.Build(seg.Chip);
+                    ChipPillFactory.AttachAddToContextMenu(pill, seg.Chip);
+                    wrap.Add(pill);
+                    any = true;
+                }
+                else if (!string.IsNullOrWhiteSpace(seg.Text))
+                {
+                    var lbl = ChatLabel.Selectable(seg.Text);
+                    lbl.AddToClassList("msg-text");
+                    wrap.Add(lbl);
+                    any = true;
+                }
             }
-            if (!string.IsNullOrEmpty(imagePath))
+            if (any) bubble.Add(wrap);
+            AppendImage(bubble, imagePath);
+            row.Add(bubble); Append(row);
+        }
+
+        /// <summary>Legacy overload — kept for TryResumePendingTurn and existing tests.</summary>
+        internal void AppendUserBubble(string text,
+            IReadOnlyList<ChipData> chips = null, string imagePath = null)
+        {
+            FinalizeAssistant();
+            var bubble    = MakeBubble(text ?? "");
+            var row       = Row("msg-user");
+            bool hasChips = chips != null && chips.Count > 0;
+            if (hasChips)
             {
-                var img = MdBlock.Image(imagePath, "");
-                bubble.Add(_registry.RenderBlock(in img));
+                var strip = new VisualElement(); strip.AddToClassList("user-chip-strip");
+                foreach (var c in chips)
+                {
+                    var p = ChipPillFactory.Build(c);
+                    ChipPillFactory.AttachAddToContextMenu(p, c);
+                    strip.Add(p);
+                }
+                bubble.Add(strip);
             }
-            row.Add(bubble);
-            Append(row);
+            var dt = hasChips ? UserTextCleaner.Strip(text) : text;
+            if (!string.IsNullOrEmpty(dt))
+                bubble.Add(MixedParagraphRenderer.InlineElement(dt, "msg-text"));
+            AppendImage(bubble, imagePath);
+            row.Add(bubble); Append(row);
         }
 
         internal void AppendOrExtendAssistant(string token)
-        {
-            if (_assistantBubble == null) BeginAssistant();
-            _assistantRaw.Append(token);
-            _dirty = true;
-        }
+        { if (_assistantBubble == null) BeginAssistant(); _assistantRaw.Append(token); _dirty = true; }
 
-        /// <summary>Renders newly-completed blocks + refreshes the trailing block.
-        /// Cheap: only the tail re-renders per tick. Call once per drain tick.</summary>
         internal void FlushStreaming()
-        {
-            if (!_dirty || _assistantBubble == null) return;
-            _dirty = false;
-            RenderProgressive(final: false);
-        }
+        { if (!_dirty || _assistantBubble == null) return; _dirty = false; RenderProgressive(final: false); }
 
-        internal void FinalizeAssistant()
-        {
-            _grouper.Close();           // TurnDone breaks any open tool group
-            FreezeAssistantBubble();
-        }
+        internal void FinalizeAssistant() { _grouper.Close(); FreezeAssistantBubble(); }
 
         internal void AppendToolChip(string toolName, bool ok, string toolId = null)
         {
-            FreezeAssistantBubble();    // flush streaming text, but keep tool group open
+            FreezeAssistantBubble();
             _grouper.Add(BuildChip(toolName, ok, toolId), isError: !ok);
         }
 
@@ -87,22 +109,48 @@ namespace UnityMCP.Editor.Chat
             if (string.IsNullOrEmpty(toolId)) return;
             var chip = FindChipById(toolId);
             if (chip == null) return;
-            chip.userData = rec;    // upgrade from string id to full record
-            // Attach copy handler once — after userData is a meaningful record.
+            chip.userData = rec;
             if (!chip.ClassListContains(CopyAttachedClass))
-            {
-                CopyableText.Attach(chip);
-                chip.AddToClassList(CopyAttachedClass);
-            }
+            { CopyableText.Attach(chip); chip.AddToClassList(CopyAttachedClass); }
             ToolDetailBuilder.AttachOrUpdate(chip, rec);
         }
 
-        // Freezes the streaming assistant bubble without touching the tool group.
         private void FreezeAssistantBubble()
         {
             if (_assistantBubble == null) return;
+            // F13 Bug 2: normalize @Name → [kind:ref] before final render.
+            if (_lastTurnChips != null && _lastTurnChips.Count > 0)
+            {
+                var raw        = _assistantRaw.ToString();
+                var normalized = AtMentionNormalizer.Normalize(raw, _lastTurnChips);
+                normalized     = BareNameNormalizer.Normalize(normalized, _lastTurnChips);
+                if (normalized != raw)
+                {
+                    _assistantRaw.Clear(); _assistantRaw.Append(normalized);
+                    // Re-render all blocks since normalization changed text
+                    _assistantBubble.Clear();
+                    _committed = 0;
+                }
+            }
+            // Scene object normalization: convert bare names even when no chips were sent.
+            var sceneMap = SceneObjects?.Invoke();
+            if (sceneMap != null && sceneMap.Count > 0)
+            {
+                var raw        = _assistantRaw.ToString();
+                var sceneChips = new List<ChipData>();
+                foreach (var kvp in sceneMap)
+                    if (kvp.Key.Length > 1)
+                        sceneChips.Add(new ChipData(ChipKindKeys.Hierarchy, kvp.Value, kvp.Key, 0));
+                var normalized = BareNameNormalizer.Normalize(raw, sceneChips);
+                if (normalized != raw)
+                {
+                    _assistantRaw.Clear(); _assistantRaw.Append(normalized);
+                    _assistantBubble.Clear();
+                    _committed = 0;
+                }
+            }
+            MarkdownInline.Linker = _savedLinker; _savedLinker = null;
             RenderProgressive(final: true);
-            // Snapshot raw markdown for right-click copy BEFORE clearing
             _assistantBubble.userData = _assistantRaw.ToString();
             CopyableText.Attach(_assistantBubble);
             _assistantBubble = null; _assistantRow = null; _liveTail = null; _liveTailSrc = null;
@@ -114,31 +162,24 @@ namespace UnityMCP.Editor.Chat
             var chip = new VisualElement(); chip.AddToClassList("tool-chip");
             if (!ok) chip.AddToClassList("tool-chip--error");
             var verb = ToolVerbMap.Humanize(toolName);
-            var lbl  = new Label(ok ? $"⚙ {verb}" : $"✕ {verb}");
-            lbl.AddToClassList("tool-chip-label");
-            chip.Add(lbl);
-            chip.userData = toolId;     // string id initially; upgraded to ToolCallRecord on UpdateToolDetail
-            // Do NOT attach copy here — raw toolId string is meaningless.
-            // CopyableText.Attach is deferred to UpdateToolDetail after record is available.
-            return chip;
+            var lbl  = new Label(ok ? $"⚙ {verb}" : $"✕ {verb}"); lbl.AddToClassList("tool-chip-label");
+            chip.Add(lbl); chip.userData = toolId; return chip;
         }
 
         private void BeginAssistant()
         {
-            _grouper.Close();
-            _assistantRaw.Clear();
+            _grouper.Close(); _assistantRaw.Clear();
             _committed = 0; _liveTail = null; _liveTailSrc = null;
+            _savedLinker         = MarkdownInline.Linker;
+            MarkdownInline.Linker = null;
             _assistantRow    = Row(null);
             _assistantBubble = new VisualElement();
             _assistantBubble.AddToClassList("msg-bubble");
             _assistantBubble.AddToClassList("msg-bubble--assistant");
             _assistantBubble.AddToClassList("md-bubble");
-            _assistantRow.Add(_assistantBubble);
-            Append(_assistantRow);
+            _assistantRow.Add(_assistantBubble); Append(_assistantRow);
         }
 
-        // Commits blocks [_committed .. tail) and (re)renders the trailing block.
-        // Image tail with unchanged Src is REUSED to avoid texture churn.
         private void RenderProgressive(bool final)
         {
             var blocks   = MarkdownParser.Parse(_assistantRaw.ToString());
@@ -146,29 +187,24 @@ namespace UnityMCP.Editor.Chat
             var  tail    = hasTail ? blocks[blocks.Count - 1] : default(MdBlock);
             bool reuse   = _liveTail != null && hasTail && tail.Kind == MdBlockKind.Image
                            && _liveTailSrc != null && _liveTailSrc == tail.Src;
-
             if (_liveTail != null && !reuse)
             { _liveTail.RemoveFromHierarchy(); _liveTail = null; _liveTailSrc = null; }
-
             int commitUpTo = final ? blocks.Count : blocks.Count - 1;
             for (int idx = _committed; idx < commitUpTo; idx++)
             { var blk = blocks[idx]; _assistantBubble.Add(_registry.RenderBlock(in blk)); }
             if (commitUpTo > _committed) _committed = commitUpTo;
-
             if (hasTail && !reuse)
             {
-                _liveTail    = _registry.RenderBlock(in tail);
+                _liveTail = _registry.RenderBlock(in tail);
                 _liveTailSrc = tail.Kind == MdBlockKind.Image ? tail.Src : null;
                 _assistantBubble.Add(_liveTail);
             }
         }
 
         private VisualElement FindChipById(string toolId)
-        {
-            return FindDescendant(_container, ve =>
+            => FindDescendant(_container, ve =>
                 (ve.userData is string s && s == toolId) ||
                 (ve.userData is ToolCallRecord r && r.Id == toolId));
-        }
 
         private static VisualElement FindDescendant(VisualElement root, Func<VisualElement, bool> pred)
         {
@@ -181,10 +217,7 @@ namespace UnityMCP.Editor.Chat
             return null;
         }
 
-        internal void Clear()
-        {
-            FinalizeAssistant(); _container.Clear(); _msgCount = 0;
-        }
+        internal void Clear() { FinalizeAssistant(); _container.Clear(); _msgCount = 0; }
 
         private static VisualElement Row(string cls)
         { var r = new VisualElement(); r.AddToClassList("msg-row"); if (cls != null) r.AddToClassList(cls); return r; }
@@ -193,6 +226,19 @@ namespace UnityMCP.Editor.Chat
         {
             _container.Add(el); _msgCount++;
             if (_msgCount > MaxMessages) { _container.RemoveAt(0); _msgCount--; }
+        }
+
+        private static VisualElement MakeBubble(string userData)
+        {
+            var b = new VisualElement();
+            b.AddToClassList("msg-bubble"); b.AddToClassList("msg-bubble--user");
+            b.userData = userData; CopyableText.Attach(b); return b;
+        }
+
+        private void AppendImage(VisualElement bubble, string imagePath)
+        {
+            if (!string.IsNullOrEmpty(imagePath))
+            { var img = MdBlock.Image(imagePath, ""); bubble.Add(_registry.RenderBlock(in img)); }
         }
     }
 }

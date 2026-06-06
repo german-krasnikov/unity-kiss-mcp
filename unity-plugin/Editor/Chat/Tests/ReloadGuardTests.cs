@@ -136,5 +136,57 @@ namespace UnityMCP.Editor.Chat.Tests
             // After reset, IsLocked is false
             Assert.IsFalse(ReloadGuard.IsLocked);
         }
+
+        // ── Chips persistence ─────────────────────────────────────────────────
+
+        [Test]
+        public void SaveAndLoad_WithChips_ChipsPreserved()
+        {
+            var state = new PendingTurnState("sid", "t",
+                new[] { "/Player", "Assets/Foo.cs" },
+                false, null, "Idle",
+                kindKeys: new[] { ChipKindKeys.Hierarchy, ChipKindKeys.Script });
+            ReloadGuard.SavePendingState(state);
+            ReloadGuard.ResetForTest();
+
+            var loaded = ReloadGuard.LoadPendingState();
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual("/Player",              loaded.Value.ChipPaths[0]);
+            Assert.AreEqual("Assets/Foo.cs",        loaded.Value.ChipPaths[1]);
+            Assert.AreEqual(ChipKindKeys.Hierarchy, loaded.Value.KindKeys[0]);
+            Assert.AreEqual(ChipKindKeys.Script,    loaded.Value.KindKeys[1]);
+        }
+
+        [Test]
+        public void SaveAndLoad_IdleState_TextAndChipsPreserved()
+        {
+            var state = new PendingTurnState(null, "draft",
+                new[] { "/Enemy" },
+                false, null, "Idle",
+                kindKeys: new[] { ChipKindKeys.Hierarchy });
+            ReloadGuard.SavePendingState(state);
+            ReloadGuard.ResetForTest();
+
+            var loaded = ReloadGuard.LoadPendingState();
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual("draft",   loaded.Value.PendingText);
+            Assert.AreEqual("/Enemy",  loaded.Value.ChipPaths[0]);
+            Assert.AreEqual("Idle",    loaded.Value.ActivityPhase);
+        }
+
+        [Test]
+        public void SaveTwice_SecondOverwritesFirst()
+        {
+            var first  = new PendingTurnState("s1", "first",  new string[0], false, null, "Idle");
+            var second = new PendingTurnState("s2", "second", new string[0], false, null, "Idle");
+            ReloadGuard.SavePendingState(first);
+            ReloadGuard.SavePendingState(second);
+            ReloadGuard.ResetForTest();
+
+            var loaded = ReloadGuard.LoadPendingState();
+            Assert.IsNotNull(loaded);
+            Assert.AreEqual("second", loaded.Value.PendingText);
+            Assert.AreEqual("s2",     loaded.Value.SessionId);
+        }
     }
 }

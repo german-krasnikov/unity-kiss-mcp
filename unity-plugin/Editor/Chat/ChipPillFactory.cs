@@ -1,6 +1,7 @@
 // ChipPillFactory: shared static pill builder for input field and response rendering.
 // All display/color routed through ChipKindRegistry — zero hardcoded per-kind logic.
 // P4: ColorResolver seam allows per-kind color overrides from BackendConfigStore.
+// F14b: AddToContextAction seam for right-click "Add to context" menu.
 using System;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -20,6 +21,22 @@ namespace UnityMCP.Editor.Chat
         /// Set to null in tests TearDown to prevent leakage.
         /// </summary>
         internal static Func<string, string> ColorResolver;
+
+        /// <summary>
+        /// Seam: when non-null, invoked with ChipData when user selects "Add to context".
+        /// Set in MCPChatWindow.OnEnable; cleared in OnDisable.
+        /// </summary>
+        internal static Action<ChipData> AddToContextAction;
+
+        /// <summary>Attach a "Add to context" right-click menu to a pill.</summary>
+        internal static void AttachAddToContextMenu(VisualElement pill, ChipData chip)
+        {
+            pill.AddManipulator(new ContextualMenuManipulator(evt =>
+            {
+                evt.menu.AppendAction("Add to context", _ =>
+                    AddToContextAction?.Invoke(chip));
+            }));
+        }
 
         /// <summary>Build from explicit kindKey and display name.</summary>
         internal static VisualElement Build(string kindKey, string displayName, Action onRemove = null)

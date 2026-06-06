@@ -25,9 +25,6 @@ namespace UnityMCP.Editor.Chat
             // 3. Clear input field + inline chips.
             if (_chipField != null) { _chipField.ClearChips(); _chipField.Text = ""; }
 
-            // 4. Clear strip chips.
-            _objChipStrip?.Clear();
-
             // 5. Clear reload-survival state (prevents resurrection on domain reload).
             ReloadGuard.ClearPendingState();
 
