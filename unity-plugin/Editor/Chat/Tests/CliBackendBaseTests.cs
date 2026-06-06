@@ -186,5 +186,27 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.DoesNotThrow(() => _b.Start());
             Assert.AreEqual(0, _b.SpawnCallCount, "No spawn when binary not found");
         }
+
+        [Test]
+        public void Start_AlreadyRunning_DoesNotSpawnAgain()
+        {
+            // Simulate a running process so IsRunning returns true.
+            _b.SimulateRunning = true;
+            _b.Start();
+            Assert.AreEqual(0, _b.SpawnCallCount, "Must not spawn when already running");
+        }
+
+        [Test]
+        public void Start_AlreadyRunning_CalledTwice_SingleSpawn()
+        {
+            // First Start: not running → spawns once.
+            _b.Start();
+            Assert.AreEqual(1, _b.SpawnCallCount);
+
+            // Second Start: now simulate running → guard must skip.
+            _b.SimulateRunning = true;
+            _b.Start();
+            Assert.AreEqual(1, _b.SpawnCallCount, "Second Start must be a no-op when already running");
+        }
     }
 }

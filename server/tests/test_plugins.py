@@ -143,3 +143,94 @@ def test_plugin_api_exports():
     from unity_mcp import plugin_api
     for name in plugin_api.__all__:
         assert hasattr(plugin_api, name), f"plugin_api.__all__ lists '{name}' but it's not defined"
+
+
+# --- Zone #28 gap tests ---
+
+def test_load_entry_points_bad_ep_load_skipped():
+    """Entry point whose .load() raises is skipped, not crash."""
+    from unity_mcp.plugins import _load_entry_points
+
+    bad_ep = MagicMock()
+    bad_ep.name = "bad_plugin"
+    bad_ep.load.side_effect = Exception("failed to load")
+
+    with patch("importlib.metadata.entry_points", return_value=[bad_ep]):
+        # Should not raise
+        _load_entry_points(MagicMock(), MagicMock(), MagicMock())
+
+
+def test_load_plugin_dirs_nonexistent_dir_skipped(monkeypatch):
+    """UNITY_MCP_PLUGIN_DIRS pointing to non-existent dir is silently skipped."""
+    from unity_mcp.plugins import _load_plugin_dirs
+
+    monkeypatch.setenv("UNITY_MCP_PLUGIN_DIRS", "/nonexistent/path/that/does/not/exist")
+    # Should not raise, just skip silently
+    _load_plugin_dirs(MagicMock(), MagicMock(), MagicMock())
+
+
+def test_check_api_version_too_high_returns_false():
+    """Module requiring API v999 is rejected when server has API_VERSION=1."""
+    import types
+    from unity_mcp.plugins import _check_api_version
+
+    mod = types.ModuleType("future_plugin")
+    mod.REQUIRED_API_VERSION = 999
+    result = _check_api_version(mod, "future_plugin")
+    assert result is False
+
+
+def test_check_api_version_compatible_returns_true():
+    """Module with REQUIRED_API_VERSION <= API_VERSION is accepted."""
+    import types
+    from unity_mcp.plugins import _check_api_version
+
+    mod = types.ModuleType("compat_plugin")
+    mod.REQUIRED_API_VERSION = 1
+    assert _check_api_version(mod, "compat_plugin") is True
+
+
+def test_check_api_version_no_version_attr_returns_true():
+    """Module with no REQUIRED_API_VERSION is always accepted."""
+    import types
+    from unity_mcp.plugins import _check_api_version
+
+    mod = types.ModuleType("plain_plugin")
+    assert _check_api_version(mod, "plain_plugin") is True
+
+
+@pytest.mark.asyncio
+async def test_save_skill_invalid_name_slash():
+    """save_skill with '/' in name raises ValueError."""
+    from unity_mcp.tools.skills import save_skill
+    with pytest.raises(ValueError, match="Invalid name"):
+        await save_skill("bad/name", "desc", "code")
+
+
+@pytest.mark.asyncio
+async def test_save_skill_invalid_name_dotdot():
+    """save_skill with '..' in name raises ValueError."""
+    from unity_mcp.tools.skills import save_skill
+    with pytest.raises(ValueError, match="Invalid name"):
+        await save_skill("../etc", "desc", "code")
+
+
+def test_plugin_register_called_twice_no_crash():
+    """Calling register twice on same module does not crash."""
+    import types
+
+    call_count = [0]
+    mod = types.ModuleType("dup_plugin")
+    mod.register = lambda mcp, s, a: call_count.__setitem__(0, call_count[0] + 1)
+
+    mcp = MagicMock()
+    send = MagicMock()
+    args = MagicMock()
+
+    with patch("unity_mcp.plugins.pkgutil.iter_modules", return_value=[("finder", "dup_plugin", False)]):
+        with patch("unity_mcp.plugins.import_module", return_value=mod):
+            from unity_mcp.plugins import load_plugins
+            load_plugins(mcp, send, args)
+            load_plugins(mcp, send, args)
+
+    assert call_count[0] >= 2  # registered twice, no exception

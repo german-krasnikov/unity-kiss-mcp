@@ -4,7 +4,9 @@
     "references": [
         "UnityMCP.Editor",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Unity.Timeline",
+        "Unity.Timeline.Editor"
     ],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],

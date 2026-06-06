@@ -207,3 +207,55 @@ def test_is_pid_alive_for_dead_pid():
 
 def test_is_pid_alive_for_none():
     assert is_pid_alive(None) is False
+
+
+# ---------------------------------------------------------------------------
+# P2 gaps: _read_pid_from_fd, read_pid_from_port_file edge cases, cleanup
+# ---------------------------------------------------------------------------
+
+def test_read_pid_from_fd_returns_none_for_corrupt_content(tmp_path):
+    """_read_pid_from_fd returns None when file contains non-integer data."""
+    from unity_mcp.lockfile import _read_pid_from_fd
+    f = tmp_path / "corrupt.lock"
+    f.write_bytes(b"not-a-pid\n")
+    fd = os.open(str(f), os.O_RDWR)
+    try:
+        result = _read_pid_from_fd(fd)
+        assert result is None
+    finally:
+        os.close(fd)
+
+
+def test_read_pid_from_port_file_corrupt_json(tmp_path):
+    """read_pid_from_port_file skips files where int(lines[0]) raises ValueError."""
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    bad_file = ports_dir / "12345.port"
+    bad_file.write_text("not-a-port\n/path/to/project")
+    with patch.object(Path, "home", return_value=tmp_path):
+        result = read_pid_from_port_file(9500)
+    assert result is None
+
+
+def test_read_pid_from_port_file_non_integer_stem(tmp_path):
+    """read_pid_from_port_file skips files with non-integer stem (e.g. 'abc.port')."""
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    bad_file = ports_dir / "abc.port"
+    bad_file.write_text("9500\n/path/to/project")
+    with patch.object(Path, "home", return_value=tmp_path):
+        result = read_pid_from_port_file(9500)
+    assert result is None
+
+
+def test_lockfile_cleanup_on_abnormal_exit(tmp_path):
+    """Lock file is cleaned up (unlocked) even when release_lock is called after crash simulation."""
+    fd = acquire_lock(lock_dir=tmp_path, port=9500)
+    lock_file = tmp_path / "server-9500.lock"
+    assert lock_file.exists()
+    # Simulate abnormal exit: release_lock still unlocks the fd
+    release_lock(fd)
+    # After release the lock can be re-acquired (file is free)
+    fd2 = acquire_lock(lock_dir=tmp_path, port=9500)
+    assert fd2 is not None
+    release_lock(fd2)

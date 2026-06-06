@@ -306,6 +306,43 @@ async def test_disabled_mode_no_metrics_event_all_fail(monkeypatch):
     assert events == [], f"Expected no events, got {events}"
 
 
+# ── Test 16: empty steps list → ("", None), no metrics ──────────────────────
+
+@pytest.mark.asyncio
+async def test_empty_steps_list_returns_empty_name_none():
+    """degrade() with no steps returns ('', None) and emits no metrics."""
+    from unity_mcp.degrade import degrade
+    from unity_mcp.metrics import METRICS
+    METRICS.reset()
+
+    step_name, value = await degrade("empty_feat", [])
+
+    assert step_name == ""
+    assert value is None
+    snap = METRICS.snapshot()["counters"]
+    assert snap.get("degraded.empty_feat", 0) == 0
+
+
+# ── Test 17: disabled + async step falls through correctly ───────────────────
+
+@pytest.mark.asyncio
+async def test_disabled_async_step_falls_through(monkeypatch):
+    """DEGRADE_DISABLED=1 with async step that returns None → next step runs."""
+    from unity_mcp.degrade import degrade
+    monkeypatch.setenv("UNITY_MCP_DEGRADE_DISABLED", "1")
+
+    async def async_none():
+        return None
+
+    step_name, value = await degrade("feat", [
+        ("async_step", async_none),
+        ("fallback", lambda: "ok"),
+    ])
+
+    assert step_name == "fallback"
+    assert value == "ok"
+
+
 # ── Test 12: all steps raise → last step name returned, counter=1 ─────────────
 
 @pytest.mark.asyncio

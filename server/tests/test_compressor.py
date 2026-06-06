@@ -208,3 +208,98 @@ def test_project_fields_empty_fields_returns_all():
 
 def test_project_fields_noop_on_empty_text():
     assert project_fields("", "mass") == ""
+
+
+# ─── Zone 9: compression edge cases ──────────────────────────────────────────
+
+# float 0.0 and 1.0 are in _DEFAULTS — verify stripping
+def test_strip_defaults_removes_float_zero():
+    data = "[C]\nspeed: 0.0\nhealth: 50.0\n"
+    result = strip_defaults(data)
+    assert "speed" not in result
+    assert "health: 50.0" in result
+
+
+def test_strip_defaults_removes_float_one():
+    data = "[C]\nvolume: 1.0\npitch: 2.0\n"
+    result = strip_defaults(data)
+    assert "volume" not in result
+    assert "pitch: 2.0" in result
+
+
+# float-tuple variants
+def test_strip_defaults_removes_float_zero_tuple_3():
+    data = "[C]\nposition: (0.0, 0.0, 0.0)\nlocalPos: (1.0, 2.0, 3.0)\n"
+    result = strip_defaults(data)
+    assert "position: (0.0, 0.0, 0.0)" not in result
+    assert "localPos: (1.0, 2.0, 3.0)" in result
+
+
+def test_strip_defaults_removes_float_identity_quaternion():
+    data = "[C]\nrotation: (0.0, 0.0, 0.0, 1.0)\nother: (0.0, 0.0, 0.0, 0.5)\n"
+    result = strip_defaults(data)
+    assert "rotation: (0.0, 0.0, 0.0, 1.0)" not in result
+    assert "other: (0.0, 0.0, 0.0, 0.5)" in result
+
+
+def test_strip_defaults_removes_float_unit_scale():
+    data = "[C]\nscale: (1.0, 1.0, 1.0)\nsize: (2.0, 2.0, 2.0)\n"
+    result = strip_defaults(data)
+    assert "scale: (1.0, 1.0, 1.0)" not in result
+    assert "size: (2.0, 2.0, 2.0)" in result
+
+
+# blank line behavior
+def test_strip_defaults_preserves_trailing_blank_line():
+    data = "[C]\nvalue: 5\n   \n"
+    result = strip_defaults(data)
+    # Blank/whitespace-only lines are kept (not stripped as default)
+    assert "value: 5" in result
+
+
+def test_strip_defaults_preserves_multiple_blank_lines():
+    data = "[C]\n\n\nvalue: 5\n\n"
+    result = strip_defaults(data)
+    assert "value: 5" in result
+
+
+# None as fields parameter
+def test_project_fields_none_fields_returns_all():
+    result = project_fields(SAMPLE_COMPONENT, None)
+    assert result == SAMPLE_COMPONENT
+
+
+# empty string input
+def test_strip_defaults_empty_string_returns_empty():
+    assert strip_defaults("") == ""
+
+
+# single-line input (no newlines)
+def test_strip_defaults_single_line_default_removed():
+    result = strip_defaults("[C]\nmass: 1")
+    assert "mass" not in result
+
+
+def test_strip_defaults_single_line_nondefault_kept():
+    result = strip_defaults("[C]\nmass: 5")
+    assert "mass: 5" in result
+
+
+def test_project_fields_single_line_no_newline():
+    data = "[C]\nmass: 5"
+    result = project_fields(data, "mass")
+    assert "mass: 5" in result
+
+
+# unicode content
+def test_strip_defaults_unicode_value_kept():
+    data = "[C]\nname: Игрок\nvalue: 0\n"
+    result = strip_defaults(data)
+    assert "name: Игрок" in result
+    assert "value" not in result
+
+
+def test_project_fields_unicode_key_matched():
+    data = "[C]\n名前: テスト\nname: Player\n"
+    result = project_fields(data, "name")
+    assert "name: Player" in result

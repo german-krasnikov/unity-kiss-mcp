@@ -57,3 +57,53 @@ async def test_smart_build_no_sampling(mock_bridge):
     result = await smart_build("create a red cube", ctx)
     assert "Sampling unavailable" in result
     assert "execute_code" in result
+
+
+# ── P2: verify_visual_diff both-files guard ───────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_verify_visual_diff_returns_none_when_before_missing(tmp_path, monkeypatch):
+    """before file does not exist → returns None immediately, no subprocess."""
+    monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
+    after = tmp_path / "after.png"
+    after.write_bytes(b"img")
+
+    svc = SamplingService()
+    result = await svc.verify_visual_diff(
+        str(tmp_path / "before.png"),  # missing
+        str(after),
+        "Did anything change?",
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_verify_visual_diff_returns_none_when_after_missing(tmp_path, monkeypatch):
+    """after file does not exist → returns None immediately, no subprocess."""
+    monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
+    before = tmp_path / "before.png"
+    before.write_bytes(b"img")
+
+    svc = SamplingService()
+    result = await svc.verify_visual_diff(
+        str(before),
+        str(tmp_path / "after.png"),  # missing
+        "Did anything change?",
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_verify_visual_diff_both_present_calls_run(tmp_path, monkeypatch):
+    """both files exist → _run is called (gated by enabled+_gate)."""
+    monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
+    before = tmp_path / "before.png"
+    after = tmp_path / "after.png"
+    before.write_bytes(b"img")
+    after.write_bytes(b"img")
+
+    svc = SamplingService()
+    with patch.object(svc, "_run", new=AsyncMock(return_value="PASS: nothing changed")):
+        result = await svc.verify_visual_diff(str(before), str(after), "Compare")
+
+    assert result == "PASS: nothing changed"

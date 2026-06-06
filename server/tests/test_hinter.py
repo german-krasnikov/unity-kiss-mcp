@@ -402,3 +402,27 @@ def test_screenshot_spam_fires():
     assert r3 is not None
     assert "[HINT:" in r3
     assert "fingerprint" in r3
+
+
+# ── Zone #29 gap tests ────────────────────────────────────────────────────────
+
+def test_console_poll_no_hint_without_recompile():
+    """get_console × 3 WITHOUT prior recompile → NO console-poll hint."""
+    h = make_hinter()
+    results = observe_seq(h, [
+        ("get_console", {}),
+        ("get_console", {}),
+        ("get_console", {}),
+    ])
+    assert all(r is None for r in results), f"Expected no hint but got: {results}"
+
+
+def test_redundant_verify_no_hint_when_reflect_off():
+    """set_property → get_component should NOT fire hint when UNITY_MCP_REFLECT=0."""
+    import os
+    from unittest.mock import patch
+    h = make_hinter()
+    with patch.dict(os.environ, {"UNITY_MCP_REFLECT": "0"}):
+        h.observe("set_property", {"path": "/A", "component": "Health", "prop": "value", "value": "100"})
+        result = h.observe("get_component", {"path": "/A", "type": "Health"})
+    assert result is None, f"Expected no hint with REFLECT=0, got: {result}"

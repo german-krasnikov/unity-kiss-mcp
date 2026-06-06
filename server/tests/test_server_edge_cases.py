@@ -1,12 +1,12 @@
 """Edge cases tests for all 18 MCP tools."""
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from mcp.server.fastmcp.exceptions import ToolError
 
 from unity_mcp.server import (
     get_hierarchy, get_component, set_property, create_object, find_objects,
     manage_component, get_console, screenshot, scene, animation, timeline,
-    _send,
+    _send, resolve_tool_schema,
 )
 
 
@@ -487,5 +487,45 @@ async def test_send_bridge_none_raises_tool_error():
         srv.slot = None
         with pytest.raises(ToolError, match="Server not initialized"):
             await get_hierarchy()
+    finally:
+        srv.slot = original
+
+
+# --- P2 gaps ---
+
+@pytest.mark.asyncio
+async def test_send_raw_wraps_generic_exception_as_tool_error(mock_bridge):
+    """_send_raw catches generic Exception (not ConnectionError) and raises ToolError."""
+    mock_bridge.send = AsyncMock(side_effect=RuntimeError("unexpected crash"))
+    with pytest.raises(ToolError, match="Unexpected error"):
+        await _send("ping", {})
+
+
+@pytest.mark.asyncio
+async def test_resolve_tool_schema_empty_input():
+    """resolve_tool_schema with empty string returns 'No schema found' message."""
+    result = await resolve_tool_schema("")
+    assert "No schema found" in result
+
+
+@pytest.mark.asyncio
+async def test_resolve_tool_schema_unknown_tool():
+    """resolve_tool_schema with unknown tool name returns 'No schema found' message."""
+    result = await resolve_tool_schema("nonexistent_tool_xyz")
+    assert "No schema found" in result
+
+
+@pytest.mark.asyncio
+async def test_send_raw_bridge_none_raises_tool_error(mock_bridge):
+    """_send_raw raises ToolError with 'No Unity connection' when slot.bridge is None."""
+    import unity_mcp.server as srv
+    from unittest.mock import Mock
+    mock_slot = Mock()
+    mock_slot.bridge = None
+    original = srv.slot
+    try:
+        srv.slot = mock_slot
+        with pytest.raises(ToolError, match="No Unity connection"):
+            await _send("ping", {})
     finally:
         srv.slot = original

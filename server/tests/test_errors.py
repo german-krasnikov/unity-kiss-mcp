@@ -74,3 +74,31 @@ def test_classify_produces_fields_used_by_send_raw():
     assert "state=compiling" in fmt
     assert "transient=True" in fmt
     assert "retry_after=10s" in fmt
+
+
+# P2 gaps
+
+def test_unity_error_original_exception_preserved():
+    """UnityError.original_exception holds the exception type name."""
+    exc = ConnectionRefusedError("refused")
+    ue = classify_failure(exc, probe_busy=False, remaining=0.0)
+    assert ue.original_exception == "ConnectionRefusedError"
+
+
+def test_domain_reload_retry_after_uses_remaining():
+    """DomainReloadError retry_after_seconds equals int(remaining) when remaining > 0."""
+    exc = DomainReloadError("going_away")
+    ue = classify_failure(exc, probe_busy=False, remaining=0.0)
+    # remaining=0 → falls back to default 5
+    assert ue.retry_after_seconds == 5
+    ue2 = classify_failure(exc, probe_busy=False, remaining=12.0)
+    assert ue2.retry_after_seconds == 12
+
+
+def test_classify_unknown_exception_message_includes_exc():
+    """Unknown exception type uses str(exc) in message and 'unknown' state."""
+    exc = ValueError("something weird")
+    ue = classify_failure(exc, probe_busy=False, remaining=0.0)
+    assert ue.unity_state == "unknown"
+    assert "something weird" in ue.message
+    assert ue.retry_after_seconds == 0

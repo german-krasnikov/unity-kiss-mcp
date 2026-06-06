@@ -101,5 +101,38 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(rt);
             Assert.AreEqual("Assets/foo\nbar.cs", rt.Value.ChipPaths[0]);
         }
+
+        // ── Custom threshold ──────────────────────────────────────────────────
+
+        [Test]
+        public void IsStale_CustomThreshold_BarelyOver_IsStale()
+        {
+            // savedAt=1000, now=1011, threshold=10 → 11 > 10 → stale
+            var state = new PendingTurnState("s", "t", new string[0], false, "", "Sending", savedAtUtc: 1000L);
+            Assert.IsTrue(PendingTurnState.IsStale(state, nowUtc: 1011L, thresholdSec: 10));
+        }
+
+        [Test]
+        public void IsStale_CustomThreshold_BarelyUnder_NotStale()
+        {
+            // savedAt=1000, now=1009, threshold=10 → 9 <= 10 → not stale
+            var state = new PendingTurnState("s", "t", new string[0], false, "", "Sending", savedAtUtc: 1000L);
+            Assert.IsFalse(PendingTurnState.IsStale(state, nowUtc: 1009L, thresholdSec: 10));
+        }
+
+        [Test]
+        public void IsStale_CustomThreshold_ExactlyEqual_NotStale()
+        {
+            // nowUtc - savedAtUtc == threshold → NOT stale (> not >=)
+            var state = new PendingTurnState("s", "t", new string[0], false, "", "Sending", savedAtUtc: 1000L);
+            Assert.IsFalse(PendingTurnState.IsStale(state, nowUtc: 1010L, thresholdSec: 10));
+        }
+
+        [Test]
+        public void IsStale_VeryShortThreshold_StillIdleExempt()
+        {
+            var state = new PendingTurnState("s", "t", new string[0], false, "", "Idle", savedAtUtc: 1000L);
+            Assert.IsFalse(PendingTurnState.IsStale(state, nowUtc: 1001L, thresholdSec: 1));
+        }
     }
 }

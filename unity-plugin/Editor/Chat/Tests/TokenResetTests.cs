@@ -61,6 +61,48 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(0, (int)s_outputTokens.GetValue(w), "outputTokens zeroed");
             UnityEngine.Object.DestroyImmediate(w);
         }
+
+        [Test]
+        public void SetMode_SameMode_NoReset()
+        {
+            var w      = CreateWindow();
+            var setMode = typeof(MCPChatWindow)
+                .GetMethod("SetMode", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            // Accumulate tokens, then call SetMode with the current mode (false = default).
+            s_inputTokens .SetValue(w, 77);
+            s_outputTokens.SetValue(w, 88);
+            setMode.Invoke(w, new object[] { false }); // same as default → guard fires
+
+            Assert.AreEqual(77, (int)s_inputTokens .GetValue(w), "no reset when mode unchanged");
+            Assert.AreEqual(88, (int)s_outputTokens.GetValue(w), "no reset when mode unchanged");
+            UnityEngine.Object.DestroyImmediate(w);
+        }
+
+        // ── AddRefToContext edge cases ────────────────────────────────────────
+
+        [Test]
+        public void AddRefToContext_EmptyPath_DoesNotThrow()
+        {
+            var w          = CreateWindow();
+            var addRef     = typeof(MCPChatWindow)
+                .GetMethod("AddRefToContext", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            // Empty string — guard must return early without throw.
+            Assert.DoesNotThrow(() => addRef.Invoke(w, new object[] { "" }));
+            UnityEngine.Object.DestroyImmediate(w);
+        }
+
+        [Test]
+        public void AddRefToContext_NullPath_DoesNotThrow()
+        {
+            var w      = CreateWindow();
+            var addRef = typeof(MCPChatWindow)
+                .GetMethod("AddRefToContext", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            Assert.DoesNotThrow(() => addRef.Invoke(w, new object[] { null }));
+            UnityEngine.Object.DestroyImmediate(w);
+        }
     }
 }
 #endif

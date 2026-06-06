@@ -228,3 +228,70 @@ def test_format_report_includes_speculation_hit_rate():
     report = METRICS.format_report()
     assert "Speculation" in report
     assert "70%" in report  # 7/10 = 70%
+
+
+# ── Zone #30 gap tests ────────────────────────────────────────────────────────
+
+def test_snapshot_and_reset_returns_correct_snapshot_then_zeros():
+    """snapshot_and_reset returns populated snapshot, then metrics are cleared."""
+    from unity_mcp.metrics import MetricsRegistry
+    m = MetricsRegistry()
+    m.inc("test.key", 5)
+    m.observe("test.obs", 42.0)
+    snap = m.snapshot_and_reset()
+    # Snapshot has the data
+    assert snap["counters"]["test.key"] == 5
+    assert snap["observations"]["test.obs"]["n"] == 1
+    # After reset, new snapshot is empty
+    fresh = m.snapshot()
+    assert fresh["counters"] == {}
+    assert fresh["observations"] == {}
+
+
+def test_format_report_sampling_section():
+    """format_report includes [Sampling/Haiku] section with calls/success/fail counts."""
+    from unity_mcp.metrics import MetricsRegistry
+    m = MetricsRegistry()
+    m.inc("sampling.calls", 10)
+    m.inc("sampling.success", 8)
+    m.inc("sampling.fail", 2)
+    report = m.format_report()
+    assert "Sampling" in report
+    assert "calls=10" in report
+    assert "success=8" in report
+    assert "fail=2" in report
+
+
+def test_format_report_lessons_section():
+    """format_report includes [Lessons] section when lessons.* counters present."""
+    from unity_mcp.metrics import MetricsRegistry
+    m = MetricsRegistry()
+    m.inc("lessons.recorded", 3)
+    m.inc("lessons.hint_emitted", 1)
+    report = m.format_report()
+    assert "Lessons" in report
+    assert "recorded=3" in report
+    assert "hint_emitted=1" in report
+
+
+def test_format_report_latency_percentile_section():
+    """format_report includes [Top commands by latency] when cmd.*.ms observations exist."""
+    from unity_mcp.metrics import MetricsRegistry
+    m = MetricsRegistry()
+    for _ in range(25):
+        m.observe("cmd.get_component.ms", 50.0)
+    report = m.format_report()
+    assert "latency" in report
+    assert "get_component" in report
+
+
+def test_format_report_empty_data():
+    """format_report with no events only contains the header line."""
+    from unity_mcp.metrics import MetricsRegistry
+    m = MetricsRegistry()
+    report = m.format_report()
+    assert "Unity MCP Metrics" in report
+    assert "Sampling" not in report
+    assert "Lessons" not in report
+    assert "Hinter" not in report
+    assert "Speculation" not in report

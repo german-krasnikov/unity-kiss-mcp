@@ -64,3 +64,29 @@ def test_normalize_empty_after_cleanup():
     text, refused = normalize("```\n```", "description")
     assert text is None
     assert refused is False
+
+
+# ── P2: normalize with sentinel kind ─────────────────────────────────────────
+
+def test_normalize_sentinel_returns_first_token():
+    text, refused = normalize("CHANGED more words follow", "sentinel")
+    assert text == "CHANGED"
+    assert refused is False
+
+
+def test_normalize_sentinel_strips_fences_then_first_token():
+    text, refused = normalize("```\nPASS extra\n```", "sentinel")
+    assert text == "PASS"
+    assert refused is False
+
+
+def test_normalize_sentinel_empty_after_strip_returns_none():
+    text, refused = normalize("```\n```", "sentinel")
+    assert text is None
+    assert refused is False
+
+
+def test_normalize_sentinel_none_input():
+    text, refused = normalize(None, "sentinel")
+    assert text is None
+    assert refused is False

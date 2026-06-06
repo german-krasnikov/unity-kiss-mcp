@@ -336,6 +336,67 @@ def test_schema_cache_evicts_oldest_not_newest():
     assert cache.get("TypeD") == frozenset({"d"})  # newest kept
 
 
+# ── P2: SchemaCache.parse positive path ──────────────────────────────────────
+
+def test_schema_cache_parse_valid_schema():
+    """parse() on a well-formed schema text returns frozenset of prop names."""
+    schema_text = "Schema: Health\n  hp: int\n  maxHp: int\n  shield: float"
+    result = SchemaCache.parse(schema_text)
+    assert isinstance(result, frozenset)
+    assert "hp" in result
+    assert "maxHp" in result
+    assert "shield" in result
+    assert "Schema" not in result  # header line excluded
+
+
+def test_schema_cache_parse_type_not_found_returns_empty():
+    result = SchemaCache.parse("Type not found: NoSuchType")
+    assert result == frozenset()
+
+
+def test_schema_cache_parse_empty_string_returns_empty():
+    assert SchemaCache.parse("") == frozenset()
+
+
+def test_schema_cache_parse_cannot_instantiate_returns_empty():
+    result = SchemaCache.parse("Cannot instantiate abstract type Foo")
+    assert result == frozenset()
+
+
+def test_schema_cache_parse_skips_comment_lines():
+    schema_text = "Schema: Foo\n  # this is a comment\n  health: int"
+    result = SchemaCache.parse(schema_text)
+    assert "health" in result
+    # comment line should not produce a prop named "# this is a comment"
+    assert all(not p.startswith("#") for p in result)
+
+
+# ── P2: SchemaGuard with unknown command ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_guard_unknown_command_returns_none():
+    """Unknown command (not set_property/manage_component/wire_event) → None (pass-through)."""
+    mw, cache, guard = make_guard()
+    result = await guard.validate(
+        "get_hierarchy",
+        {"path": "/"},
+        fake_send,
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_guard_batch_command_returns_none():
+    """'batch' command → None (pass-through, not a mutation guard target)."""
+    mw, cache, guard = make_guard()
+    result = await guard.validate(
+        "batch",
+        {"commands": []},
+        fake_send,
+    )
+    assert result is None
+
+
 # ── 10. Exception in send_fn → fail-open ─────────────────────────────────────
 
 @pytest.mark.asyncio

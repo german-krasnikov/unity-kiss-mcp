@@ -528,3 +528,48 @@ def test_component_cache_evicts_oldest_not_newest():
     assert "/b" in mw._component_cache
     assert "/c" in mw._component_cache
     assert "/d" in mw._component_cache
+
+
+# ─── CircuitBreaker.remaining ────────────────────────────────────────────────
+
+def test_circuit_breaker_remaining_when_open():
+    """remaining() returns positive time while circuit is open."""
+    cb = CircuitBreaker(threshold=1, cooldown=30.0)
+    cb.record_failure()
+    assert cb.state == CircuitBreaker.OPEN
+    r = cb.remaining()
+    assert 0.0 < r <= 30.0
+
+
+def test_circuit_breaker_remaining_when_closed():
+    """remaining() returns 0.0 when circuit is closed (cooldown not started)."""
+    cb = CircuitBreaker(threshold=3, cooldown=15.0)
+    # opened_at=0.0, so monotonic()-0 >> cooldown → max(0, negative) = 0.0
+    assert cb.remaining() == 0.0
+
+
+def test_circuit_breaker_remaining_after_expired():
+    """remaining() returns 0.0 once cooldown has passed."""
+    cb = CircuitBreaker(threshold=1, cooldown=0.0)
+    cb.record_failure()
+    assert cb.remaining() == 0.0
+
+
+# ─── Middleware.__init__ log-dir branch ──────────────────────────────────────
+
+def test_middleware_init_creates_log_dir(tmp_path, monkeypatch):
+    """When UNITY_MCP_LOG_DIR is set to a non-existent dir, it gets created."""
+    log_dir = str(tmp_path / "new_log_dir")
+    monkeypatch.setenv("UNITY_MCP_LOG_DIR", log_dir)
+    mw2 = Middleware()
+    import os
+    assert os.path.isdir(log_dir)
+    assert mw2._mutation_log is not None
+    mw2._mutation_log.close()
+
+
+def test_middleware_init_no_log_dir_by_default(monkeypatch):
+    """Without UNITY_MCP_LOG_DIR, _mutation_log stays None."""
+    monkeypatch.delenv("UNITY_MCP_LOG_DIR", raising=False)
+    mw2 = Middleware()
+    assert mw2._mutation_log is None

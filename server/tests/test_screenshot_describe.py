@@ -279,3 +279,108 @@ async def test_legitimate_description_cached():
     assert result == "A red cube in center."
     resolved_prompt, _ = resolve("auto")
     assert cache.get("fp_legit", resolved_prompt) == "A red cube in center."
+
+
+# ── P2: mark + empty legend falls back to plain prompt ───────────────────────
+
+@pytest.mark.asyncio
+async def test_describe_mark_with_empty_legend_uses_plain_prompt():
+    """mark=True but legend is '(no marks)' → resolve() used, not resolve_som()."""
+    from unity_mcp.screenshot_describe.cache import FingerprintCache
+    from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
+    from unity_mcp.screenshot_describe.prompts import resolve, resolve_som
+
+    cache = FingerprintCache()
+    mock_sampling = MagicMock()
+    mock_sampling.describe_image = AsyncMock(return_value="Plain scene description.")
+
+    d = ScreenshotDescriber(mock_sampling, cache)
+    result = await d.describe("/fake/path.png", "auto", "fp_mark_empty",
+                              mark=True, legend="(no marks)")
+
+    assert result == "Plain scene description."
+    # Must be cached under plain prompt, NOT som prompt
+    plain_prompt, _ = resolve("auto")
+    som_prompt, _ = resolve_som("auto", "(no marks)")
+    assert cache.get("fp_mark_empty", plain_prompt) == "Plain scene description."
+    assert cache.get("fp_mark_empty", som_prompt) is None
+
+
+# ── P2: describe() with no marks at all ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_describe_no_mark_uses_plain_prompt():
+    """mark=False (default) → plain resolve(), SoM legend never appended."""
+    from unity_mcp.screenshot_describe.cache import FingerprintCache
+    from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
+    from unity_mcp.screenshot_describe.prompts import resolve
+
+    cache = FingerprintCache()
+    mock_sampling = MagicMock()
+    mock_sampling.describe_image = AsyncMock(return_value="A sky with clouds.")
+
+    d = ScreenshotDescriber(mock_sampling, cache)
+    result = await d.describe("/fake/path.png", "scene_overview", "fp_nomark")
+
+    assert result == "A sky with clouds."
+    plain_prompt, _ = resolve("scene_overview")
+    assert "Legend:" not in plain_prompt
+    assert cache.get("fp_nomark", plain_prompt) == "A sky with clouds."
+
+
+# ── P2: cache miss then hit ───────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_cache_miss_then_hit_basic_contract():
+    """First call → miss (sampling invoked). Second call → hit (sampling NOT invoked)."""
+    from unity_mcp.screenshot_describe.cache import FingerprintCache
+    from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
+
+    cache = FingerprintCache()
+    mock_sampling = MagicMock()
+    mock_sampling.describe_image = AsyncMock(return_value="A player character.")
+
+    d = ScreenshotDescriber(mock_sampling, cache)
+
+    # First call — cache miss
+    result1 = await d.describe("/fake/path.png", "auto", "fp_miss_hit")
+    assert result1 == "A player character."
+    assert mock_sampling.describe_image.call_count == 1
+
+    # Second call — cache hit, no new sampling call
+    result2 = await d.describe("/fake/path.png", "auto", "fp_miss_hit")
+    assert result2 == "A player character."
+    assert mock_sampling.describe_image.call_count == 1  # still 1
+
+
+# ── P2: partial viewport overlap — mark=True, legend present ─────────────────
+
+@pytest.mark.asyncio
+async def test_describe_mark_with_legend_uses_som_prompt():
+    """mark=True + real legend → resolve_som() used, legend appended to prompt."""
+    from unity_mcp.screenshot_describe.cache import FingerprintCache
+    from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
+    from unity_mcp.screenshot_describe.prompts import resolve_som
+
+    cache = FingerprintCache()
+    calls: list[str] = []
+
+    async def capture_prompt(prompt, path):
+        calls.append(prompt)
+        return "Scene with markers."
+
+    mock_sampling = MagicMock()
+    mock_sampling.describe_image = AsyncMock(side_effect=capture_prompt)
+
+    legend = "1=Player, 2=Enemy"
+    d = ScreenshotDescriber(mock_sampling, cache)
+    result = await d.describe("/fake/path.png", "auto", "fp_som",
+                              mark=True, legend=legend)
+
+    assert result == "Scene with markers."
+    assert calls, "describe_image must be called"
+    assert "Legend:" in calls[0]
+    assert legend in calls[0]
+    # Cached under som prompt
+    som_prompt, _ = resolve_som("auto", legend)
+    assert cache.get("fp_som", som_prompt) == "Scene with markers."

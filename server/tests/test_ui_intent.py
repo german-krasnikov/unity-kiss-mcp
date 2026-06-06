@@ -190,3 +190,40 @@ def test_ui_builder_nested_manage_component_uses_full_path():
     assert "/Canvas/HUD/Menu" in comp_lines[0], (
         f"Expected full path /Canvas/HUD/Menu, got: {comp_lines[0]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 6. E2E edge cases
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_ui_intent_unknown_template_returns_error():
+    """Unknown template name returns ERROR without calling bridge."""
+    from unity_mcp.tools.ui_intent_tool import ui_intent
+    with patch("unity_mcp.tools.ui_intent_tool._send", new_callable=AsyncMock) as mock_send:
+        result = await ui_intent(intent="anything", template="nonexistent_xyz")
+        mock_send.assert_not_called()
+        assert "ERROR" in result
+        assert "nonexistent_xyz" in result
+
+
+@pytest.mark.asyncio
+async def test_ui_intent_empty_dsl_from_llm_returns_error():
+    """Empty/whitespace DSL from LLM produces ERROR, no bridge call."""
+    from unity_mcp.tools.ui_intent_tool import ui_intent
+    with patch("unity_mcp.tools.ui_intent_tool._send", new_callable=AsyncMock) as mock_send:
+        with patch("unity_mcp.tools.ui_intent_tool._sampling") as mock_svc:
+            mock_svc.generate = AsyncMock(return_value="   ")
+            result = await ui_intent(intent="make a HUD")
+            mock_send.assert_not_called()
+            assert "ERROR" in result
+
+
+def test_ui_builder_external_parent_applied_to_root_node():
+    """build_ui_batch with external parent= wires top-level node under that parent."""
+    from unity_mcp.tools.ui_intent_tool import parse_ui_dsl, build_ui_batch
+    dsl = "canvas Canvas"
+    nodes = parse_ui_dsl(dsl)
+    lines = build_ui_batch(nodes, parent="/ExistingUI")
+    create_line = next(l for l in lines if "Canvas" in l and "create_ui" in l)
+    assert "parent=/ExistingUI" in create_line

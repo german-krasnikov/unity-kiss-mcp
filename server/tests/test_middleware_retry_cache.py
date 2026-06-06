@@ -125,3 +125,70 @@ def test_retry_cache_evicts_oldest_not_newest(mw):
     mw.check_retry("cmd_d", {"p": "d"})
     assert len(mw._retry_cache) == 3
     assert oldest_key not in mw._retry_cache
+
+
+# ── Zone 8: middleware_reads gaps ─────────────────────────────────────────────
+
+def test_update_confidence_floor_at_zero(mw):
+    """confidence can't go below 0.0 after repeated writes."""
+    mw.confidence = 0.0
+    mw.update_confidence("set_property", "ok")
+    assert mw.confidence == 0.0
+
+
+def test_update_confidence_floor_stays_zero_multiple_writes(mw):
+    """Multiple writes at 0.0 keep confidence at exactly 0.0."""
+    mw.confidence = 0.0
+    for _ in range(5):
+        mw.update_confidence("set_property", "ok")
+    assert mw.confidence == 0.0
+
+
+def test_lru_add_component_existing_key_promoted(mw):
+    """_lru_add_component with existing key calls move_to_end (promotes it)."""
+    mw._MAX_COMPONENTS = 3
+    mw._component_cache.clear()
+    mw._lru_add_component("/a", "Transform")
+    mw._lru_add_component("/b", "Rigidbody")
+    # Re-add /a — should promote it to end, /b should now be oldest
+    mw._lru_add_component("/a", "Camera")
+    # Add /c to fill, then /d to evict oldest
+    mw._lru_add_component("/c", "Light")
+    mw._lru_add_component("/d", "AudioSource")  # should evict /b (oldest after /a promoted)
+    assert "/b" not in mw._component_cache
+    assert "/a" in mw._component_cache
+
+
+def test_lru_add_component_existing_key_accumulates_components(mw):
+    """_lru_add_component with same path adds new component to existing set."""
+    mw._lru_add_component("/obj", "Transform")
+    mw._lru_add_component("/obj", "Rigidbody")
+    assert "Transform" in mw._component_cache["/obj"]
+    assert "Rigidbody" in mw._component_cache["/obj"]
+
+
+def test_track_editor_state_invalidates_schema_on_recompile(mw):
+    """track_editor_state('recompile', ...) invalidates schema_cache."""
+    if mw.schema_cache is None:
+        pytest.skip("schema_cache disabled")
+    mw.schema_cache.put("Transform", frozenset(["position"]))
+    mw.track_editor_state("recompile", "recompile started")
+    assert mw.schema_cache.get("Transform") is None
+
+
+def test_track_editor_state_invalidates_schema_on_scene(mw):
+    """track_editor_state('scene', ...) invalidates schema_cache."""
+    if mw.schema_cache is None:
+        pytest.skip("schema_cache disabled")
+    mw.schema_cache.put("Rigidbody", frozenset(["mass"]))
+    mw.track_editor_state("scene", "scene loaded")
+    assert mw.schema_cache.get("Rigidbody") is None
+
+
+def test_track_editor_state_no_invalidation_for_get_component(mw):
+    """Non-recompile/scene commands don't invalidate schema_cache."""
+    if mw.schema_cache is None:
+        pytest.skip("schema_cache disabled")
+    mw.schema_cache.put("Camera", frozenset(["fov"]))
+    mw.track_editor_state("get_component", "result")
+    assert mw.schema_cache.get("Camera") is not None

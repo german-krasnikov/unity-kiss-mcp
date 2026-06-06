@@ -160,5 +160,37 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("", argsRec.Value.ArgsJson, "args-complete record must have empty string ArgsJson");
             Assert.IsFalse(argsRec.Value.HasResult);
         }
+
+        // ── Result-before-complete ordering ───────────────────────────────────
+
+        [Test]
+        public void Feed_ResultBeforeArgsComplete_TreatedAsOrphan()
+        {
+            // ToolStart received, but ToolArgsComplete hasn't fired yet.
+            // A ToolResult for the same id arrives out of order → orphan path ("?").
+            _acc.Feed(ChatEvent.ToolStart("my_tool", "", "id_early"));
+
+            var rec = _acc.Feed(ChatEvent.ToolResult("id_early", "early result", true));
+
+            Assert.IsTrue(rec.HasValue);
+            Assert.AreEqual("?",            rec.Value.Name,       "out-of-order result is an orphan");
+            Assert.AreEqual("id_early",     rec.Value.Id);
+            Assert.AreEqual("early result", rec.Value.ResultText);
+            Assert.IsTrue(rec.Value.IsOk);
+        }
+
+        [Test]
+        public void Feed_ResultBeforeArgsComplete_SubsequentArgsCompleteStillWorks()
+        {
+            // After the orphan result, ToolArgsComplete still fires (stream can be
+            // spec-non-conformant). The accumulator should return the assembled record
+            // without throwing, but the pending slot is now dangling.
+            _acc.Feed(ChatEvent.ToolStart("t2", "", "id_dangling"));
+            _acc.Feed(ChatEvent.ToolResult("id_dangling", "res", true)); // orphan
+            // ToolArgsComplete fires late — _currentId is "id_dangling", assembles normally.
+            var rec = _acc.Feed(ChatEvent.ToolArgsComplete());
+            Assert.IsTrue(rec.HasValue, "ToolArgsComplete must still produce a record");
+            Assert.AreEqual("t2", rec.Value.Name);
+        }
     }
 }

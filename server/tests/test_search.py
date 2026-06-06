@@ -3,8 +3,10 @@ import json
 import struct
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
+from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.bridge import UnityBridge
 from unity_mcp.server import search_scene, scene
+from unity_mcp.tools.scene import get_hierarchy
 
 
 def make_response(data=None, ok=True, err=None, msg_id="0001"):
@@ -159,3 +161,11 @@ async def test_scene_save_error_raises_tool_error(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Save failed: read-only"})
     with pytest.raises(ToolError, match="Save failed"):
         await scene(action="save", path="Assets/Scene.unity")
+
+
+@pytest.mark.asyncio
+async def test_get_hierarchy_error_raises_tool_error(mock_bridge):
+    """get_hierarchy raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Scene not loaded"})
+    with pytest.raises(ToolError, match="Scene not loaded"):
+        await get_hierarchy()

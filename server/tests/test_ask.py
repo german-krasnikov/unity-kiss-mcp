@@ -334,3 +334,102 @@ async def test_summarizer_multi_result_short_total_still_calls_haiku():
     result = await s.summarize("any issues?", raw, hint="scene health")
     svc.generate.assert_called_once()
     assert result == "summary from haiku"
+
+
+# ---------------------------------------------------------------------------
+# 16. Router — COUNT_ACTIVE returns None (plan not implemented) (P2)
+# ---------------------------------------------------------------------------
+
+def test_router_count_active_returns_none():
+    """COUNT_ACTIVE matches pattern but CANONICAL_PLANS has None → route() returns None."""
+    from unity_mcp.ask.router import route
+    result = route("how many active objects are there?")
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# 17. Summarizer — empty result list goes to Haiku (P2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_summarizer_empty_result_list_calls_haiku():
+    """Empty raw_results: combined='', len!=1 → Haiku path."""
+    from unity_mcp.ask.summarizer import Summarizer
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(return_value="nothing found")
+
+    s = Summarizer(svc)
+    result = await s.summarize("any errors?", [], hint="scene health")
+    svc.generate.assert_called_once()
+    assert result == "nothing found"
+
+
+@pytest.mark.asyncio
+async def test_summarizer_empty_result_list_haiku_returns_none_falls_back():
+    """Empty list + Haiku returns None → fallback to combined[:500] which is ''."""
+    from unity_mcp.ask.summarizer import Summarizer
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(return_value=None)
+
+    s = Summarizer(svc)
+    result = await s.summarize("any errors?", [], hint="hint")
+    assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# 18. Summarizer — exception during summarization (P2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_summarizer_exception_during_haiku_propagates():
+    """If svc.generate raises, exception propagates (no silent swallow in summarizer)."""
+    from unity_mcp.ask.summarizer import Summarizer
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(side_effect=RuntimeError("haiku down"))
+
+    s = Summarizer(svc)
+    with pytest.raises(RuntimeError, match="haiku down"):
+        await s.summarize("any errors?", ["x" * 250], hint="hint")
+
+
+# ---------------------------------------------------------------------------
+# 19. AskExecutor — empty plan returns empty list (P2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_executor_empty_plan_returns_empty_list():
+    """ToolPlan with no steps → run() returns []."""
+    from unity_mcp.ask.executor import AskExecutor
+    from unity_mcp.ask.plans import ToolPlan
+
+    send = AsyncMock()
+    ex = AskExecutor(send)
+    plan = ToolPlan([], "hint", "EMPTY")
+    results = await ex.run(plan)
+    assert results == []
+    send.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 20. AskExecutor — all steps failing (P2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_executor_all_steps_failing_returns_error_strings():
+    """All steps raise → each result is 'ERROR: ...' string, no exception bubbles."""
+    from unity_mcp.ask.executor import AskExecutor
+    from unity_mcp.ask.plans import ToolPlan
+
+    send = AsyncMock(side_effect=ConnectionError("unity offline"))
+    ex = AskExecutor(send)
+    plan = ToolPlan(
+        [("scan_scene", {}), ("validate_references", {"path": "/"})],
+        "hint",
+        "SCENE_HEALTH",
+    )
+    results = await ex.run(plan)
+    assert len(results) == 2
+    assert all(r.startswith("ERROR:") for r in results)

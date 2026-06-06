@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 from mcp.server.fastmcp.exceptions import ToolError
 
 from unity_mcp.server import batch
+from unity_mcp.tools.batch import validate_references
 
 
 @pytest.mark.asyncio
@@ -138,3 +139,34 @@ async def test_batch_atomic_with_on_error(mock_bridge, bridge_response):
     call_args = mock_bridge.send.call_args[0]
     assert call_args[1].get("atomic") == "true"
     assert "on_error" not in call_args[1]  # default value omitted
+
+
+@pytest.mark.asyncio
+async def test_batch_empty_commands_list(mock_bridge, bridge_response):
+    """batch with only whitespace/newlines sends empty commands string."""
+    bridge_response(data="ok:0")
+    result = await batch(commands="\n\n  \n")
+    call_args = mock_bridge.send.call_args[0]
+    # commands forwarded as-is (whitespace only), no dsl rejection triggered
+    assert call_args[0] == "batch"
+
+
+@pytest.mark.asyncio
+async def test_validate_references_ignore_optional_sent(mock_bridge):
+    """validate_references with ignore_optional=True sends ignore_optional flag."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "0 ERROR, 3 OK"})
+    await validate_references(path="/Root", ignore_optional=True)
+    mock_bridge.send.assert_called_once_with(
+        "validate_references",
+        {"path": "/Root", "depth": 3, "ignore_optional": "true"},
+        timeout=30.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_references_ignore_optional_false_omitted(mock_bridge):
+    """validate_references with ignore_optional=False (default) omits the key."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "0 ERROR, 3 OK"})
+    await validate_references(path="/Root")
+    call_args = mock_bridge.send.call_args[0][1]
+    assert "ignore_optional" not in call_args

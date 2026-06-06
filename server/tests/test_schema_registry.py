@@ -140,3 +140,42 @@ def test_annotations_preserved():
     result = reg.get_full("safe_tool")
     assert result is not None
     assert result.get("annotations") == annotations
+
+
+# ── P2: format_text edge cases ────────────────────────────────────────────────
+
+def test_format_text_empty_schema_no_params_line():
+    """Tool with no properties → no 'Params:' line, still shows name + description."""
+    from unity_mcp.tools.schema_registry import SchemaRegistry
+    reg = SchemaRegistry()
+    reg.capture("empty_tool", {"type": "object"}, "No params tool")
+    text = reg.format_text(["empty_tool"])
+    assert "== empty_tool ==" in text
+    assert "No params tool" in text
+    assert "Params:" not in text
+
+
+def test_format_text_nested_object_shows_type_object():
+    """Property with type 'object' (nested) → rendered as 'object', no crash."""
+    from unity_mcp.tools.schema_registry import SchemaRegistry
+    reg = SchemaRegistry()
+    schema = _make_schema({
+        "config": {
+            "type": "object",
+            "properties": {"x": {"type": "number"}},
+        }
+    })
+    reg.capture("nested_tool", schema, "Nested prop tool")
+    text = reg.format_text(["nested_tool"])
+    assert "config" in text
+    assert "object" in text
+    assert "{" not in text  # still plain text
+
+
+def test_format_text_empty_list_returns_empty_string():
+    """format_text([]) → empty string."""
+    from unity_mcp.tools.schema_registry import SchemaRegistry
+    reg = SchemaRegistry()
+    reg.capture("some_tool", _make_schema({"x": {"type": "string"}}), "Desc")
+    text = reg.format_text([])
+    assert text == ""

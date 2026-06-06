@@ -81,6 +81,18 @@ async def test_setup_objects_empty(mock_send):
     assert "No" in result
 
 
+@pytest.mark.asyncio
+async def test_setup_objects_parent_double_slash_normalized(mock_send):
+    """parent path containing // is not double-slashed in generated commands."""
+    from unity_mcp.tools.autobatch import setup_objects
+    # parent already has leading slash — should not produce //
+    await setup_objects("Enemy parent=/World/Enemies")
+    cmds = _batch_cmds(mock_send)
+    assert "//" not in cmds
+    assert "create_object name=Enemy" in cmds
+    assert "parent=/World/Enemies" in cmds
+
+
 # ── set_properties ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
