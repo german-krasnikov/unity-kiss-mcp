@@ -137,9 +137,9 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 
 | Component | Tested | Minimum |
 |-----------|--------|---------|
-| Unity | 6000.0 (Unity 6) | 2021.3 LTS |
-| Python | 3.12, 3.11, 3.10 | 3.10 |
-| OS | macOS (primary), Windows, Linux | — |
+| Unity | 6000.3 | 6000.0 (Unity 6) |
+| Python | 3.12 | 3.10 |
+| OS | macOS | macOS, Windows, Linux |
 | Claude Code | latest | any with MCP support |
 
 </details>
