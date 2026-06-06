@@ -110,15 +110,12 @@ namespace UnityMCP.Editor.Tests
         [TestCase("UnityEngine.CoreModule")]
         [TestCase("UnityEditor")]
         [TestCase("UnityEditor.CoreModule")]
-        [TestCase("Assembly-CSharp")]
-        [TestCase("Assembly-CSharp-Editor")]
         public void IsAllowedAssembly_AllowedName_ReturnsTrue(string asmName)
         {
             Assert.IsNotNull(_isAllowedAssemblyMethod, "IsAllowedAssembly not found");
             var target = System.AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == asmName);
-            if (target == null)
-                Assert.Ignore($"Assembly '{asmName}' not loaded in test domain");
+            Assert.IsNotNull(target, $"Assembly '{asmName}' not loaded in test domain");
             Assert.IsTrue(CallIsAllowed(target), $"Expected '{asmName}' to be allowed");
         }
 

@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 
-[assembly: InternalsVisibleTo("Tests")]
+[assembly: InternalsVisibleTo("UnityMCP.TestProject")]
 
 namespace UnityMCP.Editor
 {
