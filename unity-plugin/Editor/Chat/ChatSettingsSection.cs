@@ -10,12 +10,16 @@ namespace UnityMCP.Editor.Chat
         /// <summary>Builds connection settings content — called by ChatConnectionSection via OnBuildConnection.</summary>
         internal static void BuildContent(VisualElement parent)
         {
-            // Binary path (auto + override)
+            // Per-backend settings — Claude foldout is expanded by default (contains primary connection info)
+            var store = BackendConfigStore.Load();
+            var claudeFoldout = new Foldout { text = "Claude Settings", value = true };
+
+            // Binary path (auto + override) — inside Claude foldout
             var autoPath = ChatBinaryResolver.Resolve();
             var pathHint = new Label($"Auto: {autoPath ?? "not found"}");
             pathHint.style.fontSize = 10;
             pathHint.style.color    = new StyleColor(autoPath != null ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
-            parent.Add(pathHint);
+            claudeFoldout.Add(pathHint);
 
             var pathField = new TextField("Override Path")
                 { value = EditorPrefs.GetString(ChatBinaryResolver.PrefKey, "") };
@@ -27,12 +31,12 @@ namespace UnityMCP.Editor.Chat
                     EditorPrefs.SetString(ChatBinaryResolver.PrefKey, e.newValue);
                 ChatBinaryResolver.Resolve(forceRefresh: true);
             });
-            parent.Add(pathField);
+            claudeFoldout.Add(pathField);
 
             // Auth status probe
             var authLabel = new Label("Auth: checking...");
             authLabel.style.fontSize = 10;
-            parent.Add(authLabel);
+            claudeFoldout.Add(authLabel);
             ProbeAuthAsync(authLabel);
 
             // ANTHROPIC_API_KEY warning
@@ -42,13 +46,9 @@ namespace UnityMCP.Editor.Chat
                 warn.style.fontSize = 9;
                 warn.style.color    = new StyleColor(new Color(0.9f, 0.7f, 0.3f));
                 warn.style.whiteSpace = WhiteSpace.Normal;
-                parent.Add(warn);
+                claudeFoldout.Add(warn);
             }
 
-            // Per-backend settings
-            var store = BackendConfigStore.Load();
-
-            var claudeFoldout = new Foldout { text = "Claude Settings", value = false };
             BackendSettingsForm.BuildClaudeForm(claudeFoldout, store.Claude, () => store.Save());
             parent.Add(claudeFoldout);
 
@@ -91,6 +91,7 @@ namespace UnityMCP.Editor.Chat
                     if (label?.panel == null) return;
                     label.text = ok ? "Auth: logged in" : "Auth: not logged in";
                     label.style.color = new StyleColor(ok ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
+                    EditorPrefs.SetString("UnityMCP_Chat_AuthStatus", ok ? "ok" : "fail");
                 };
             });
         }

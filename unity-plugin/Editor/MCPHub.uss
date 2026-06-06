@@ -1,0 +1,274 @@
+.hub-root {
+    flex-direction: column;
+    padding: 12px;
+    background-color: var(--unity-colors-window-background);
+}
+
+/* General settings section */
+.hub-section {
+    margin-bottom: 6px;
+}
+
+.hub-port-label {
+    font-size: 10px;
+    color: var(--unity-colors-label-text);
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
+
+/* Card buttons */
+.hub-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    background-color: var(--unity-colors-window-background);
+    transition-property: border-color, background-color;
+    transition-duration: 0.2s;
+    cursor: link;
+}
+
+.hub-card:hover {
+    border-color: #3ad29f;
+    background-color: rgba(58, 210, 159, 0.06);
+}
+
+.hub-card-icon {
+    font-size: 20px;
+    width: 32px;
+    -unity-text-align: middle-center;
+    margin-right: 8px;
+}
+
+.hub-card-col {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.hub-card-title {
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.hub-card-subtitle {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-top: 1px;
+}
+
+/* Heartbeat divider */
+.hub-divider {
+    flex-direction: row;
+    align-items: center;
+    margin: 10px 0;
+    height: 12px;
+}
+
+.hub-divider-line {
+    flex-grow: 1;
+    height: 1px;
+    background-color: var(--unity-colors-default-border);
+}
+
+.hub-divider-spike {
+    width: 10px;
+    height: 10px;
+    margin: 0 6px;
+    background-color: var(--unity-colors-default-border);
+    border-radius: 2px;
+    opacity: 0.3;
+    transition-property: opacity, background-color;
+    transition-duration: 0.45s;
+}
+
+.hub-divider-spike.beat {
+    opacity: 0.9;
+}
+
+.hub-divider-spike.beat-up     { background-color: #3ad29f; }
+.hub-divider-spike.beat-listen { background-color: #e8a23a; }
+.hub-divider-spike.beat-down   { background-color: #6e2b3a; }
+
+/* === Tools: toggle switch row === */
+.anim-tools {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    margin: 6px 0;
+}
+.toggle-track {
+    width: 28px; height: 14px; border-radius: 7px;
+    border-width: 1px; border-color: var(--unity-colors-default-border);
+    background-color: rgba(0,0,0,0.12);
+    margin: 0 4px;
+    flex-direction: row; align-items: center;
+}
+.toggle-knob {
+    width: 10px; height: 10px; border-radius: 5px;
+    margin-left: 1px;
+    background-color: var(--unity-colors-default-border);
+    transition-property: margin-left, background-color;
+    transition-duration: 0.35s;
+}
+.toggle-knob.on        { margin-left: 15px; }
+.toggle-knob.conn-up   { background-color: #3ad29f; }
+.toggle-knob.conn-listen { background-color: #e8a23a; }
+.toggle-knob.conn-down { background-color: #6e2b3a; }
+
+/* === Permissions: shield + lock === */
+.shield-root { flex-direction: row; align-items: center; margin: 10px 0; height: 56px; }
+.shield-line { flex-grow: 1; height: 1px; background-color: var(--unity-colors-default-border); }
+.shield-hub  { width: 48px; height: 48px; position: relative; margin: 0 8px; }
+.shield-body {
+    width: 36px; height: 38px; position: absolute; left: 6px; top: 5px;
+    border-top-left-radius: 4px; border-top-right-radius: 4px;
+    border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;
+    background-color: transparent; border-width: 2px;
+    opacity: 0.5;
+    transition-property: opacity, border-color; transition-duration: 0.4s;
+}
+.shield-body--pulse { opacity: 1.0; }
+.shield--up     { border-color: #3ad29f; }
+.shield--listen { border-color: #e8a23a; }
+.shield--down   { border-color: #6e2b3a; }
+.lock-shackle {
+    width: 10px; height: 7px; position: absolute; left: 19px; top: 12px;
+    border-top-left-radius: 5px; border-top-right-radius: 5px;
+    border-width: 2px; border-bottom-width: 0;
+    background-color: transparent; opacity: 0.7;
+    transition-property: opacity, top, border-color; transition-duration: 0.3s;
+}
+.lock-shackle--up { top: 9px; opacity: 1.0; }
+.lock-bar {
+    width: 14px; height: 10px; position: absolute; left: 17px; top: 18px;
+    border-radius: 2px;
+    transition-property: background-color; transition-duration: 0.5s;
+}
+.lock-bar--up     { background-color: #3ad29f; }
+.lock-bar--listen { background-color: #e8a23a; }
+.lock-bar--down   { background-color: #6e2b3a; }
+.lock-dot {
+    width: 4px; height: 4px; position: absolute; left: 22px; top: 21px;
+    border-radius: 50%;
+    background-color: var(--unity-colors-window-background);
+}
+
+/* === Chat: WiFi arc pulse === */
+.wave-root { flex-direction: row; align-items: center; margin: 10px 0; height: 56px; }
+.wave-line { flex-grow: 1; height: 1px; background-color: var(--unity-colors-default-border); }
+.wave-hub  { width: 48px; height: 48px; position: relative; margin: 0 8px; }
+.wave-arc {
+    border-radius: 50%; background-color: transparent;
+    border-width: 1.5px; position: absolute;
+    opacity: 0.15;
+    transition-property: opacity, border-color; transition-duration: 0.25s;
+}
+.wave-arc--lit { opacity: 0.9; }
+.wave-arc-1 { width: 20px; height: 20px; top: 14px; left: 14px; }
+.wave-arc-2 { width: 32px; height: 32px; top: 8px; left: 8px; }
+.wave-arc-3 { width: 44px; height: 44px; top: 2px; left: 2px; }
+.wave--up     { border-color: #3ad29f; }
+.wave--listen { border-color: #e8a23a; }
+.wave--down   { border-color: #6e2b3a; }
+.wave-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    position: absolute; top: 21px; left: 21px;
+    opacity: 0.9;
+    transition-property: background-color; transition-duration: 0.4s;
+}
+.wave-dot--up     { background-color: #3ad29f; }
+.wave-dot--listen { background-color: #e8a23a; }
+.wave-dot--down   { background-color: #6e2b3a; }
+
+/* === Hub Header Animation (F25-alt) === */
+
+.hub-anim-root {
+    flex-direction: row;
+    align-items: center;
+    height: 56px;
+    margin-bottom: 8px;
+    position: relative;
+}
+
+.han-line {
+    flex-grow: 1;
+    height: 1px;
+    background-color: var(--unity-colors-default-border);
+    opacity: 0.5;
+    transition-property: background-color, opacity;
+    transition-duration: 0.4s;
+}
+.han-line.han--up     { background-color: #3ad29f; opacity: 0.4; }
+.han-line.han--listen { background-color: #e8a23a; opacity: 0.4; }
+.han-line.han--down   { background-color: #6e2b3a; opacity: 0.4; }
+
+.han-node {
+    border-radius: 50%;
+    background-color: transparent;
+    border-width: 1.5px;
+    border-color: var(--unity-colors-default-border);
+    opacity: 0.4;
+    transition-property: border-color, opacity, background-color;
+    transition-duration: 0.35s;
+    flex-shrink: 0;
+}
+.han-node--sm { width: 8px;  height: 8px; }
+.han-node--md { width: 12px; height: 12px; }
+
+.han-node.han--up     { border-color: #3ad29f; opacity: 0.75; }
+.han-node.han--listen { border-color: #e8a23a; opacity: 0.75; }
+.han-node.han--down   { border-color: #6e2b3a; opacity: 0.5; }
+
+.han-hub {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    border-width: 2px;
+    border-color: var(--unity-colors-default-border);
+    background-color: rgba(0,0,0,0.0);
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.55;
+    transition-property: border-color, background-color, opacity;
+    transition-duration: 0.4s;
+}
+.han-hub--pulse { opacity: 1.0; }
+.han-hub.han--up     { border-color: #3ad29f; background-color: rgba(58,210,159,0.08); }
+.han-hub.han--listen { border-color: #e8a23a; background-color: rgba(232,162,58,0.08); }
+.han-hub.han--down   { border-color: #6e2b3a; background-color: rgba(110,43,58,0.08); }
+
+.han-status {
+    font-size: 7px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    white-space: normal;
+    color: var(--unity-colors-label-text);
+    transition-property: color;
+    transition-duration: 0.4s;
+    width: 40px;
+}
+.han-status.han--up     { color: #3ad29f; }
+.han-status.han--listen { color: #e8a23a; }
+.han-status.han--down   { color: #6e2b3a; }
+
+.han-packet {
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    position: absolute;
+    top: 25px;
+    left: 3%;
+    background-color: var(--unity-colors-default-border);
+    opacity: 0.3;
+    transition-property: background-color, opacity;
+    transition-duration: 0.08s;
+}
+.han-packet--bright { opacity: 1.0; }
+.han-packet.han--up     { background-color: #3ad29f; }
+.han-packet.han--listen { background-color: #e8a23a; }
+.han-packet.han--down   { background-color: #6e2b3a; }
