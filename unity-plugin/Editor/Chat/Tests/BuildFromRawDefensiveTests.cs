@@ -265,6 +265,98 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(2, msg.Chips.Count, "Both chips must be in output regardless of offset");
         }
 
+        // ── F21c–g: exact screenshot reproductions ───────────────────────────
+
+        // F21c: exact screenshot — two chips, Cyrillic text between, both mentions stripped
+        [Test]
+        public void R_Def_F21c_ExactScreenshot_CyrillicBetween_BothStripped()
+        {
+            var c1 = H("/Coll_1", "Collectible_1", 1);
+            var c2 = H("/Coll_2", "Collectible_2", 2);
+            var raw = "@Collectible_1 что это @Collectible_2 ?";
+            var msg = ChipTextInterleaver.BuildFromRaw(raw,
+                new List<PositionedChip> { PC(c1, 0), PC(c2, 23) });
+            Assert.AreEqual(2, msg.Chips.Count);
+            Assert.AreEqual(4, msg.Segments.Count, "chip1, text, chip2, remaining");
+            Assert.IsTrue(msg.Segments[0].IsChip);
+            Assert.AreEqual("что это ", msg.Segments[1].Text);
+            Assert.IsTrue(msg.Segments[2].IsChip);
+            foreach (var seg in msg.Segments)
+                if (!seg.IsChip) StringAssert.DoesNotContain("@", seg.Text,
+                    $"Text segment contains @: '{seg.Text}'");
+        }
+
+        // F21d: full InlineChipField integration with Cyrillic text
+        [Test]
+        public void R_Def_F21d_InlineChipField_CyrillicFlow_NoStrayAt()
+        {
+            var field = new InlineChipField();
+            field.AddChip(H("/Coll_1", "Collectible_1", 1));
+            ChipTestHelpers.Type(field, "что это ");
+            field.AddChip(H("/Coll_2", "Collectible_2", 2));
+            ChipTestHelpers.Type(field, "?");
+
+            var rawText = (field.Text ?? "").Trim();
+            var positioned = new System.Collections.Generic.List<PositionedChip>(
+                field.Model.PositionedChips);
+            var msg = ChipTextInterleaver.BuildFromRaw(rawText, positioned);
+
+            Assert.AreEqual(2, msg.Chips.Count, "Both chips present");
+            foreach (var seg in msg.Segments)
+                if (!seg.IsChip) StringAssert.DoesNotContain("@", seg.Text,
+                    $"Text contains @: '{seg.Text}'");
+        }
+
+        // F21e: display name with space + Cyrillic text
+        [Test]
+        public void R_Def_F21e_SpaceInName_CyrillicText_BothStripped()
+        {
+            var c1 = H("/Coll_2", "Collectible_2", 1);
+            var c2 = H("/Main Camera", "Main Camera", 2);
+            var raw = "@Collectible_2 что это @Main Camera ?";
+            var msg = ChipTextInterleaver.BuildFromRaw(raw,
+                new List<PositionedChip> { PC(c1, 0), PC(c2, 23) });
+            Assert.AreEqual(2, msg.Chips.Count);
+            foreach (var seg in msg.Segments)
+                if (!seg.IsChip)
+                {
+                    StringAssert.DoesNotContain("@Collectible_2", seg.Text);
+                    StringAssert.DoesNotContain("@Main Camera", seg.Text);
+                }
+        }
+
+        // F21f: Trim() shifts offsets — fallback search still finds mentions
+        [Test]
+        public void R_Def_F21f_TrimShiftsOffsets_FallbackFinds()
+        {
+            var c1 = H("/Coll_1", "Collectible_1", 1);
+            var c2 = H("/Coll_2", "Collectible_2", 2);
+            // Simulate: TextField had leading space, Trim removed it, offsets shifted by 1
+            var raw = "@Collectible_1 что это @Collectible_2 ?"; // already trimmed
+            var msg = ChipTextInterleaver.BuildFromRaw(raw,
+                new List<PositionedChip> { PC(c1, 1), PC(c2, 24) }); // offsets +1 from original
+            Assert.AreEqual(2, msg.Chips.Count);
+            foreach (var seg in msg.Segments)
+                if (!seg.IsChip) StringAssert.DoesNotContain("@", seg.Text,
+                    $"Text contains @: '{seg.Text}'");
+        }
+
+        // F21g: large offset drift — fallback search across full remaining text
+        [Test]
+        public void R_Def_F21g_LargeOffsetDrift_FallbackFinds()
+        {
+            var c1 = H("/Coll_1", "Collectible_1", 1);
+            var c2 = H("/Coll_2", "Collectible_2", 2);
+            var raw = "@Collectible_1 что это @Collectible_2 ?";
+            // chip2 offset = 10 (way off — actual @ at 23)
+            var msg = ChipTextInterleaver.BuildFromRaw(raw,
+                new List<PositionedChip> { PC(c1, 0), PC(c2, 10) });
+            Assert.AreEqual(2, msg.Chips.Count);
+            foreach (var seg in msg.Segments)
+                if (!seg.IsChip) StringAssert.DoesNotContain("@Collectible_2", seg.Text,
+                    $"Text contains @Collectible_2: '{seg.Text}'");
+        }
+
         // ── Regression: exact user scenario ──────────────────────────────────
 
         [Test]
