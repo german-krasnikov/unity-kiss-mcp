@@ -5,12 +5,10 @@ using UnityEngine.UIElements;
 namespace UnityMCP.Editor
 {
     /// <summary>
-    /// Standalone window for Agent Tool Permissions — deny-set configuration.
-    /// Distinct from MCPToolSettingsWindow which controls what tools exist.
+    /// Permissions window — deny-set configuration for Agent Chat tools.
     /// </summary>
     public class MCPPermissionsWindow : EditorWindow
     {
-        [MenuItem("MCP/Permissions", priority = 3)]
         public static void ShowWindow()
         {
             var window = GetWindow<MCPPermissionsWindow>("MCP Permissions");
@@ -18,26 +16,27 @@ namespace UnityMCP.Editor
             window.maxSize = new Vector2(600, 900);
         }
 
-        public void CreateGUI()
+        private void CreateGUI()
         {
-            var styleSheet = MCPEditorUtils.LoadStyleSheet("MCPSettings.uss");
-            if (styleSheet != null)
-                rootVisualElement.styleSheets.Add(styleSheet);
+            var root = rootVisualElement;
 
-            var header = new Label("Agent Tool Permissions");
-            header.AddToClassList("plugin-section-header");
-            rootVisualElement.Add(header);
+            var styleSheet = MCPEditorUtils.LoadStyleSheet("MCPSettings.uss");
+            if (styleSheet != null) root.styleSheets.Add(styleSheet);
+
+            var hubSs = MCPEditorUtils.LoadStyleSheet("MCPHub.uss");
+            if (hubSs != null) root.styleSheets.Add(hubSs);
+
+            root.Add(PermissionsHeaderAnim.Build(root));
 
             var info = new Label("Controls which tools Agent Chat may call. " +
-                                 "Tool Settings controls what tools exist.");
+                                 "Tool toggles are in the Settings hub.");
             info.AddToClassList("info-label");
             info.style.whiteSpace = WhiteSpace.Normal;
             info.style.marginBottom = 8;
-            rootVisualElement.Add(info);
+            root.Add(info);
 
             var config = new PermissionConfig();
-            var content = MCPSettingsPermUI.BuildContent(config);
-            rootVisualElement.Add(content);
+            root.Add(MCPSettingsPermUI.BuildContent(config));
         }
     }
 }

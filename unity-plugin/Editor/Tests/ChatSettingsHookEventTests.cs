@@ -5,7 +5,7 @@ using UnityMCP.Editor;
 namespace UnityMCP.Editor.Tests
 {
     [TestFixture]
-    public class MCPConnectionWindowTests
+    public class ChatSettingsHookEventTests
     {
         [TearDown]
         public void TearDown() => ChatSettingsHook.ResetConnectionEvent();

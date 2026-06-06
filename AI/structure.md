@@ -147,9 +147,18 @@ unity-kiss-mcp/
 │       ├── FingerprintHelper.cs + ScanHelper.cs + SceneDiffHelper.cs
 │       ├── ChangeWatcher.cs + ColliderChecker.cs + SchemaHelper.cs
 │       ├── MCPSettings.cs                 # Pure static data class (catalog, EnabledTools, no EditorWindow)
+│       ├── MCPSettingsHub.cs              # Central hub window coordinating all settings UI (F26)
+│       ├── MCPHubUI.cs                    # Hub-level layout + sub-window orchestration (F26)
+│       ├── HubHeaderAnim.cs               # Circuit-node network animation: 5 nodes + lines + packet (F26)
+│       ├── HubCardButton.cs               # Launcher card buttons for each settings window (F26)
+│       ├── MCPHubDivider.cs               # Visual divider component for hub sections (F26)
+│       ├── MCPHub.uss                     # Stylesheet for hub + animation classes `han-*` (F26)
 │       ├── MCPToolSettingsWindow.cs       # MCP/Tool Settings window (toggles + presets + plugins)
+│       ├── ToolsHeaderAnim.cs             # 5 toggle-sweep animation (400ms) — connection-aware colors (F25)
 │       ├── MCPPermissionsWindow.cs        # MCP/Permissions window (deny-set config)
-│       ├── MCPConnectionWindow.cs         # MCP/Connection window (CLI binary + auth + backends + chips)
+│       ├── PermissionsHeaderAnim.cs       # Shield + lock pulse (150ms) — connection-aware colors (F25)
+│       ├── MCPChatSettingsWindow.cs       # Chat Settings window (backend selection + model/auth settings)
+│       ├── ChatHeaderAnim.cs              # WiFi arc pulse (150ms) — connection-aware colors (F25)
 │       ├── ChatSettingsHook.cs            # Event hook: OnBuildConnection fired when Connection window builds
 │       ├── MCPStatusWindow.cs             # Connection status monitor (heartbeat animation)
 │       ├── MCPActions.cs                  # Shared actions (Restart, Kill, Reimport)
@@ -158,6 +167,13 @@ unity-kiss-mcp/
 │       ├── Tests/                         # Editor tests asmdef (references core)
 │       │   ├── UnityMCP.Editor.Tests.asmdef
 │       │   ├── MCPStatusModelTests.cs     # 14 NUnit tests (state transitions, labels, pills)
+│       │   ├── HubHeaderAnimTests.cs      # 11 NUnit tests (circuit-node animation, packet motion, state logic) (F26)
+│       │   ├── HubCardButtonTests.cs      # NUnit tests (card rendering, click behavior) (F26)
+│       │   ├── MCPHubDividerTests.cs      # NUnit tests (divider styling, layout) (F26)
+│       │   ├── ToolsHeaderAnimTests.cs    # 7 NUnit tests (toggle sweep, color cycling, state logic)
+│       │   ├── PermissionsHeaderAnimTests.cs # 7 NUnit tests (shield pulse, state logic)
+│       │   ├── ChatHeaderAnimTests.cs     # 7 NUnit tests (wifi arc, state logic)
+│       │   ├── ChatSettingsHookEventTests.cs # NUnit tests (event firing, hook execution) (F26)
 │       ├── Chat/                          # Optional in-Unity Agent Chat (isolated, UNITY_MCP_CHAT define)
 │       │   ├── ChatEvent.cs               # Normalized event struct
 │       │   ├── ChatStreamParser.cs        # Parse stream-json from claude CLI stdout

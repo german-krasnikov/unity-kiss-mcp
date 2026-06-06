@@ -24,6 +24,20 @@ namespace UnityMCP.Editor
         internal static bool HasConnectionSubscribers => OnBuildConnection != null;
         internal static void ResetConnectionEvent() => OnBuildConnection = null;
 
+        public static bool IsChatBinaryAvailable()
+        {
+            try
+            {
+                var t = System.Type.GetType("UnityMCP.Editor.Chat.ChatBinaryResolver, UnityMCP.Editor.Chat");
+                if (t == null) return false;
+                var method = t.GetMethod("Resolve",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic,
+                    null, new[] { typeof(bool) }, null);
+                return method?.Invoke(null, new object[] { false }) as string != null;
+            }
+            catch { return false; }
+        }
+
         public static bool IsChatEnabled()
         {
             var group = EditorUserBuildSettings.selectedBuildTargetGroup;
