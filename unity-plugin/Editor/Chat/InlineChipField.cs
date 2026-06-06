@@ -54,6 +54,8 @@ namespace UnityMCP.Editor.Chat
             Add(_pillRow);
 
             _textField = new TextField { multiline = true };
+            _textField.selectAllOnFocus   = false;
+            _textField.selectAllOnMouseUp = false;
             _textField.style.flexGrow   = 1;
             _textField.style.flexShrink = 1;
             Add(_textField);

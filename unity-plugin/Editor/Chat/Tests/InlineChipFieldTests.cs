@@ -127,6 +127,24 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(DisplayStyle.None, field[0].style.display.value);
         }
 
+        // ── F20: no select-all on focus / mouse-up ────────────────────────────
+
+        [Test]
+        public void F20_SelectAllOnFocus_IsFalse()
+        {
+            var field = new InlineChipField();
+            Assert.IsFalse(field.TextField.selectAllOnFocus,
+                "TextField must not select-all on focus (F20)");
+        }
+
+        [Test]
+        public void F20_SelectAllOnMouseUp_IsFalse()
+        {
+            var field = new InlineChipField();
+            Assert.IsFalse(field.TextField.selectAllOnMouseUp,
+                "TextField must not select-all on mouse-up (F20)");
+        }
+
         // ── Model sync ────────────────────────────────────────────────────────
 
         [Test]

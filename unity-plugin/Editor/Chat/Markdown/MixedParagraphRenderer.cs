@@ -35,9 +35,10 @@ namespace UnityMCP.Editor.Chat
                             br.style.height = 0;
                             container.Add(br);
                         }
-                        if (!string.IsNullOrEmpty(lines[i]))
+                        var stripped = StripOrphanBold(lines[i]);
+                        if (!string.IsNullOrEmpty(stripped))
                         {
-                            var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(lines[i]), richText: true);
+                            var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(stripped), richText: true);
                             container.Add(lbl);
                         }
                     }
@@ -64,6 +65,17 @@ namespace UnityMCP.Editor.Chat
         }
 
         // ── private ───────────────────────────────────────────────────────────
+
+        /// <summary>Strip orphan leading/trailing ** from text segments adjacent to pills.</summary>
+        internal static string StripOrphanBold(string text)
+        {
+            var t = text.Trim();
+            bool startsDouble = t.StartsWith("**");
+            bool endsDouble   = t.EndsWith("**") && t.Length >= 4;
+            if (startsDouble && !endsDouble) t = t.Substring(2).TrimStart();
+            if (endsDouble   && !startsDouble) t = t.Substring(0, t.Length - 2).TrimEnd();
+            return t;
+        }
 
         private static VisualElement BuildPill(string kindKey, string rawRef)
         {

@@ -122,6 +122,38 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(3, CountBreaks(ve), "\\n\\n\\n must produce 3 break elements");
         }
 
+        // ── F22: orphan ** bold markers stripped from text segments ──────────
+
+        // F22a: "**" prefix and suffix stripped around pill
+        [Test]
+        public void F22a_OrphanBoldMarkers_StrippedFromTextSegments()
+        {
+            // LLM output: "**[hierarchy:/Name #1]**" → text "**" + pill + text "**"
+            var ve = MixedParagraphRenderer.Render("** [hierarchy:/Name #1] **");
+            // No label should contain bare "**"
+            foreach (var lbl in ve.Query<Label>().ToList())
+                StringAssert.DoesNotContain("**", lbl.text,
+                    $"Label must not contain orphan **: '{lbl.text}'");
+        }
+
+        // F22b: coordinates after orphan ** are preserved
+        [Test]
+        public void F22b_CoordinatesAfterOrphanBold_Preserved()
+        {
+            // text segment "** (3, 0.5, 3) |" → after strip → "(3, 0.5, 3) |"
+            var stripped = MixedParagraphRenderer.StripOrphanBold("** (3, 0.5, 3) |");
+            StringAssert.Contains("(3, 0.5, 3)", stripped);
+            StringAssert.DoesNotStartWith("**", stripped);
+        }
+
+        // F22c: balanced **bold** as whole segment must NOT be stripped
+        [Test]
+        public void F22c_BalancedBold_NotStripped()
+        {
+            var result = MixedParagraphRenderer.StripOrphanBold("**important**");
+            Assert.AreEqual("**important**", result, "Balanced bold must survive StripOrphanBold");
+        }
+
         // MP8: newline immediately before tag → break element before pill
         [Test]
         public void MP8_NewlineBeforeTag_BreakBeforePill()

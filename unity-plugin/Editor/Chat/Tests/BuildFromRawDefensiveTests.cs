@@ -237,6 +237,34 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(2, pills.Count, "Both chips must render as pills");
         }
 
+        // ── F21: stored offset undershot (wide forward search) ───────────────
+
+        [Test]
+        public void R_Def_F21_StoredOffsetUndershot_MentionFoundAndStripped()
+        {
+            // chip2 stored at offset 16, but @Collectible_3 is actually at position 23
+            var c1 = H("/Coll_2", "Collectible_2", 1);
+            var c2 = H("/Coll_3", "Collectible_3", 2);
+            var raw = "@Collectible_2 что это @Collectible_3 ?";
+            var msg = ChipTextInterleaver.BuildFromRaw(raw,
+                new List<PositionedChip> { PC(c1, 0), PC(c2, 16) });
+            Assert.AreEqual(2, msg.Chips.Count);
+            foreach (var seg in msg.Segments)
+                if (!seg.IsChip) StringAssert.DoesNotContain("@Collectible_3", seg.Text);
+        }
+
+        // F21b: two chips same name, second offset overshoots — known limitation
+        [Test]
+        public void R_Def_F21b_DuplicateNameSecondOvershot_BothChipsPresent()
+        {
+            var c1 = H("/Cam", "Camera", 1);
+            var c2 = H("/Cam2", "Camera", 2);
+            var raw = "@Camera is near @Camera object";
+            var msg = ChipTextInterleaver.BuildFromRaw(raw,
+                new List<PositionedChip> { PC(c1, 0), PC(c2, 99) });
+            Assert.AreEqual(2, msg.Chips.Count, "Both chips must be in output regardless of offset");
+        }
+
         // ── Regression: exact user scenario ──────────────────────────────────
 
         [Test]

@@ -125,7 +125,7 @@ namespace UnityMCP.Editor.Chat
                 else
                 {
                     int searchStart = System.Math.Max(rawPos, chipRawOffset - mention.Length);
-                    int searchLen   = System.Math.Min(chipRawOffset + mention.Length + 1, rawText.Length) - searchStart;
+                    int searchLen   = rawText.Length - searchStart;
                     if (searchLen > 0)
                     {
                         int idx = rawText.IndexOf(mention, searchStart, searchLen,
