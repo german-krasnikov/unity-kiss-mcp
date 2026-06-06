@@ -215,7 +215,7 @@ namespace UnityMCP.Editor.Tests
 
             try
             {
-                ObjectManager.SetParent("/OM_TestObj", null);
+                ObjectManager.SetParent("/OM_Parent/OM_TestObj", null);
 
                 Assert.IsNull(_go.transform.parent, "Parent should be null after unparenting");
             }

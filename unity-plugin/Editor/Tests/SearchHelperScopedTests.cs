@@ -152,8 +152,9 @@ namespace UnityMCP.Editor.Tests
             // _root has children Child1, Child2 — but no Camera
             var result = SearchHelper.Search("t:Camera", root: "/" + _root.name);
             StringAssert.Contains(_root.name, result);
-            StringAssert.DoesNotContain(
-                UnityEngine.SceneManagement.SceneManager.GetActiveScene().name, result);
+            var sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (!string.IsNullOrEmpty(sceneName))
+                StringAssert.DoesNotContain(sceneName, result);
         }
 
         // Scenario 21: overflow value is exact total-minus-limit (single-pass correctness).

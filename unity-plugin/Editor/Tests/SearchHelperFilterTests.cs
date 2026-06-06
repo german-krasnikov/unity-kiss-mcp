@@ -123,8 +123,7 @@ namespace UnityMCP.Editor.Tests
         {
             // No object is both on layer=3 AND inactive
             var result = SearchHelper.Search("Filter_ layer=3 active=false");
-            StringAssert.DoesNotContain("Filter_Layered", result);
-            StringAssert.DoesNotContain("Filter_Tagged", result);
+            StringAssert.Contains("no matches", result);
         }
     }
 }

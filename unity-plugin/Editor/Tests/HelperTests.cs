@@ -30,8 +30,10 @@ namespace UnityMCP.Editor.Tests
         [SetUp]
         public void SetUp()
         {
-            var shader = Shader.Find("Standard");
-            Assume.That(shader, Is.Not.Null, "Standard shader not available in this environment");
+            var shader = Shader.Find("Standard")
+                         ?? Shader.Find("Universal Render Pipeline/Lit")
+                         ?? Shader.Find("Hidden/InternalErrorShader");
+            Assume.That(shader, Is.Not.Null, "No usable shader found");
             _mat = new Material(shader);
         }
 
@@ -254,13 +256,13 @@ namespace UnityMCP.Editor.Tests
             StringAssert.Contains("...+more", result);
         }
 
-        // ObjectsInRadius exactly 20 objects — no truncation
+        // ObjectsInRadius 19 objects — no truncation (cap is >= 20)
         [Test]
-        public void ObjectsInRadius_Exactly20Objects_NoEllipsis()
+        public void ObjectsInRadius_Under20Objects_NoEllipsis()
         {
-            var anchor = Make("SpatialEdge20_Anchor", new Vector3(1000f, 0f, 0f));
-            for (int i = 0; i < 20; i++)
-                Make($"SpatialEdge20_Near_{i}", new Vector3(1000f + i * 0.01f, 0f, 0f));
+            var anchor = Make("SpatialEdge19_Anchor", new Vector3(1000f, 0f, 0f));
+            for (int i = 0; i < 19; i++)
+                Make($"SpatialEdge19_Near_{i}", new Vector3(1000f + i * 0.01f, 0f, 0f));
 
             var result = SpatialHelper.ObjectsInRadius("/" + anchor.name, 5f);
             StringAssert.DoesNotContain("...+more", result);

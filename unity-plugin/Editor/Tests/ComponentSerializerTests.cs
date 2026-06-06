@@ -29,15 +29,13 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Integer_ReturnsDecimalString()
         {
-            // Camera.m_Depth is a float in newer Unity, but RenderTexture depth is int.
-            // Rigidbody.m_SolverIterations is an int.
-            var rb = _go.AddComponent<Rigidbody>();
-            rb.solverIterations = 7;
-            var so = new SerializedObject(rb);
+            var light = _go.AddComponent<Light>();
+            light.cullingMask = 42;
+            var so = new SerializedObject(light);
             so.Update();
-            var prop = so.FindProperty("m_SolverIterations");
-            Assert.IsNotNull(prop, "m_SolverIterations not found");
-            Assert.AreEqual("7", ComponentSerializer.GetPropertyValueString(prop));
+            var prop = so.FindProperty("m_CullingMask");
+            Assert.IsNotNull(prop, "m_CullingMask not found on Light");
+            Assert.AreEqual("42", ComponentSerializer.GetPropertyValueString(prop));
         }
 
         // ── Float branch ──────────────────────────────────────────────────────
