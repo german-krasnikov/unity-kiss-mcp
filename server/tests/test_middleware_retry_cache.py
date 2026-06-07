@@ -12,6 +12,13 @@ def mw():
     return Middleware()
 
 
+@pytest.fixture
+def mw_validated(monkeypatch):
+    """Middleware with schema_cache enabled (overrides conftest UNITY_MCP_VALIDATE=0)."""
+    monkeypatch.setenv("UNITY_MCP_VALIDATE", "1")
+    return Middleware()
+
+
 # ── Test 1: sentinel ─────────────────────────────────────────────────────────
 
 def test_retry_cache_expires_after_ttl(mw):
@@ -167,28 +174,22 @@ def test_lru_add_component_existing_key_accumulates_components(mw):
     assert "Rigidbody" in mw._component_cache["/obj"]
 
 
-def test_track_editor_state_invalidates_schema_on_recompile(mw):
+def test_track_editor_state_invalidates_schema_on_recompile(mw_validated):
     """track_editor_state('recompile', ...) invalidates schema_cache."""
-    if mw.schema_cache is None:
-        pytest.skip("schema_cache disabled")
-    mw.schema_cache.put("Transform", frozenset(["position"]))
-    mw.track_editor_state("recompile", "recompile started")
-    assert mw.schema_cache.get("Transform") is None
+    mw_validated.schema_cache.put("Transform", frozenset(["position"]))
+    mw_validated.track_editor_state("recompile", "recompile started")
+    assert mw_validated.schema_cache.get("Transform") is None
 
 
-def test_track_editor_state_invalidates_schema_on_scene(mw):
+def test_track_editor_state_invalidates_schema_on_scene(mw_validated):
     """track_editor_state('scene', ...) invalidates schema_cache."""
-    if mw.schema_cache is None:
-        pytest.skip("schema_cache disabled")
-    mw.schema_cache.put("Rigidbody", frozenset(["mass"]))
-    mw.track_editor_state("scene", "scene loaded")
-    assert mw.schema_cache.get("Rigidbody") is None
+    mw_validated.schema_cache.put("Rigidbody", frozenset(["mass"]))
+    mw_validated.track_editor_state("scene", "scene loaded")
+    assert mw_validated.schema_cache.get("Rigidbody") is None
 
 
-def test_track_editor_state_no_invalidation_for_get_component(mw):
+def test_track_editor_state_no_invalidation_for_get_component(mw_validated):
     """Non-recompile/scene commands don't invalidate schema_cache."""
-    if mw.schema_cache is None:
-        pytest.skip("schema_cache disabled")
-    mw.schema_cache.put("Camera", frozenset(["fov"]))
-    mw.track_editor_state("get_component", "result")
-    assert mw.schema_cache.get("Camera") is not None
+    mw_validated.schema_cache.put("Camera", frozenset(["fov"]))
+    mw_validated.track_editor_state("get_component", "result")
+    assert mw_validated.schema_cache.get("Camera") is not None

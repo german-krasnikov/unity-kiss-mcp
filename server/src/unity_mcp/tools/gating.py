@@ -131,17 +131,14 @@ FORCE_VISIBLE: set[str] = {
 # ---------------------------------------------------------------------------
 
 def get_catalog() -> dict:
-    """Return JSON-serializable catalog: {categories: {CAT: [tools]}, core: [locked tools]}.
+    """Return catalog dict: {categories: {CAT: [tools]}}.
 
-    PUBLIC tools only — never includes plugin/NDA tools.
-    CORE tools appear only in 'core' list, not duplicated in categories.
+    PUBLIC tools only — never includes plugin/NDA tool names.
+    CORE tools appear only in categories["CORE"].
     """
     categories = {cat: list(tools) for cat, tools in _THEMED_CATEGORIES.items()}
     categories["CORE"] = sorted(_CORE_TOOLS)
-    return {
-        "categories": categories,
-        "core": sorted(_CORE_TOOLS),
-    }
+    return {"categories": categories}
 
 
 def is_core(name: str) -> bool:

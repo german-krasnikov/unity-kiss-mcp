@@ -4,71 +4,52 @@ using System.Collections.Generic;
 namespace UnityMCP.Editor
 {
     /// <summary>
-    /// Parses the Python-pushed catalog JSON into category→tools map.
-    /// Uses JsonHelper primitives — no external JSON dependency.
+    /// Parses the Python-pushed catalog text into category→tools map.
     ///
-    /// Expected shape: {"categories": {"CAT": ["tool", ...], ...}, "core": ["tool", ...]}
+    /// Wire format (one line per category):
+    ///   CORE:get_hierarchy,batch,inspect
+    ///   SCENE_EDIT:find_objects,set_active
+    ///   CONNECTION:
     /// </summary>
     internal static class CatalogParser
     {
-        public static Dictionary<string, string[]> Parse(string json)
+        public static Dictionary<string, string[]> Parse(string text)
         {
             var result = new Dictionary<string, string[]>();
-            if (string.IsNullOrEmpty(json)) return result;
+            if (string.IsNullOrEmpty(text)) return result;
 
-            var categoriesJson = JsonHelper.ExtractObject(json, "categories");
-            if (string.IsNullOrEmpty(categoriesJson) || categoriesJson == "{}") return result;
-
-            // Walk top-level keys of categoriesJson
-            int i = 1; // skip '{'
-            int len = categoriesJson.Length;
-            while (i < len - 1)
+            foreach (var line in text.Split('\n'))
             {
-                // Skip whitespace and commas
-                while (i < len && (categoriesJson[i] == ' ' || categoriesJson[i] == ',' ||
-                                   categoriesJson[i] == '\n' || categoriesJson[i] == '\r')) i++;
-                if (i >= len - 1) break;
-                if (categoriesJson[i] != '"') { i++; continue; }
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed)) continue;
 
-                // Read key
-                var keyEnd = categoriesJson.IndexOf('"', i + 1);
-                if (keyEnd < 0) break;
-                var key = categoriesJson.Substring(i + 1, keyEnd - i - 1);
-                i = keyEnd + 1;
+                var colon = trimmed.IndexOf(':');
+                if (colon < 0) continue;
 
-                // Skip colon
-                while (i < len && categoriesJson[i] != '[' && categoriesJson[i] != '{') i++;
-                if (i >= len || categoriesJson[i] != '[') { i++; continue; }
+                var key = trimmed.Substring(0, colon).Trim();
+                var right = trimmed.Substring(colon + 1).Trim();
 
-                // Extract array
-                var tools = ExtractStringArray(categoriesJson, ref i);
-                result[key] = tools;
+                string[] tools;
+                if (string.IsNullOrEmpty(right))
+                {
+                    tools = Array.Empty<string>();
+                }
+                else
+                {
+                    var parts = right.Split(',');
+                    var list = new List<string>(parts.Length);
+                    foreach (var p in parts)
+                    {
+                        var t = p.Trim();
+                        if (!string.IsNullOrEmpty(t)) list.Add(t);
+                    }
+                    tools = list.ToArray();
+                }
+
+                if (!string.IsNullOrEmpty(key))
+                    result[key] = tools;
             }
             return result;
-        }
-
-        private static string[] ExtractStringArray(string json, ref int i)
-        {
-            var list = new List<string>();
-            if (i >= json.Length || json[i] != '[') return Array.Empty<string>();
-
-            i++; // skip '['
-            while (i < json.Length && json[i] != ']')
-            {
-                // skip whitespace, commas
-                while (i < json.Length && (json[i] == ' ' || json[i] == ',' ||
-                                           json[i] == '\n' || json[i] == '\r')) i++;
-                if (i >= json.Length || json[i] == ']') break;
-                if (json[i] != '"') { i++; continue; }
-
-                i++; // skip opening quote
-                var end = json.IndexOf('"', i);
-                if (end < 0) break;
-                list.Add(json.Substring(i, end - i));
-                i = end + 1;
-            }
-            if (i < json.Length) i++; // skip ']'
-            return list.ToArray();
         }
     }
 }

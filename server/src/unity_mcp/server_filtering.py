@@ -3,7 +3,6 @@
 Pure, stateless helpers. State (_disabled_tools_cache, _refresh_tools_lock)
 lives in server.py so tests can mutate srv._disabled_tools_cache directly.
 """
-import json
 import os
 
 from .tools.gating import filter_by_tier, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
@@ -43,7 +42,11 @@ async def push_catalog(bridge_) -> None:
     try:
         if bridge_ is None or not bridge_.connected:
             return
-        catalog_str = json.dumps(get_catalog())
+        categories = get_catalog()["categories"]
+        catalog_str = "\n".join(
+            f"{cat}:{','.join(tools)}"
+            for cat, tools in categories.items()
+        )
         await bridge_.send("set_tool_catalog", {"catalog": catalog_str}, timeout=5.0)
     except Exception:
         pass

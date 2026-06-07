@@ -1,4 +1,3 @@
-import json
 import os
 import time
 from ._annotations import RW as _RW, RO as _RO
@@ -14,14 +13,11 @@ def _extract_saved_path(result: str) -> str:
 async def save_session() -> str:
     """Save current scene state to .claude/session-context.json for cold-start recovery."""
     hierarchy = await _send("get_hierarchy", {"summary": "true"})
-    console = await _send("get_console", {"count": 5, "level": "Error"})
-    editor_state = await _send("editor", {"action": "state"})
-    state = {"hierarchy": hierarchy, "console": console, "editor": editor_state, "timestamp": time.time()}
     path = os.path.join(os.getcwd(), ".claude", "session-context.json")
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
-            json.dump(state, f, indent=2)
+            f.write(f"{time.time()}\n=== hierarchy ===\n{hierarchy}\n")
     except OSError as e:
         return f"Failed to save session: {e}"
     return f"Session saved to {path}"
@@ -34,13 +30,14 @@ async def load_session() -> str:
         return "No previous session found."
     try:
         with open(path) as f:
-            prev = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        return f"Session file corrupt or unreadable: {e}"
+            content = f.read()
+        ts_str, _, hier = content.partition("\n=== hierarchy ===\n")
+        ts = float(ts_str.strip())
+    except (OSError, ValueError):
+        return "Session file corrupt or unreadable"
     current = await _send("get_hierarchy", {"summary": "true"})
-    ts = prev.get("timestamp", "?")
-    label = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if isinstance(ts, float) else ts
-    return f"Previous ({label}):\n{prev['hierarchy']}\n\nCurrent:\n{current}"
+    label = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
+    return f"Previous ({label}):\n{hier.strip()}\n\nCurrent:\n{current}"
 
 
 async def screenshot_baseline(name: str = "default", width: int = 640, height: int = 480,

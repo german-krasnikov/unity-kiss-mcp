@@ -152,7 +152,8 @@ def wrap_send(send_fn, mw: Optional["Middleware"] = None):
                 protocol_err = True
                 result = result.get("err", "Unknown error")
             elif "file" in result:
-                result = f"Data saved to: {result['file']}"
+                file_msg = f"Data saved to: {result['file']}"
+                result = f"{result.get('data', '')}\n{file_msg}" if result.get("data") else file_msg
             else:
                 result = result.get("data", "")
 

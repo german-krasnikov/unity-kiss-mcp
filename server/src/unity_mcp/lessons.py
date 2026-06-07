@@ -44,7 +44,7 @@ class LessonStore:
     def flush(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({k: asdict(v) for k, v in self._lessons.items()}, indent=2))
+        tmp.write_text(json.dumps({k: asdict(v) for k, v in self._lessons.items()}))
         tmp.replace(self.path)
 
     def add(self, lesson: Lesson) -> None:

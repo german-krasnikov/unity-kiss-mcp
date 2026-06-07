@@ -87,6 +87,7 @@ unity-kiss-mcp/
 │   │   │   ├── budget_tool.py           # Haiku spend tracking
 │   │   │   ├── metrics_tool.py          # Performance metrics tool
 │   │   │   ├── code_intel.py            # find_references, compile_preflight, semantic_at
+│   │   │   ├── scene_session.py         # save_session, load_session, screenshot_baseline/compare (plain-text format v0.18.0+)
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
@@ -147,6 +148,7 @@ unity-kiss-mcp/
 │       ├── FingerprintHelper.cs + ScanHelper.cs + SceneDiffHelper.cs
 │       ├── ChangeWatcher.cs + ColliderChecker.cs + SchemaHelper.cs
 │       ├── MCPSettings.cs                 # Pure static data class (catalog, EnabledTools, no EditorWindow)
+│       ├── CatalogParser.cs               # Plain-text catalog parser (v0.18.0+): "CORE:tool1,tool2\n..." format
 │       ├── MCPSettingsHub.cs              # Central hub window coordinating all settings UI (F26)
 │       ├── MCPHubUI.cs                    # Hub-level layout + sub-window orchestration (F26)
 │       ├── HubHeaderAnim.cs               # Circuit-node network animation: 5 nodes + lines + packet (F26)

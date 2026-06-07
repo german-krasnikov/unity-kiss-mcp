@@ -32,7 +32,7 @@ async def save_skill(name: str, description: str, code: str) -> str:
              "kind": _detect_kind(code),
              "created": time.strftime("%Y-%m-%d %H:%M"), "used_count": 0}
     with open(os.path.join(_skills_dir(), f"{name}.json"), "w") as f:
-        json.dump(skill, f, indent=2)
+        json.dump(skill, f)
     return f"Skill saved: {name} — {description}"
 
 
@@ -54,7 +54,7 @@ async def use_skill(name: str, params: str | None = None) -> str:
     skill["used_count"] = skill.get("used_count", 0) + 1
     skill["last_used"] = time.strftime("%Y-%m-%d %H:%M")
     with open(path, "w") as f:
-        json.dump(skill, f, indent=2)
+        json.dump(skill, f)
     if skill.get("kind", _detect_kind(code)) == "csharp":
         return await _send("execute_code", {"code": code, "undo_label": f"skill:{name}"})
     return await _send("batch", {"commands": code})

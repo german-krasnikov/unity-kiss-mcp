@@ -25,6 +25,9 @@ async def test_save_skill_creates_file(skills_dir):
     assert data["description"] == "Does something"
     assert data["code"] == "var go = new GameObject();"
     assert data["used_count"] == 0
+    # Compact contract: skill file must be a single line (no embedded newlines in JSON)
+    content = (skills_dir / "test_skill.json").read_text()
+    assert content.count('\n') == 0, "skill JSON must be compact (no indent=2)"
 
 
 @pytest.mark.asyncio

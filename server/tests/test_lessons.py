@@ -52,6 +52,9 @@ def test_lesson_store_atomic_write_no_corrupt(tmp_path):
     store.add(Lesson("x1", "cmd", "pat", "err", "fix", 1, time.time()))
     store.flush()
     assert json.loads(p.read_text())  # valid JSON
+    # Compact contract: no pretty-print newlines after the opening brace
+    content = p.read_text()
+    assert '\n' not in content.split('{')[1][:10], "lessons.json must be compact (no indent=2)"
 
 
 def test_lesson_store_hint_for_returns_known_pattern(tmp_path):

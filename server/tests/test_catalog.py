@@ -5,9 +5,8 @@ Tests:
 2. CORE tools are locked (is_core)
 3. Every public tool is in exactly one category (drift guard)
 4. No plugin/NDA tool names in catalog
-5. _push_catalog sends set_tool_catalog with parseable JSON
+5. _push_catalog sends set_tool_catalog with plain-text catalog
 """
-import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,7 +31,7 @@ def test_get_catalog_returns_dict_with_categories():
     cat = get_catalog()
     assert isinstance(cat, dict)
     assert "categories" in cat
-    assert "core" in cat
+    assert "core" not in cat
 
 
 def test_get_catalog_categories_are_dict_of_lists():
@@ -41,17 +40,6 @@ def test_get_catalog_categories_are_dict_of_lists():
     assert isinstance(cats, dict)
     for name, tools in cats.items():
         assert isinstance(tools, list), f"category {name!r} should be a list"
-
-
-def test_get_catalog_core_is_list():
-    from unity_mcp.tools.gating import get_catalog
-    assert isinstance(get_catalog()["core"], list)
-
-
-def test_get_catalog_is_json_serializable():
-    from unity_mcp.tools.gating import get_catalog
-    # Should not raise
-    json.dumps(get_catalog())
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +62,7 @@ def test_all_expected_categories_present():
 
 def test_core_category_has_expected_tools():
     from unity_mcp.tools.gating import get_catalog
-    core_tools = get_catalog()["core"]
+    core_tools = get_catalog()["categories"]["CORE"]
     for tool in ("get_hierarchy", "get_component", "inspect", "batch", "set_property",
                  "create_object", "delete_object", "manage_component", "scene", "search_scene"):
         assert tool in core_tools, f"Expected {tool!r} in CORE"
@@ -129,7 +117,6 @@ def test_catalog_contains_only_public_tools():
     from unity_mcp.tools.gating import get_catalog
     cat = get_catalog()
     all_cat_tools = {t for tools in cat["categories"].values() for t in tools}
-    all_cat_tools |= set(cat["core"])
     external = all_cat_tools - _public_tool_names()
     assert not external, f"Non-public tools leaked into catalog: {sorted(external)}"
 
@@ -189,7 +176,7 @@ async def test_push_catalog_sends_set_tool_catalog():
 
 
 @pytest.mark.asyncio
-async def test_push_catalog_sends_parseable_json():
+async def test_push_catalog_sends_text_format():
     from unity_mcp.server import _push_catalog
     mock_bridge = AsyncMock()
     mock_bridge.connected = True
@@ -204,9 +191,12 @@ async def test_push_catalog_sends_parseable_json():
     await _push_catalog(mock_bridge)
     assert captured["cmd"] == "set_tool_catalog"
     catalog_str = captured["args"]["catalog"]
-    parsed = json.loads(catalog_str)  # must not raise
-    assert "categories" in parsed
-    assert "core" in parsed
+    lines = [l for l in catalog_str.splitlines() if l.strip()]
+    assert any(l.startswith("CORE:") for l in lines), f"No CORE: line in: {catalog_str!r}"
+    # Must NOT be valid JSON
+    import json as _json
+    with pytest.raises((_json.JSONDecodeError, ValueError)):
+        _json.loads(catalog_str)
 
 
 @pytest.mark.asyncio
@@ -246,11 +236,3 @@ def test_get_categories_still_works():
     assert len(cats) >= 8  # at least the original 8 categories
 
 
-# ---------------------------------------------------------------------------
-# Cycle 8: core key consistency (drift guard)
-# ---------------------------------------------------------------------------
-
-def test_catalog_core_key_matches_core_category():
-    from unity_mcp.tools.gating import get_catalog
-    cat = get_catalog()
-    assert sorted(cat["core"]) == sorted(cat["categories"]["CORE"])

@@ -5,10 +5,9 @@ Zero coverage identified in audit. Covers:
 - save_session OSError → returns error string
 - load_session happy path (reads file, calls bridge for current hierarchy)
 - load_session missing file → "No previous session found."
-- load_session corrupt JSON → error string
+- load_session corrupt text → error string
 - load_session register() wires _send
 """
-import json
 import os
 import time
 import pytest
@@ -48,21 +47,20 @@ async def test_save_session_calls_bridge_and_writes_file(tmp_path):
     assert "session-context.json" in result or "session saved" in result.lower()
     written = tmp_path / ".claude" / "session-context.json"
     assert written.exists()
-    data = json.loads(written.read_text())
-    assert "hierarchy" in data
-    assert "timestamp" in data
+    content = written.read_text()
+    assert "=== hierarchy ===" in content
+    assert "ok" in content
 
 
 @pytest.mark.asyncio
-async def test_save_session_bridge_called_three_times(tmp_path):
+async def test_save_session_bridge_called_once(tmp_path):
     send = AsyncMock(return_value="data")
     _wire(send)
 
     with patch("os.getcwd", return_value=str(tmp_path)):
         await _invoke_save_session()
 
-    # get_hierarchy, get_console, editor
-    assert send.call_count == 3
+    assert send.call_count == 1  # only get_hierarchy; no console, no editor_state
 
 
 @pytest.mark.asyncio
@@ -94,15 +92,10 @@ async def test_load_session_missing_file_returns_no_session(tmp_path):
 
 @pytest.mark.asyncio
 async def test_load_session_happy_path(tmp_path):
-    prev = {
-        "hierarchy": "root\n  child",
-        "console": "",
-        "editor": "EditMode",
-        "timestamp": time.time(),
-    }
+    ts = time.time()
     session_path = tmp_path / ".claude" / "session-context.json"
     session_path.parent.mkdir(parents=True)
-    session_path.write_text(json.dumps(prev))
+    session_path.write_text(f"{ts}\n=== hierarchy ===\nroot\n  child\n")
 
     send = AsyncMock(return_value="current-root\n  updated")
     _wire(send)
@@ -121,7 +114,7 @@ async def test_load_session_happy_path(tmp_path):
 async def test_load_session_corrupt_json_returns_error(tmp_path):
     session_path = tmp_path / ".claude" / "session-context.json"
     session_path.parent.mkdir(parents=True)
-    session_path.write_text("{not valid json!}")
+    session_path.write_text("NOTAFLOAT\n=== hierarchy ===\nhier\n")
 
     send = AsyncMock(return_value="current")
     _wire(send)
