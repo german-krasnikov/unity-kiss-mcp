@@ -185,10 +185,12 @@ unity-kiss-mcp/
 │       │   ├── ChatProcess.cs             # Process lifecycle manager
 │       │   ├── CliBackendBase.cs          # Abstract host: shared lifecycle, 4 variation axes
 │       │   ├── ClaudeBackend.cs           # Claude: CliBackendBase subclass (persistent stdin)
-│       │   ├── CodexArgBuilder.cs         # Codex: argv builder for exec --json + resume
-│       │   ├── CodexStreamParser.cs       # Codex: NDJSON → ChatEvent parser
-│       │   ├── CodexBackend.cs            # Codex: CliBackendBase subclass (spawn-per-turn)
-│       │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum
+│       │   ├── CodexArgBuilder.cs         # Codex (exec): argv builder for exec --json + resume
+│       │   ├── CodexStreamParser.cs       # Codex (exec): NDJSON → ChatEvent parser
+│       │   ├── CodexBackend.cs            # Codex (exec): CliBackendBase subclass (spawn-per-turn, deprecated)
+│       │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions, token streaming
+│       │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC → ChatEvent (item/agentMessage/delta, mcpToolCall)
+│       │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex exec, Codex app-server)
 │       │   ├── BackendConfig.cs           # [Serializable] Claude/Codex configs + persistence (F9)
 │       │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (F9, project-local Library/)
 │       │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (F9)
@@ -273,9 +275,9 @@ unity-kiss-mcp/
 │       │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
 │       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated
 │       │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators
-│       │   └── Tests/                     # 24+ NUnit suites = ~550+ test cases (render + backend + chips + pure)
+│       │   └── Tests/                     # 25+ NUnit suites = ~565+ test cases (render + backend + chips + pure)
 │       │       │   # Render (66): MdBlockTests(5), MarkdownParserTests(16), MarkdownInlineTests(13), MermaidParserTests(17), MermaidLayoutTests(15)
-│       │       │   # Backend/parse (119): ChatStreamParserTests(24), CliBackendBaseTests(29), CodexArgBuilderTests(35), CodexStreamParserTests(26), ClaudeArgBuilderTests(8), ToolVerbMapTests(5)
+│       │       │   # Backend/parse (150): ChatStreamParserTests(24), CliBackendBaseTests(29), CodexArgBuilderTests(35), CodexStreamParserTests(26), CodexAppServerParserTests(15), ClaudeArgBuilderTests(8), ToolVerbMapTests(5), BackendRegistryTests(8)
 │       │       │   # Interactivity/input (43): EnterKeySendTests(7), InputHeightCalcTests(14), ChatActivityStateTests(13), CopyTextBuilderTests(9)
 │       │       │   # Chips (320+): ChipSequenceTests, ChipSequenceExtraTests, ChipSendSequenceTests, ChipSendSequenceExtraTests, ChipTestHelpers (shared)
 │       │       │   # Pure/state (6+489): TokenFormatTests(6), PendingTurnStateTests(187), PendingTurnStateV4Tests(197), PendingTurnStateStalenessTests(105)

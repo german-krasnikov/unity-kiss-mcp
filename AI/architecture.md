@@ -214,10 +214,12 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 ### Agent Chat Backends (C#: CliBackendBase + subclasses, v0.14.0+)
 - **CliBackendBase** (abstract): Shared lifecycle host for CLI-based backends. 4 variation axes: (a) `BuildArgs` (spawn/resume argv + env-key-strip), (b) `ParseLine` (NDJSON line → ChatEvent[]), (c) `BinaryName` (CLI executable), (d) `IsPersistentProcess` (stdin loop vs spawn-per-turn). Owns spawn, drain, accumulate, SessionId, Stop, Dispose — subclasses override only the 4 axes.
 - **ClaudeBackend** (ported onto base): Zero behavior change (−65 lines net). Persistent stdin loop (IsPersistentProcess=true), Claude NDJSON parser, `--resume <sessionId>` argv builder.
-- **CodexBackend** (new): OpenAI Codex via spawn-per-turn model (IsPersistentProcess=false). Each turn disposes old process, spawns fresh with prompt baked into argv (`-c mcp_servers.*` flags). Stdin closed immediately.
-- **CodexArgBuilder**: Constructs `codex exec --json` argv. Re-passes three `-c mcp_servers.*` flags every turn.
-- **CodexStreamParser**: Codex NDJSON → ChatEvent (agent_message, mcp_tool_call, command_execution[aggregated_output/declined], file_change[changes], turn.completed usage; CostUsd=0).
-- **BackendRegistry** & **BackendKind** enum: Factory dispatch. User selects Claude or Codex from dropdown.
+- **CodexBackend** (deprecated): OpenAI Codex via spawn-per-turn model (IsPersistentProcess=false). Each turn disposes old process, spawns fresh with prompt baked into argv (`-c mcp_servers.*` flags).
+- **CodexAppServerBackend** (v0.14.0+ preferred): Persistent Codex session via `codex app-server` (direct stdio, JSON-RPC 2.0). One process per chat session (IsPersistentProcess=true), eliminates TCP slot-thrash from spawn-per-turn. Protocol: `initialize` → `thread/start` → repeated `turn/start` with `mcpToolCall` items + real token streaming via `item/agentMessage/delta` (240+ deltas/turn). MCP injection via `-c mcp_servers.*` flags at session init. Spike-verified with codex 0.137.0.
+- **CodexAppServerParser**: JSON-RPC 2.0 notification/response parser → ChatEvent (notification item types: mcpToolCall camelCase, agentMessage/delta token stream, turn/completed with usage; thread_id at result.thread.id).
+- **CodexArgBuilder**: Constructs `codex exec --json` argv. Re-passes three `-c mcp_servers.*` flags every turn (exec model).
+- **CodexStreamParser**: Codex NDJSON → ChatEvent (exec model, deprecated; kept for backward compat).
+- **BackendRegistry** & **BackendKind** enum: Factory dispatch. User selects Claude, Codex (exec), or Codex (app-server) from dropdown.
 - **PendingTurnState v3**: Now persists `BackendKind` for domain-reload survival (back-compatible with v1/v2).
 
 ### Per-Backend Settings (C#: BackendConfig + BackendSettingsForm, v0.15.0 F9)
