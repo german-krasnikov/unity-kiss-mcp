@@ -25,6 +25,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.Contains("--mcp-config",               args);
             Assert.Contains("/tmp/mcp.json",              args);
             Assert.Contains("--permission-mode",          args);
+            Assert.Contains("--strict-mcp-config",        args);
             Assert.Contains("plan",                       args);
         }
 
@@ -257,6 +258,30 @@ namespace UnityMCP.Editor.Chat.Tests
             var idx = System.Array.IndexOf(args, "--disallowedTools");
             Assert.Greater(idx, -1, "--disallowedTools must still be present");
             Assert.AreEqual("AskUserQuestion", args[idx + 1]);
+        }
+
+        // ── strict-mcp-config ─────────────────────────────────────────────────
+
+        [Test]
+        public void Build_IncludesStrictMcpConfig()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "plan", null);
+
+            Assert.Contains("--strict-mcp-config", args);
+        }
+
+        [Test]
+        public void Build_StrictMcpConfigAfterMcpConfigFlag()
+        {
+            var (args, _) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "plan", null);
+
+            var mcpIdx    = System.Array.IndexOf(args, "--mcp-config");
+            var strictIdx = System.Array.IndexOf(args, "--strict-mcp-config");
+            Assert.Greater(mcpIdx, -1,    "--mcp-config must be present");
+            var pathIdx = mcpIdx + 1;
+            Assert.Greater(strictIdx, pathIdx, "--strict-mcp-config must come after the config path value");
         }
 
         // ── F9: model + extraArgs ─────────────────────────────────────────────

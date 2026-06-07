@@ -28,7 +28,7 @@ namespace UnityMCP.Editor
 
             root.Add(PermissionsHeaderAnim.Build(root));
 
-            var info = new Label("Controls which tools Agent Chat may call. " +
+            var info = new Label("Controls which MCP tools the in-Unity Chat agent may call. " +
                                  "Tool toggles are in the Settings hub.");
             info.AddToClassList("info-label");
             info.style.whiteSpace = WhiteSpace.Normal;
