@@ -225,6 +225,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **BackendConfigStore.cs** — Loads/saves to `Library/MCP_ChatBackendConfig.json` (project-local, NOT global ~/.codex/config.toml)
 - **BackendSettingsForm.cs** — UIToolkit foldout per backend with model/permission/timeout/extra-args dropdowns
 - **Wiring:** `ClaudeArgBuilder` + `CodexArgBuilder` read from store, inject into argv construction
+  - **ClaudeArgBuilder.cs** — builds `claude` subprocess argv with stdin pipe + MCP config path + `--strict-mcp-config` flag (prevents secondary MCP server registration from `~/.mcp.json`, keeping only the in-editor config)
 - **ArgTokenizer.cs** — Shell-style quote-aware split (double+single quotes, unbalanced trailing tolerated); centralizes whitespace+quote parsing for both builders; fixes silent corruption of quoted multi-word ExtraArgs values (e.g., `--append-system-prompt "be terse"`); +11 tests
 
 ### Typed Context Tags (C#: ChipKind + ResponseTagInliner, v0.15.0 F10)
