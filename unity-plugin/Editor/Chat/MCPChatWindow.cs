@@ -175,6 +175,12 @@ namespace UnityMCP.Editor.Chat
                         store.Codex.ExtraArgs);
                     break;
 
+                case BackendKind.CodexAppServer:
+                    _backend = new CodexAppServerBackend(resumeSessionId,
+                        store.Codex.StartupTimeoutSec,
+                        store.Codex.ExtraArgs);
+                    break;
+
                 default: // BackendKind.Claude
                     var cfg = ChatMcpConfigWriter.GetOrCreateConfigPath()
                         ?? Path.Combine(
