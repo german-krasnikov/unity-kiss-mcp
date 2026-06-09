@@ -46,5 +46,23 @@ namespace UnityMCP.Editor.Chat.Tests
             SetCursor(field, 0);
             return (turnJson, rawText);
         }
+
+        // Variant that also stores the llmPayload in the bubble userData (UserBubbleData).
+        internal static (string turnJson, string rawText) SimulateSendWithPayload(
+            InlineChipField field, ChatTranscript transcript, ChipConfig cfg)
+        {
+            var rawText    = (field.Text ?? "").Trim();
+            var positioned = new List<PositionedChip>(field.Model.PositionedChips);
+            var msg        = ChipTextInterleaver.BuildFromRaw(rawText, positioned);
+            var llmText    = ChipTextInterleaver.ToLlmPayload(msg, cfg);
+            if (string.IsNullOrEmpty(llmText)) return (null, rawText);
+            var turnJson = UserTurnBuilder.Build(llmText);
+            transcript.SetLastTurnChips(msg.Chips);
+            transcript.AppendUserBubble(msg, llmText);
+            field.ClearChips();
+            field.Text = "";
+            SetCursor(field, 0);
+            return (turnJson, rawText);
+        }
     }
 }

@@ -168,10 +168,10 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.AddChip(HierarchyChip("/Player", "Player", 99));
             SimulateSend();
             var bubble   = ChatWindowAssertions.GetUserBubble(_container, 0);
-            var userData = bubble.userData as string ?? "";
-            StringAssert.Contains("check the player", userData);
-            StringAssert.Contains("@Player", userData);
-            Assert.IsFalse(userData.Contains("[hierarchy:"), "userData must not contain bracket expansion");
+            var display  = bubble.userData is UserBubbleData u ? u.Display : bubble.userData as string ?? "";
+            StringAssert.Contains("check the player", display);
+            StringAssert.Contains("@Player", display);
+            Assert.IsFalse(display.Contains("[hierarchy:"), "Display must not contain bracket expansion");
         }
 
         [Test]
@@ -204,7 +204,8 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "hello world";
             SimulateSend();
             var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
-            Assert.AreEqual("hello world", bubble.userData as string);
+            var display = bubble.userData is UserBubbleData u ? u.Display : bubble.userData as string;
+            Assert.AreEqual("hello world", display);
         }
     }
 }

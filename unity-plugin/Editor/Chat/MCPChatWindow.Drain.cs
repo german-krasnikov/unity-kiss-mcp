@@ -53,7 +53,9 @@ namespace UnityMCP.Editor.Chat
                 savedAtUtc:       DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                 backendKind:      _selectedKind,
                 kindKeys:         kindKeys,
-                chipTextOffsets:  chipOffsets);
+                chipTextOffsets:  chipOffsets,
+                // task#10: in-flight saves carry the full-path payload to re-send; idle saves don't.
+                pendingLlmPayload: isIdle ? "" : _sentLlmCache.Get());
             ReloadGuard.SavePendingState(state);
         }
 
@@ -97,13 +99,18 @@ namespace UnityMCP.Editor.Chat
             CreateBackendWithSession(p.SessionId);
 
             var displayText = p.PendingText;
+            // task#10: re-send the full-path payload (paths + [kind:path] block), NOT the short-name
+            // display text. Pre-v6 blobs have no payload → fall back to PendingText.
+            var resendBody = string.IsNullOrEmpty(p.PendingLlmPayload)
+                ? displayText
+                : p.PendingLlmPayload;
             if (!string.IsNullOrEmpty(displayText))
             {
-                // Build the full text sent to Claude (snapshot + original), but display only original.
+                // Build the full text sent to Claude (snapshot + payload), but display only original.
                 var snap     = EditorStateSnapshot.Capture();
                 var sentText = string.IsNullOrEmpty(snap)
-                    ? displayText
-                    : snap + "\n" + displayText;
+                    ? resendBody
+                    : snap + "\n" + resendBody;
                 // FIX B: lock reload for the resumed turn, symmetric with DispatchTurn.
                 ReloadGuard.OnTurnStarted();
                 // #12: close pre-reload undo group BEFORE opening the resumed one;
@@ -117,13 +124,17 @@ namespace UnityMCP.Editor.Chat
                     : displayText);
                 // Cache the FULL sent text (with snapshot) so a re-reload can persist it.
                 _sentTextCache.Set(sentText);
+                // task#10: keep the llm cache symmetric — a re-reload persists the same full payload.
+                _sentLlmCache.Set(sentText);
                 // Show only the original user text in the bubble (no state dump).
                 var chipList = _chipField?.Model?.Chips is { Count: > 0 } c
                     ? new System.Collections.Generic.List<ChipData>(c) : null;
                 _transcript?.SetLastTurnChips(chipList);          // P0-1: ALWAYS — normalization context for resumed response
                 if (!transcriptRestored)
-                    _transcript?.AppendUserBubble(displayText, chipList); // P0-1: skip when transcript restore already rendered it
+                    _transcript?.AppendUserBubble(displayText, chipList, llmPayload: sentText); // P0-1: skip when transcript restore already rendered it; llmPayload=sentText so "Show LLM payload" reveals snapshot
                 // (no field reset here — already cleared at entry)
+                // task#10 RESOLVED: sentText now carries the full-path payload (paths + [kind:path]
+                // block) from PendingLlmPayload, matching the fresh-send payload exactly.
                 _backend.SendTurn(UserTurnBuilder.Build(sentText));
                 if (_activity.Send()) OnActivityChanged();
             }

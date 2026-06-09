@@ -107,8 +107,8 @@ namespace UnityMCP.Editor.Chat.Tests
             var positioned = new List<PositionedChip> { PC(chip, 5) };
             var msg = ChipTextInterleaver.Build("fix it please", positioned);
             var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
-            // "fix i" (ends in 'i') → space added before @Foo.cs → "fix i @Foo.cs t please"
-            StringAssert.Contains("fix i @Foo.cs t please", payload);
+            // "fix i" (ends in 'i') → space added before @Assets/Foo.cs → "fix i @Assets/Foo.cs t please"
+            StringAssert.Contains("fix i @Assets/Foo.cs t please", payload);
             StringAssert.Contains("[script:Assets/Foo.cs]", payload);
         }
 
@@ -131,7 +131,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var msg = ChipTextInterleaver.Build("fix", positioned);
             var cfg = new ChipConfig { ScriptDepth = "none" };
             var payload = ChipTextInterleaver.ToLlmPayload(msg, cfg);
-            Assert.AreEqual("@Foo.cs fix", payload);
+            Assert.AreEqual("@Assets/Foo.cs fix", payload);
             Assert.IsFalse(payload.Contains("[script:"));
         }
 
@@ -324,7 +324,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var positioned = new List<PositionedChip> { PC(chip, 0) };
             var msg = ChipTextInterleaver.Build("test", positioned);
             var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
-            StringAssert.StartsWith("@Main Camera test", payload);
+            StringAssert.StartsWith("@/Main Camera test", payload);
         }
 
         // M9: user scenario — "test" with two Main Camera chips at 0 and 5

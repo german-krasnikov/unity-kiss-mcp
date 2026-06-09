@@ -20,7 +20,7 @@ namespace UnityMCP.Editor.Chat
             var llmText  = ChipTextInterleaver.ToLlmPayload(msg, store.Chips);
             if (string.IsNullOrEmpty(llmText)) return;
 
-            DispatchTurn(UserTurnBuilder.Build(llmText), msg);
+            DispatchTurn(UserTurnBuilder.Build(llmText), msg, llmText);
         }
 
         private void AttachScreenshot()
@@ -35,12 +35,12 @@ namespace UnityMCP.Editor.Chat
             var rawText  = (_chipField?.Text ?? _input?.value ?? "").Trim();
             var msg      = ChipTextInterleaver.BuildFromRaw(rawText, _chipField?.Model?.PositionedChips);
             var llmText  = ChipTextInterleaver.ToLlmPayload(msg, store.Chips);
-            DispatchTurn(UserTurnBuilder.Build(llmText, bytes), msg, screenshotPath: capturePath);
+            DispatchTurn(UserTurnBuilder.Build(llmText, bytes), msg, llmText, screenshotPath: capturePath);
         }
 
         // Shared send sequence.
         private void DispatchTurn(string turnJson, UserMessage displayMsg,
-            string screenshotPath = null)
+            string llmPayload, string screenshotPath = null)
         {
             ReloadGuard.OnTurnStarted();
             var displayText = ChipTextInterleaver.ToDisplayText(displayMsg);
@@ -48,8 +48,9 @@ namespace UnityMCP.Editor.Chat
                 ? displayText.Substring(0, 40)
                 : displayText);
             _sentTextCache.Set(displayText);
+            _sentLlmCache.Set(llmPayload); // task#10: persist the EXACT full-path bytes sent this turn
             _transcript.SetLastTurnChips(displayMsg.Chips);
-            _transcript.AppendUserBubble(displayMsg, screenshotPath);
+            _transcript.AppendUserBubble(displayMsg, llmPayload, screenshotPath);
             _backend.SendTurn(turnJson);
             if (_chipField != null) { _chipField.ClearChips(); _chipField.Text = ""; }
             else if (_input != null) { _input.value = ""; _input.cursorIndex = _input.selectIndex = 0; }
@@ -59,6 +60,7 @@ namespace UnityMCP.Editor.Chat
         }
 
         // Overload accepting plain string — used by InjectCompileErrors and ApproveAndExecute.
+        // For these callers the sent text equals displayText (no chip context block).
         private void DispatchTurn(string turnJson, string displayText,
             System.Collections.Generic.IReadOnlyList<ChipData> chipSnapshot = null,
             string screenshotPath = null)
@@ -68,7 +70,7 @@ namespace UnityMCP.Editor.Chat
                 foreach (var c in chipSnapshot)
                     positioned.Add(new PositionedChip(c, 0));
             var msg = ChipTextInterleaver.Build(displayText ?? "", positioned);
-            DispatchTurn(turnJson, msg, screenshotPath);
+            DispatchTurn(turnJson, msg, llmPayload: displayText, screenshotPath: screenshotPath);
         }
     }
 }

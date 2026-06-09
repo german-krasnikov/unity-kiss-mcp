@@ -10,12 +10,14 @@ namespace UnityMCP.Editor.Chat
         internal enum Kind { User = 0, Assistant = 1 }
         internal Kind   EntryKind;
         internal string Text;
-        internal string ChipsData; // \x1F-delimited KindKey\x1FPath\x1FDisplayName triplets
+        internal string ChipsData;  // \x1F-delimited KindKey\x1FPath\x1FDisplayName triplets
+        internal string LlmPayload; // full-path payload sent to LLM (nullable; null = same as Text)
     }
 
     internal static class TranscriptSerializer
     {
-        // Format per line: Kind|Base64(Text)|Base64(ChipsData)
+        // Format per line: Kind|Base64(Text)|Base64(ChipsData)|Base64(LlmPayload)
+        // Old format (3 columns) is backward-compat — missing 4th column → LlmPayload=null.
         internal static string Serialize(List<TranscriptEntry> entries)
         {
             if (entries == null || entries.Count == 0) return "";
@@ -24,7 +26,9 @@ namespace UnityMCP.Editor.Chat
             {
                 var textB64  = ToB64(e.Text ?? "");
                 var chipsB64 = string.IsNullOrEmpty(e.ChipsData) ? "" : ToB64(e.ChipsData);
-                sb.Append((int)e.EntryKind).Append('|').Append(textB64).Append('|').Append(chipsB64).Append('\n');
+                var llmB64   = string.IsNullOrEmpty(e.LlmPayload) ? "" : ToB64(e.LlmPayload);
+                sb.Append((int)e.EntryKind).Append('|').Append(textB64).Append('|')
+                  .Append(chipsB64).Append('|').Append(llmB64).Append('\n');
             }
             return sb.ToString();
         }
@@ -44,11 +48,14 @@ namespace UnityMCP.Editor.Chat
                 try { text = FromB64(parts[1]); } catch { continue; }
                 string chipsData = parts.Length > 2 && !string.IsNullOrEmpty(parts[2])
                     ? TryFromB64(parts[2]) : null;
+                string llmPayload = parts.Length > 3 && !string.IsNullOrEmpty(parts[3])
+                    ? TryFromB64(parts[3]) : null;
                 result.Add(new TranscriptEntry
                 {
                     EntryKind  = (TranscriptEntry.Kind)kindInt,
                     Text       = text,
                     ChipsData  = chipsData,
+                    LlmPayload = llmPayload,
                 });
             }
             return result;

@@ -183,34 +183,34 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // ── E2E: @mention in turnJson ─────────────────────────────────────────
 
-        // E2E_1: chip + text → turnJson text block includes @mention
+        // E2E_1: chip + text → turnJson text block includes @mention (full path)
         [Test]
         public void Send_ChipWithText_TurnJsonContainsAtMention()
         {
             InsertChip(H("/Player", "Player", 1));
             Type(" fix health");
             var (tj, _) = SimulateSend();
-            StringAssert.Contains("@Player", tj);
+            StringAssert.Contains("@/Player", tj);
             StringAssert.Contains("[hierarchy:/Player #1]", tj);
         }
 
-        // E2E_2: chip-only message → turnJson starts with @Name
+        // E2E_2: chip-only message → turnJson contains @Path (full path)
         [Test]
         public void Send_ChipOnly_TurnJsonContainsAtMention()
         {
             InsertChip(H("/Cube", "Cube", 5));
             var (tj, _) = SimulateSend();
-            StringAssert.Contains("@Cube", tj);
+            StringAssert.Contains("@/Cube", tj);
         }
 
-        // E2E_3: chip with spaces in display name → @mention preserves spaces
+        // E2E_3: chip with spaces in path → @mention uses full path (preserves spaces)
         [Test]
         public void Send_ChipWithSpaces_TurnJsonHasAtMentionWithSpaces()
         {
             _chipField.AddChip(new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -7));
             Type("look");
             var (tj, _) = SimulateSend();
-            StringAssert.Contains("@Main Camera", tj);
+            StringAssert.Contains("@/Main Camera", tj);
         }
     }
 }

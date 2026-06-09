@@ -33,10 +33,13 @@ namespace UnityMCP.Editor.Chat
         internal void SetLastTurnChips(IReadOnlyList<ChipData> chips) => _lastTurnChips = chips;
 
         /// <summary>F13: render an interleaved UserMessage (fixes Bug 1 double display).</summary>
-        internal void AppendUserBubble(UserMessage msg, string imagePath = null)
+        internal void AppendUserBubble(UserMessage msg, string llmPayload = null, string imagePath = null)
         {
             FinalizeAssistant();
-            var bubble = MakeBubble(ChipTextInterleaver.ToDisplayText(msg));
+            var display = ChipTextInterleaver.ToDisplayText(msg);
+            var ud      = new UserBubbleData(display,
+                string.IsNullOrEmpty(llmPayload) ? display : llmPayload);
+            var bubble  = MakeBubble(ud);
             var row    = Row("msg-user");
             var wrap   = new VisualElement(); wrap.AddToClassList("msg-user-content");
             wrap.style.flexDirection = FlexDirection.Row;
@@ -63,18 +66,24 @@ namespace UnityMCP.Editor.Chat
             AppendImage(bubble, imagePath);
             row.Add(bubble); Append(row);
             if (!_restoring) _entries.Add(new TranscriptEntry {
-                EntryKind = TranscriptEntry.Kind.User,
-                Text      = ChipTextInterleaver.ToDisplayText(msg),
-                ChipsData = TranscriptSerializer.SerializeChips(msg.Chips),
+                EntryKind  = TranscriptEntry.Kind.User,
+                Text       = display,
+                ChipsData  = TranscriptSerializer.SerializeChips(msg.Chips),
+                LlmPayload = string.IsNullOrEmpty(llmPayload) ? null : llmPayload,
             });
         }
 
-        /// <summary>Legacy overload — kept for TryResumePendingTurn and existing tests.</summary>
+        /// <summary>Legacy overload — kept for TryResumePendingTurn and existing tests.
+        /// Pass llmPayload to store UserBubbleData (G1/G2/G3 payload inspector support).</summary>
         internal void AppendUserBubble(string text,
-            IReadOnlyList<ChipData> chips = null, string imagePath = null)
+            IReadOnlyList<ChipData> chips = null, string imagePath = null,
+            string llmPayload = null)
         {
             FinalizeAssistant();
-            var bubble    = MakeBubble(text ?? "");
+            object userData = llmPayload != null
+                ? (object)new UserBubbleData(text ?? "", llmPayload)
+                : (text ?? "");
+            var bubble    = MakeBubble(userData);
             var row       = Row("msg-user");
             bool hasChips = chips != null && chips.Count > 0;
             if (hasChips)
@@ -94,9 +103,10 @@ namespace UnityMCP.Editor.Chat
             AppendImage(bubble, imagePath);
             row.Add(bubble); Append(row);
             if (!_restoring) _entries.Add(new TranscriptEntry {
-                EntryKind = TranscriptEntry.Kind.User,
-                Text      = text ?? "",
-                ChipsData = TranscriptSerializer.SerializeChips(chips),
+                EntryKind  = TranscriptEntry.Kind.User,
+                Text       = text ?? "",
+                ChipsData  = TranscriptSerializer.SerializeChips(chips),
+                LlmPayload = llmPayload,
             });
         }
 
@@ -256,7 +266,8 @@ namespace UnityMCP.Editor.Chat
                     switch (e.EntryKind)
                     {
                         case TranscriptEntry.Kind.User:
-                            AppendUserBubble(e.Text, TranscriptSerializer.DeserializeChips(e.ChipsData));
+                            AppendUserBubble(e.Text, TranscriptSerializer.DeserializeChips(e.ChipsData),
+                                llmPayload: e.LlmPayload);
                             break;
                         case TranscriptEntry.Kind.Assistant:
                             AppendOrExtendAssistant(e.Text);
@@ -278,7 +289,7 @@ namespace UnityMCP.Editor.Chat
             if (_msgCount > MaxMessages) { _container.RemoveAt(0); _msgCount--; }
         }
 
-        private static VisualElement MakeBubble(string userData)
+        private static VisualElement MakeBubble(object userData)
         {
             var b = new VisualElement();
             b.AddToClassList("msg-bubble"); b.AddToClassList("msg-bubble--user");

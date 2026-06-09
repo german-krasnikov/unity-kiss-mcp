@@ -4,6 +4,9 @@
 // v4: chip lines become "PathB64|KindKeyB64". Pipe-free B64 makes | a safe separator.
 //     Back-compat: v3 chip lines have no pipe → KindKey="" → re-detect via registry.
 // v5: chip lines become "PathB64|KindKeyB64|OffsetStr". Offsets default to 0 for v4/v3.
+// v6: header gains a trailing PendingLlmPayloadB64 (full-path @paths + [kind:path] block).
+//     Back-compat: pre-v6 blobs have no 10th header field → payload="" → resume falls back
+//     to PendingText (task#10). The display text (PendingText) is unchanged across versions.
 using System;
 
 namespace UnityMCP.Editor.Chat
@@ -21,12 +24,14 @@ namespace UnityMCP.Editor.Chat
         public int         UndoGroupId;    // -1 = none/legacy
         public long        SavedAtUtc;     // 0  = legacy/no-timestamp
         public BackendKind BackendKind;    // v3 — default Claude
+        public string      PendingLlmPayload; // v6 — full-path payload re-sent on in-flight resume; "" = idle/legacy
 
         internal PendingTurnState(string sessionId, string pendingText, string[] chipPaths,
             bool agentMode, string agentName, string activityPhase,
             int undoGroupId = -1, long savedAtUtc = 0,
             BackendKind backendKind = BackendKind.Claude,
-            string[] kindKeys = null, int[] chipTextOffsets = null)
+            string[] kindKeys = null, int[] chipTextOffsets = null,
+            string pendingLlmPayload = null)
         {
             SessionId        = sessionId     ?? "";
             PendingText      = pendingText   ?? "";
@@ -39,6 +44,7 @@ namespace UnityMCP.Editor.Chat
             UndoGroupId      = undoGroupId;
             SavedAtUtc       = savedAtUtc;
             BackendKind      = backendKind;
+            PendingLlmPayload = pendingLlmPayload ?? "";
         }
 
         // ── Staleness guard ───────────────────────────────────────────────────
@@ -73,7 +79,8 @@ namespace UnityMCP.Editor.Chat
                 chipCount.ToString(),
                 UndoGroupId.ToString(),
                 SavedAtUtc.ToString(),
-                ((int)BackendKind).ToString());
+                ((int)BackendKind).ToString(),
+                ToB64(PendingLlmPayload ?? "")); // v6
             for (var i = 0; i < chipCount; i++)
             {
                 var kindKey = (KindKeys != null && i < KindKeys.Length) ? KindKeys[i] : "";
@@ -108,6 +115,8 @@ namespace UnityMCP.Editor.Chat
                     : BackendKind.Claude;
                 // F28: map legacy CodexAppServer (int=2) to Codex (int=1)
                 if ((int)backendKind == 2) backendKind = BackendKind.Codex;
+                // v6: full-path payload; pre-v6 blobs have no 10th field → "".
+                var llmPayload = header.Length > 9 ? FromB64(header[9]) : "";
 
                 var chips    = new string[chipCount];
                 var kindKeys = new string[chipCount];
@@ -145,7 +154,8 @@ namespace UnityMCP.Editor.Chat
                 }
 
                 return new PendingTurnState(sessionId, pendingText, chips, agentMode, agentName,
-                    activityPhase, undoGroupId, savedAtUtc, backendKind, kindKeys, offsets);
+                    activityPhase, undoGroupId, savedAtUtc, backendKind, kindKeys, offsets,
+                    llmPayload);
             }
             catch
             {

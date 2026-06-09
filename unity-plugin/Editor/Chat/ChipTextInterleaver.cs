@@ -1,5 +1,6 @@
 // ChipTextInterleaver: builds a UserMessage (interleaved text+chip segments) at send time.
 // Pure static — no Unity dependencies. Fixes Bug 1 (double display in bubble).
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -62,7 +63,7 @@ namespace UnityMCP.Editor.Chat
         /// <summary>Serialize to LLM: text with @mentions + chip context block.</summary>
         internal static string ToLlmPayload(UserMessage msg, ChipConfig cfg)
         {
-            var plainText = ToDisplayText(msg);
+            var plainText = ToLlmText(msg);
 
             var chipCtx = ChipContextResolver.ResolveAllTyped(
                 new List<ChipData>(msg.Chips), cfg);
@@ -72,21 +73,24 @@ namespace UnityMCP.Editor.Chat
         }
 
         /// <summary>Reconstruct display text with @mentions from a UserMessage.</summary>
-        internal static string ToDisplayText(UserMessage msg)
+        internal static string ToDisplayText(UserMessage msg) => BuildText(msg, c => c.DisplayName);
+
+        /// <summary>LLM text: like ToDisplayText but chips emit Path instead of DisplayName.</summary>
+        // Path preferred; fall back to DisplayName when a chip has no path (orphan/empty-path chip).
+        private static string ToLlmText(UserMessage msg)
+            => BuildText(msg, c => string.IsNullOrEmpty(c.Path) ? c.DisplayName : c.Path);
+
+        private static string BuildText(UserMessage msg, Func<ChipData, string> token)
         {
             var sb = new StringBuilder();
             foreach (var seg in msg.Segments)
             {
                 if (seg.IsChip)
                 {
-                    if (sb.Length > 0 && sb[sb.Length - 1] != ' ')
-                        sb.Append(' ');
-                    sb.Append('@').Append(seg.Chip.DisplayName).Append(' ');
+                    if (sb.Length > 0 && sb[sb.Length - 1] != ' ') sb.Append(' ');
+                    sb.Append('@').Append(token(seg.Chip)).Append(' ');
                 }
-                else
-                {
-                    sb.Append(seg.Text);
-                }
+                else sb.Append(seg.Text);
             }
             return sb.ToString().Trim();
         }

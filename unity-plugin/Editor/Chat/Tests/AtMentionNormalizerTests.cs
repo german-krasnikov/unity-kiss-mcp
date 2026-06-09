@@ -133,6 +133,65 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.DoesNotContain("@Main", r);
         }
 
+        // ── FIX 1: full-path echo tests ──────────────────────────────────────
+
+        // P1: LLM echoes full path — @/GridPlayer → bracket
+        [Test]
+        public void P1_FullPathEcho_HierarchyChip_ReplacedWithBracket()
+        {
+            var chips = new List<ChipData> { H("/GridPlayer", "GridPlayer", 5) };
+            var result = AtMentionNormalizer.Normalize("Check @/GridPlayer now", chips);
+            StringAssert.Contains("[hierarchy:/GridPlayer #5]", result);
+            StringAssert.DoesNotContain("@/GridPlayer", result);
+        }
+
+        // P2: full path with spaces consumed fully; DisplayName chip also present (longest-first)
+        [Test]
+        public void P2_FullPathWithSpaces_LongestFirstOverDisplayName()
+        {
+            var chips = new List<ChipData>
+            {
+                H("/UI Canvas/Main Camera", "Main Camera", 7),
+            };
+            var result = AtMentionNormalizer.Normalize("see @/UI Canvas/Main Camera ok", chips);
+            StringAssert.Contains("[hierarchy:/UI Canvas/Main Camera #7]", result);
+            StringAssert.DoesNotContain("@/UI Canvas/Main Camera", result);
+        }
+
+        // P3: plain DisplayName echo still normalizes (regression guard)
+        [Test]
+        public void P3_DisplayNameEcho_StillNormalized()
+        {
+            var chips = new List<ChipData> { H("/GridPlayer", "GridPlayer", 5) };
+            var result = AtMentionNormalizer.Normalize("fix @GridPlayer health", chips);
+            StringAssert.Contains("[hierarchy:/GridPlayer #5]", result);
+            StringAssert.DoesNotContain("@GridPlayer", result);
+        }
+
+        // P4: script chip (asset path, no leading '/') — @Assets/Foo.cs → bracket
+        [Test]
+        public void P4_ScriptPathEcho_ReplacedWithBracket()
+        {
+            var chip   = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo", 0);
+            var chips  = new List<ChipData> { chip };
+            var result = AtMentionNormalizer.Normalize("open @Assets/Foo.cs please", chips);
+            // Script chips have no instanceID so FormatChipRef emits [script:Assets/Foo.cs]
+            StringAssert.Contains("[script:Assets/Foo.cs]", result);
+            StringAssert.DoesNotContain("@Assets/Foo.cs", result);
+        }
+
+        // P5: both @/FullPath and @DisplayName in same response — both replaced
+        [Test]
+        public void P5_BothFullPathAndDisplayName_BothReplaced()
+        {
+            var chips = new List<ChipData> { H("/GridPlayer", "GridPlayer", 5) };
+            var result = AtMentionNormalizer.Normalize(
+                "check @/GridPlayer and also @GridPlayer again", chips);
+            Assert.AreEqual(0, CountOccurrences(result, "@/GridPlayer"));
+            Assert.AreEqual(0, CountOccurrences(result, "@GridPlayer"));
+            Assert.AreEqual(2, CountOccurrences(result, "[hierarchy:/GridPlayer #5]"));
+        }
+
         // ── helper ────────────────────────────────────────────────────────────
 
         private static int CountOccurrences(string text, string pattern)

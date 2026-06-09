@@ -883,6 +883,21 @@ With disallowedTools: "What color would you like for the particle system? (I wou
 4. Domain reload completes; Chat window re-initializes on next EditorApplication.update
 5. User can start a new chat session
 
+### Full-Path Chip Payload + "Show LLM payload" Inspector (Plugin v0.20.6)
+
+Two paired changes guarantee the model receives full object/file paths and the UI can reveal the exact raw text of any sent turn.
+
+**Full-path payload (`ChipTextInterleaver` + `AtMentionNormalizer`):**
+- `ToLlmPayload`/`ToLlmText` emit each chip's `Path` (e.g. `@/Env/Player`) instead of its short `DisplayName` (`@Player`), falling back to `DisplayName` only for an orphan chip with an empty path. The display bubble still shows the short name via `ToDisplayText`.
+- `AtMentionNormalizer` now builds match candidates from BOTH `DisplayName` and `Path`, sorted globally longest-first, so an echoed `@/UI Canvas/Main Camera` in the response wins over `@Main Camera` over `@Main`.
+- **Reload-resume keeps the full path (task#10, plugin v0.20.7):** `DispatchTurn` caches the exact full-path `llmText` in `_sentLlmCache`; `SaveStateBeforeReload` persists it as `PendingTurnState.PendingLlmPayload` (v6 base64 header column) for in-flight saves only. `TryResumePendingTurn` re-sends `EditorStateSnapshot + PendingLlmPayload`, so a resumed turn carries the SAME full `@paths` + `[kind:path]` block as a fresh send. Pre-v6 blobs (no field) and idle saves fall back to `PendingText`; the serializer's `header.Length > 9` guard makes old blobs deserialize to `payload=""` with no crash. Idle-reload input restore is untouched.
+
+**Always-raw inspector (`UserBubbleData` + `CopyableText`):**
+- New `UserBubbleData { Display, Llm }` carries the bubble's short display text alongside the exact string sent to the model. User-bubble `userData` becomes a `UserBubbleData` whenever an `llmPayload` is threaded; it stays a bare `string` for the legacy null-payload path (assistant/tool bubbles are untouched).
+- The sent-bubble right-click action is **"Show LLM payload"** (was "Show as text"); it logs `[MCP Chat] LLM payload:\n<raw>` reading `UserBubbleData.Llm`. **Copy** still returns `Display`.
+- Payload is threaded for every turn type: fresh send / screenshot (`llmText`), compile-inject + approve (`displayText`, since sent == displayed), reload-resume (`sentText = EditorStateSnapshot + PendingLlmPayload`, the persisted full-path payload — see task#10 below — so the inspector reveals the state snapshot prefix AND the full @paths + `[kind:path]` block), and reload-restore (persisted `LlmPayload`). Backend-agnostic — identical for Claude and Codex.
+- `TranscriptSerializer` persists a 4th base64 column `LlmPayload`; old 3-column blobs restore with `LlmPayload = null` (bare-string userData, no crash). Round-trip is idempotent.
+
 ## Known Limitations
 
 - **ChipPath Repaint After Resume:** Object chips are persisted via `PendingTurnState` and restored after domain reload, but the chip strip UI is not repainted. The turn executes with correct context; the visual strip just shows stale paths until the next user message. This is a cosmetic UX issue; the actual turn data is correct.

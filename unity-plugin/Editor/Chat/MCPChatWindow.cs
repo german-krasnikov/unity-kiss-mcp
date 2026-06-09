@@ -16,6 +16,9 @@ namespace UnityMCP.Editor.Chat
         private int            _inputTokens, _outputTokens;
         private readonly TurnUndoTracker _undoTracker = new TurnUndoTracker();
         private readonly SentTextCache _sentTextCache = new SentTextCache();
+        // task#10: caches the full-path LLM payload (paths + [kind:path] block) sent this turn,
+        // so an in-flight domain reload re-sends the SAME payload, not the short-name display text.
+        private readonly SentTextCache _sentLlmCache = new SentTextCache();
         private readonly List<ChatEvent>       _evBuf    = new List<ChatEvent>(16);
         private readonly List<ToolCallRecord>  _toolBuf  = new List<ToolCallRecord>(8);
         internal readonly CompileAutoFix       _autoFix  = new CompileAutoFix();

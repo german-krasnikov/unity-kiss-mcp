@@ -124,7 +124,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(0, directLabels, "Empty text segments should not produce Labels");
         }
 
-        // D6: userData on bubble includes @mention (ToDisplayText with @Name)
+        // D6: userData on bubble includes @mention (ToDisplayText with @Name) — via Display field.
         [Test]
         public void D6_BubbleUserData_ContainsAtMention()
         {
@@ -132,9 +132,9 @@ namespace UnityMCP.Editor.Chat.Tests
             var pos  = new List<PositionedChip> { PC(chip, 5) };
             var msg  = ChipTextInterleaver.Build("fix health now", pos);
             _transcript.AppendUserBubble(msg);
-            var userData = Bubble().userData as string ?? "";
-            StringAssert.Contains("@Player", userData);
-            StringAssert.Contains("fix", userData);
+            var display = Bubble().userData is UserBubbleData u ? u.Display : Bubble().userData as string ?? "";
+            StringAssert.Contains("@Player", display);
+            StringAssert.Contains("fix", display);
         }
 
         // D7: bubble has msg-bubble and msg-bubble--user classes

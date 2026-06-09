@@ -21,11 +21,11 @@ namespace UnityMCP.Editor.Chat
 
                 if (el.ClassListContains("msg-bubble--user"))
                 {
-                    evt.menu.AppendAction("Show as text", _ =>
+                    evt.menu.AppendAction("Show LLM payload", _ =>
                     {
-                        var raw = el.userData as string;
+                        var raw = el.userData is UserBubbleData u ? u.Llm : el.userData as string;
                         if (!string.IsNullOrEmpty(raw))
-                            UnityEngine.Debug.Log($"[MCP Chat] Raw: {raw}");
+                            UnityEngine.Debug.Log($"[MCP Chat] LLM payload:\n{raw}");
                     });
                 }
             }));
@@ -54,7 +54,8 @@ namespace UnityMCP.Editor.Chat
         private static string ReadText(VisualElement el)
         {
             if (el.userData is ToolCallRecord rec) return CopyTextBuilder.ForToolChip(rec);
-            if (el.userData is string s) return s;
+            if (el.userData is UserBubbleData u)   return u.Display;
+            if (el.userData is string s)            return s;
             return null;
         }
     }

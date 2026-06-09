@@ -51,8 +51,10 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "first"; SimulateSend();
             _chipField.Text = "second"; SimulateSend();
             ChatWindowAssertions.AssertUserBubbleCount(_container, 2);
-            Assert.AreEqual("first",  ChatWindowAssertions.GetUserBubble(_container, 0).userData as string);
-            Assert.AreEqual("second", ChatWindowAssertions.GetUserBubble(_container, 1).userData as string);
+            var d0 = ChatWindowAssertions.GetUserBubble(_container, 0).userData is UserBubbleData u0 ? u0.Display : ChatWindowAssertions.GetUserBubble(_container, 0).userData as string;
+            var d1 = ChatWindowAssertions.GetUserBubble(_container, 1).userData is UserBubbleData u1 ? u1.Display : ChatWindowAssertions.GetUserBubble(_container, 1).userData as string;
+            Assert.AreEqual("first",  d0);
+            Assert.AreEqual("second", d1);
         }
 
         [Test]
