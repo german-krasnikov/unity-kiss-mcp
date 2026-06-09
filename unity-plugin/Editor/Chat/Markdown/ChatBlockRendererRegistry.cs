@@ -58,7 +58,9 @@ namespace UnityMCP.Editor.Chat
         {
             if (root is Label lbl && lbl.enableRichText && !string.IsNullOrEmpty(lbl.text))
             {
-                var linkified = ChatLinkify.Apply(lbl.text, _resolver.ResolveObject, _resolver.ResolveScript, ResolveAssetPath);
+                // F20: scene-object resolver removed — bare object names in code spans are not
+                // underline-linked; they reach BareNameNormalizer as pills instead (Path A).
+                var linkified = ChatLinkify.Apply(lbl.text, null, _resolver.ResolveScript, ResolveAssetPath);
                 if (linkified != lbl.text)
                 {
                     lbl.text = linkified;

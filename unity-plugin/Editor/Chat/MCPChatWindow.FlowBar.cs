@@ -12,6 +12,7 @@ namespace UnityMCP.Editor.Chat
         private VisualElement _flowBar;
         private VisualElement _flowFill;
         private bool _sweepPhase;
+        private Button _sendBtn, _stopBtn;
 
         private VisualElement BuildFlowBar()
         {
@@ -42,6 +43,13 @@ namespace UnityMCP.Editor.Chat
                     _flowFill.RemoveFromClassList("flowbar__fill--b");
                     _sweepPhase = false;
                     break;
+            }
+            // F20: swap Send ↔ Stop button visibility based on activity phase.
+            if (_sendBtn != null && _stopBtn != null)
+            {
+                bool idle = _activity.Phase == ActivityPhase.Idle;
+                _sendBtn.style.display = idle ? DisplayStyle.Flex : DisplayStyle.None;
+                _stopBtn.style.display = idle ? DisplayStyle.None : DisplayStyle.Flex;
             }
         }
 
@@ -83,14 +91,6 @@ namespace UnityMCP.Editor.Chat
             var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
             bar.Add(spacer);
 
-            var autoScrollToggle = new Toggle("Auto-scroll") { value = _autoScrollEnabled };
-            autoScrollToggle.AddToClassList("autoscroll-toggle");
-            autoScrollToggle.RegisterValueChangedCallback(evt =>
-            {
-                _autoScrollEnabled = evt.newValue;
-                EditorPrefs.SetBool("MCPChat.AutoScroll", evt.newValue);
-            });
-            bar.Add(autoScrollToggle);
             bar.Add(BuildSessionMenuButton());
 
             _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
@@ -98,9 +98,12 @@ namespace UnityMCP.Editor.Chat
 
             var ssBtn   = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
             ssBtn.AddToClassList("chat-btn"); ssBtn.AddToClassList("chat-btn--screenshot");
-            var sendBtn = new Button(OnSend) { text = "Send" };
-            sendBtn.AddToClassList("chat-btn"); sendBtn.AddToClassList("chat-btn--send");
-            bar.Add(ssBtn); bar.Add(sendBtn);
+            _sendBtn = new Button(OnSend) { text = "Send" };
+            _sendBtn.AddToClassList("chat-btn"); _sendBtn.AddToClassList("chat-btn--send");
+            _stopBtn = new Button(CancelTurn) { text = "Stop" };
+            _stopBtn.AddToClassList("chat-btn"); _stopBtn.AddToClassList("chat-btn--stop");
+            _stopBtn.style.display = DisplayStyle.None;
+            bar.Add(ssBtn); bar.Add(_sendBtn); bar.Add(_stopBtn);
             return bar;
         }
 

@@ -14,6 +14,9 @@ namespace UnityMCP.Editor.Chat
         // #1 Save turn state before domain reload so it can be resumed after.
         private void SaveStateBeforeReload()
         {
+            // F21: save transcript before UI tree is destroyed
+            SessionState.SetString("MCPChat_Transcript",
+                _transcript?.SerializeForReload() ?? "");
             string[] chipPaths, kindKeys;
             int[]    chipOffsets;
             if (_chipField?.Model != null && _chipField.Model.Count > 0)
@@ -57,6 +60,11 @@ namespace UnityMCP.Editor.Chat
         // #1 Called by ChatProcess.OnAfterReloadResume after assembly reload completes.
         private void TryResumePendingTurn()
         {
+            // P0-1: consume the restore flag exactly once per call, regardless of which
+            // return path we take below (idle/stale/null all returned early before).
+            var transcriptRestored = _transcriptRestored;
+            _transcriptRestored = false;
+
             var pending = ReloadGuard.LoadPendingState();
             if (pending == null) return;
             ReloadGuard.ClearPendingState();
@@ -112,8 +120,10 @@ namespace UnityMCP.Editor.Chat
                 // Show only the original user text in the bubble (no state dump).
                 var chipList = _chipField?.Model?.Chips is { Count: > 0 } c
                     ? new System.Collections.Generic.List<ChipData>(c) : null;
-                _transcript?.SetLastTurnChips(chipList);
-                _transcript?.AppendUserBubble(displayText, chipList);
+                _transcript?.SetLastTurnChips(chipList);          // P0-1: ALWAYS — normalization context for resumed response
+                if (!transcriptRestored)
+                    _transcript?.AppendUserBubble(displayText, chipList); // P0-1: skip when transcript restore already rendered it
+                // (no field reset here — already cleared at entry)
                 _backend.SendTurn(UserTurnBuilder.Build(sentText));
                 if (_activity.Send()) OnActivityChanged();
             }
@@ -133,6 +143,7 @@ namespace UnityMCP.Editor.Chat
                 {
                     // #2 fix: release the reload lock; without this the lock was held until the 120s watchdog.
                     ReloadGuard.OnTurnFinished();
+                    ResetTurnFlags(); // P0-2: dead-process guard must also clear stale flags
                     // F6: dead process — treat as failed turn.
                     _undoTracker.OnTurnFailed();
                     if (_activity.Fail()) OnActivityChanged();
@@ -149,7 +160,12 @@ namespace UnityMCP.Editor.Chat
             foreach (var ev in _evBuf) HandleEvent(ev);
             foreach (var rec in _toolBuf) HandleToolRecord(rec);
             _transcript.FlushStreaming();
-            if (_autoScrollEnabled)
+            if (_needsRefresh)
+            {
+                _needsRefresh = false;
+                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+            }
+            if (EditorPrefs.GetBool("MCPChat.AutoScroll", true))
                 _scroll.scrollOffset = new Vector2(0, float.MaxValue);
         }
 
@@ -164,6 +180,10 @@ namespace UnityMCP.Editor.Chat
                 case ChatEventKind.TurnDone:
                     ReloadGuard.OnTurnFinished(); // #1 unlock after turn complete
                     if (_activity.Done()) OnActivityChanged();
+                    // F20: refresh resolver before freeze so objects created during this turn
+                    // are visible to BareNameNormalizer's scene-wide pass (closes cache-staleness gap).
+                    _resolver?.Refresh();
+                    _lastRefresh = EditorApplication.timeSinceStartup;
                     _transcript.FinalizeAssistant();
                     if (ev.InputTokens > 0 || ev.OutputTokens > 0)
                     {
@@ -182,9 +202,8 @@ namespace UnityMCP.Editor.Chat
                         else if (_turnEditedCode)
                             _autoFix.Arm();
                     }
-                    _turnEditedCode = false;
-                    var hadToolCalls = _turnHasToolCalls;
-                    _turnHasToolCalls = false;
+                    var hadToolCalls = _turnHasToolCalls; // P0-2: capture before reset
+                    ResetTurnFlags(); // P0-2: DRY reset (was 3 inline assignments)
                     // F6: close the undo group and append a Restore button.
                     _undoTracker.OnTurnEnd();
                     _transcript?.Append(RestoreButton.Create(_undoTracker));
@@ -204,8 +223,7 @@ namespace UnityMCP.Editor.Chat
                     ReloadGuard.OnTurnFinished(); // #1 unlock even on error
                     if (_activity.Fail()) OnActivityChanged();
                     _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
-                    _turnEditedCode   = false; // provenance gate: symmetric with TurnDone
-                    _turnHasToolCalls = false;
+                    ResetTurnFlags(); // P0-2: DRY reset (was 3 inline assignments)
                     // F6: partial mutations still restorable on error.
                     _undoTracker.OnTurnFailed();
                     _transcript?.Append(RestoreButton.Create(_undoTracker));
@@ -248,9 +266,12 @@ namespace UnityMCP.Editor.Chat
                 if (rec.ArgsJson != null && !rec.HasResult)
                 {
                     ToolPing.TryPing(rec);
-                    if (IsCodeEditingTool(rec)) _turnEditedCode = true;
+                    if (IsCodeEditingTool(rec))
+                        _turnEditedCode = true;
                 }
                 _transcript.UpdateToolDetail(rec.Id, rec);
+                if (rec.HasResult && IsCodeEditingTool(rec))
+                    _needsRefresh = true;
             }
         }
     }

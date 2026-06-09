@@ -1,4 +1,4 @@
-// TDD — BareNameNormalizer tests (F14a).
+// TDD — BareNameNormalizer tests (F14a, F20).
 // Pure headless: no Unity runtime dependency.
 // Verifies bare name → [kind:ref] bracket tag replacement.
 using System.Collections.Generic;
@@ -186,6 +186,40 @@ namespace UnityMCP.Editor.Chat.Tests
             var result = BareNameNormalizer.Normalize(text, chips);
             StringAssert.Contains("[hierarchy:/Player #1]", result); // outside block
             StringAssert.Contains("Player.Move()", result);          // inside block preserved
+        }
+
+        // ── F20 boundary coverage (ported from deleted SceneNameLinkerTests) ──
+        // BareNameNormalizer is chip-scoped (explicit user selections) so it uses
+        // a simpler Length>1 guard — no skip list, no digit/underscore heuristic.
+
+        // 18. TwoCharName_Accepted (unlike SceneNameLinker min-3 guard)
+        [Test]
+        public void TwoCharName_Accepted()
+        {
+            var chips = new List<ChipData> { H("/Go", "Go", 1) };
+            // "Go" is 2 chars — BareNameNormalizer accepts it (length > 1)
+            var result = BareNameNormalizer.Normalize("fix Go now", chips);
+            StringAssert.Contains("[hierarchy:/Go #1]", result);
+        }
+
+        // 19. GenericName_Accepted (unlike SceneNameLinker SkipList for "Canvas" etc.)
+        [Test]
+        public void GenericName_Accepted()
+        {
+            var chips = new List<ChipData> { H("/Canvas", "Canvas", 1) };
+            // "Canvas" is in SceneNameLinker.SkipList but BareNameNormalizer has no skip list
+            var result = BareNameNormalizer.Normalize("fix Canvas here", chips);
+            StringAssert.Contains("[hierarchy:/Canvas #1]", result);
+        }
+
+        // 20. AllLowerName_Accepted (unlike SceneNameLinker requiring digit/underscore/consecUpper)
+        [Test]
+        public void AllLowerName_Accepted()
+        {
+            var chips = new List<ChipData> { H("/player", "player", 1) };
+            // "player" (all lower, no special chars) passes BareNameNormalizer length>1 guard
+            var result = BareNameNormalizer.Normalize("fix player now", chips);
+            StringAssert.Contains("[hierarchy:/player #1]", result);
         }
 
         // ── helper ────────────────────────────────────────────────────────────

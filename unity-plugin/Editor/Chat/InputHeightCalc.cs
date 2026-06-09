@@ -4,7 +4,7 @@ namespace UnityMCP.Editor.Chat
 {
     internal sealed class InputHeightCalc
     {
-        internal const float CompactH   = 72f;
+        internal const float CompactH   = 117f; // 4 lines: 4*18 + PadH(14) + ActionBarH(31)
         internal const float LineH      = 18f;
         internal const float PadH       = 14f;
         internal const float ActionBarH = 31f;
@@ -34,7 +34,8 @@ namespace UnityMCP.Editor.Chat
             float textH  = System.Math.Max(lineCount, 1) * LineH + PadH;
             float areaH  = textH + ActionBarH + chipH;
             float maxH   = (float)System.Math.Min(windowH * WindowFrac, AbsMaxH);
-            return Clamp(areaH, CompactH, maxH);
+            float minH   = (float)System.Math.Min(CompactH, maxH); // tiny window: respect cap
+            return Clamp(areaH, minH, maxH);
         }
 
         internal float ComputeMax(float windowH)

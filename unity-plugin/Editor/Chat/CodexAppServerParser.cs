@@ -73,7 +73,7 @@ namespace UnityMCP.Editor.Chat
             }
         }
 
-        // ── Item dispatch (shared logic with CodexStreamParser) ───────────────
+        // ── Item dispatch ────────────────────────────────────────────────────
 
         private static void DispatchItem(string eventType, string item, List<ChatEvent> sink)
         {

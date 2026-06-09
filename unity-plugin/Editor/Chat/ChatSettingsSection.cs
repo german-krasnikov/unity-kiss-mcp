@@ -10,6 +10,11 @@ namespace UnityMCP.Editor.Chat
         /// <summary>Builds connection settings content — called by ChatConnectionSection via OnBuildConnection.</summary>
         internal static void BuildContent(VisualElement parent)
         {
+            // F22: Auto-scroll toggle — at the top, outside any foldout.
+            var autoScrollToggle = new Toggle("Auto-scroll") { value = EditorPrefs.GetBool("MCPChat.AutoScroll", true) };
+            autoScrollToggle.RegisterValueChangedCallback(evt => EditorPrefs.SetBool("MCPChat.AutoScroll", evt.newValue));
+            parent.Add(autoScrollToggle);
+
             // Per-backend settings — Claude foldout is expanded by default (contains primary connection info)
             var store = BackendConfigStore.Load();
             var claudeFoldout = new Foldout { text = "Claude Settings", value = true };

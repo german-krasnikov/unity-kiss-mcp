@@ -44,18 +44,17 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(result[0].Enabled);
         }
 
-        // ── Last entry is always Codex (Session) (enabled) ───────────────────
+        // ── Last entry is always Codex (session-based) (enabled) ────────────
 
         [Test]
         public void Discover_CodexIsLast()
         {
             var result = BackendRegistry.Discover(new string[0]);
-            // Codex (spawn-per-turn) is second-to-last; Codex (Session) is last
-            var codex = result.Find(b => b.Kind == BackendKind.Codex);
-            Assert.IsNotNull(codex.DisplayName);
-            Assert.AreEqual("Codex", codex.DisplayName);
-            Assert.IsTrue(codex.Enabled);
-            Assert.AreEqual(BackendKind.CodexAppServer, result[result.Count - 1].Kind);
+            Assert.AreEqual(2, result.Count); // Claude + Codex only
+            var last = result[result.Count - 1];
+            Assert.AreEqual("Codex",             last.DisplayName);
+            Assert.AreEqual(BackendKind.Codex,   last.Kind);
+            Assert.IsTrue(last.Enabled);
         }
 
         // ── Agent files are discovered ────────────────────────────────────────
@@ -68,7 +67,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            Assert.AreEqual(4, result.Count); // Claude + code-reviewer + Codex + Codex (Session)
+            Assert.AreEqual(3, result.Count); // Claude + code-reviewer + Codex
             Assert.AreEqual("code-reviewer", result[1].DisplayName);
             Assert.AreEqual("code-reviewer", result[1].AgentName);
             Assert.IsTrue(result[1].Enabled);
@@ -82,7 +81,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { userDir });
 
-            Assert.AreEqual(4, result.Count);
+            Assert.AreEqual(3, result.Count); // Claude + doc-keeper + Codex
             Assert.AreEqual("doc-keeper", result[1].AgentName);
         }
 
@@ -110,12 +109,10 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var result = BackendRegistry.Discover(new[] { "/nonexistent/path1", "/nonexistent/path2" });
 
-            Assert.AreEqual(3, result.Count);
-            Assert.AreEqual("Claude",            result[0].DisplayName);
-            Assert.AreEqual("Codex",             result[1].DisplayName);
-            Assert.AreEqual("Codex (Session)", result[2].DisplayName);
+            Assert.AreEqual(2, result.Count);
+            Assert.AreEqual("Claude", result[0].DisplayName);
+            Assert.AreEqual("Codex",  result[1].DisplayName);
             Assert.IsTrue(result[1].Enabled);
-            Assert.IsTrue(result[2].Enabled);
         }
 
         // ── Agent named "Claude" is skipped (collision guard) ─────────────────
@@ -128,8 +125,8 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            // Claude + Codex + Codex (Session), no extra "Claude" entry
-            Assert.AreEqual(3, result.Count);
+            // Claude + Codex, no extra "Claude" entry
+            Assert.AreEqual(2, result.Count);
         }
 
         // ── Agent named "Codex" is skipped (collision guard) ─────────────────

@@ -150,11 +150,24 @@ namespace UnityMCP.Editor.Chat
                 }
                 else
                 {
-                    // Mention not found — include text as-is, chip still tracked.
-                    if (chipRawOffset > rawPos)
-                        cleanText.Append(rawText, rawPos, chipRawOffset - rawPos);
-                    cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
-                    rawPos = chipRawOffset;
+                    // Mention not found near expected offset — search all remaining text (F24).
+                    int globalIdx = rawText.IndexOf(mention, rawPos, System.StringComparison.Ordinal);
+                    if (globalIdx >= 0)
+                    {
+                        if (globalIdx > rawPos)
+                            cleanText.Append(rawText, rawPos, globalIdx - rawPos);
+                        cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
+                        int afterMention = globalIdx + mention.Length;
+                        rawPos = afterMention < rawText.Length && rawText[afterMention] == ' '
+                            ? afterMention + 1 : afterMention;
+                    }
+                    else
+                    {
+                        if (chipRawOffset > rawPos)
+                            cleanText.Append(rawText, rawPos, chipRawOffset - rawPos);
+                        cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
+                        rawPos = chipRawOffset;
+                    }
                 }
             }
             if (rawPos < rawText.Length)

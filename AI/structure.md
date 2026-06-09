@@ -187,21 +187,19 @@ unity-kiss-mcp/
 │       │   ├── ChatProcess.cs             # Process lifecycle manager
 │       │   ├── CliBackendBase.cs          # Abstract host: shared lifecycle, 4 variation axes
 │       │   ├── ClaudeBackend.cs           # Claude: CliBackendBase subclass (persistent stdin)
-│       │   ├── CodexArgBuilder.cs         # Codex (exec): argv builder for exec --json + resume
-│       │   ├── CodexStreamParser.cs       # Codex (exec): NDJSON → ChatEvent parser
-│       │   ├── CodexBackend.cs            # Codex (exec): CliBackendBase subclass (spawn-per-turn, deprecated)
-│       │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions, token streaming
-│       │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC → ChatEvent (item/agentMessage/delta, mcpToolCall)
-│       │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex exec, Codex app-server)
+│       │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions, token streaming (F28)
+│       │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC → ChatEvent (item/agentMessage/delta, mcpToolCall) (F28)
+│       │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex) (F28: 2 backends, removed spawn-per-turn)
 │       │   ├── BackendConfig.cs           # [Serializable] Claude/Codex configs + persistence (F9)
 │       │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (F9, project-local Library/)
 │       │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (F9)
 │       │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
+│       │   ├── TranscriptSerializer.cs    # Serialize/deserialize chat history to plain-text (F21 reload survival)
 │       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
-│       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates (partial class)
+│       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates + domain refresh trigger (F27) (partial class)
 │       │   ├── MCPChatWindow.Send.cs      # Send path: OnSend, rawText/llmText split, chip snapshot (partial class)
 │       │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (partial class)
-│       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons
+│       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons (F29: external files/folders)
 │       │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
 │       │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
 │       │   ├── MCPChatWindow.Resize.cs    # Window resize logic
@@ -215,7 +213,7 @@ unity-kiss-mcp/
 │       │   ├── ChatRefResolver.cs         # Scan hierarchy, resolve scene/script refs (F4 #ID)
 │       │   ├── CopyableText.cs            # Selectable text wrapper
 │       │   ├── CopyTextBuilder.cs         # Multi-line copy block assembly
-│       │   ├── InputHeightCalc.cs         # Input field auto-height calculation
+│       │   ├── InputHeightCalc.cs         # Input field auto-height calculation (F30: 4-line default, tiny-window clamp fix)
 │       │   ├── JsonArrayScan.cs           # Scan JSON arrays for streaming results
 │       │   ├── ArgTokenizer.cs            # Shell-style quote-aware split (F9, review-hardening)
 │       │   ├── ArgQuoting.cs              # Quote escaping helpers
@@ -243,7 +241,7 @@ unity-kiss-mcp/
 │       │   ├── SlashPopup.cs              # UIToolkit popup
 │       │   ├── MCPChatWindow.Slash.cs     # Slash setup
 │       │   ├── ReloadGuard.cs             # Domain-reload lock
-│       │   ├── PendingTurnState.cs        # Persist in-flight state (v3: BackendKind)
+│       │   ├── PendingTurnState.cs        # Persist in-flight state (v3: BackendKind) (F28: backward-compat mapping for old int=2)
 │       │   ├── SentTextCache.cs           # Domain-reload dedup
 │       │   ├── StderrRingBuffer.cs        # Stderr capture
 │       │   ├── ToolCallAccumulator.cs     # Accumulate tool calls
@@ -279,7 +277,7 @@ unity-kiss-mcp/
 │       │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators
 │       │   └── Tests/                     # 25+ NUnit suites = ~565+ test cases (render + backend + chips + pure)
 │       │       │   # Render (66): MdBlockTests(5), MarkdownParserTests(16), MarkdownInlineTests(13), MermaidParserTests(17), MermaidLayoutTests(15)
-│       │       │   # Backend/parse (150): ChatStreamParserTests(24), CliBackendBaseTests(29), CodexArgBuilderTests(35), CodexStreamParserTests(26), CodexAppServerParserTests(15), ClaudeArgBuilderTests(8), ToolVerbMapTests(5), BackendRegistryTests(8)
+│       │       │   # Backend/parse (150): ChatStreamParserTests(24), CliBackendBaseTests(29), CodexAppServerParserTests(15), CodexArgBuilderTests(35), ClaudeArgBuilderTests(8), ToolVerbMapTests(5), BackendRegistryTests(8), DomainRefreshTests(4), DragDropExternalTests(8)
 │       │       │   # Interactivity/input (43): EnterKeySendTests(7), InputHeightCalcTests(14), ChatActivityStateTests(13), CopyTextBuilderTests(9)
 │       │       │   # Chips (320+): ChipSequenceTests, ChipSequenceExtraTests, ChipSendSequenceTests, ChipSendSequenceExtraTests, ChipTestHelpers (shared)
 │       │       │   # Pure/state (6+489): TokenFormatTests(6), PendingTurnStateTests(187), PendingTurnStateV4Tests(197), PendingTurnStateStalenessTests(105)

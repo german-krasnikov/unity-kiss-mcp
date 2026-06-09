@@ -18,7 +18,6 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             ChipKindRegistry.ResetToBuiltIns();
             ChipPillFactory.ColorResolver = null;
-            MarkdownInline.Linker = null;
             _container  = new VisualElement();
             _transcript = new ChatTranscript(_container,
                 ChatBlockRendererFactory.CreateDefault(null, null));
@@ -30,7 +29,6 @@ namespace UnityMCP.Editor.Chat.Tests
             ChipKindRegistry.ResetToBuiltIns();
             ChipPillFactory.ColorResolver = null;
             ChipPillFactory.AddToContextAction = null;
-            MarkdownInline.Linker = null;
         }
 
         // F15b-C1: scene object name in LLM response → rendered as pill in assistant bubble

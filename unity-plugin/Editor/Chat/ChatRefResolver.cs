@@ -15,7 +15,7 @@ namespace UnityMCP.Editor.Chat
         // name (no .cs) -> asset path e.g. "Assets/Scripts/Player.cs"
         private readonly Dictionary<string, string> _scripts = new Dictionary<string, string>();
 
-        /// <summary>Exposes scene object name→path map for SceneNameLinker (P3).</summary>
+        /// <summary>Exposes scene object name→path map for BareNameNormalizer scene-wide pass.</summary>
         internal IReadOnlyDictionary<string, string> Objects => _objects;
 
         /// <summary>Rebuilds both caches. Call once before rendering a batch of blocks.</summary>

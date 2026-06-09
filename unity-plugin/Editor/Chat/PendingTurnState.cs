@@ -106,6 +106,8 @@ namespace UnityMCP.Editor.Chat
                 var backendKind = header.Length > 8
                     ? (BackendKind)int.Parse(header[8])
                     : BackendKind.Claude;
+                // F28: map legacy CodexAppServer (int=2) to Codex (int=1)
+                if ((int)backendKind == 2) backendKind = BackendKind.Codex;
 
                 var chips    = new string[chipCount];
                 var kindKeys = new string[chipCount];

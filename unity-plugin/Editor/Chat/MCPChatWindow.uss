@@ -274,6 +274,21 @@
     opacity: 0.75;
 }
 
+.chat-btn--stop {
+    background-color: #b03a2e;
+    border-color: #922b21;
+    color: #ffffff;
+}
+
+.chat-btn--stop:hover {
+    background-color: #922b21;
+}
+
+.chat-btn--stop:active {
+    background-color: #b03a2e;
+    opacity: 0.75;
+}
+
 /* Mode toggle (Ask / Agent) — inside .mode-segment, no individual border-radius */
 .mode-toggle-btn {
     height: 20px;

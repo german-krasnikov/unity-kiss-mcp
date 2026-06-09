@@ -1,4 +1,4 @@
-// Converts inline Markdown spans to Unity rich-text. Pure, NUnit-testable.
+// Converts inline Markdown spans to Unity rich-text. Pure, NUnit-testable. F20: Linker seam removed.
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -10,9 +10,6 @@ namespace UnityMCP.Editor.Chat
     {
         internal const string CodeColor = "#9aa5ce"; // single source; ChatLinkify matches this
         private const string LinkColor = "#566677";
-
-        /// <summary>Injectable seam for P3 auto-linking. Set by MCPChatWindow after resolver refresh.</summary>
-        internal static SceneNameLinker Linker;
 
         // U+FDD0/U+FDD1 are permanent Unicode non-characters — they can never appear in
         // real text, so they are collision-proof placeholders for extracted code spans.
@@ -59,10 +56,6 @@ namespace UnityMCP.Editor.Chat
             // is Split first, so individual segments never reach here — Apply is a no-op on
             // tagless runs, so no double-render is possible.
             withPlaceholders = ResponseTagInliner.Apply(withPlaceholders);
-
-            // Step 2c: auto-link known scene object names.
-            if (Linker != null)
-                withPlaceholders = Linker.Linkify(withPlaceholders);
 
             // Step 3: apply bold, italic, links.
             withPlaceholders = _bold.Replace(withPlaceholders, "<b>$1</b>");

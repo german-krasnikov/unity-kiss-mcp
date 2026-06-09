@@ -2,8 +2,6 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using UnityEngine;
-using UnityEngine.TestTools;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -182,8 +180,10 @@ namespace UnityMCP.Editor.Chat.Tests
         public void Start_NullBinary_DoesNotThrow()
         {
             ChatBinaryResolver.WhichOverride = _ => null;
-            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("binary not found"));
+            string captured = null;
+            _b.LogError = m => captured = m;
             Assert.DoesNotThrow(() => _b.Start());
+            StringAssert.Contains("binary not found", captured);
             Assert.AreEqual(0, _b.SpawnCallCount, "No spawn when binary not found");
         }
 

@@ -72,13 +72,13 @@ Each CLI-based backend is a strategy over **4 variation axes:**
 
 **ClaudeBackend** (ported): Zero behavior change (−65 lines net). Now a thin wrapper over the base. Regression anchor proving the abstraction doesn't alter existing behavior.
 
-**CodexBackend** (new, v0.14.0): Implements the 4 axes for OpenAI Codex. Spawn-per-turn model: each turn disposes the old process and spawns a fresh one with the prompt baked into argv (via `-c mcp_servers.*` flags). Stdin closed immediately (spike fact #4: Codex hangs without this).
+**CodexAppServerBackend** (v0.14.0, simplified in v0.20.0 as only Codex option): Implements the 4 axes for OpenAI Codex via persistent `codex app-server` (JSON-RPC 2.0). One process per chat session (IsPersistentProcess=true), eliminates spawn-per-turn churn. Protocol: `initialize` → `thread/start` → repeated `turn/start` with `mcpToolCall` items + real token streaming via `item/agentMessage/delta`.
 
-**CodexArgBuilder** (new): Constructs `codex exec --json` argv. Three `-c mcp_servers.unity*` flags re-passed every turn, including on resume. Format: `-c mcp_servers.{unity,unity_auth,unity_plugins}=<value>`.
+**CodexArgBuilder** (v0.14.0): Constructs `codex app-server` argv + init args. Three `-c mcp_servers.unity*` flags passed at initialization. Format: `-c mcp_servers.{unity,unity_auth,unity_plugins}=<value>`.
 
-**CodexStreamParser** (new): Codex NDJSON → ChatEvent. Emits agent_message, mcp_tool_call, command_execution (aggregated_output or declined), file_change (changes array), and turn.completed (usage stats; CostUsd=0). 26 NUnit test cases cover all paths.
+**CodexAppServerParser** (v0.14.0, replaces CodexStreamParser): JSON-RPC 2.0 notification/response parser → ChatEvent. Emits agent_message (via delta tokens), mcp_tool_call, command_execution (aggregated_output or declined), file_change (changes array), and turn.completed (usage stats; CostUsd=0). 15+ NUnit test cases cover all paths.
 
-**BackendRegistry** & **BackendKind**: Central enum + factory. User selects Claude or Codex from dropdown; MCPChatWindow.CreateBackend dispatches to the right subclass.
+**BackendRegistry** & **BackendKind** (simplified v0.20.0): Central enum + factory. User selects Claude (persistent stdin) or Codex (persistent JSON-RPC) from dropdown; MCPChatWindow.CreateBackend dispatches to the right subclass. BackendKind = {Claude, Codex} (removed spawn-per-turn CodexBackend entry).
 
 **PendingTurnState v3** (upgraded): Now persists `BackendKind` to survive domain reload. Back-compatible with v1/v2 state; header includes version marker.
 
@@ -100,7 +100,7 @@ public interface IChatBackend
 }
 ```
 
-**Implementations:** `ClaudeBackend` (Claude, persistent stdin), `CodexBackend` (Codex, spawn-per-turn). Future: add more via `CliBackendBase` subclasses.
+**Implementations:** `ClaudeBackend` (Claude, persistent stdin), `CodexAppServerBackend` (Codex, persistent JSON-RPC). Future: add more via `CliBackendBase` subclasses.
 
 **ChatEvent struct:**
 - Normalized event type (ToolCard, ToolResult, UserMessage, Error, Status, Done)
@@ -572,36 +572,32 @@ User-sent messages now render `[kind:ref]` tags as clickable pills — identical
 
 **Tests:** UserBubblePillTests (4 cases) — plain text, single tag, mixed content, empty text.
 
-#### P3: AI Response Auto-Linking (SceneNameLinker)
+#### P3: Unified Chat Reference Rendering (v0.20.0 Phase 1 consolidation)
 
-AI responses can now mention scene object names (e.g., "see Player1 here") and Claude Code auto-converts them to clickable `<link>` references without explicit `[kind:ref]` tags.
+AI responses can now mention scene object names (e.g., "see Player1 here") and they route through ONE unified rendering path: bare name → BareNameNormalizer → `[kind:ref]` tag → ResponseTagInliner → MixedParagraph → ChipPillFactory pill.
 
-**Logic:** `SceneNameLinker.Linkify()` scans response text and wraps known object names with `<link="chip:hierarchy:<path>">`. **Filters aggressively:**
-- Requires name length ≥3 chars
-- Skips generics: Canvas, Camera, Light, Image, Text, Button, Panel, Slider, Toggle, Grid, Manager, Controller, System, Default, Global, World, Event, Debug, Player
-- Requires **signature traits:** digit (e.g., Player1), underscore (e.g., Main_Camera), or consecutive uppercase (e.g., NPCSpawner)
+**Legacy path deleted (v0.20.0):** Removed the secondary SceneNameLinker.Linkify path which was wrapping refs as `<link><u>Name</u></link>` at the static mutable `MarkdownInline.Linker` seam. This divergence caused dual rendering and inconsistent state. The unified path is now enforced:
 
-**Regex safety:** Uses `\b` word boundaries and avoids re-linking names inside existing `<link>` tags (counts open/close balance).
+1. **Normalization stage (BareNameNormalizer):** Scans LLM output text and converts bare scene object names to `[kind:ref]` bracket tags. Filters aggressively (length ≥3, skips generics, requires signature traits: digits/underscores/consecutive uppercase). Protects existing `[kind:ref]` tags and triple-backtick fenced code blocks.
+
+2. **Response rendering stage (ResponseTagInliner → MixedParagraph → ChipPillFactory):** Parses all `[kind:ref]` tags (conservative regex, no false positives) and renders as graphical pills with click→ping/select, tooltips, colors per kind.
+
+**Kill-switch:** `MCPChat.DisableSceneNameNorm` allows disabling normalization if needed (e.g., for custom name-linking logic in plugins).
 
 **Integration:**
-- `MarkdownInline.cs` — Added `SceneNameLinker Linker` seam (injectable for tests, set once in window)
-- Response processing chain: escape → linkify → bold/italic
+- `BareNameNormalizer.cs` — Converts bare names to `[kind:ref]` format
+- `ResponseTagInliner.cs` — Parses `[kind:ref]` tags and injects pills
+- `ChatRefResolver.cs` — Exposed `Objects` property (read-only dict) for name lookup
+- `MCPChatWindow.cs` — Calls RefreshResolver (renamed from RefreshLinker) before FinalizeAssistant in Drain TurnDone
 
-**Refresh cycle:** When scene hierarchy changes (`hierarchyChanged` callback), `ChatTranscript` calls `linker.Refresh(chatRefResolver.Objects)` (map of known object paths).
-
-**Files modified:**
-- `MarkdownInline.cs` — Added seam (7 lines)
-- `ChatRefResolver.cs` — Exposed `Objects` property (read-only dict)
-- `MCPChatWindow.cs` — Wired `hierarchyChanged` → refresh linker
-
-**Tests:** SceneNameLinkerTests (13 cases) — ShouldAutoLink filter logic (6 cases), Linkify rendering (7 cases including nesting/multi-name safety).
+**Tests:** BareNameNormalizerTests (fenced-block protection, edge cases), NormalizationPipelineTests (7 cases verifying unified path), ResponseTagInlinerTests (false-positive guards).
 
 #### Test Coverage & Metrics
 
-- **New test suites:** UserBubblePillTests (4), ChipConsolidationTests (3), SceneNameLinkerTests (13)
+- **New test suites:** UserBubblePillTests (4), ChipConsolidationTests (3), NormalizationPipelineTests (7)
 - **Test count:** 1600+/1605 EditMode pass (5 pre-existing reds, 0 new failures, 20 new tests)
-- **Code delta:** −83 net lines (removed dual-path legacy), +341 insertions (new features)
-- **plugin version:** 0.17.0 → 0.17.1
+- **Code delta:** −97 net lines (removed SceneNameLinker path), +120 insertions (unified path + tests)
+- **plugin version:** 0.17.0 → 0.17.1 → 0.20.0
 
 ### Feature F14 — Inline @DisplayName Insertion + Chip Pill Strip in Bubbles (v0.17.2)
 
@@ -687,8 +683,8 @@ unity-plugin/Editor/
 │   ├── ChatSettingsSection.cs        # Settings foldout in MCPSettings
 │   ├── CliBackendBase.cs             # Abstract host for CLI backends (4 axes)
 │   ├── CodexArgBuilder.cs            # Codex: argv + env-key-strip builder
-│   ├── CodexStreamParser.cs          # Codex: NDJSON → ChatEvent
-│   ├── CodexBackend.cs               # Codex: IChatBackend implementation (spawn-per-turn)
+│   ├── CodexAppServerParser.cs       # Codex: JSON-RPC 2.0 → ChatEvent
+│   ├── CodexAppServerBackend.cs      # Codex: IChatBackend implementation (persistent JSON-RPC)
 │   ├── BackendRegistry.cs            # Backend factory + enum
 │   ├── ReloadGuard.cs                # Domain-reload: lock + unlock mechanism
 │   ├── PendingTurnState.cs           # Domain-reload: persist in-flight turn state (v3: BackendKind)
@@ -705,7 +701,7 @@ unity-plugin/Editor/
 │   ├── SlashRegistry.cs              # Template registry: Builtins, Match, Resolve
 │   ├── SlashPopup.cs                 # UIToolkit popup: 5 visible, arrow nav
 │   ├── MCPChatWindow.Slash.cs        # Slash setup: KeyDown + ChangeEvent on parent
-│   ├── SceneNameLinker.cs            # Auto-link scene object names in responses (injectable, NUnit-testable)
+│   ├── BareNameNormalizer.cs         # Converts bare scene names in LLM output to [kind:ref] tags
 │   ├── UnityMCP.Editor.Chat.asmdef   # Assembly definition (references Core)
 │   └── Tests/
 │       ├── ChatStreamParserTests.cs
@@ -714,7 +710,7 @@ unity-plugin/Editor/
 │       ├── ToolVerbMapTests.cs
 │       ├── CliBackendBaseTests.cs              # Tests base lifecycle + 4-axis dispatch
 │       ├── CodexArgBuilderTests.cs             # Tests argv construction + env-key-strip
-│       ├── CodexStreamParserTests.cs           # Tests Codex NDJSON → ChatEvent (26 cases)
+│       ├── CodexAppServerParserTests.cs        # Tests Codex JSON-RPC → ChatEvent (15+ cases)
 │       ├── ReloadGuardTests.cs
 │       ├── PendingTurnStateTests.cs            # Tests v3 header + BackendKind persistence
 │       ├── SelectionSummaryTests.cs
@@ -724,7 +720,8 @@ unity-plugin/Editor/
 │       ├── SlashPopupTests.cs
 │       ├── UserBubblePillTests.cs             # User bubbles render [kind:ref] chips as pills (4 cases)
 │       ├── ChipConsolidationTests.cs          # Verify chip serialization format (3 cases)
-│       ├── SceneNameLinkerTests.cs            # Auto-link logic + regex safety (13 cases)
+│       ├── NormalizationPipelineTests.cs      # Unified bare-name → [kind:ref] → pill pipeline (7 cases)
+│       ├── BareNameNormalizerTests.cs         # Bare name detection + fenced-code protection
 │       └── UnityMCP.Editor.Chat.Tests.asmdef
 ├── ChatSettingsHook.cs               # Event hook for settings updates
 ├── MCPSettingsUI.cs                  # Modified: fires ChatSettingsHook.Invoke

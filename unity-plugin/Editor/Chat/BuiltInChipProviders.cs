@@ -165,6 +165,27 @@ namespace UnityMCP.Editor.Chat
         public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
     }
 
+    internal sealed class FolderChipProvider : IChipKindProvider
+    {
+        public string Key      => ChipKindKeys.Folder;
+        public int    Priority => 150;
+        public string IconName => "d_Folder Icon";
+        public string HexColor => "#a78bfa";
+        public string DefaultDepth => "path";
+
+        public bool CanHandle(Object obj, string assetPath)
+            => obj is DefaultAsset && !string.IsNullOrEmpty(assetPath)
+               && AssetDatabase.IsValidFolder(assetPath);
+
+        public ChipData Create(Object obj, string assetPath)
+            => new ChipData(Key, assetPath, obj.name, 0);
+
+        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
+            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
+
+        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
+    }
+
     internal sealed class AssetChipProvider : IChipKindProvider
     {
         public string Key      => ChipKindKeys.Asset;

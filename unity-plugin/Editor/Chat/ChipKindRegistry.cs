@@ -111,6 +111,7 @@ namespace UnityMCP.Editor.Chat
             if (_builtInsRegistered) return;
             _builtInsRegistered = true;
             Register(new HierarchyChipProvider());
+            Register(new FolderChipProvider());
             Register(new SceneChipProvider());
             Register(new ScriptChipProvider());
             Register(new PrefabChipProvider());

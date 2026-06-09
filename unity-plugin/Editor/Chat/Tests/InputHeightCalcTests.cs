@@ -42,9 +42,9 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Compute_OneLine_ReturnsExpected()
         {
-            // 1*18 + 14 + 31 = 63 < CompactH=72, clamps to 72
+            // 1*18 + 14 + 31 = 63 < CompactH=117, clamps to 117
             var h = _calc.Compute(1, 800f, false);
-            Assert.AreEqual(72f, h, 0.01f);
+            Assert.AreEqual(117f, h, 0.01f);
         }
 
         [Test]
@@ -58,9 +58,9 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Compute_WithChips_AddsChipHeight()
         {
-            // 1*18+14+31+24=87
+            // 1*18+14+31+24=87 < CompactH=117, clamps to 117
             var h = _calc.Compute(1, 800f, true);
-            Assert.AreEqual(87f, h, 0.01f);
+            Assert.AreEqual(117f, h, 0.01f);
         }
 
         [Test]
@@ -68,6 +68,14 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             // 10*18+14+31=225, windowH=200 => maxH=min(80,300)=80
             var h = _calc.Compute(10, 200f, false);
+            Assert.AreEqual(80f, h, 0.01f);
+        }
+
+        [Test]
+        public void Compute_TinyWindow_MaxWinsOverCompactH()
+        {
+            // windowH=200 => maxH=80, CompactH=117 > maxH → minH=80, areaH=63 < minH → returns 80
+            var h = _calc.Compute(1, 200f, false);
             Assert.AreEqual(80f, h, 0.01f);
         }
 
@@ -88,7 +96,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(300f, _calc.ManualHeight, 0.01f);
 
             _calc.SetManual(5f);
-            Assert.AreEqual(72f, _calc.ManualHeight, 0.01f);
+            Assert.AreEqual(117f, _calc.ManualHeight, 0.01f);
         }
 
         [Test]

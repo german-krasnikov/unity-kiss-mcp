@@ -9,7 +9,7 @@ namespace UnityMCP.Editor.Chat
     public partial class MCPChatWindow : EditorWindow
     {
         private IChatBackend   _backend;
-        private ChatTranscript _transcript;
+        internal ChatTranscript _transcript;
         private bool           _agentMode;
         private BackendKind    _selectedKind = BackendKind.Claude;
         private PermissionConfig _permConfig = new PermissionConfig();
@@ -21,7 +21,8 @@ namespace UnityMCP.Editor.Chat
         internal readonly CompileAutoFix       _autoFix  = new CompileAutoFix();
         internal bool _turnEditedCode;
         internal bool _turnHasToolCalls;
-        internal bool _autoScrollEnabled = true;
+        internal bool _needsRefresh;
+        private bool  _transcriptRestored;
         private TextField          _input;
         private Label              _tokenReadout;
         private Button             _askBtn, _agentBtn;
@@ -43,6 +44,12 @@ namespace UnityMCP.Editor.Chat
             return false;
         }
 
+        // P0-2: DRY helper — reset all per-turn flags (3 sites in Drain + CancelTurn + NewSession).
+        private void ResetTurnFlags()
+        {
+            _turnEditedCode = _turnHasToolCalls = _needsRefresh = false;
+        }
+
         internal void ResetTokenCounters()
         {
             _inputTokens = _outputTokens = 0;
@@ -56,14 +63,13 @@ namespace UnityMCP.Editor.Chat
 
         private void OnEnable()
         {
-            _autoScrollEnabled = EditorPrefs.GetBool("MCPChat.AutoScroll", true);
             RefreshColorResolver();
             ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
             CreateBackend();
             ResetTokenCounters();
             ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
             AssemblyReloadEvents.beforeAssemblyReload += SaveStateBeforeReload;
-            EditorApplication.hierarchyChanged += RefreshLinker;
+            EditorApplication.hierarchyChanged += RefreshResolver;
             _autoFix.Subscribe();
             _autoFix.OnErrorsDetected += InjectCompileErrors;
             _undoTracker.Invalidate();
@@ -76,7 +82,7 @@ namespace UnityMCP.Editor.Chat
 
         private void OnDisable()
         {
-            EditorApplication.hierarchyChanged -= RefreshLinker;
+            EditorApplication.hierarchyChanged -= RefreshResolver;
             AssemblyReloadEvents.beforeAssemblyReload -= SaveStateBeforeReload;
             ChatProcess.OnAfterReloadResume -= TryResumePendingTurn;
             _autoFix.OnErrorsDetected -= InjectCompileErrors;
@@ -90,13 +96,10 @@ namespace UnityMCP.Editor.Chat
         }
 
         private ChatRefResolver _resolver;
-        private SceneNameLinker  _linker;
 
-        private void RefreshLinker()
+        private void RefreshResolver()
         {
-            if (_resolver == null) return;
-            _resolver.Refresh();
-            _linker?.Refresh(_resolver.Objects);
+            _resolver?.Refresh();
         }
 
         private void CreateGUI()
@@ -114,13 +117,17 @@ namespace UnityMCP.Editor.Chat
             _scroll.Add(inner);
             _resolver = new ChatRefResolver();
             _resolver.Refresh();
-            _linker = new SceneNameLinker();
-            _linker.Refresh(_resolver.Objects);
-            // Static seam: all windows share one scene, so last-write-wins is correct.
-            MarkdownInline.Linker = _linker;
             var registry = ChatBlockRendererFactory.CreateDefault(_resolver, AddRefToContext);
             _transcript = new ChatTranscript(inner, registry);
             _transcript.SceneObjects = () => _resolver.Objects;
+            // F21: restore transcript that was saved before domain reload
+            var savedTranscript = SessionState.GetString("MCPChat_Transcript", "");
+            if (!string.IsNullOrEmpty(savedTranscript))
+            {
+                _transcript.RestoreFromReload(savedTranscript);
+                SessionState.EraseString("MCPChat_Transcript");
+            }
+            _transcriptRestored = !string.IsNullOrEmpty(savedTranscript); // P0-1: guard duplicate bubble
             root.Add(_scroll);
             _inputArea = BuildInputArea();
             ResetInputAreaHeight();
@@ -132,6 +139,15 @@ namespace UnityMCP.Editor.Chat
             root.schedule.Execute(TickFlowBarSweep).Every(950);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
             root.RegisterCallback<DragPerformEvent>(OnDragPerform);
+            // F20: Esc cancels a running turn. Guard: Idle → no-op (slash popup handles its own Esc).
+            root.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Escape && _activity.Phase != ActivityPhase.Idle)
+                {
+                    CancelTurn();
+                    evt.StopPropagation();
+                }
+            }, TrickleDown.TrickleDown);
             TryResumePendingTurn();
         }
 
@@ -170,12 +186,6 @@ namespace UnityMCP.Editor.Chat
             switch (_selectedKind)
             {
                 case BackendKind.Codex:
-                    _backend = new CodexBackend(resumeSessionId,
-                        store.Codex.StartupTimeoutSec,
-                        store.Codex.ExtraArgs);
-                    break;
-
-                case BackendKind.CodexAppServer:
                     _backend = new CodexAppServerBackend(resumeSessionId,
                         store.Codex.StartupTimeoutSec,
                         store.Codex.ExtraArgs);
@@ -191,6 +201,20 @@ namespace UnityMCP.Editor.Chat
                         store.Claude.Model, store.Claude.ExtraArgs);
                     break;
             }
+        }
+
+        internal void CancelTurn()
+        {
+            if (_activity.Phase == ActivityPhase.Idle) return;
+            _transcript?.FinalizeAssistant();
+            ReloadGuard.OnTurnFinished();
+            ResetTurnFlags(); // P0-2: clear stale per-turn flags on cancel
+            _undoTracker.OnTurnFailed();
+            _activity.Fail();
+            OnActivityChanged();
+            _backend?.Stop();
+            _backend = null;
+            CreateBackend();
         }
 
         private void ResetInputAreaHeight()

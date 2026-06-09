@@ -24,6 +24,9 @@ namespace UnityMCP.Editor.Chat
 
         // ── SHARED STATE ─────────────────────────────────────────────────────
 
+        // Injectable logger — prod default is Debug.LogError; tests swap to capture.
+        internal Action<string> LogError = UnityEngine.Debug.LogError;
+
         internal  ChatProcess _proc;
         private   readonly List<string>         _drainBuf    = new List<string>(32);
         private   readonly List<ChatEvent>       _parseBuf    = new List<ChatEvent>(4);
@@ -43,7 +46,7 @@ namespace UnityMCP.Editor.Chat
             var binary = ChatBinaryResolver.Resolve(BinaryName);
             if (binary == null)
             {
-                Debug.LogError($"[MCP Chat] {BinaryName} binary not found — check Settings > Agent Chat > Binary Path.");
+                LogError($"[MCP Chat] {BinaryName} binary not found — check Settings > Agent Chat > Binary Path.");
                 return;
             }
             var (args, strip) = BuildArgs(binary, SessionId);

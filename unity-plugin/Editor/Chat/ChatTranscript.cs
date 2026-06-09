@@ -1,4 +1,5 @@
 // Transcript rendering. F13: AppendUserBubble(UserMessage) + AtMentionNormalizer wired.
+// F21: reload-survival via _entries + SerializeForReload/RestoreFromReload.
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -12,12 +13,12 @@ namespace UnityMCP.Editor.Chat
         private readonly ChatBlockRendererRegistry _registry;
         private readonly StringBuilder             _assistantRaw = new StringBuilder();
         private readonly ToolChipGrouper           _grouper;
+        private readonly List<TranscriptEntry>     _entries = new List<TranscriptEntry>();
         private VisualElement _assistantBubble, _assistantRow, _liveTail;
         private string        _liveTailSrc;
         private int           _committed, _msgCount;
-        private bool          _dirty;
+        private bool          _dirty, _restoring;
         private IReadOnlyList<ChipData> _lastTurnChips;
-        private SceneNameLinker         _savedLinker;
         internal Func<IReadOnlyDictionary<string, string>> SceneObjects;
         private const int MaxMessages = 200;
 
@@ -61,6 +62,11 @@ namespace UnityMCP.Editor.Chat
             if (any) bubble.Add(wrap);
             AppendImage(bubble, imagePath);
             row.Add(bubble); Append(row);
+            if (!_restoring) _entries.Add(new TranscriptEntry {
+                EntryKind = TranscriptEntry.Kind.User,
+                Text      = ChipTextInterleaver.ToDisplayText(msg),
+                ChipsData = TranscriptSerializer.SerializeChips(msg.Chips),
+            });
         }
 
         /// <summary>Legacy overload — kept for TryResumePendingTurn and existing tests.</summary>
@@ -87,6 +93,11 @@ namespace UnityMCP.Editor.Chat
                 bubble.Add(MixedParagraphRenderer.InlineElement(dt, "msg-text"));
             AppendImage(bubble, imagePath);
             row.Add(bubble); Append(row);
+            if (!_restoring) _entries.Add(new TranscriptEntry {
+                EntryKind = TranscriptEntry.Kind.User,
+                Text      = text ?? "",
+                ChipsData = TranscriptSerializer.SerializeChips(chips),
+            });
         }
 
         internal void AppendOrExtendAssistant(string token)
@@ -133,26 +144,33 @@ namespace UnityMCP.Editor.Chat
                 }
             }
             // Scene object normalization: convert bare names even when no chips were sent.
-            var sceneMap = SceneObjects?.Invoke();
-            if (sceneMap != null && sceneMap.Count > 0)
+            // Kill-switch: EditorPrefs.GetBool("MCPChat.DisableSceneNameNorm", false) disables this pass.
+            if (!UnityEditor.EditorPrefs.GetBool("MCPChat.DisableSceneNameNorm", false))
             {
-                var raw        = _assistantRaw.ToString();
-                var sceneChips = new List<ChipData>();
-                foreach (var kvp in sceneMap)
-                    if (kvp.Key.Length > 1)
-                        sceneChips.Add(new ChipData(ChipKindKeys.Hierarchy, kvp.Value, kvp.Key, 0));
-                var normalized = BareNameNormalizer.Normalize(raw, sceneChips);
-                if (normalized != raw)
+                var sceneMap = SceneObjects?.Invoke();
+                if (sceneMap != null && sceneMap.Count > 0)
                 {
-                    _assistantRaw.Clear(); _assistantRaw.Append(normalized);
-                    _assistantBubble.Clear();
-                    _committed = 0;
+                    var raw        = _assistantRaw.ToString();
+                    var sceneChips = new List<ChipData>();
+                    foreach (var kvp in sceneMap)
+                        if (kvp.Key.Length > 1)
+                            sceneChips.Add(new ChipData(ChipKindKeys.Hierarchy, kvp.Value, kvp.Key, 0));
+                    var normalized = BareNameNormalizer.Normalize(raw, sceneChips);
+                    if (normalized != raw)
+                    {
+                        _assistantRaw.Clear(); _assistantRaw.Append(normalized);
+                        _assistantBubble.Clear();
+                        _committed = 0;
+                    }
                 }
             }
-            MarkdownInline.Linker = _savedLinker; _savedLinker = null;
             RenderProgressive(final: true);
             _assistantBubble.userData = _assistantRaw.ToString();
             CopyableText.Attach(_assistantBubble);
+            if (!_restoring) _entries.Add(new TranscriptEntry {
+                EntryKind = TranscriptEntry.Kind.Assistant,
+                Text      = _assistantRaw.ToString(),
+            });
             _assistantBubble = null; _assistantRow = null; _liveTail = null; _liveTailSrc = null;
             _committed = 0; _assistantRaw.Clear(); _dirty = false;
         }
@@ -170,8 +188,6 @@ namespace UnityMCP.Editor.Chat
         {
             _grouper.Close(); _assistantRaw.Clear();
             _committed = 0; _liveTail = null; _liveTailSrc = null;
-            _savedLinker         = MarkdownInline.Linker;
-            MarkdownInline.Linker = null;
             _assistantRow    = Row(null);
             _assistantBubble = new VisualElement();
             _assistantBubble.AddToClassList("msg-bubble");
@@ -217,7 +233,41 @@ namespace UnityMCP.Editor.Chat
             return null;
         }
 
-        internal void Clear() { FinalizeAssistant(); _container.Clear(); _msgCount = 0; }
+        internal void Clear() { FinalizeAssistant(); _container.Clear(); _msgCount = 0; _entries.Clear(); }
+
+        // F21: reload-survival serialization — cap to MaxMessages to match _container eviction
+        internal string SerializeForReload()
+        {
+            var toSerialize = _entries.Count > MaxMessages
+                ? _entries.GetRange(_entries.Count - MaxMessages, MaxMessages)
+                : _entries;
+            return TranscriptSerializer.Serialize(toSerialize);
+        }
+
+        internal void RestoreFromReload(string data)
+        {
+            var entries = TranscriptSerializer.Deserialize(data);
+            if (entries.Count == 0) return;
+            _restoring = true;
+            try
+            {
+                foreach (var e in entries)
+                {
+                    switch (e.EntryKind)
+                    {
+                        case TranscriptEntry.Kind.User:
+                            AppendUserBubble(e.Text, TranscriptSerializer.DeserializeChips(e.ChipsData));
+                            break;
+                        case TranscriptEntry.Kind.Assistant:
+                            AppendOrExtendAssistant(e.Text);
+                            FinalizeAssistant();
+                            break;
+                    }
+                    _entries.Add(e); // rebuild _entries from saved data
+                }
+            }
+            finally { _restoring = false; }
+        }
 
         private static VisualElement Row(string cls)
         { var r = new VisualElement(); r.AddToClassList("msg-row"); if (cls != null) r.AddToClassList(cls); return r; }

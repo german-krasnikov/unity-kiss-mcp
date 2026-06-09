@@ -37,8 +37,7 @@ namespace UnityMCP.Editor.Chat
 
             // 8. Disarm auto-fix (no stale compile-error retries into new session).
             _autoFix.Disarm();
-            _turnEditedCode   = false;
-            _turnHasToolCalls = false;
+            ResetTurnFlags(); // P0-2: DRY reset (was 2 inline, _needsRefresh was missing)
 
             // 9. Reset activity state to Idle (unlocks send button).
             if (_activity.Phase != ActivityPhase.Idle)
@@ -56,28 +55,22 @@ namespace UnityMCP.Editor.Chat
 
         /// <summary>
         /// Build the session menu button for the footer bar.
-        /// GenericMenu — standard Unity Editor dropdown pattern.
+        /// Direct click → confirm dialog → NewSession (F25: removed submenu layer).
         /// </summary>
         internal Button BuildSessionMenuButton()
         {
             var btn = new Button(() =>
             {
-                var menu = new GenericMenu();
-                menu.AddItem(new GUIContent("New Session / Clear"), false, () =>
+                if (EditorUtility.DisplayDialog(
+                    "New Session",
+                    "Clear the transcript and start a fresh session?\n\nThis kills the current backend process and cannot be undone.",
+                    "Clear", "Cancel"))
                 {
-                    if (EditorUtility.DisplayDialog(
-                        "New Session",
-                        "Clear the transcript and start a fresh session?\n\n" +
-                        "This kills the current backend process and cannot be undone.",
-                        "Clear", "Cancel"))
-                    {
-                        NewSession();
-                    }
-                });
-                menu.ShowAsContext();
-            }) { text = "☰" }; // ☰ hamburger
+                    NewSession();
+                }
+            }) { text = "☰" };
             btn.AddToClassList("chat-btn");
-            btn.tooltip = "Session commands";
+            btn.tooltip = "New session / Clear";
             return btn;
         }
     }
