@@ -261,6 +261,10 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("get_console", ExecGetConsole);
             CommandRegistry.Register("get_compile_errors", _ => CompileErrorCapture.GetErrors());
             CommandRegistry.Register("compile_status", _ => CompileNotifier.GetStatus());
+            // sync/sync_status: unified reload API (v0.21)
+            CommandRegistry.Register("sync",        args => SyncHelper.TriggerSync(
+                JsonHelper.ExtractString(args, "resolve") == "true"));
+            CommandRegistry.Register("sync_status", _ => SyncHelper.GetSyncStatus());
             // screenshot is intercepted in Process/ProcessAsync for file response formatting;
             // registered here only for IsRegistered/IsMutating queries
             CommandRegistry.Register("screenshot", _ => throw new InvalidOperationException("screenshot intercepted before ExecuteCommand"));
@@ -421,7 +425,7 @@ namespace UnityMCP.Editor
         internal static bool IsAllowedDuringCompile(string cmd) =>
             cmd == "ping" || cmd == "get_version" || cmd == "get_console" ||
             cmd == "screenshot" || cmd == "get_enabled_tools" || cmd == "compile_status" ||
-            cmd == "get_disabled_tools" || cmd == "set_tool_catalog";
+            cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "sync_status";
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {

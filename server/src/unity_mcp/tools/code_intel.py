@@ -57,10 +57,23 @@ def _parse_status(status: str) -> tuple[str, float]:
         return "idle", 0.0
 
 
+def _parse_sync_status(status: str) -> tuple[int, str, str]:
+    """Parse 'epoch=N|state=S[|dur=X][|err=...]' → (epoch, state, dur_or_err)."""
+    try:
+        parts = {p.split("=", 1)[0]: p.split("=", 1)[1] for p in status.split("|") if "=" in p}
+        epoch = int(parts.get("epoch", "0"))
+        state = parts.get("state", "idle")
+        extra = parts.get("err", parts.get("dur", ""))
+        return epoch, state, extra
+    except (ValueError, AttributeError):
+        return 0, "idle", ""
+
+
 async def await_compile(timeout: float = 60.0) -> str:
     """Block until Unity finishes compiling + reloading, then return compile errors.
     Use after writing .cs files instead of sleep. Returns errors or 'compile clean (Xs)'.
-    Handles domain reload disconnects transparently. timeout=0 → immediate check, no loop."""
+    Handles domain reload disconnects transparently. timeout=0 → immediate check, no loop.
+    Epoch-aware via sync_status when available (+10 from MAJOR-1); falls back to compile_status."""
     async def _get_errors() -> str:
         try:
             csharp = await _send("get_compile_errors", {})
@@ -80,6 +93,16 @@ async def await_compile(timeout: float = 60.0) -> str:
             pass
         return await _get_errors()
 
+    # Epoch-aware path: try sync_status first; fall back to compile_status if unavailable.
+    epoch = None
+    try:
+        raw = await _send("sync_status", {})
+        ep, st, _ = _parse_sync_status(raw)
+        if ep > 0 and st in ("compiling", "reloading"):
+            epoch = ep  # there's a pending sync cycle — wait for this epoch
+    except (ConnectionError, Exception):
+        pass  # sync_status not available → use compile_status fallback
+
     deadline = time.monotonic() + timeout
 
     while True:
@@ -89,10 +112,31 @@ async def await_compile(timeout: float = 60.0) -> str:
             msg = f"timeout after {elapsed_total:.1f}s — compile still in progress"
             return f"{msg}\n{errors}" if errors else msg
 
+        if epoch is not None:
+            # Epoch-aware: poll sync_status until this epoch is ready/failed/idle
+            try:
+                raw = await _send("sync_status", {})
+                ep, st, err = _parse_sync_status(raw)
+            except ConnectionError:
+                await asyncio.sleep(1)
+                continue
+
+            if ep == epoch:
+                if st == "ready" or st == "idle":
+                    errors = await _get_errors()
+                    return errors if errors else "compile clean (sync)"
+                if st == "failed":
+                    errors = await _get_errors()
+                    return errors if errors else f"compile failed: {err}"
+            # still compiling/reloading or epoch mismatch — poll
+            await asyncio.sleep(1)
+            continue
+
+        # Fallback: compile_status poll (original behavior)
         try:
             status = await _send("compile_status", {})
         except ConnectionError:
-            # Domain reload (DomainReloadError is-a ConnectionError): Unity is restarting — wait and retry
+            # Domain reload: Unity is restarting — wait and retry
             await asyncio.sleep(1)
             continue
 

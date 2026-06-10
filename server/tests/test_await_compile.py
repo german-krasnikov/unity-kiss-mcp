@@ -12,7 +12,8 @@ from unity_mcp.bridge import DomainReloadError
 
 
 def _make_send(status_seq, errors_response=""):
-    """Route compile_status / get_compile_errors; errors_response may be an Exception."""
+    """Route compile_status / get_compile_errors; errors_response may be an Exception.
+    sync_status raises ConnectionError (simulate not-available) to trigger compile_status fallback."""
     status_iter = iter(status_seq)
 
     async def _send(cmd, args=None, **kwargs):
@@ -22,6 +23,9 @@ def _make_send(status_seq, errors_response=""):
             if isinstance(errors_response, Exception):
                 raise errors_response
             return errors_response
+        if cmd == "sync_status":
+            # Simulate sync_status unavailable → triggers compile_status fallback in await_compile
+            raise ConnectionError("Command not registered: sync_status")
         raise AssertionError(f"Unexpected cmd: {cmd}")
 
     return _send
@@ -196,3 +200,38 @@ async def test_get_errors_tool_error_propagates():
     _ci._send = _make_send(["idle|2.0"], errors_response=ToolError("malformed response"))
     with pytest.raises(ToolError):
         await _ci.await_compile(timeout=60.0)
+
+
+# #34: await_compile uses sync_status epoch-aware wait when available (MAJOR-1 spec)
+@pytest.mark.asyncio
+async def test_await_compile_uses_sync_status_epoch():
+    """When sync_status available and returns compiling epoch, await_compile waits for that epoch."""
+    call_log = []
+
+    async def _epoch_send(cmd, args=None, **kwargs):
+        call_log.append(cmd)
+        if cmd == "sync_status":
+            # First call: epoch=5, state=compiling → triggers epoch-aware path
+            # Subsequent calls: epoch=5, state=ready → done
+            if call_log.count("sync_status") == 1:
+                return "epoch=5|state=compiling|dur=1.2"
+            return "epoch=5|state=ready"
+        if cmd == "get_compile_errors":
+            return ""
+        raise AssertionError(f"Unexpected: {cmd}")
+
+    _ci._send = _epoch_send
+    result = await _ci.await_compile(timeout=60.0)
+    # Must have used sync_status (epoch-aware path) and returned clean
+    assert "sync_status" in call_log, "await_compile must call sync_status for epoch-aware wait"
+    assert "compile clean" in result
+
+
+# Fallback: sync_status unavailable → compile_status fallback still works
+@pytest.mark.asyncio
+async def test_await_compile_falls_back_to_compile_status_when_no_sync_status():
+    """When sync_status is not available, await_compile still works via compile_status fallback."""
+    # compile_status returns idle → await_compile must complete cleanly
+    _ci._send = _make_send(["idle|3.0"], errors_response="")
+    result = await _ci.await_compile(timeout=60.0)
+    assert result == "compile clean (3.0s)"

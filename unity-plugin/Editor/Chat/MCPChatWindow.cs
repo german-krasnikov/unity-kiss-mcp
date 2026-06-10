@@ -26,6 +26,10 @@ namespace UnityMCP.Editor.Chat
         internal bool _turnHasToolCalls;
         internal bool _needsRefresh;
         private bool  _transcriptRestored;
+        // D6: bounded retry counter for TryResumePendingTurn compile-clean gate.
+        // Resets to 0 on success; gives up after MaxResumeRetries+1 calls with !IsCompileClean.
+        internal int  _resumeRetryCount;
+        internal const int MaxResumeRetries = 30;
         private TextField          _input;
         private Label              _tokenReadout;
         private Button             _askBtn, _agentBtn;

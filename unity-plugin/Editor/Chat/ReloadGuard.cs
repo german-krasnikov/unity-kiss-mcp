@@ -1,17 +1,22 @@
 // Domain-reload-safe lock + pending-state persistence.
 // Prevents assembly reload from killing a live turn; resumes it after reload.
-// Unity-API calls (Lock/Unlock) are guarded by _locked counter so this class
-// is also usable from unit tests via OverrideFilePath + ResetForTest.
+// Unity-API calls (Lock/Unlock/Disallow/Allow) are guarded by _lockDepth counter
+// so this class is usable from unit tests via OverrideFilePath + ResetForTest.
+// T6 safe pattern: Disallow → Lock → try/finally { Unlock → Allow } + SessionState rebalance.
 using System;
 using System.IO;
 using UnityEditor;
 
 namespace UnityMCP.Editor.Chat
 {
+    [InitializeOnLoad]
     internal static class ReloadGuard
     {
         // Default path — Library/ is local/gitignored in every Unity project.
         private static string _filePath = Path.Combine("Library", "MCP_ChatPendingTurn.txt");
+
+        // Marker survives reload — native counter doesn't die even though managed state does.
+        private const string LockMarkerKey = "MCP_ReloadGuardLocked";
 
         // Counter (not bool) so OnTurnFinished is always safe even if called extra times.
         private static int _lockDepth;
@@ -19,6 +24,18 @@ namespace UnityMCP.Editor.Chat
         // Watchdog: auto-unlock after ~120s to prevent a hung turn blocking all reloads.
         private static double _lockStartTime;
         private const double  WatchdogSeconds = 120.0;
+
+        static ReloadGuard()
+        {
+            // If the marker is set at reload, managed _lockDepth died — native counter may
+            // still be held. Rebalance: force-unlock once regardless of depth.
+            if (SessionState.GetBool(LockMarkerKey, false))
+            {
+                SessionState.EraseBool(LockMarkerKey);
+                try { EditorApplication.UnlockReloadAssemblies(); } catch { }
+                try { AssetDatabase.AllowAutoRefresh(); } catch { }
+            }
+        }
 
         internal static bool IsLocked => _lockDepth > 0;
 
@@ -28,9 +45,22 @@ namespace UnityMCP.Editor.Chat
         {
             if (_lockDepth == 0)
             {
-                EditorApplication.LockReloadAssemblies();
-                _lockStartTime = EditorApplication.timeSinceStartup;
-                EditorApplication.update += WatchdogTick;
+                // T6 safe pattern (ref-§6): Disallow → Lock → try/finally { Unlock → Allow }.
+                // _lockDepth++ is inside finally: ForceUnlock always has a matching release path
+                // even when a Unity API throws during acquisition.
+                try
+                {
+                    AssetDatabase.DisallowAutoRefresh();
+                    EditorApplication.LockReloadAssemblies();
+                }
+                finally
+                {
+                    _lockDepth++;
+                    SessionState.SetBool(LockMarkerKey, true);
+                    _lockStartTime = EditorApplication.timeSinceStartup;
+                    EditorApplication.update += WatchdogTick;
+                }
+                return;  // _lockDepth already incremented in finally
             }
             _lockDepth++;
         }
@@ -48,6 +78,8 @@ namespace UnityMCP.Editor.Chat
             _lockDepth = 0;
             EditorApplication.update -= WatchdogTick;
             EditorApplication.UnlockReloadAssemblies();
+            AssetDatabase.AllowAutoRefresh();
+            SessionState.EraseBool(LockMarkerKey);
         }
 
         private static void WatchdogTick()
@@ -103,7 +135,8 @@ namespace UnityMCP.Editor.Chat
             // Reset in-memory counter without touching Unity API
             // (tests run without domain reload machinery).
             _lockDepth = 0;
-            EditorApplication.update -= WatchdogTick; // prevent stale delegate accumulation across tests
+            EditorApplication.update -= WatchdogTick; // prevent stale delegate accumulation
+            SessionState.EraseBool(LockMarkerKey);
         }
     }
 }

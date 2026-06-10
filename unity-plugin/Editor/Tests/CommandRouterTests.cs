@@ -256,5 +256,18 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void ExtractKeys_NullJson_ReturnsEmpty()
             => Assert.IsEmpty(CommandSchema.ExtractKeys(null));
+
+        // ── Step 2: sync + sync_status commands (#11, #12) ───────────────────
+
+        // #11: sync and sync_status are registered
+        [TestCase("sync",        ExpectedResult = true)]
+        [TestCase("sync_status", ExpectedResult = true)]
+        public bool Sync_Commands_Registered(string cmd)
+            => CommandRegistry.IsRegistered(cmd);
+
+        // #12: sync_status is allowed during compile
+        [TestCase("sync_status", ExpectedResult = true)]
+        public bool SyncStatus_Allowed_During_Compile(string cmd)
+            => CommandRouter.IsAllowedDuringCompile(cmd);
     }
 }

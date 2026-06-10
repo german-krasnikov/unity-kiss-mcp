@@ -79,12 +79,13 @@ namespace UnityMCP.Editor
             CompilationPipeline.compilationStarted += _ => { _isCompiling = true; _compileStartTime = DateTime.UtcNow; WriteStateFile("compiling"); };
             CompilationPipeline.compilationFinished += _ =>
             {
+                // R-4 fix: never write "ready" from compilationFinished.
+                // If compile failed → no reload will happen, write compile_failed.
+                // If compile succeeded → reload is coming; "ready" written after reload in StartAsync.
                 _isCompiling = false;
-                EditorApplication.delayCall += () =>
-                {
-                    if (!EditorApplication.isCompiling && !_shuttingDown)
-                        WriteStateFile(IsRunning ? "ready" : "restarting");
-                };
+                if (EditorUtility.scriptCompilationFailed)
+                    WriteStateFile("compile_failed");
+                // else: state stays "compiling" until reload completes (StartAsync writes "ready")
             };
             EditorSceneManager.sceneOpened += (_, _) => RefManager.Invalidate();
             EditorSceneManager.newSceneCreated += (_, _, _) => RefManager.Invalidate();
@@ -127,7 +128,12 @@ namespace UnityMCP.Editor
                     try
                     {
                         _listener = new TcpListener(IPAddress.Loopback, Port);
+#if UNITY_EDITOR_WIN
+                        // Windows: SO_REUSEADDR = port-hijack; use ExclusiveAddressUse instead (CoplayDev #1173)
+                        _listener.Server.ExclusiveAddressUse = true;
+#else
                         _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+#endif
                         _listener.Start();
                         break;
                     }
@@ -498,10 +504,14 @@ namespace UnityMCP.Editor
                 var tmp = path + ".tmp";
                 var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
                 var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                var epoch = SyncHelper.CurrentEpoch;
                 // Invariant culture so decimal separator is always '.'
-                File.WriteAllText(tmp, $"{state}\n{ts.ToString(System.Globalization.CultureInfo.InvariantCulture)}\n{pid}");
-                // rename(2) on POSIX atomically overwrites
-                if (File.Exists(path)) File.Delete(path); // .NET Framework compat
+                File.WriteAllText(tmp,
+                    $"{state}\n{ts.ToString(System.Globalization.CultureInfo.InvariantCulture)}\n{pid}\n{epoch}");
+                // Unity editor scripting is still Mono/netstandard2.1 — no
+                // File.Move(string,string,bool) overload (CS1739). Delete+Move:
+                // tiny non-atomic window, readers retry so it's acceptable.
+                try { File.Delete(path); } catch { }
                 File.Move(tmp, path);
             }
             catch { }

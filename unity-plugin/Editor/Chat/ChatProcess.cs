@@ -31,8 +31,9 @@ namespace UnityMCP.Editor.Chat
             if (!int.TryParse(pidStr, out var pid)) return;
             try { Process.GetProcessById(pid)?.Kill(); } catch { /* already gone */ }
             SessionState.EraseString(PidKey);
-            // ReloadGuard.OnTurnFinished() — unlock is handled by the guard itself on reload;
-            // the watchdog will also fire. No extra call needed here.
+            // ReloadGuard rebalance is handled by its [InitializeOnLoad] static ctor via
+            // SessionState marker (LockMarkerKey). The managed _lockDepth dies with the old
+            // domain but the native counter is rebalanced post-reload. See ReloadGuard.cs.
         }
 
         private static void TriggerResume() => OnAfterReloadResume?.Invoke();

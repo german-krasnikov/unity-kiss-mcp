@@ -357,7 +357,8 @@ namespace UnityMCP.Editor.Tests
             try
             {
                 var lines = File.ReadAllLines(statePath);
-                Assert.AreEqual(3, lines.Length, "State file should have 3 lines: state, ts, pid");
+                // State file: line 0=state, 1=timestamp, 2=pid, 3=epoch (added v0.21)
+                Assert.GreaterOrEqual(lines.Length, 3, "State file should have at least 3 lines: state, ts, pid");
                 Assert.AreEqual("ready", lines[0]);
                 Assert.IsTrue(double.TryParse(lines[1],
                     System.Globalization.NumberStyles.Float,

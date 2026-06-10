@@ -123,7 +123,7 @@ async def screenshot(width: int = 640, height: int = 480, camera: str | None = N
 
 
 async def recompile() -> str:
-    """Force Unity to recompile all C# scripts and wait for completion (up to 60 s). Use only after writing new .cs files to disk — Unity normally auto-detects file changes, so this is only needed when auto-refresh is disabled or you need to block until compilation is confirmed done. Prefer `compile_preflight` to validate code before writing, and `execute_code` for ad-hoc logic that doesn't require a full recompile cycle."""
+    """Trigger Unity to reimport C# scripts. Returns immediately; use await_compile to block until done."""
     return await _send("recompile", {}, timeout=60.0)
 
 
