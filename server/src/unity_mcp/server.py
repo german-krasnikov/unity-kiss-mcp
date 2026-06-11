@@ -245,6 +245,18 @@ async def resolve_tool_schema(tools: str) -> str:
     return text
 
 
+@mcp.tool()
+async def set_llm_config(config: str) -> str:
+    """Override LLM profiles for sampling features. Format: feature:model,turns,timeout,max_tokens (one per line).
+    Features: visual_verify, screenshot_describe, visual_diff, do_intent, summarize, distiller."""
+    from .llm_config import parse_tcp_config, apply_config
+    parsed = parse_tcp_config(config)
+    if not parsed:
+        return "err: no valid entries parsed"
+    apply_config(parsed)
+    return f"ok: updated {', '.join(parsed)}"
+
+
 # Install filtering handler — captures schemas + applies gating + disabled-set.
 install_list_tools_filter(mcp, lambda: _disabled_tools_cache)
 

@@ -98,11 +98,9 @@ async def test_verify_visual_bad_screenshot_ignored(monkeypatch):
 
     assert result == "PASS: text only"
     args = mock_exec.call_args[0]
-    # bad path → no Read tool flags, max-turns stays 1
+    # bad path → no Read tool flags; max-turns comes from profile (visual_verify default=2)
     assert "--tools" not in args
     assert "--max-turns" in args
-    turns_idx = list(args).index("--max-turns") + 1
-    assert args[turns_idx] == "1"
 
 
 @pytest.mark.asyncio

@@ -251,10 +251,6 @@
     background-color: var(--unity-colors-button-background-pressed, var(--unity-colors-button-background-hover));
 }
 
-.chat-btn--screenshot {
-    /* intentionally uses default .chat-btn styling */
-}
-
 .chat-btn--perms {
     /* intentionally uses default .chat-btn styling */
 }
@@ -305,8 +301,8 @@
     transition-duration: 0.1s;
 }
 
-/* Last button in segment — no right divider */
-.mode-toggle-btn:last-child {
+/* Last button in segment — no right divider (applied via C# .mode-toggle-btn--last) */
+.mode-toggle-btn--last {
     border-right-width: 0;
 }
 
@@ -777,4 +773,24 @@
 .chat-root--light .chat-btn--restore:hover {
     background-color: rgba(183, 121, 31, 0.28);
     border-color:     rgba(183, 121, 31, 0.8);
+}
+
+.mermaid-container {
+    position: relative;
+}
+
+.mermaid-expand-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    padding: 0;
+    border-radius: 4px;
+    opacity: 0.6;
+}
+
+.mermaid-expand-btn:hover {
+    opacity: 1.0;
 }

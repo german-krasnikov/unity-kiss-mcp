@@ -132,5 +132,60 @@ namespace UnityMCP.Editor.Chat.Tests
                 Object.DestroyImmediate(go);
             }
         }
+
+        // --- Component drag tests (Block 5) ---
+
+        [Test]
+        public void ProcessDraggedObject_MonoBehaviourComponent_InsertsGOChip()
+        {
+            var go = new GameObject("TestGO_Comp");
+            try
+            {
+                var comp = go.AddComponent<BoxCollider>();
+                Assert.IsNotNull(comp, "AddComponent<BoxCollider> must not return null");
+                _chips = new List<(Object, string, string)>();
+                MCPChatWindow.ProcessDraggedObject(comp, null, Capture);
+
+                Assert.AreEqual(1, _chips.Count, "Built-in Component: exactly GO chip");
+                Assert.AreEqual(go, _chips[0].obj, "Chip must be the GO");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void ProcessDraggedObject_BuiltInComponent_InsertsOnlyGOChip()
+        {
+            var go = new GameObject("TestGO_Rigid");
+            try
+            {
+                var rb = go.AddComponent<Rigidbody>();
+                _chips = new List<(Object, string, string)>();
+                MCPChatWindow.ProcessDraggedObject(rb, null, Capture);
+                Assert.AreEqual(1, _chips.Count, "Built-in: only GO chip");
+                Assert.AreEqual(go, _chips[0].obj);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // --- DefaultAsset (non-folder) tests ---
+
+        [Test]
+        public void ProcessDraggedObject_DefaultAsset_HandledPaths_TracksInsertedPath()
+        {
+            // Use a real DefaultAsset from the project if available
+            var guids = AssetDatabase.FindAssets("t:DefaultAsset", new[] { "Assets" });
+            if (guids.Length == 0) { Assert.Ignore("No DefaultAsset found in Assets"); return; }
+            var assetPath = AssetDatabase.GUIDToAssetPath(guids[0]);
+            var obj = AssetDatabase.LoadAssetAtPath<DefaultAsset>(assetPath);
+            if (obj == null) { Assert.Ignore("Could not load DefaultAsset"); return; }
+
+            _chips = new List<(Object, string, string)>();
+            var handled = new System.Collections.Generic.HashSet<string>();
+            MCPChatWindow.ProcessDraggedObject(obj, null, Capture, handledPaths: handled);
+
+            // Whether it's folder or file, the path should be tracked if a chip was inserted
+            Assert.AreEqual(1, _chips.Count, "Expected chip for DefaultAsset");
+            Assert.IsTrue(handled.Contains(assetPath), "handledPaths must contain inserted path");
+        }
     }
 }

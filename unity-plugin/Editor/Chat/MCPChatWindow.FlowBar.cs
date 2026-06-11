@@ -85,6 +85,7 @@ namespace UnityMCP.Editor.Chat
             var seg = new VisualElement(); seg.AddToClassList("mode-segment");
             _askBtn   = MakeModeBtn("Ask",   false);
             _agentBtn = MakeModeBtn("Agent", true);
+            _agentBtn.AddToClassList("mode-toggle-btn--last");
             seg.Add(_askBtn); seg.Add(_agentBtn);
             bar.Add(seg);
 
@@ -96,14 +97,12 @@ namespace UnityMCP.Editor.Chat
             _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
             bar.Add(_tokenReadout);
 
-            var ssBtn   = new Button(AttachScreenshot) { text = "SS", tooltip = "Attach 4-panel screenshot" };
-            ssBtn.AddToClassList("chat-btn"); ssBtn.AddToClassList("chat-btn--screenshot");
             _sendBtn = new Button(OnSend) { text = "Send" };
             _sendBtn.AddToClassList("chat-btn"); _sendBtn.AddToClassList("chat-btn--send");
             _stopBtn = new Button(CancelTurn) { text = "Stop" };
             _stopBtn.AddToClassList("chat-btn"); _stopBtn.AddToClassList("chat-btn--stop");
             _stopBtn.style.display = DisplayStyle.None;
-            bar.Add(ssBtn); bar.Add(_sendBtn); bar.Add(_stopBtn);
+            bar.Add(_sendBtn); bar.Add(_stopBtn);
             return bar;
         }
 

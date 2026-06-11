@@ -31,7 +31,6 @@ namespace UnityMCP.Editor.Chat
                 {
                     evt.StopPropagation();
                     evt.StopImmediatePropagation();
-                    evt.PreventDefault();
                 }
 
                 if (action == EnterAction.Send)

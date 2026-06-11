@@ -1,4 +1,5 @@
 // Chip methods extracted to a partial to keep MCPChatWindow.cs under 200 lines.
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -19,11 +20,12 @@ namespace UnityMCP.Editor.Chat
         {
             DragAndDrop.AcceptDrag();
             var selected = Selection.activeGameObject;
+            var handled = new HashSet<string>();
             foreach (var obj in DragAndDrop.objectReferences)
-                ProcessDraggedObject(obj, selected, InsertInlineChip);
-            // F29: handle external paths (Finder drag) only when no Unity objects present
-            if (DragAndDrop.objectReferences.Length == 0 && DragAndDrop.paths.Length > 0)
-                foreach (var path in DragAndDrop.paths)
+                ProcessDraggedObject(obj, selected, InsertInlineChip, handledPaths: handled);
+            // Always process external paths (Finder drag); deduplicate via handled set
+            foreach (var path in DragAndDrop.paths)
+                if (!handled.Contains(path))
                     ProcessExternalPath(path, InsertInlineChip);
         }
 
@@ -31,8 +33,9 @@ namespace UnityMCP.Editor.Chat
 
         // F26: extracted for testability — injectable selectedGO + ChipInserter delegate
         // hasComponent is injectable for tests where FromMonoBehaviour can't bind test-assembly types
+        // handledPaths: collects inserted asset paths for dedup with ProcessExternalPath
         internal static void ProcessDraggedObject(Object obj, GameObject selectedGO, ChipInserter insert,
-            HasComponentFn hasComponent = null)
+            HasComponentFn hasComponent = null, HashSet<string> handledPaths = null)
         {
             if (obj == null) return;
             hasComponent ??= (go, t) => go.GetComponent(t) != null;
@@ -43,13 +46,36 @@ namespace UnityMCP.Editor.Chat
                 return;
             }
 
-            // F29: folder from Project window
+            // Component drag from Inspector: insert GO chip + optional MonoScript chip
+            if (obj is Component comp)
+            {
+                var compGO = comp.gameObject;
+                insert(compGO, ComponentSerializer.GetPath(compGO), compGO.name);
+                if (comp is MonoBehaviour mb)
+                {
+                    var script = MonoScript.FromMonoBehaviour(mb);
+                    if (script != null)
+                    {
+                        var scriptPath = AssetDatabase.GetAssetPath(script);
+                        if (!string.IsNullOrEmpty(scriptPath))
+                        {
+                            insert(script, scriptPath, script.name);
+                            handledPaths?.Add(scriptPath);
+                        }
+                    }
+                }
+                return;
+            }
+
+            // Accept all DefaultAsset with a valid path (folders + .md, .txt, .json, etc.)
             if (obj is DefaultAsset)
             {
-                var folderPath = AssetDatabase.GetAssetPath(obj);
-                if (!string.IsNullOrEmpty(folderPath) && AssetDatabase.IsValidFolder(folderPath))
-                    insert(obj, folderPath, obj.name);
-                // non-folder DefaultAsset — reject silently
+                var assetPath = AssetDatabase.GetAssetPath(obj);
+                if (!string.IsNullOrEmpty(assetPath))
+                {
+                    insert(obj, assetPath, obj.name);
+                    handledPaths?.Add(assetPath);
+                }
                 return;
             }
 
@@ -65,6 +91,7 @@ namespace UnityMCP.Editor.Chat
                     insert(selectedGO, ComponentSerializer.GetPath(selectedGO), selectedGO.name);
                 }
                 insert(ms, assetPath, ms.name);
+                handledPaths?.Add(assetPath);
                 return;
             }
 
@@ -72,7 +99,10 @@ namespace UnityMCP.Editor.Chat
             {
                 var assetPath = AssetDatabase.GetAssetPath(obj);
                 if (!string.IsNullOrEmpty(assetPath))
+                {
                     insert(obj, assetPath, obj.name);
+                    handledPaths?.Add(assetPath);
+                }
             }
             else if (!(obj is GameObject))
                 Debug.LogWarning($"[MCP Chat] {obj.GetType().Name} not supported as a context chip");

@@ -21,6 +21,12 @@ namespace UnityMCP.Editor.Chat
                 return;
             }
             window.InsertInlineChip(component.gameObject);
+            if (component is MonoBehaviour mb)
+            {
+                var ms = MonoScript.FromMonoBehaviour(mb);
+                if (ms != null)
+                    window.InsertInlineChip(ms, AssetDatabase.GetAssetPath(ms), ms.name);
+            }
         }
     }
 }

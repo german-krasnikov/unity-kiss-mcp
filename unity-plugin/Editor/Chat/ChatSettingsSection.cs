@@ -79,31 +79,37 @@ namespace UnityMCP.Editor.Chat
         {
             var binary = ChatBinaryResolver.Resolve();
             if (binary == null) { label.text = "Auth: binary not found"; return; }
+
+            // Build PSI on main thread (Unity APIs like SystemInfo require it)
+            ProcessStartInfo psi;
+            if (Application.platform != RuntimePlatform.OSXEditor)
+            {
+                psi = new ProcessStartInfo(binary, "auth status")
+                {
+                    UseShellExecute        = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    CreateNoWindow         = true,
+                };
+            }
+            else
+            {
+                psi = LoginShellCommand.Create("\"$1\" auth status", binary);
+                psi.RedirectStandardError = true;
+            }
+
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
                 bool ok = false;
                 try
                 {
-                    // R2: cross-platform dispatch (LoginShellCommand.Create is macOS-only /bin/zsh)
-                    ProcessStartInfo psi;
-                    if (UnityEngine.SystemInfo.operatingSystemFamily == UnityEngine.OperatingSystemFamily.Windows
-                     || UnityEngine.SystemInfo.operatingSystemFamily == UnityEngine.OperatingSystemFamily.Linux)
-                    {
-                        psi = new ProcessStartInfo(binary, "auth status")
-                        {
-                            UseShellExecute        = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError  = true,
-                            CreateNoWindow         = true,
-                        };
-                    }
-                    else
-                    {
-                        psi = LoginShellCommand.Create("\"$1\" auth status", binary);
-                    }
                     using var p = Process.Start(psi);
-                    p?.StandardOutput.ReadToEnd();
-                    if (p != null && !p.WaitForExit(2000)) { try { p.Kill(); } catch { } }
+                    if (p != null)
+                    {
+                        p.BeginErrorReadLine();
+                        p.StandardOutput.ReadToEnd();
+                        if (!p.WaitForExit(2000)) { try { p.Kill(); } catch { } }
+                    }
                     ok = p != null && p.HasExited && p.ExitCode == 0;
                 }
                 catch { }

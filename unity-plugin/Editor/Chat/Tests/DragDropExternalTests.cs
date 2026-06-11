@@ -81,5 +81,37 @@ namespace UnityMCP.Editor.Chat.Tests
             var provider = new FolderChipProvider();
             Assert.IsFalse(provider.CanHandle(null, "Assets/SomeFolder"));
         }
+
+        // Bug fix: external paths must be processed even when objectReferences present.
+        // These tests verify ProcessExternalPath itself handles all file types.
+
+        [Test]
+        public void ProcessExternalPath_MarkdownFile_InsertsChip()
+        {
+            var calls = new List<(string path, string name)>();
+            MCPChatWindow.ProcessExternalPath("/Users/dev/README.md", (_, p, n) => calls.Add((p, n)));
+            Assert.AreEqual(1, calls.Count);
+            Assert.AreEqual("/Users/dev/README.md", calls[0].path);
+            Assert.AreEqual("README.md", calls[0].name);
+        }
+
+        [Test]
+        public void ProcessExternalPath_JsonFile_InsertsChip()
+        {
+            var calls = new List<(string path, string name)>();
+            MCPChatWindow.ProcessExternalPath("/Users/dev/config.json", (_, p, n) => calls.Add((p, n)));
+            Assert.AreEqual(1, calls.Count);
+            Assert.AreEqual("config.json", calls[0].name);
+        }
+
+        [Test]
+        public void ProcessExternalPath_FolderPath_InsertsChip()
+        {
+            var calls = new List<(string path, string name)>();
+            MCPChatWindow.ProcessExternalPath("/Users/dev/MyFolder", (_, p, n) => calls.Add((p, n)));
+            Assert.AreEqual(1, calls.Count);
+            Assert.AreEqual("/Users/dev/MyFolder", calls[0].path);
+            Assert.AreEqual("MyFolder", calls[0].name);
+        }
     }
 }

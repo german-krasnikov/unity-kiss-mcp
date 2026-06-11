@@ -20,7 +20,15 @@ namespace UnityMCP.Editor.Chat
             var scroller = new ScrollView(ScrollViewMode.Horizontal);
             scroller.AddToClassList("mermaid-scroll");
             scroller.Add(view);
-            return scroller;
+
+            var container = new VisualElement();
+            container.AddToClassList("mermaid-container");
+            var expandBtn = new Button(() => MermaidViewerWindow.Show(graph, lines)) { text = "↗" };
+            expandBtn.AddToClassList("mermaid-expand-btn");
+            expandBtn.tooltip = "Open in viewer";
+            container.Add(expandBtn);
+            container.Add(scroller);
+            return container;
         }
 
         private static VisualElement CodeBoxFallback(in MdBlock block)

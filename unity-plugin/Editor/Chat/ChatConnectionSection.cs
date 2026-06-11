@@ -1,4 +1,4 @@
-// Subscribes to ChatSettingsHook.OnBuildConnection and fills MCPChatSettingsWindow
+// Subscribes to ChatSettingsHook.OnBuildConnection and fills the Chat settings nav page
 // with connection content (binary, auth, backends, chips) — no outer Foldout wrapper.
 using UnityEditor;
 using UnityEngine.UIElements;

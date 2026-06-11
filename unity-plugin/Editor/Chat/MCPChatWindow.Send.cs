@@ -1,4 +1,4 @@
-// Partial MCPChatWindow — send path: OnSend, AttachScreenshot, DispatchTurn.
+// Partial MCPChatWindow — send path: OnSend, DispatchTurn.
 // F13: AppendChipContext removed — ChipTextInterleaver handles chip serialization.
 // Text is clean by construction (InlineChipField — no FFFC/NBSP stripping needed).
 using System.IO;
@@ -21,21 +21,6 @@ namespace UnityMCP.Editor.Chat
             if (string.IsNullOrEmpty(llmText)) return;
 
             DispatchTurn(UserTurnBuilder.Build(llmText), msg, llmText);
-        }
-
-        private void AttachScreenshot()
-        {
-            if (!_activity.CanSend) return;
-            var target = Selection.activeGameObject;
-            if (target == null) { Debug.LogWarning("[MCP Chat] Select a GameObject first"); return; }
-            var capturePath = MultiViewCapture.CaptureToFile(target);
-            if (string.IsNullOrEmpty(capturePath)) { Debug.LogWarning("[MCP Chat] Screenshot failed"); return; }
-            var bytes    = File.ReadAllBytes(capturePath);
-            var store    = BackendConfigStore.Load();
-            var rawText  = (_chipField?.Text ?? _input?.value ?? "").Trim();
-            var msg      = ChipTextInterleaver.BuildFromRaw(rawText, _chipField?.Model?.PositionedChips);
-            var llmText  = ChipTextInterleaver.ToLlmPayload(msg, store.Chips);
-            DispatchTurn(UserTurnBuilder.Build(llmText, bytes), msg, llmText, screenshotPath: capturePath);
         }
 
         // Shared send sequence.

@@ -70,6 +70,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
         "animator_intent", "get_metrics",
         "setup_objects", "set_properties", "configure_objects",
         "scan_scene", "check_colliders", "spatial_query",
+        "set_llm_config",
     ],
 }
 

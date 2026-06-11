@@ -28,7 +28,8 @@ unity-kiss-mcp/
 │   │   ├── metrics.py          # Performance metrics
 │   │   ├── prefetch_cache.py   # Speculative prefetch
 │   │   ├── resources.py        # MCP resources
-│   │   ├── sampling.py         # Visual verification (Haiku)
+│   │   ├── llm_config.py        # LlmProfile dataclass: universal config for Claude/Codex (v0.23.0 Block 3)
+│   │   ├── sampling.py         # Visual verification (DRY: uses get_profile for model selection) (v0.23.0)
 │   │   ├── sampling_postproc.py # Sampling post-processing
 │   │   ├── scene_brief.py      # Scene context injection
 │   │   ├── schema_cache.py     # Schema caching
@@ -154,8 +155,12 @@ unity-kiss-mcp/
 │       ├── ChangeWatcher.cs + ColliderChecker.cs + SchemaHelper.cs
 │       ├── MCPSettings.cs                 # Pure static data class (catalog, EnabledTools, no EditorWindow)
 │       ├── CatalogParser.cs               # Plain-text catalog parser (v0.18.0+): "CORE:tool1,tool2\n..." format
-│       ├── MCPSettingsHub.cs              # Central hub window coordinating all settings UI (F26)
-│       ├── MCPHubUI.cs                    # Hub-level layout + sub-window orchestration (F26)
+│       ├── SettingsNavController.cs       # iOS-style navigational stack + slide animations (v0.23.0 Block 1)
+│       ├── SettingsPageFactory.cs         # DRY builder for 4 settings pages (Tools/Permissions/Chat/Sampling) (v0.23.0 Block 1)
+│       ├── LlmConfig.cs                   # [Serializable] universal LLM config (Claude + Codex profiles) (v0.23.0 Block 3)
+│       ├── LlmConfigStore.cs              # Load/Save LLM configs to Library/ (v0.23.0 Block 3)
+│       ├── MCPSettingsHub.cs              # Central hub window coordinating all settings UI (F26, v0.23.0)
+│       ├── MCPHubUI.cs                    # Hub-level layout + sub-window orchestration (F26, v0.23.0)
 │       ├── HubHeaderAnim.cs               # Circuit-node network animation: 5 nodes + lines + packet (F26)
 │       ├── HubCardButton.cs               # Launcher card buttons for each settings window (F26)
 │       ├── MCPHubDivider.cs               # Visual divider component for hub sections (F26)
@@ -164,8 +169,6 @@ unity-kiss-mcp/
 │       ├── ToolsHeaderAnim.cs             # 5 toggle-sweep animation (400ms) — connection-aware colors (F25)
 │       ├── MCPPermissionsWindow.cs        # MCP/Permissions window (deny-set config)
 │       ├── PermissionsHeaderAnim.cs       # Shield + lock pulse (150ms) — connection-aware colors (F25)
-│       ├── MCPChatSettingsWindow.cs       # Chat Settings window (backend selection + model/auth settings)
-│       ├── ChatHeaderAnim.cs              # WiFi arc pulse (150ms) — connection-aware colors (F25)
 │       ├── ChatSettingsHook.cs            # Event hook: OnBuildConnection fired when Connection window builds
 │       ├── MCPStatusWindow.cs             # Connection status monitor (heartbeat animation)
 │       ├── MCPActions.cs                  # Shared actions (Restart, Kill, Reimport)
@@ -205,7 +208,7 @@ unity-kiss-mcp/
 │       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates + domain refresh trigger (F27) (partial class)
 │       │   ├── MCPChatWindow.Send.cs      # Send path: OnSend, rawText/llmText split, chip snapshot (partial class)
 │       │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (partial class)
-│       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons (F29: external files/folders)
+│       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons (F29: external files/folders, v0.23.0 Block 5: ProcessDraggedObject)
 │       │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
 │       │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
 │       │   ├── MCPChatWindow.Resize.cs    # Window resize logic
@@ -235,7 +238,7 @@ unity-kiss-mcp/
 │       │   ├── EditorStateSnapshot.cs     # Context block injection
 │       │   ├── ToolPing.cs                # Flash object on tool-call
 │       │   ├── HierarchyContextMenu.cs    # Right-click Hierarchy GameObject → Add to Chat Context (F16a)
-│       │   ├── ComponentContextMenu.cs    # Right-click Component → Add to Chat Context (F16b)
+│       │   ├── ComponentContextMenu.cs    # Right-click Component → Add to Chat Context (F16b, v0.23.0 Block 5: dual-chip @GO|@Script)
 │       │   ├── ChipContextResolver.cs     # Resolve chips + emit typed (F10)
 │       │   ├── MCPChatWindow.Approve.cs   # Event handler (F3 gate)
 │       │   ├── ApproveHelper.cs           # Session management
@@ -271,12 +274,16 @@ unity-kiss-mcp/
 │       │   │   ├── MarkdownBlockRenderer.Table.cs # Table grid layout (partial)
 │       │   │   ├── MarkdownBlockRenderer.List.cs # Bullet/ordered list (partial)
 │       │   │   ├── ImageBlockRenderer.cs  # PNG/JPG → Texture2D + click-to-open (v0.23.0: IsImageFile guard)
+│       │   │   ├── Viewers/                # Media viewer windows (v0.23.0 Block 4)
+│       │   │   │   ├── ImageViewerWindow.cs # Modal image viewer: zoom/pan/fit controls
+│       │   │   │   ├── MermaidViewerWindow.cs # Modal mermaid viewer: zoom/pan + exportable SVG
+│       │   │   │   └── ZoomPanManipulator.cs # DRY shared zoom/pan/fit logic (reusable for future viewers)
 │       │   │   ├── Mermaid/               # Native Mermaid flowchart (no lib, pure parse+layout)
 │       │   │   │   ├── MermaidGraph.cs    # POCO: nodes, edges, direction
 │       │   │   │   ├── MermaidParser.cs   # lines → graph or null
 │       │   │   │   ├── MermaidLayout.cs   # Kahn topo + longest-path + dynamic node sizing
 │       │   │   │   ├── MermaidLayout.Layers.cs # Layer building + cycle guard
-│       │   │   │   ├── MermaidBlockRenderer.cs # CanRender Mermaid, fallback to code-box
+│       │   │   │   ├── MermaidBlockRenderer.cs # CanRender Mermaid, fallback to code-box (v0.23.0: opens MermaidViewerWindow)
 │       │   │   │   ├── MermaidView.cs     # Absolute nodes + edge overlay + geom-change callback
 │       │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
 │       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated

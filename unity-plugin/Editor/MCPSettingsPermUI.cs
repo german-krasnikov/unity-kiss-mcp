@@ -48,7 +48,7 @@ namespace UnityMCP.Editor
         }
 
         /// <summary>
-        /// Standalone version without outer Foldout — for MCPPermissionsWindow.
+        /// Standalone version without outer Foldout — for settings nav page.
         /// </summary>
         public static VisualElement BuildContent(PermissionConfig config)
         {

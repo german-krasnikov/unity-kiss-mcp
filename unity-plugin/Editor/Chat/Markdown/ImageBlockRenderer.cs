@@ -52,7 +52,7 @@ namespace UnityMCP.Editor.Chat
                 if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
             });
 
-            img.RegisterCallback<ClickEvent>(_ => EditorUtility.OpenWithDefaultApp(path));
+            img.RegisterCallback<ClickEvent>(_ => ImageViewerWindow.Show(path));
 
             var container = new VisualElement();
             container.AddToClassList("md-image-container");

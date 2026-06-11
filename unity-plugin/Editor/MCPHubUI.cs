@@ -9,23 +9,27 @@ namespace UnityMCP.Editor
         {
             var ss = MCPEditorUtils.LoadStyleSheet("MCPHub.uss");
             if (ss != null) root.styleSheets.Add(ss);
+            var settingsSs = MCPEditorUtils.LoadStyleSheet("MCPSettings.uss");
+            if (settingsSs != null) root.styleSheets.Add(settingsSs);
             root.AddToClassList("hub-root");
 
-            root.Add(HubHeaderAnim.Build(root));
-            root.Add(BuildGeneralSection());
+            var nav = new SettingsNavController(root);
 
-            var divTop = MCPHubDivider.Build(root);
-            root.Add(divTop);
+            var home = new VisualElement();
+            home.Add(HubHeaderAnim.Build(root));
+            home.Add(BuildGeneralSection());
+            home.Add(MCPHubDivider.Build(root));
+            home.Add(HubCardButton.Build("⚙",  "Tools",        "Enable / disable MCP tools",
+                () => nav.Push(SettingsPageFactory.BuildToolsPage(() => nav.Pop()))));
+            home.Add(HubCardButton.Build("🔒", "Permissions",   "Agent tool deny-set",
+                () => nav.Push(SettingsPageFactory.BuildPermissionsPage(() => nav.Pop()))));
+            home.Add(HubCardButton.Build("💬", "Chat Settings",  ChatCardSubtitle(),
+                () => nav.Push(SettingsPageFactory.BuildChatPage(() => nav.Pop()))));
+            home.Add(HubCardButton.Build("🧠", "LLM Sampling",  "Claude / Codex presets",
+                () => nav.Push(SettingsPageFactory.BuildSamplingPage(() => nav.Pop()))));
+            home.Add(MCPHubDivider.Build(root));
 
-            root.Add(HubCardButton.Build("⚙",  "Tools",         "Enable / disable MCP tools",
-                MCPToolSettingsWindow.ShowWindow));
-            root.Add(HubCardButton.Build("🔒", "Permissions",    "Agent tool deny-set",
-                MCPPermissionsWindow.ShowWindow));
-            root.Add(HubCardButton.Build("💬", "Chat Settings",  ChatCardSubtitle(),
-                MCPChatSettingsWindow.ShowWindow));
-
-            var divBot = MCPHubDivider.Build(root);
-            root.Add(divBot);
+            nav.SetRoot(home);
         }
 
         private static VisualElement BuildGeneralSection()

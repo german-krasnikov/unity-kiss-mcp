@@ -35,8 +35,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Build_InputMode_HasRemoveButton()
         {
-            bool removed = false;
-            var pill = ChipPillFactory.Build(ChipKindKeys.Script, "Foo.cs", onRemove: () => removed = true);
+            var pill = ChipPillFactory.Build(ChipKindKeys.Script, "Foo.cs", onRemove: () => { });
 
             var btn = pill.Q<Button>(className: "inline-chip-remove");
             Assert.IsNotNull(btn, "remove button missing in input mode");

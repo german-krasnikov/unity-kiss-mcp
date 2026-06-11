@@ -9,6 +9,8 @@ from typing import Optional
 
 CLAUDE_CMD = os.environ.get("UNITY_MCP_CLAUDE_CMD", "claude")
 
+from .llm_config import get_profile  # noqa: E402
+
 _budget_tracker = None
 _budget_router = None
 
@@ -87,7 +89,7 @@ class SamplingService:
                 METRICS.inc("sampling.success")
                 est_in = sum(len(a) for a in args if isinstance(a, str)) // 4
                 est_out = len(result) // 4
-                METRICS.cost("sampling", "haiku", est_in, est_out)
+                METRICS.cost("sampling", args[args.index("--model") + 1] if "--model" in args else "haiku", est_in, est_out)
             else:
                 METRICS.inc("sampling.fail")
             return result
@@ -122,15 +124,15 @@ class SamplingService:
             return None
         if not _gate(feature, 0.7):
             return None
+        profile = get_profile(feature)
         system = "You verify Unity scene changes. Answer: PASS or FAIL + 1 sentence. Nothing else."
         full_prompt = f"{system}\n\n{prompt}"
         if screenshot_path and os.path.isfile(screenshot_path):
             full_prompt += f"\n\nRead this screenshot and verify: {screenshot_path}"
-            args = [CLAUDE_CMD, "-p", full_prompt, "--model", "haiku",
-                    "--max-turns", "2", "--tools", "Read"]
+            args = [CLAUDE_CMD, "-p", full_prompt] + profile.to_cli_args() + ["--tools", "Read"]
         else:
-            args = [CLAUDE_CMD, "-p", full_prompt, "--model", "haiku", "--max-turns", "1"]
-        result = await self._run(args, 15.0)
+            args = [CLAUDE_CMD, "-p", full_prompt] + profile.to_cli_args()
+        result = await self._run(args, profile.timeout)
         if result:
             await _record_async(feature, has_image=bool(screenshot_path and os.path.isfile(screenshot_path)))
         return result
@@ -146,8 +148,8 @@ class SamplingService:
             return None
         if not _gate(feature, 0.5):
             return None
-        result = await self._run(
-            [CLAUDE_CMD, "-p", prompt, "--model", "haiku", "--max-turns", "1"], 15.0)
+        profile = get_profile(feature)
+        result = await self._run([CLAUDE_CMD, "-p", prompt] + profile.to_cli_args(), profile.timeout)
         if result:
             await _record_async(feature)
         return result
@@ -164,10 +166,10 @@ class SamplingService:
             return None
         if not _gate(feature, 0.9):
             return None
+        profile = get_profile(feature)
         full_prompt = f"Read this image and analyze it.\nImage: {image_path}\n\n{prompt}"
-        args = [CLAUDE_CMD, "-p", full_prompt, "--model", "haiku",
-                "--max-turns", "2", "--tools", "Read"]
-        result = await self._run(args, 20.0)
+        args = [CLAUDE_CMD, "-p", full_prompt] + profile.to_cli_args() + ["--tools", "Read"]
+        result = await self._run(args, profile.timeout)
         if result:
             await _record_async(feature)
         return result
@@ -187,10 +189,10 @@ class SamplingService:
             return None
         if not _gate(feature, 0.9):
             return None
+        profile = get_profile(feature)
         full_prompt = f"Read these two images and compare them.\nImage 1 (before): {before}\nImage 2 (after): {after}\n\n{prompt}"
-        args = [CLAUDE_CMD, "-p", full_prompt, "--model", "haiku",
-                "--max-turns", "2", "--tools", "Read"]
-        result = await self._run(args, 25.0)
+        args = [CLAUDE_CMD, "-p", full_prompt] + profile.to_cli_args() + ["--tools", "Read"]
+        result = await self._run(args, profile.timeout)
         if result:
             await _record_async(feature)
         return result
@@ -206,9 +208,9 @@ class SamplingService:
             return None
         if not _gate(feature, 0.2):
             return None
+        profile = get_profile(feature)
         full_prompt = f"{instruction}:\n{data[:3000]}"
-        result = await self._run(
-            [CLAUDE_CMD, "-p", full_prompt, "--model", "haiku", "--max-turns", "1"], 15.0)
+        result = await self._run([CLAUDE_CMD, "-p", full_prompt] + profile.to_cli_args(), profile.timeout)
         if result:
             await _record_async(feature)
         return result

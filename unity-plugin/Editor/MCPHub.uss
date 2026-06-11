@@ -272,3 +272,63 @@
 .han-packet.han--up     { background-color: #3ad29f; }
 .han-packet.han--listen { background-color: #e8a23a; }
 .han-packet.han--down   { background-color: #6e2b3a; }
+
+/* === Settings Navigation === */
+.nav-viewport {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.nav-container {
+    flex-direction: row;
+    width: 200%;
+    height: 100%;
+    transition-property: translate;
+    transition-duration: 350ms;
+}
+
+.nav-no-transition {
+    transition-duration: 0ms;
+}
+
+.nav-slot {
+    width: 50%;
+    height: 100%;
+}
+
+.nav-page {
+    flex-grow: 1;
+    padding: 8px;
+}
+
+.nav-back-header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.nav-back-btn {
+    font-size: 11px;
+    padding: 2px 8px;
+    margin-right: 8px;
+}
+
+.nav-back-title {
+    font-size: 14px;
+    -unity-font-style: bold;
+}
+
+/* === Sampling form === */
+.sampling-row {
+    margin: 4px 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+}
+
+.sampling-label {
+    font-size: 11px;
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
