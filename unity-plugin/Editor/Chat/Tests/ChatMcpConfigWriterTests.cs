@@ -180,6 +180,42 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(new[] { "-m", "unity_mcp.server" }, args);
         }
 
+        // ── 8b. ResolvePythonCommand Windows Scripts/python.exe wins (File.Exists-driven) ──
+
+        [Test]
+        public void ResolvePythonCommand_WindowsVenvExists_ReturnsScriptsPythonExe()
+        {
+            var serverDir   = Path.Combine(_tmpDir, "server");
+            var scriptsDir  = Path.Combine(serverDir, ".venv", "Scripts");
+            Directory.CreateDirectory(scriptsDir);
+            // Create the Windows-style executable
+            File.WriteAllText(Path.Combine(scriptsDir, "python.exe"), "");
+
+            var (cmd, args) = ChatMcpConfigWriter.ResolvePythonCommand(serverDir, null);
+
+            // Scripts/python.exe must be returned regardless of platform (File.Exists is pure)
+            StringAssert.EndsWith("python.exe", cmd);
+            StringAssert.Contains("Scripts", cmd);
+            Assert.AreEqual(new[] { "-m", "unity_mcp.server" }, args);
+        }
+
+        [Test]
+        public void ResolvePythonCommand_BothVenvsExist_WindowsScriptsPythonExeWins()
+        {
+            // Both bin/python (Unix-style) AND Scripts/python.exe exist — Windows path must win
+            var serverDir  = Path.Combine(_tmpDir, "server");
+            var binDir     = Path.Combine(serverDir, ".venv", "bin");
+            var scriptsDir = Path.Combine(serverDir, ".venv", "Scripts");
+            Directory.CreateDirectory(binDir);
+            Directory.CreateDirectory(scriptsDir);
+            File.WriteAllText(Path.Combine(scriptsDir, "python.exe"), "");
+            File.WriteAllText(Path.Combine(binDir, "python"), "#!/bin/sh");
+
+            var (cmd, _) = ChatMcpConfigWriter.ResolvePythonCommand(serverDir, null);
+
+            StringAssert.Contains("Scripts", cmd, "Scripts/python.exe must take priority over bin/python");
+        }
+
         // ── 9. Contract/shape test ────────────────────────────────────────────
 
         [Test]

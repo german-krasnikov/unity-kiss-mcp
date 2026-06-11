@@ -35,3 +35,14 @@ def _apply_socket_options(sock) -> None:
         _try(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
         _try(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
         _try(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+    elif sys.platform == "win32":
+        # SIO_KEEPALIVE_VALS: (onoff=1, keepalivetime_ms=60000, keepaliveinterval_ms=10000)
+        # Best-effort — app-level heartbeat (15s) handles faster liveness checks.
+        import struct
+        try:
+            sock.ioctl(
+                socket.SIO_KEEPALIVE_VALS,
+                struct.pack("III", 1, 60_000, 10_000),
+            )
+        except Exception:
+            pass

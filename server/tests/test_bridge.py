@@ -803,3 +803,36 @@ async def test_heartbeat_marks_recompile_on_domain_reload():
             bridge.stop_heartbeat()
 
     idle_probe.mark_recompile_issued.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# B8 — MSG_DONTWAIT removed from connected peek (cross-platform)
+# ---------------------------------------------------------------------------
+
+def test_connected_property_no_msg_dontwait():
+    """connected peek must NOT use MSG_DONTWAIT — the flag breaks on Windows.
+
+    Verifies that select.select gates the recv (no blocking) and that the
+    recv call uses only MSG_PEEK (not MSG_PEEK | MSG_DONTWAIT).
+    """
+    import socket
+
+    bridge = UnityBridge()
+
+    # Fake a writer with a mock socket that returns b"x" (connection alive)
+    mock_sock = Mock()
+    mock_sock.recv.return_value = b"x"
+
+    mock_writer = Mock()
+    mock_writer.is_closing.return_value = False
+    mock_writer.get_extra_info.return_value = mock_sock
+
+    bridge._writer = mock_writer
+
+    # select.select returns readable (data waiting)
+    with patch("select.select", return_value=([mock_sock], [], [])):
+        result = bridge.connected
+
+    assert result is True
+    # recv was called with exactly MSG_PEEK — no MSG_DONTWAIT
+    mock_sock.recv.assert_called_once_with(1, socket.MSG_PEEK)

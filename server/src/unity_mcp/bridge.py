@@ -222,7 +222,7 @@ class UnityBridge(HeartbeatMixin):
             try:
                 r, _, _ = select.select([sock], [], [], 0)
                 if r:
-                    data = sock.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT)
+                    data = sock.recv(1, socket.MSG_PEEK)
                     if not data:
                         return False
             except (OSError, ValueError, BlockingIOError):

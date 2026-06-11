@@ -1,31 +1,48 @@
-"""Cross-process file lock via fcntl. Linux + macOS only.
+"""Cross-platform file lock — hand-rolled, no external deps.
 
 Used by CostTracker to serialize multi-process writes to budget.json.
-Blocking exclusive lock — held briefly per write.
+Blocking exclusive lock held briefly per write. Sentinel .lock file
+approach: never locks the data file itself, preventing data corruption.
 """
 from __future__ import annotations
 
-import fcntl
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 
 
 @contextmanager
 def locked(path: Path):
-    """Acquire fcntl exclusive lock on a sentinel `.lock` file next to path.
+    """Acquire exclusive lock on a sentinel `.lock` file next to path.
 
-    Auto-releases on context exit. Sentinel file allows safe cross-process
-    serialization without race on the data file itself.
+    Blocking — waits until the lock is available.
+    Auto-releases on context exit (including exceptions).
     """
     sentinel = path.with_suffix(path.suffix + ".lock")
     sentinel.parent.mkdir(parents=True, exist_ok=True)
     f = open(sentinel, "w")
     try:
-        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-        yield
+        if sys.platform == "win32":
+            import msvcrt  # deferred: win32-only, functional only on Windows
+            f.seek(0)
+            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                try:
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                except Exception:
+                    pass
+        else:
+            import fcntl
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                try:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                except Exception:
+                    pass
     finally:
-        try:
-            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-        except Exception:
-            pass
         f.close()

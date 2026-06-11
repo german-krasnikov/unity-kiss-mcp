@@ -1,21 +1,72 @@
 """PID lockfile — exclusive lock, kills old unity_mcp server if needed."""
-import fcntl
 import logging
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
 
 log = logging.getLogger("unity_mcp.lockfile")
 
+_IS_WIN = sys.platform == "win32"
 _MAX_RETRIES = 2
 _MAX_KILL_WAIT_S = 3.0
 _POLL_INTERVAL_S = 0.1
 
+# Lock sentinel byte lives at offset 1024 — far outside PID data (bytes 0-31).
+# On Windows, mandatory locking blocks reads on locked bytes, so the lock region
+# MUST NOT overlap PID data that other processes need to read.
+# On Unix, advisory fcntl.flock locks the whole file anyway — offset is a no-op.
+_LOCK_OFFSET = 1024
+
+_OPEN_FLAGS = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
+
+if _IS_WIN:
+    import msvcrt
+
+    def _lock_nb(fd: int) -> None:
+        """Non-blocking exclusive lock on sentinel byte at offset 1024."""
+        os.lseek(fd, _LOCK_OFFSET, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+
+    def _unlock(fd: int) -> None:
+        """Release the sentinel byte lock."""
+        os.lseek(fd, _LOCK_OFFSET, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+
+else:
+    import fcntl
+
+    def _lock_nb(fd: int) -> None:
+        """Non-blocking exclusive flock (advisory, whole-file)."""
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def _unlock(fd: int) -> None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+def _write_pid(fd: int) -> None:
+    """Write current PID to bytes 0-31 of the lockfile."""
+    os.ftruncate(fd, 0)
+    os.lseek(fd, 0, os.SEEK_SET)
+    os.write(fd, f"{os.getpid()}\n".encode())
+
+
+def _read_pid_from_fd(fd: int) -> Optional[int]:
+    """Read PID from bytes 0-31. Always readable — outside the locked region."""
+    os.lseek(fd, 0, os.SEEK_SET)
+    data = os.read(fd, 32).decode(errors="ignore").strip()
+    try:
+        return int(data)
+    except ValueError:
+        return None
+
 
 def _is_unity_mcp_pid(pid: int) -> bool:
-    """Return True if pid's cmdline contains 'unity_mcp'."""
+    """Return True if pid's cmdline belongs to unity_mcp."""
+    if _IS_WIN:
+        return _is_unity_mcp_pid_win(pid)
     try:
         out = subprocess.check_output(
             ["ps", "-p", str(pid), "-o", "command="],
@@ -26,13 +77,44 @@ def _is_unity_mcp_pid(pid: int) -> bool:
         return False
 
 
-def _read_pid_from_fd(fd: int) -> Optional[int]:
-    os.lseek(fd, 0, os.SEEK_SET)
-    data = os.read(fd, 32).decode(errors="ignore").strip()
+def _is_unity_mcp_pid_win(pid: int) -> bool:
+    """Windows: check cmdline via PowerShell CIM; fallback to tasklist weak check."""
+    # Primary: PowerShell CIM gives us the full command line (matches unity_mcp exactly).
     try:
-        return int(data)
-    except ValueError:
-        return None
+        out = subprocess.check_output(
+            [
+                "powershell", "-NoProfile", "-Command",
+                f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+        return b"unity_mcp" in out.lower()
+    except (OSError, subprocess.SubprocessError):
+        pass  # PowerShell unavailable — fall through to tasklist
+
+    # Fallback: tasklist gives only image name, not full cmdline — weaker guarantee
+    # (any recycled python PID would match). Documented intentional limitation.
+    try:
+        out = subprocess.check_output(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            stderr=subprocess.DEVNULL,
+        )
+        return b"python" in out.lower()
+    except (FileNotFoundError, subprocess.SubprocessError, OSError):
+        return False  # fail-safe: don't kill what we can't identify
+
+
+def is_pid_alive(pid: Optional[int]) -> bool:
+    """Return True if the process with given PID exists."""
+    if pid is None:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True  # exists but can't signal — common on Windows
+    except (OSError, ProcessLookupError):
+        return False
 
 
 def acquire_lock(lock_dir=None, port: int = 9500) -> int:
@@ -42,35 +124,31 @@ def acquire_lock(lock_dir=None, port: int = 9500) -> int:
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_file = lock_dir / f"server-{port}.lock"
 
-    fd = os.open(str(lock_file), os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
+    fd = os.open(str(lock_file), _OPEN_FLAGS, 0o600)
 
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            # Got the lock
-            os.ftruncate(fd, 0)
-            os.lseek(fd, 0, os.SEEK_SET)
-            os.write(fd, f"{os.getpid()}\n".encode())
+            _lock_nb(fd)
+            # Got the lock — write our PID
+            _write_pid(fd)
             return fd
-        except BlockingIOError:
+        except (BlockingIOError, OSError):
             if attempt == _MAX_RETRIES:
                 break
-            # Read PID from lockfile and maybe kill it
+            # PID data (bytes 0-31) is always readable — outside locked region.
             old_pid = _read_pid_from_fd(fd)
             if old_pid and is_pid_alive(old_pid) and _is_unity_mcp_pid(old_pid):
                 log.info("Killing stale unity_mcp server pid=%d", old_pid)
-                os.kill(old_pid, 15)  # SIGTERM
+                os.kill(old_pid, 15)  # SIGTERM (TerminateProcess on Windows)
             # Poll until lock is free
             deadline = time.monotonic() + _MAX_KILL_WAIT_S
             while time.monotonic() < deadline:
                 time.sleep(_POLL_INTERVAL_S)
                 try:
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    os.ftruncate(fd, 0)
-                    os.lseek(fd, 0, os.SEEK_SET)
-                    os.write(fd, f"{os.getpid()}\n".encode())
+                    _lock_nb(fd)
+                    _write_pid(fd)
                     return fd
-                except BlockingIOError:
+                except (BlockingIOError, OSError):
                     continue
 
     os.close(fd)
@@ -78,7 +156,10 @@ def acquire_lock(lock_dir=None, port: int = 9500) -> int:
 
 
 def release_lock(fd: int):
-    fcntl.flock(fd, fcntl.LOCK_UN)
+    try:
+        _unlock(fd)
+    except OSError:
+        pass  # already unlocked (process dying, fd closing)
     os.close(fd)
 
 
@@ -95,14 +176,3 @@ def read_pid_from_port_file(port: int) -> Optional[int]:
         except (ValueError, IndexError, OSError):
             continue
     return None
-
-
-def is_pid_alive(pid: Optional[int]) -> bool:
-    """Return True if the process with given PID exists."""
-    if pid is None:
-        return False
-    try:
-        os.kill(pid, 0)
-        return True
-    except (OSError, ProcessLookupError):
-        return False

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using UnityEngine;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -48,7 +49,7 @@ namespace UnityMCP.Editor.Chat
 
             // MCP server wiring via TOML -c flags (3 required)
             args.Add("-c");
-            args.Add($"mcp_servers.unity.command=\"{TomlEscapeString(pythonCommand ?? "python3")}\"");
+            args.Add($"mcp_servers.unity.command=\"{TomlEscapeString(pythonCommand ?? PythonFallback)}\"");
             args.Add("-c");
             args.Add($"mcp_servers.unity.args=[{BuildTomlStringArray(pythonArgs)}]");
             args.Add("-c");
@@ -67,6 +68,10 @@ namespace UnityMCP.Editor.Chat
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
+
+        /// <summary>Platform-aware Python executable name: "python" on Windows, "python3" elsewhere.</summary>
+        internal static string PythonFallback
+            => SystemInfo.operatingSystemFamily == OperatingSystemFamily.Windows ? "python" : "python3";
 
         private static string ProjectRoot()
         {

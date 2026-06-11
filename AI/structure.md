@@ -7,7 +7,7 @@ unity-kiss-mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: single connection
-│   │   ├── lockfile.py         # Exclusive fcntl.flock per port + stale server cleanup
+│   │   ├── lockfile.py         # Cross-platform exclusive locking (fcntl on Unix, msvcrt on Windows) + stale server cleanup
 │   │   ├── compile_state.py    # CompileStateProbe (heuristic Unity compile detection)
 │   │   ├── middleware.py       # 23-layer middleware pipeline (env-gated UNITY_MCP_MIDDLEWARE=1)
 │   │   ├── middleware_paths.py # PathResolverMixin extracted from middleware.py
@@ -234,8 +234,8 @@ unity-kiss-mcp/
 │       │   ├── MCPChatWindow.Approve.cs   # Event handler (F3 gate)
 │       │   ├── ApproveHelper.cs           # Session management
 │       │   ├── ApproveButtonFactory.cs    # Button builder
-│       │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS)
-│       │   ├── ChatMcpConfigWriter.cs     # --mcp-config generation
+│       │   ├── ChatBinaryResolver.cs      # Cross-platform binary PATH resolution (where.exe, bash -lic, zsh -lc per OS)
+│       │   ├── ChatMcpConfigWriter.cs     # Cross-platform Python command resolution + --mcp-config generation
 │       │   ├── SlashTemplate.cs           # Template model
 │       │   ├── SlashRegistry.cs           # Template registry
 │       │   ├── SlashPopup.cs              # UIToolkit popup

@@ -1,19 +1,23 @@
-// Resolves the absolute path to the claude CLI binary.
-// Handles Unity-from-Finder truncated PATH via /bin/zsh -lc 'command -v claude'.
+// Resolves absolute paths to CLI binaries (claude, codex, uv, …).
+// Platform dispatch: where.exe (Windows), bash -lic (Linux), /bin/zsh -lc (macOS).
 using System;
 using System.Diagnostics;
+using System.IO;
 using UnityEditor;
+using UnityEngine;
 
 namespace UnityMCP.Editor.Chat
 {
     internal static class ChatBinaryResolver
     {
-        internal const string PrefKey = "UnityMCP_Chat_ClaudePath";
+        internal const string PrefKey      = "UnityMCP_Chat_ClaudePath";
+        internal const string CodexPrefKey = "UnityMCP_Chat_Path_codex";
+
         private static string _cached;
         private static bool   _probed;
 
 #if UNITY_INCLUDE_TESTS
-        // Seam: inject in tests instead of spawning /bin/zsh (mirrors FindObjectOverride pattern)
+        // Seam: inject in tests instead of spawning a shell (mirrors FindObjectOverride pattern)
         internal static Func<string, string> WhichOverride;
         internal static void ResetCacheForTests() { _cached = null; _probed = false; }
 #endif
@@ -25,7 +29,6 @@ namespace UnityMCP.Editor.Chat
         /// </summary>
         internal static string Resolve(bool forceRefresh = false)
         {
-            // EditorPrefs override always wins (bypasses cache entirely)
             var pref = EditorPrefs.GetString(PrefKey, "");
             if (!string.IsNullOrEmpty(pref)) return pref;
 
@@ -38,11 +41,18 @@ namespace UnityMCP.Editor.Chat
 
         /// <summary>
         /// Resolve an arbitrary CLI binary by name via login shell (no PrefKey/cache).
-        /// For "claude", delegates to <see cref="Resolve()"/> to honour EditorPrefs override.
+        /// For "claude" delegates to <see cref="Resolve()"/> to honour EditorPrefs + cache.
+        /// For other binaries, checks a per-binary EditorPrefs key first.
         /// </summary>
         internal static string Resolve(string binaryName)
         {
             if (binaryName == "claude") return Resolve();
+
+            // Per-backend EditorPrefs escape-hatch (R1: codex, etc.)
+            var overrideKey  = $"UnityMCP_Chat_Path_{binaryName}";
+            var overridePref = EditorPrefs.GetString(overrideKey, "");
+            if (!string.IsNullOrEmpty(overridePref)) return overridePref;
+
             return WhichViaSh(binaryName);
         }
 
@@ -53,10 +63,61 @@ namespace UnityMCP.Editor.Chat
 #endif
             try
             {
-                var psi = LoginShellCommand.Create("command -v \"$1\"", binary);
+                ProcessStartInfo psi;
+                switch (SystemInfo.operatingSystemFamily)
+                {
+                    case OperatingSystemFamily.Windows:
+                        psi = new ProcessStartInfo("where.exe", binary)
+                        {
+                            UseShellExecute        = false,
+                            RedirectStandardOutput = true,
+                            CreateNoWindow         = true,
+                        };
+                        // CWD-hijack mitigation (MITRE T1574.008)
+                        psi.EnvironmentVariables["NoDefaultCurrentDirectoryInExePath"] = "1";
+                        break;
+
+                    case OperatingSystemFamily.Linux:
+                        // -lic: login+interactive so ~/.bashrc (nvm/pyenv/mise) is sourced.
+                        // bash -lc skips .bashrc due to non-interactive guard.
+                        var shell     = File.Exists("/bin/bash") ? "/bin/bash" : "/bin/sh";
+                        var shellName = Path.GetFileName(shell);
+                        var bashArgs  = $"-lic 'command -v \"$1\"' {shellName} {LoginShellCommand.ShellQuoteSingle(binary)}";
+                        psi = new ProcessStartInfo(shell, bashArgs)
+                        {
+                            UseShellExecute        = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError  = true,  // suppress "no job control" warning
+                            CreateNoWindow         = true,
+                        };
+                        break;
+
+                    default: // macOS
+                        psi = LoginShellCommand.Create("command -v \"$1\"", binary);
+                        break;
+                }
+
                 using var p = Process.Start(psi);
-                var result = p?.StandardOutput.ReadToEnd().Trim();
-                if (p != null && !p.WaitForExit(3000)) { try { p.Kill(); } catch { } }
+                if (p == null) return null;
+
+                string result;
+                if (SystemInfo.operatingSystemFamily == OperatingSystemFamily.Windows)
+                {
+                    result = PickWindowsPath(p.StandardOutput.ReadToEnd());
+                }
+                else if (SystemInfo.operatingSystemFamily == OperatingSystemFamily.Linux)
+                {
+                    var allOutput = p.StandardOutput.ReadToEnd();
+                    try { p.StandardError.ReadToEnd(); } catch { } // drain stderr (suppress "no job control")
+                    result = PickLinuxPath(allOutput);
+                }
+                else
+                {
+                    // macOS: interior newline after Trim() == banner contamination → reject.
+                    result = RejectIfMultiline(p.StandardOutput.ReadToEnd().Trim());
+                }
+
+                if (!p.WaitForExit(3000)) { try { p.Kill(); } catch { } }
                 return string.IsNullOrEmpty(result) ? null : result;
             }
             catch
@@ -64,5 +125,50 @@ namespace UnityMCP.Editor.Chat
                 return null;
             }
         }
+
+        // ── Output-parsing helpers (internal for unit tests) ─────────────────
+
+        /// <summary>
+        /// From multi-line where.exe output, return first .exe line (preferred),
+        /// then first .cmd line, else null. Extensionless npm bash-shim lines are rejected.
+        /// </summary>
+        internal static string PickWindowsPath(string whereOutput)
+        {
+            string exeLine = null, cmdLine = null;
+            foreach (var raw in whereOutput.Split('\n'))
+            {
+                var line = raw.Trim();
+                if (string.IsNullOrEmpty(line)) continue;
+                if (exeLine == null && line.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    exeLine = line;
+                if (cmdLine == null && line.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase))
+                    cmdLine = line;
+            }
+            return exeLine ?? cmdLine;
+        }
+
+        /// <summary>
+        /// From bash -lic output, return the last line starting with '/' (the real path).
+        /// Interactive .bashrc banners precede the path and don't start with '/'.
+        /// </summary>
+        internal static string PickLinuxPath(string stdout)
+        {
+            var lines = stdout.Split('\n');
+            for (int i = lines.Length - 1; i >= 0; i--)
+            {
+                var line = lines[i].Trim();
+                if (line.Length > 0 && line[0] == '/') return line;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Returns null if trimmedOutput contains an interior '\n' (banner contamination).
+        /// Otherwise returns the value unchanged.
+        /// Interior newline after Trim() means multiple output lines were received — reject
+        /// to avoid treating a banner line as a valid path.
+        /// </summary>
+        internal static string RejectIfMultiline(string trimmedOutput)
+            => (trimmedOutput != null && trimmedOutput.Contains("\n")) ? null : trimmedOutput;
     }
 }

@@ -51,12 +51,18 @@ namespace UnityMCP.Editor.Chat
 
         /// <summary>
         /// Resolves the Python command and args for the server.
-        /// Resolution order: venv python → uv (resolvedUvPath) → python3.
+        /// Resolution order: .venv/Scripts/python.exe (Windows) → .venv/bin/python →
+        ///   uv (resolvedUvPath) → python (Windows) / python3 (others).
         /// <para>Pass a pre-resolved absolute uv path (or null) to keep this unit-testable
         /// without depending on the host having uv in PATH.</para>
         /// </summary>
         public static (string command, string[] args) ResolvePythonCommand(string serverDir, string resolvedUvPath)
         {
+            // Windows venv: Scripts/python.exe (checked first — File.Exists is pure/cross-platform)
+            var winVenvPy = Path.Combine(serverDir, ".venv", "Scripts", "python.exe");
+            if (File.Exists(winVenvPy))
+                return (winVenvPy, new[] { "-m", "unity_mcp.server" });
+
             var venvPython = Path.Combine(serverDir, ".venv", "bin", "python");
             if (File.Exists(venvPython))
                 return (venvPython, new[] { "-m", "unity_mcp.server" });
@@ -64,25 +70,17 @@ namespace UnityMCP.Editor.Chat
             if (!string.IsNullOrEmpty(resolvedUvPath))
                 return (resolvedUvPath, new[] { "run", "--directory", serverDir, "unity-mcp" });
 
-            return ("python3", new[] { "-m", "unity_mcp.server" });
+            // Platform-aware fallback: python on Windows, python3 elsewhere
+            var fallback = SystemInfo.operatingSystemFamily == OperatingSystemFamily.Windows
+                ? "python" : "python3";
+            return (fallback, new[] { "-m", "unity_mcp.server" });
         }
 
         /// <summary>
-        /// Resolves uv's absolute path via the login shell (handles macOS GUI truncated PATH).
+        /// Resolves uv's absolute path via the login shell (DRY — delegates to ChatBinaryResolver).
         /// Returns null if uv is not found.
         /// </summary>
-        private static string ResolveUvPath()
-        {
-            try
-            {
-                var psi = LoginShellCommand.Create("command -v \"$1\"", "uv");
-                using var p = System.Diagnostics.Process.Start(psi);
-                var result = p?.StandardOutput.ReadToEnd().Trim();
-                if (p != null && !p.WaitForExit(3000)) { try { p.Kill(); } catch { } }
-                return string.IsNullOrEmpty(result) ? null : result;
-            }
-            catch { return null; }
-        }
+        private static string ResolveUvPath() => ChatBinaryResolver.Resolve("uv");
 
         /// <summary>
         /// Resolves everything, writes the config to a stable temp file, and returns its path.

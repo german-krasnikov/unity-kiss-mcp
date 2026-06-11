@@ -2,6 +2,7 @@
 // P4: BuildChipDisplayForm replaces hardcoded BuildChipConfigForm — registry-driven.
 using System;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -101,6 +102,25 @@ namespace UnityMCP.Editor.Chat
             CodexBackendConfig config,
             Action onSave)
         {
+            // Binary path override (R1 — escape hatch when where.exe/which can't find codex)
+            var autoCodexPath = ChatBinaryResolver.Resolve("codex");
+            var codexPathHint = new Label($"Auto: {autoCodexPath ?? "not found"}");
+            codexPathHint.style.fontSize = 10;
+            codexPathHint.style.color    = new StyleColor(autoCodexPath != null
+                ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
+            parent.Add(codexPathHint);
+
+            var codexPathField = new TextField("Binary Path")
+                { value = EditorPrefs.GetString(ChatBinaryResolver.CodexPrefKey, "") };
+            codexPathField.RegisterValueChangedCallback(e =>
+            {
+                if (string.IsNullOrEmpty(e.newValue))
+                    EditorPrefs.DeleteKey(ChatBinaryResolver.CodexPrefKey);
+                else
+                    EditorPrefs.SetString(ChatBinaryResolver.CodexPrefKey, e.newValue);
+            });
+            parent.Add(codexPathField);
+
             var modelField = new TextField("Model") { value = config.Model };
             modelField.RegisterValueChangedCallback(e => { config.Model = e.newValue; onSave(); });
             parent.Add(modelField);

@@ -54,15 +54,43 @@ namespace UnityMCP.Editor.Chat
         {
             if (IsRunning) return;
 
-            var psi = new ProcessStartInfo(binaryPath)
+            // Windows: .cmd/.bat shims (npm installs) cannot be executed by CreateProcess directly
+            // under Unity Mono (Win32Exception 193). Route through cmd.exe /c instead.
+            // Note on arg quoting: TOML -c args contain embedded " escaped as \" by QuoteWindows.
+            // cmd.exe does NOT honour \" natively, but npm shims (codex.cmd, claude.cmd) use %* to
+            // forward all args verbatim to node, whose CRT re-parses \" correctly.
+            // This works for %*-style npm shims but would break a .bat that uses positional %1/%2.
+            // TODO: must validate on real Windows before shipping.
+            var isCmdShim = SystemInfo.operatingSystemFamily == OperatingSystemFamily.Windows
+                         && (binaryPath.EndsWith(".cmd", System.StringComparison.OrdinalIgnoreCase)
+                          || binaryPath.EndsWith(".bat", System.StringComparison.OrdinalIgnoreCase));
+
+            ProcessStartInfo psi;
+            if (isCmdShim)
             {
-                UseShellExecute        = false,
-                RedirectStandardInput  = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError  = true,
-                CreateNoWindow         = true,
-                Arguments              = string.Join(" ", QuoteArgs(args)),
-            };
+                psi = new ProcessStartInfo("cmd.exe")
+                {
+                    UseShellExecute        = false,
+                    RedirectStandardInput  = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    CreateNoWindow         = true,
+                    Arguments              = "/c " + ArgQuoting.QuoteWindows(binaryPath)
+                                             + " " + string.Join(" ", QuoteArgs(args)),
+                };
+            }
+            else
+            {
+                psi = new ProcessStartInfo(binaryPath)
+                {
+                    UseShellExecute        = false,
+                    RedirectStandardInput  = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
+                    CreateNoWindow         = true,
+                    Arguments              = string.Join(" ", QuoteArgs(args)),
+                };
+            }
 
             // Strip env keys that would override subscription auth
             foreach (var key in stripEnvKeys)

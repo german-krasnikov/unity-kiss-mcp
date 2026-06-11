@@ -8,7 +8,10 @@ from unittest.mock import patch, call, MagicMock
 
 import pytest
 
-from unity_mcp.lockfile import acquire_lock, release_lock, read_pid_from_port_file, is_pid_alive
+from unity_mcp.lockfile import (
+    acquire_lock, release_lock, read_pid_from_port_file, is_pid_alive,
+    _lock_nb, _unlock,
+)
 
 
 def test_acquire_creates_file_with_pid(tmp_path):
@@ -259,3 +262,78 @@ def test_lockfile_cleanup_on_abnormal_exit(tmp_path):
     fd2 = acquire_lock(lock_dir=tmp_path, port=9500)
     assert fd2 is not None
     release_lock(fd2)
+
+
+# ---------------------------------------------------------------------------
+# Cross-platform abstraction layer tests (B5)
+# ---------------------------------------------------------------------------
+
+def test_lock_nb_and_unlock_importable():
+    """_lock_nb and _unlock are importable and callable (abstraction boundary)."""
+    assert callable(_lock_nb)
+    assert callable(_unlock)
+
+
+def test_is_pid_alive_permission_error_returns_true():
+    """PermissionError from os.kill means process exists but we can't signal it — return True."""
+    with patch("os.kill", side_effect=PermissionError("operation not permitted")):
+        assert is_pid_alive(12345) is True
+
+
+def test_is_unity_mcp_pid_powershell_match(monkeypatch):
+    """On Windows (mocked), PowerShell CIM returns cmdline with unity_mcp → True."""
+    import unity_mcp.lockfile as lm
+    monkeypatch.setattr(lm, "_IS_WIN", True)
+    cmdline = b"python -m unity_mcp.server\r\n"
+    with patch("subprocess.check_output", return_value=cmdline):
+        result = lm._is_unity_mcp_pid(12345)
+    assert result is True
+
+
+def test_is_unity_mcp_pid_powershell_no_match(monkeypatch):
+    """On Windows (mocked), PowerShell CIM returns unrelated cmdline → False."""
+    import unity_mcp.lockfile as lm
+    monkeypatch.setattr(lm, "_IS_WIN", True)
+    with patch("subprocess.check_output", return_value=b"C:\\Windows\\system32\\notepad.exe\r\n"):
+        result = lm._is_unity_mcp_pid(12345)
+    assert result is False
+
+
+def test_is_unity_mcp_pid_powershell_fails_tasklist_fallback_match(monkeypatch):
+    """When PowerShell fails, falls back to tasklist; 'python' in output → True (weak check)."""
+    import unity_mcp.lockfile as lm
+    monkeypatch.setattr(lm, "_IS_WIN", True)
+    csv_output = b'"python.exe","12345","Console","1","12,345 K"\r\n'
+    call_count = {"n": 0}
+    def check_output_side_effect(cmd, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise FileNotFoundError("powershell not found")
+        return csv_output
+    with patch("subprocess.check_output", side_effect=check_output_side_effect):
+        result = lm._is_unity_mcp_pid(12345)
+    assert result is True
+
+
+def test_is_unity_mcp_pid_powershell_fails_tasklist_fallback_no_match(monkeypatch):
+    """When PowerShell fails, falls back to tasklist; no 'python' → False."""
+    import unity_mcp.lockfile as lm
+    monkeypatch.setattr(lm, "_IS_WIN", True)
+    call_count = {"n": 0}
+    def check_output_side_effect(cmd, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise FileNotFoundError("powershell not found")
+        return b"INFO: No tasks running.\r\n"
+    with patch("subprocess.check_output", side_effect=check_output_side_effect):
+        result = lm._is_unity_mcp_pid(12345)
+    assert result is False
+
+
+def test_is_unity_mcp_pid_all_fallbacks_fail(monkeypatch):
+    """When both PowerShell and tasklist raise OSError → return False (fail-safe)."""
+    import unity_mcp.lockfile as lm
+    monkeypatch.setattr(lm, "_IS_WIN", True)
+    with patch("subprocess.check_output", side_effect=OSError("all gone")):
+        result = lm._is_unity_mcp_pid(12345)
+    assert result is False

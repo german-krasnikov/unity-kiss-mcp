@@ -2,6 +2,7 @@
 // One process per session; MCP server stays connected across all turns.
 using System.Collections.Generic;
 using System.IO;
+using UnityEngine;
 using UnityMCP.Editor;
 
 namespace UnityMCP.Editor.Chat
@@ -33,8 +34,8 @@ namespace UnityMCP.Editor.Chat
                 (_pythonCommand, _pythonArgs) = ChatMcpConfigWriter.ResolvePythonCommand(serverDir, null);
             else
             {
-                _pythonCommand = "python3";
-                _pythonArgs    = new[] { "-m", "unity_mcp.server" };
+                _pythonCommand = CodexArgBuilder.PythonFallback;
+                _pythonArgs = new[] { "-m", "unity_mcp.server" };
             }
         }
 
@@ -45,7 +46,7 @@ namespace UnityMCP.Editor.Chat
             // resumeId is irrelevant here — thread resume goes via JSON-RPC, not argv
             var args = new List<string> { "app-server" };
             args.Add("-c");
-            args.Add($"mcp_servers.unity.command=\"{CodexArgBuilder.TomlEscapeString(_pythonCommand ?? "python3")}\"");
+            args.Add($"mcp_servers.unity.command=\"{CodexArgBuilder.TomlEscapeString(_pythonCommand ?? CodexArgBuilder.PythonFallback)}\"");
             args.Add("-c");
             args.Add($"mcp_servers.unity.args=[{BuildTomlArray(_pythonArgs)}]");
             args.Add("-c");

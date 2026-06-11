@@ -251,10 +251,11 @@ install_list_tools_filter(mcp, lambda: slot, lambda: _disabled_tools_cache)
 
 def main():
     import signal
-    try:
-        signal.signal(signal.SIGPIPE, signal.SIG_IGN)
-    except (OSError, ValueError):
-        pass
+    if hasattr(signal, "SIGPIPE"):
+        try:
+            signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+        except (OSError, ValueError):
+            pass
     transport = os.environ.get("UNITY_MCP_TRANSPORT", "stdio")
     try:
         if transport == "http":
