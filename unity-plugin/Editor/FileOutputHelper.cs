@@ -9,6 +9,7 @@ namespace UnityMCP.Editor
         public const int TEXT_THRESHOLD = 81920; // 80KB
 
         private static string _outputDir;
+        private static string _screenshotsDir;
 
         public static string OutputDir
         {
@@ -23,6 +24,19 @@ namespace UnityMCP.Editor
             }
         }
 
+        public static string ScreenshotsDir
+        {
+            get
+            {
+                if (_screenshotsDir == null)
+                {
+                    _screenshotsDir = Path.Combine(Application.dataPath, "..", "ScreenShots");
+                    Directory.CreateDirectory(_screenshotsDir);
+                }
+                return _screenshotsDir;
+            }
+        }
+
         public static string WriteText(string content, string prefix = "output")
         {
             Cleanup();
@@ -33,8 +47,7 @@ namespace UnityMCP.Editor
 
         public static string WritePng(byte[] pngData, string prefix = "screenshot")
         {
-            Cleanup();
-            var path = Path.Combine(OutputDir, $"{prefix}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.png");
+            var path = Path.Combine(ScreenshotsDir, $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss}_{prefix}.png");
             File.WriteAllBytes(path, pngData);
             return path;
         }

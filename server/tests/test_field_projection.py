@@ -1,6 +1,7 @@
-"""F07: get_component/inspect `fields=` projection wiring (tool level)."""
+"""F07: get_component/inspect `fields=` projection wiring (tool level). D4: full= param."""
 import pytest
 from unity_mcp.tools import objects
+from unity_mcp.tools import scene
 
 
 def _args(**kwargs):
@@ -41,3 +42,87 @@ async def test_inspect_fields_projects(fake_send):
     assert fake_send["args"].get("_no_strip") is True
     assert "m_Mass: 2" in result
     assert "m_Drag" not in result
+
+
+# ── D4: full= parameter ────────────────────────────────────────────────────────
+
+@pytest.fixture
+def fake_send_scene(monkeypatch):
+    sent = {}
+    HIER = "Scene\n/Player\n/Enemy\n"
+
+    async def send_fn(cmd, args, timeout=30.0):
+        sent["cmd"], sent["args"] = cmd, args
+        return HIER
+
+    monkeypatch.setattr(scene, "_send", send_fn)
+    monkeypatch.setattr(scene, "_args", _args)
+    return sent
+
+
+@pytest.mark.asyncio
+async def test_get_component_full_sets_no_distill(monkeypatch):
+    sent = {}
+
+    async def send_fn(cmd, args, timeout=30.0):
+        sent["cmd"], sent["args"] = cmd, args
+        return "[Transform]\nm_Mass: 2\n"
+
+    monkeypatch.setattr(objects, "_send", send_fn)
+    monkeypatch.setattr(objects, "_args", _args)
+    await objects.get_component("/Cube", "Transform", full=True)
+    assert sent["args"].get("_no_distill") is True
+
+
+@pytest.mark.asyncio
+async def test_get_component_full_false_no_flag(monkeypatch):
+    sent = {}
+
+    async def send_fn(cmd, args, timeout=30.0):
+        sent["cmd"], sent["args"] = cmd, args
+        return "[Transform]\nm_Mass: 2\n"
+
+    monkeypatch.setattr(objects, "_send", send_fn)
+    monkeypatch.setattr(objects, "_args", _args)
+    await objects.get_component("/Cube", "Transform", full=False)
+    assert "_no_distill" not in sent["args"]
+
+
+@pytest.mark.asyncio
+async def test_inspect_full_sets_no_distill(monkeypatch):
+    sent = {}
+
+    async def send_fn(cmd, args, timeout=30.0):
+        sent["cmd"], sent["args"] = cmd, args
+        return "[Transform]\nm_Mass: 2\n"
+
+    monkeypatch.setattr(objects, "_send", send_fn)
+    monkeypatch.setattr(objects, "_args", _args)
+    await objects.inspect("/A,/B", full=True)
+    assert sent["args"].get("_no_distill") is True
+
+
+@pytest.mark.asyncio
+async def test_get_object_detail_full_sets_no_distill(monkeypatch):
+    sent = {}
+
+    async def send_fn(cmd, args, timeout=30.0):
+        sent["cmd"], sent["args"] = cmd, args
+        return "detail output\n"
+
+    monkeypatch.setattr(objects, "_send", send_fn)
+    monkeypatch.setattr(objects, "_args", _args)
+    await objects.get_object_detail(42, full=True)
+    assert sent["args"].get("_no_distill") is True
+
+
+@pytest.mark.asyncio
+async def test_get_hierarchy_full_sets_no_distill(fake_send_scene):
+    await scene.get_hierarchy(full=True)
+    assert fake_send_scene["args"].get("_no_distill") is True
+
+
+@pytest.mark.asyncio
+async def test_get_hierarchy_full_false_no_flag(fake_send_scene):
+    await scene.get_hierarchy(full=False)
+    assert "_no_distill" not in fake_send_scene["args"]

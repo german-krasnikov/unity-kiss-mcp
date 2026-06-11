@@ -1,3 +1,8 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "unity": {
+      "command": "uv",
+      "args": ["run", "--directory", "server", "unity-mcp"]
+    }
+  }
 }

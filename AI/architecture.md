@@ -48,8 +48,8 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 
 2. **TCP Bridge** (Python: `bridge.py` + `connection_slot.py` + `lockfile.py` + `compile_state.py` + `server_filtering.py`)
    - **ConnectionSlot**: dual per-project connections (CLI main + Chat agent-only) with project-based discovery
-   - **Port Discovery** (`server_filtering.py:read_unity_port`): CWD-based project matching → ~/.unity-mcp/ports/*.port files → env UNITY_MCP_PORT → default 9500. Candidates ranked by project path match (CWD), then mtime. PermissionError (cross-user processes) skipped gracefully, live .port files preserved.
-   - **Fail-Fast Lockfile** (`lockfile.py`): RuntimeError raised on live process (instead of SIGTERM) to let Python server handle reconnection logic cleanly.
+   - **Port Discovery** (`server_filtering.py:read_unity_port`, v0.23.0): CWD-based project matching → ~/.unity-mcp/ports/*.port files → env UNITY_MCP_PORT → default 9500. **v0.23.0: TCP probe** filters stale discovery files (port written but not listening). Candidates ranked by project path match (CWD), then mtime. PermissionError (cross-user processes) skipped gracefully, live .port files preserved.
+   - **Fail-Fast Lockfile** (`lockfile.py`): RuntimeError raised on live process (instead of SIGTERM) to let Python server handle reconnection logic cleanly. **v0.23.0: Zombie detection** — `_is_zombie(pid)` check prevents treating defunct processes as "live", allowing fast server startup without waiting for cleanup.
    - **UnityBridge**: AsyncIO TCP client, 4-byte BE length prefix JSON
    - Socket: TCP_NODELAY, SO_KEEPALIVE (idle=60s, interval=10s, count=3 on macOS/Linux)
    - **Heartbeat**: 15s interval, raw ping, 3 consecutive failures → close, 2s polling when disconnected (5s when busy). Sole reconnect mechanism.
@@ -59,12 +59,13 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      * **macOS/Linux**: `fcntl.flock` (advisory, whole-file lock)
      * **Windows**: `msvcrt.locking` on sentinel byte at offset 1024 (non-blocking, avoids mandatory lock of PID data at bytes 0-31)
      * Kills stale servers: SIGTERM→SIGKILL (Unix), TerminateProcess (Windows)
+     * **v0.23.0: Zombie detection** via `_is_zombie()` prevents stale defunct processes from blocking reconnection
    - **SIGPIPE handling**: guarded with `hasattr(signal, "SIGPIPE")` since Windows lacks SIGPIPE. Suppressed on Unix to prevent server crash on client disconnect.
    - Reconnect: cooldown MIN_RECONNECT_INTERVAL=2.0s, ping verification, fires callbacks
    - Max message: 10MB, timeouts: 30s default, 60s compile_preflight/batch, 120s run_tests/run_playtest/fuzz_playtest
 
 3. **Unity Plugin** (C#: 72+ files, ~13600 LOC)
-   - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections
+   - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, **v0.23.0: SO_REUSEPORT** (macOS/Linux) for rapid reconnect recovery, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections
    - **PortResolver.cs**: Pure testable helpers (ResolvePort, ResolveChatPort, FindFreePort, SavePorts, IsValidPort, ParsePortFromJson) with 25 NUnit tests. Validates 1024–65535 range, skips reserved ports, fallback to OS-assigned via port 0
    - **CommandRouter.cs**: RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutatingCommand/IsRuntimeCommand
    - **PluginRegistry.cs**: Static registry for IMCPPlugin implementations. Plugins register via `[InitializeOnLoad]`. One-way asmdef dependency: external → public.
@@ -74,7 +75,9 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **ValueParser.cs**: vectors, quaternions, colors, arrays, type-aware SetPropertyValue
    - **InputNormalizer.cs**: component/property/value normalization
    - **BatchHelper.cs**: multi-command text parser + executor (on_error=continue/stop)
-   - **7 Serializers**: HierarchySerializer (tree, MAX_NODES=3000, incremental, summary), ComponentSerializer (key-value, UnityEvent expansion, PrefabStage-aware), AnimationSerializer, TimelineSerializer, AnimatorControllerSerializer, ParticleSerializer, ShaderSerializer
+   - **7 Serializers**: HierarchySerializer (tree, MAX_NODES=3000, incremental, summary), ComponentSerializer (key-value, UnityEvent expansion, PrefabStage-aware, **v0.23.0: #instanceID in all path tools**), AnimationSerializer, TimelineSerializer, AnimatorControllerSerializer, ParticleSerializer, ShaderSerializer
+   - **ObjectManager (v0.23.0 fixes)**: Properties.cs auto-redirects `set_property("active")` to SetActive. Lookup.cs adds FindType + short-name fallback for custom components.
+   - **FileOutputHelper (v0.23.0)**: ScreenshotsDir now `<ProjectRoot>/ScreenShots/` (project-local, not shared cache)
    - **RefManager**: short refs $a-$zz (702 slots), invalidated on scene change
    - **ErrorHelper**: contextual errors with did-you-mean hints
 
@@ -192,7 +195,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 17. Console Error Categorization — hints for NullRef, MissingComponent, FormatException
 18. PrefetchCache — predicted reads after writes
 19. HierarchyDiff — returns unified diff when <50% changed
-20. Distiller — heuristic + Haiku background distillation of large responses
+20. Distiller — heuristic + Haiku background distillation of large responses (**v0.23.0: full param + cache key fix**)
 21. Disambiguator — resolves ambiguous paths via context clues
 22. SchemaGuard — pre-flight argument validation
 23. Asymmetric Reflection — compares write args vs read-back snapshot
@@ -205,6 +208,12 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **ProactiveWatchdog** (`UNITY_MCP_WATCHDOG`): background validate_references + console scan
 - **SessionContext/Inferrer** (`UNITY_MCP_INFERENCE`): argument inference
 - **CostTracker/BudgetRouter** (`UNITY_MCP_BUDGET`, default ON): Haiku spend tracking
+
+### v0.23.0 Tool Fixes
+- **compressor.py**: `_FIELD_ALIASES` dict for field projection (bypass distill)
+- **objects.py**: `full` param to bypass distill filtering
+- **scene.py**: `full: bool = False` parameter for scene tools
+- **middleware_async.py**: distill cache key collision fix (include full flag)
 
 ### Auto-Batch (Python: `tools/autobatch.py`)
 - `setup_objects(specs)` — create+configure multiple objects (one per line DSL)

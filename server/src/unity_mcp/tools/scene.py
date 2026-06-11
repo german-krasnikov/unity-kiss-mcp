@@ -50,14 +50,16 @@ def compress_hierarchy(text: str) -> str:
 
 async def get_hierarchy(depth: int = 2, root: str | None = None, filter: str | None = None,
                         components: bool = False, compress: bool = False,
-                        summary: bool = False, incremental: bool = False) -> str:
-    """Scene hierarchy as text tree. Max 3000 nodes. Use filter/depth to narrow. Set components=true to see component types. Set compress=true to group repeated slots/points/meshes. Set summary=true for compact root-only counts (60-100 tokens). Set incremental=true to get NO_CHANGE if scene unchanged since last call."""
+                        summary: bool = False, incremental: bool = False, full: bool = False) -> str:
+    """Scene hierarchy as text tree. Max 3000 nodes. Use filter/depth to narrow. Set components=true to see component types. Set compress=true to group repeated slots/points/meshes. Set summary=true for compact root-only counts (60-100 tokens). Set incremental=true to get NO_CHANGE if scene unchanged since last call. full=True: bypass distillation."""
+    no_distill = {"_no_distill": True} if full else {}
     if summary:
-        return await _send("get_hierarchy", _args(root=root, summary="true"))
+        return await _send("get_hierarchy", _args(root=root, summary="true", **no_distill))
     result = await _send("get_hierarchy", _args(
         depth=depth, root=root, filter=filter,
         components="true" if components else None,
-        incremental="true" if incremental else None))
+        incremental="true" if incremental else None,
+        **no_distill))
     if compress:
         result = compress_hierarchy(result)
     return result

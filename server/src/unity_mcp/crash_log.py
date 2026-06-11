@@ -2,8 +2,30 @@
 import atexit
 import json
 import time
+import traceback
 from pathlib import Path
 from typing import Optional
+
+
+def _crash_path(log_dir: Optional[Path] = None) -> Path:
+    return Path(log_dir or Path.home() / ".unity-mcp") / "crash.jsonl"
+
+
+def log_crash(exc: BaseException, *, log_dir=None) -> None:
+    try:
+        path = _crash_path(log_dir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ev": "crash",
+            "t": time.time(),
+            "exc": type(exc).__name__,
+            "msg": str(exc),
+            "tb": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
+        }
+        with path.open("a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
 
 
 class CrashLogger:
@@ -12,9 +34,7 @@ class CrashLogger:
     MAX_BYTES = 15 * 1024 * 1024  # 15 MB
 
     def __init__(self, log_dir: Optional[Path] = None, max_entries: int = 500):
-        if log_dir is None:
-            log_dir = Path.home() / ".unity-mcp"
-        self._path = Path(log_dir) / "crash.jsonl"
+        self._path = _crash_path(log_dir)
         self._closed = False
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)

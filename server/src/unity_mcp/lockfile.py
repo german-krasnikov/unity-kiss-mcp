@@ -63,6 +63,20 @@ def _read_pid_from_fd(fd: int) -> Optional[int]:
         return None
 
 
+def _is_zombie(pid: int) -> bool:
+    """Return True if process is a zombie (stat contains 'Z'). Windows always False."""
+    if _IS_WIN:
+        return False
+    try:
+        out = subprocess.check_output(
+            ["ps", "-p", str(pid), "-o", "stat="],
+            stderr=subprocess.DEVNULL,
+        )
+        return b"Z" in out
+    except subprocess.CalledProcessError:
+        return False
+
+
 def _is_unity_mcp_pid(pid: int) -> bool:
     """Return True if pid's cmdline belongs to unity_mcp."""
     if _IS_WIN:
@@ -137,7 +151,7 @@ def acquire_lock(lock_dir=None, port: int = 9500) -> int:
                 break
             # PID data (bytes 0-31) is always readable — outside locked region.
             old_pid = _read_pid_from_fd(fd)
-            if old_pid and is_pid_alive(old_pid) and _is_unity_mcp_pid(old_pid):
+            if old_pid and is_pid_alive(old_pid) and not _is_zombie(old_pid) and _is_unity_mcp_pid(old_pid):
                 # Fail-fast: another live session owns this port — don't kill it
                 os.close(fd)
                 raise RuntimeError(

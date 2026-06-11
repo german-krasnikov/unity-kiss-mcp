@@ -1,5 +1,13 @@
 """Strip default values from component read responses to save tokens."""
 
+_FIELD_ALIASES = {
+    "position": "m_localposition", "localposition": "m_localposition",
+    "rotation": "m_localrotation", "localrotation": "m_localrotation",
+    "scale": "m_localscale", "localscale": "m_localscale",
+    "mass": "m_mass", "enabled": "m_enabled", "active": "m_isactive",
+    "name": "m_name", "tag": "m_tagstring", "layer": "m_layer",
+}
+
 _DEFAULTS = frozenset({
     "0", "0.0", "false", "null", "None", '""',
     "(0, 0, 0)", "(0.0, 0.0, 0.0)",
@@ -17,7 +25,15 @@ def project_fields(text: str, fields: str) -> str:
     """F07: keep only lines whose key matches a requested field (exact or dotted-prefix,
     case-insensitive). Always keep headers ([...]), separators (---), error/blank lines.
     Requesting 'm_LocalPosition' keeps 'm_LocalPosition.x/y/z'; 'pos' does NOT match 'position'."""
-    wanted = [f.strip().lower() for f in (fields or "").split(",") if f.strip()]
+    wanted = []
+    for f in (fields or "").split(","):
+        raw = f.strip().lower()
+        if not raw:
+            continue
+        wanted.append(raw)
+        alias = _FIELD_ALIASES.get(raw)
+        if alias and alias != raw:
+            wanted.append(alias)
     if not wanted:
         return text
     out = []

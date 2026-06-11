@@ -65,13 +65,20 @@ def count_mcp_tools(src_dir: pathlib.Path) -> Optional[int]:
     return count
 
 
+def _python_for(tests_dir: pathlib.Path) -> str:
+    """Return venv python if present next to tests_dir, else sys.executable."""
+    # tests_dir is typically server/tests — check server/.venv/bin/python
+    venv = tests_dir.parent / ".venv" / "bin" / "python"
+    return str(venv) if venv.exists() else sys.executable
+
+
 def count_pytest_tests(tests_dir: pathlib.Path) -> Optional[int]:
-    """Run pytest --collect-only and count '::' lines."""
+    """Run pytest --collect-only and count '::' lines (excludes live tests)."""
     if not tests_dir.exists():
         return None
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", str(tests_dir),
+            [_python_for(tests_dir), "-m", "pytest", str(tests_dir),
              "--co", "-q", "--no-header", "-m", "not live"],
             capture_output=True, text=True, timeout=120,
         )
@@ -80,6 +87,33 @@ def count_pytest_tests(tests_dir: pathlib.Path) -> Optional[int]:
     except Exception as e:
         warnings.warn(f"pytest collection failed: {e}")
         return None
+
+
+def count_live_tests(tests_dir: pathlib.Path) -> Optional[int]:
+    """Run pytest --collect-only with -m live and count '::' lines."""
+    if not tests_dir.exists():
+        return None
+    try:
+        result = subprocess.run(
+            [_python_for(tests_dir), "-m", "pytest", str(tests_dir),
+             "--co", "-q", "--no-header", "-m", "live"],
+            capture_output=True, text=True, timeout=120,
+        )
+        lines = result.stdout.splitlines()
+        return sum(1 for l in lines if "::" in l)
+    except Exception as e:
+        warnings.warn(f"pytest live collection failed: {e}")
+        return None
+
+
+def count_nunit_tests(editor_dir: pathlib.Path) -> Optional[int]:
+    """Count [Test] attributes in unity-plugin/Editor/**/*.cs."""
+    if not editor_dir.exists():
+        return None
+    count = 0
+    for cs in editor_dir.rglob("*.cs"):
+        count += cs.read_text(encoding="utf-8", errors="ignore").count("[Test]")
+    return count
 
 
 def read_server_version(pyproject: pathlib.Path) -> Optional[str]:
@@ -116,7 +150,8 @@ def generate_changelog_details(text: str, n: int = 5) -> str:
     Older versions go into a collapsed "Older releases" list.
     """
     parts = re.split(r"(?=^## \[)", text, flags=re.MULTILINE)
-    releases = [p for p in parts if re.match(r"## \[", p)]
+    releases = [p for p in parts
+                if re.match(r"## \[", p) and "Unreleased" not in p.splitlines()[0]]
 
     def parse_entry(block: str) -> tuple[str, str, str, str]:
         """Return (version, date, title, first_sentence)."""
@@ -126,7 +161,7 @@ def generate_changelog_details(text: str, n: int = 5) -> str:
             return "?", "?", "", ""
         ver, date, rest = m.group(1).strip(), m.group(2).strip(), m.group(3)
 
-        svg_m = re.search(r"<!--\s*svg:\s*(.+?)\s*-->", rest)
+        svg_m = re.search(r"<!--\s*(?:svg:\s*)?(.+?)\s*-->", rest)
         title = svg_m.group(1) if svg_m else ""
 
         bullets = [l for l in block.splitlines()[1:] if l.strip().startswith("- ")]
@@ -211,8 +246,15 @@ def make_badge_json(label: str, message: str, color: str) -> dict:
     return {"schemaVersion": 1, "label": label, "message": message, "color": color}
 
 
-def update_stats_svg(svg: str, tools: Optional[int], tests: Optional[int]) -> str:
-    """Replace <!-- STAT:TOOLS -->N<!-- /STAT --> and <!-- STAT:TESTS -->N<!-- /STAT -->."""
+def update_stats_svg(
+    svg: str,
+    tools: Optional[int],
+    tests: Optional[int],
+    python_tests: Optional[int] = None,
+    nunit_tests: Optional[int] = None,
+    live_tests: Optional[int] = None,
+) -> str:
+    """Update STAT markers, aria-label, and subtitle line in stats.svg."""
     if tools is not None:
         svg = re.sub(
             r"<!-- STAT:TOOLS -->[^<]*<!-- /STAT -->",
@@ -223,6 +265,25 @@ def update_stats_svg(svg: str, tools: Optional[int], tests: Optional[int]) -> st
         svg = re.sub(
             r"<!-- STAT:TESTS -->[^<]*<!-- /STAT -->",
             f"<!-- STAT:TESTS -->{tests}<!-- /STAT -->",
+            svg,
+        )
+    # Update aria-label
+    py = python_tests or 0
+    nu = nunit_tests or 0
+    lv = live_tests or 0
+    t = tools or 0
+    tot = tests or (py + nu + lv)
+    if tools is not None or tests is not None:
+        aria = (
+            f"Unity MCP stats: {t} MCP Tools, {tot} Tests "
+            f"({py} Python + {nu} Unity + {lv} Live), 80-95% Batch Savings"
+        )
+        svg = re.sub(r'aria-label="[^"]*"', f'aria-label="{aria}"', svg)
+        # Update subtitle: "XXXX Python &#x00B7; XXXX Unity &#x00B7; XX Live"
+        subtitle = f"{py} Python &#x00B7; {nu} Unity &#x00B7; {lv} Live"
+        svg = re.sub(
+            r"\d+ Python &#x00B7; \d+ Unity &#x00B7; \d+ Live",
+            subtitle,
             svg,
         )
     return svg
@@ -282,6 +343,11 @@ def update_readme_badges(readme: str, stats: dict) -> str:
             rf"\g<1>{stats['tools']}\2",
             readme,
         )
+        readme = re.sub(
+            r"Full access to \d+ MCP tools",
+            f"Full access to {stats['tools']} MCP tools",
+            readme,
+        )
     if "server_ver" in stats and stats["server_ver"] is not None:
         v = stats["server_ver"]
         readme = re.sub(r"server-v[\d.]+", f"server-v{v}", readme)
@@ -291,6 +357,33 @@ def update_readme_badges(readme: str, stats: dict) -> str:
         readme = re.sub(r"plugin-v[\d.]+", f"plugin-v{v}", readme)
         readme = re.sub(r'(alt="plugin v)[\d.]+', rf'\g<1>{v}', readme)
     return readme
+
+
+def update_readme_alt_text(
+    readme: str,
+    tools: Optional[int],
+    tests: Optional[int],
+    python_tests: Optional[int] = None,
+    nunit_tests: Optional[int] = None,
+    live_tests: Optional[int] = None,
+) -> str:
+    """Update stats.svg alt text in README: 'XX MCP Tools · XXXX Tests (...)'."""
+    if tools is None and tests is None:
+        return readme
+    py = python_tests or 0
+    nu = nunit_tests or 0
+    lv = live_tests or 0
+    t = tools or 0
+    tot = tests or (py + nu + lv)
+    alt = (
+        f"{t} MCP Tools · {tot} Tests "
+        f"({py} Python · {nu} Unity · {lv} Live) · 80-95% Batch Savings"
+    )
+    return re.sub(
+        r'(alt=")[\d]+ MCP Tools[^"]*(")',
+        rf"\g<1>{alt}\2",
+        readme,
+    )
 
 
 def git_commit_count() -> Optional[int]:
@@ -310,24 +403,36 @@ def git_commit_count() -> Optional[int]:
 
 def main() -> None:
     tools = count_mcp_tools(REPO_ROOT / "server" / "src" / "unity_mcp")
-    tests = count_pytest_tests(REPO_ROOT / "server" / "tests")
+    python_tests = count_pytest_tests(REPO_ROOT / "server" / "tests")
+    live_tests = count_live_tests(REPO_ROOT / "server" / "tests")
+    nunit_tests = count_nunit_tests(REPO_ROOT / "unity-plugin" / "Editor")
     server_ver = read_server_version(REPO_ROOT / "server" / "pyproject.toml")
     plugin_ver = read_plugin_version(REPO_ROOT / "unity-plugin" / "package.json")
     commits = git_commit_count()
     changelog_text = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     cl_ver, cl_title = parse_latest_changelog(changelog_text)
 
+    # Total = unit python + NUnit C# + live python
+    py = python_tests or 0
+    nu = nunit_tests or 0
+    lv = live_tests or 0
+    total_tests = py + nu + lv if (py or nu or lv) else None
+
     def _v(val, fallback: str = "?") -> str:
         return str(val) if val is not None else fallback
 
-    print(f"tools={_v(tools)}  tests={_v(tests)}  server={_v(server_ver)}  "
-          f"plugin={_v(plugin_ver)}  commits={_v(commits)}  latest={cl_ver}")
+    print(
+        f"tools={_v(tools)}  python={_v(python_tests)}  nunit={_v(nunit_tests)}  "
+        f"live={_v(live_tests)}  total={_v(total_tests)}  "
+        f"server={_v(server_ver)}  plugin={_v(plugin_ver)}  "
+        f"commits={_v(commits)}  latest={cl_ver}"
+    )
 
-    # --- badges JSON ---
+    # --- badges JSON (uses total tests) ---
     badges_dir = REPO_ROOT / ".github" / "badges"
     badges_dir.mkdir(parents=True, exist_ok=True)
 
-    tests_badge = make_badge_json("tests", f"{_v(tests)} passing", "3ad29f")
+    tests_badge = make_badge_json("tests", f"{_v(total_tests)} passing", "3ad29f")
     (badges_dir / "tests.json").write_text(json.dumps(tests_badge, indent=2) + "\n")
     print(f"  wrote {badges_dir}/tests.json")
 
@@ -335,16 +440,26 @@ def main() -> None:
     (badges_dir / "tools.json").write_text(json.dumps(tools_badge, indent=2) + "\n")
     print(f"  wrote {badges_dir}/tools.json")
 
-    # --- README badges ---
+    # --- stats SVG ---
+    svg_path = REPO_ROOT / "docs" / "assets" / "stats.svg"
+    svg = svg_path.read_text(encoding="utf-8")
+    svg = update_stats_svg(svg, tools, total_tests, python_tests, nunit_tests, live_tests)
+    svg_path.write_text(svg, encoding="utf-8")
+    print("  updated docs/assets/stats.svg")
+
+    # --- README badges + alt text + changelog ---
     readme_path = REPO_ROOT / "README.md"
     readme = readme_path.read_text(encoding="utf-8")
     original_readme = readme
 
     stats: dict = {
-        "tests": tests, "tools": tools,
+        "tests": total_tests, "tools": tools,
         "server_ver": server_ver, "plugin_ver": plugin_ver,
     }
     readme = update_readme_badges(readme, stats)
+    readme = update_readme_alt_text(
+        readme, tools, total_tests, python_tests, nunit_tests, live_tests
+    )
 
     # --- changelog injection ---
     changelog_html = generate_changelog_details(changelog_text, n=5)

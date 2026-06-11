@@ -25,6 +25,13 @@ namespace UnityMCP.Editor
                 throw new System.ArgumentException($"Stale ref: {path}. Call get_hierarchy to refresh.");
             }
 
+            if (path.StartsWith("#") && int.TryParse(path.Substring(1), out var iid))
+            {
+                var byId = FindObjectById(iid);
+                if (byId != null) return byId;
+                throw new System.ArgumentException($"Instance ID {path} not found");
+            }
+
             if (path.StartsWith("/")) path = path.Substring(1);
             if (string.IsNullOrEmpty(path)) return null;
 

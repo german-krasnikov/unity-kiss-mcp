@@ -303,3 +303,75 @@ def test_project_fields_unicode_key_matched():
     data = "[C]\n名前: テスト\nname: Player\n"
     result = project_fields(data, "name")
     assert "name: Player" in result
+
+
+# ── D5: Field aliases ──────────────────────────────────────────────────────────
+
+SERIALIZED_DATA = """\
+[Transform]
+m_LocalPosition.x: 5
+m_LocalPosition.y: 3
+m_LocalRotation.x: 0
+m_LocalScale.x: 1
+m_Mass: 2
+m_Enabled: true
+m_IsActive: true
+m_Name: Player
+m_TagString: Untagged
+m_Layer: 0
+"""
+
+
+def test_alias_position_maps_to_m_localposition():
+    result = project_fields(SERIALIZED_DATA, "position")
+    assert "m_LocalPosition.x: 5" in result
+    assert "m_LocalPosition.y: 3" in result
+    assert "m_Mass" not in result
+
+
+def test_alias_localposition_maps_to_m_localposition():
+    result = project_fields(SERIALIZED_DATA, "localposition")
+    assert "m_LocalPosition.x: 5" in result
+
+
+def test_alias_rotation_maps_to_m_localrotation():
+    result = project_fields(SERIALIZED_DATA, "rotation")
+    assert "m_LocalRotation.x: 0" in result
+
+
+def test_alias_scale_maps_to_m_localscale():
+    result = project_fields(SERIALIZED_DATA, "scale")
+    assert "m_LocalScale.x: 1" in result
+
+
+def test_alias_mass_maps_to_m_mass():
+    result = project_fields(SERIALIZED_DATA, "mass")
+    assert "m_Mass: 2" in result
+
+
+def test_alias_enabled_maps_to_m_enabled():
+    result = project_fields(SERIALIZED_DATA, "enabled")
+    assert "m_Enabled: true" in result
+
+
+def test_alias_active_maps_to_m_isactive():
+    result = project_fields(SERIALIZED_DATA, "active")
+    assert "m_IsActive: true" in result
+
+
+def test_alias_name_maps_to_m_name():
+    result = project_fields(SERIALIZED_DATA, "name")
+    assert "m_Name: Player" in result
+
+
+def test_alias_mixed_canonical_and_alias():
+    """Can mix canonical names with aliases in one call."""
+    result = project_fields(SERIALIZED_DATA, "position,mass")
+    assert "m_LocalPosition.x: 5" in result
+    assert "m_Mass: 2" in result
+    assert "m_Layer" not in result
+
+
+def test_alias_case_insensitive():
+    result = project_fields(SERIALIZED_DATA, "POSITION")
+    assert "m_LocalPosition.x: 5" in result

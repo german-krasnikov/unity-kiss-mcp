@@ -1,5 +1,6 @@
+import errno
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch, MagicMock
 from mcp.server.fastmcp.exceptions import ToolError
 
 from unity_mcp.server import (
@@ -1066,3 +1067,47 @@ async def test_screenshot_angle_omitted_when_none(mock_bridge):
     await screenshot(camera="multi_view", path="/Obj")
     args = mock_bridge.send.call_args[0][1]
     assert "angle" not in args
+
+
+# ── main() crash-logging tests ────────────────────────────────────────────────
+
+def test_main_logs_base_exception(monkeypatch):
+    """T7: main() calls log_crash for unexpected BaseException."""
+    import unity_mcp.server as srv
+    logged = []
+    monkeypatch.setattr(srv, "_main_transport", "stdio", raising=False)
+
+    with patch("unity_mcp.server.mcp.run", side_effect=RuntimeError("kaboom")):
+        with patch("unity_mcp.crash_log.log_crash", side_effect=lambda exc, **kw: logged.append(exc)):
+            with pytest.raises(RuntimeError):
+                srv.main()
+    assert len(logged) == 1
+    assert isinstance(logged[0], RuntimeError)
+
+
+def test_main_does_not_log_keyboard_interrupt():
+    """T8: main() swallows KeyboardInterrupt without logging."""
+    import unity_mcp.server as srv
+    with patch("unity_mcp.server.mcp.run", side_effect=KeyboardInterrupt()):
+        with patch("unity_mcp.crash_log.log_crash") as mock_log:
+            srv.main()  # must not raise
+    mock_log.assert_not_called()
+
+
+def test_main_does_not_log_system_exit():
+    """T9: main() swallows SystemExit without logging."""
+    import unity_mcp.server as srv
+    with patch("unity_mcp.server.mcp.run", side_effect=SystemExit(0)):
+        with patch("unity_mcp.crash_log.log_crash") as mock_log:
+            srv.main()  # must not raise
+    mock_log.assert_not_called()
+
+
+def test_main_does_not_log_epipe_oserror():
+    """T10: main() swallows OSError(EPIPE) without logging."""
+    import unity_mcp.server as srv
+    epipe = OSError(errno.EPIPE, "Broken pipe")
+    with patch("unity_mcp.server.mcp.run", side_effect=epipe):
+        with patch("unity_mcp.crash_log.log_crash") as mock_log:
+            srv.main()  # must not raise
+    mock_log.assert_not_called()

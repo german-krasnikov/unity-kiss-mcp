@@ -214,6 +214,103 @@ class TestUpdateStatsSvg:
         result = ur.update_stats_svg(svg, tools=None, tests=None)
         assert result == svg
 
+    def test_updates_aria_label(self) -> None:
+        svg = (
+            '<svg aria-label="Unity MCP stats: 91 MCP Tools, 3635 Tests '
+            '(1949 Python + 1633 Unity + 53 Live), 80-95% Batch Savings">'
+            '<!-- STAT:TOOLS -->91<!-- /STAT -->'
+            '<!-- STAT:TESTS -->3635<!-- /STAT -->'
+            '</svg>'
+        )
+        result = ur.update_stats_svg(svg, tools=95, tests=3700,
+                                     python_tests=2000, nunit_tests=1600, live_tests=100)
+        assert 'aria-label="Unity MCP stats: 95 MCP Tools, 3700 Tests' in result
+        assert "2000 Python + 1600 Unity + 100 Live" in result
+
+    def test_updates_subtitle_line(self) -> None:
+        svg = (
+            '<text>1949 Python &#x00B7; 1633 Unity &#x00B7; 53 Live</text>'
+            '<!-- STAT:TOOLS -->91<!-- /STAT -->'
+            '<!-- STAT:TESTS -->3635<!-- /STAT -->'
+        )
+        result = ur.update_stats_svg(svg, tools=91, tests=3700,
+                                     python_tests=2000, nunit_tests=1600, live_tests=100)
+        assert "2000 Python &#x00B7; 1600 Unity &#x00B7; 100 Live" in result
+        assert "1949 Python" not in result
+
+
+# ---------------------------------------------------------------------------
+# count_nunit_tests
+# ---------------------------------------------------------------------------
+
+class TestCountNunitTests:
+    def test_counts_test_attribute(self, tmp_path: pathlib.Path) -> None:
+        (tmp_path / "Foo.cs").write_text(
+            "[Test]\npublic void A() {}\n[Test]\npublic void B() {}\n"
+        )
+        assert ur.count_nunit_tests(tmp_path) == 2
+
+    def test_counts_across_subdirs(self, tmp_path: pathlib.Path) -> None:
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (tmp_path / "A.cs").write_text("[Test]\npublic void X() {}\n")
+        (sub / "B.cs").write_text("[Test]\npublic void Y() {}\n[Test]\npublic void Z() {}\n")
+        assert ur.count_nunit_tests(tmp_path) == 3
+
+    def test_ignores_non_cs_files(self, tmp_path: pathlib.Path) -> None:
+        (tmp_path / "notes.txt").write_text("[Test]\n[Test]\n")
+        (tmp_path / "Real.cs").write_text("[Test]\npublic void A() {}\n")
+        assert ur.count_nunit_tests(tmp_path) == 1
+
+    def test_missing_dir_returns_none(self, tmp_path: pathlib.Path) -> None:
+        assert ur.count_nunit_tests(tmp_path / "nonexistent") is None
+
+    def test_zero_when_no_tests(self, tmp_path: pathlib.Path) -> None:
+        (tmp_path / "NoTests.cs").write_text("public class Foo {}\n")
+        assert ur.count_nunit_tests(tmp_path) == 0
+
+
+# ---------------------------------------------------------------------------
+# count_live_tests
+# ---------------------------------------------------------------------------
+
+class TestCountLiveTests:
+    def test_returns_int_or_none(self) -> None:
+        result = ur.count_live_tests(REPO_ROOT / "server" / "tests")
+        assert result is None or isinstance(result, int)
+
+    def test_nonexistent_dir_returns_none(self, tmp_path: pathlib.Path) -> None:
+        result = ur.count_live_tests(tmp_path / "no_such_tests")
+        assert result is None
+
+    def test_returns_fewer_than_full_suite(self) -> None:
+        tests_dir = REPO_ROOT / "server" / "tests"
+        full = ur.count_pytest_tests(tests_dir)
+        live = ur.count_live_tests(tests_dir)
+        if full is not None and live is not None:
+            assert live < full
+
+
+# ---------------------------------------------------------------------------
+# update_readme_alt_text
+# ---------------------------------------------------------------------------
+
+class TestUpdateReadmeAltText:
+    def test_updates_alt_text(self) -> None:
+        readme = '<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 3635 Tests (1949 Python · 1633 Unity · 53 Live) · 80-95% Batch Savings">'
+        result = ur.update_readme_alt_text(readme, tools=95, tests=3700,
+                                           python_tests=2000, nunit_tests=1600, live_tests=100)
+        assert "95 MCP Tools" in result
+        assert "3700 Tests" in result
+        assert "2000 Python" in result
+        assert "1600 Unity" in result
+        assert "100 Live" in result
+
+    def test_no_change_when_all_none(self) -> None:
+        readme = '<img alt="91 MCP Tools · 3635 Tests (x)">'
+        result = ur.update_readme_alt_text(readme, tools=None, tests=None)
+        assert result == readme
+
 
 # ---------------------------------------------------------------------------
 # generate_changelog_details

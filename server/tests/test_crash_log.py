@@ -113,3 +113,64 @@ async def test_disconnect_logs_to_crash_log():
     assert call_kwargs["cmd"] == "ping"
     assert call_kwargs["error_type"] == "ConnectionRefusedError"
     assert call_kwargs["port"] == 9999
+
+
+# ── Group 3: log_crash() module-level function ────────────────────────────────
+
+from unity_mcp.crash_log import log_crash
+
+
+def test_log_crash_writes_ev_crash(tmp_path):
+    """T1: log_crash writes ev=crash entry to crash.jsonl."""
+    exc = RuntimeError("boom")
+    log_crash(exc, log_dir=tmp_path)
+    lines = (tmp_path / "crash.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["ev"] == "crash"
+    assert entry["exc"] == "RuntimeError"
+    assert entry["msg"] == "boom"
+
+
+def test_log_crash_includes_traceback(tmp_path):
+    """T2: log_crash writes tb field with traceback string."""
+    try:
+        raise ValueError("trace me")
+    except ValueError as exc:
+        log_crash(exc, log_dir=tmp_path)
+    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
+    assert "tb" in entry
+    assert "ValueError" in entry["tb"]
+
+
+def test_log_crash_includes_timestamp(tmp_path):
+    """T3: log_crash writes numeric t field close to now."""
+    before = time.time()
+    log_crash(RuntimeError("ts"), log_dir=tmp_path)
+    after = time.time()
+    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
+    assert before - 1 <= entry["t"] <= after + 1
+
+
+def test_log_crash_creates_dir_if_missing(tmp_path):
+    """T4: log_crash creates missing parent dir."""
+    log_dir = tmp_path / "new" / "nested"
+    assert not log_dir.exists()
+    log_crash(RuntimeError("dir"), log_dir=log_dir)
+    assert (log_dir / "crash.jsonl").exists()
+
+
+def test_log_crash_silent_on_permission_error(tmp_path):
+    """T5: log_crash silently no-ops when write fails."""
+    with patch("pathlib.Path.open", side_effect=PermissionError("denied")):
+        log_crash(RuntimeError("nope"), log_dir=tmp_path)  # must not raise
+
+
+def test_log_crash_appends_preserves_existing(tmp_path):
+    """T6: log_crash appends — existing entries preserved."""
+    log_crash(RuntimeError("first"), log_dir=tmp_path)
+    log_crash(RuntimeError("second"), log_dir=tmp_path)
+    lines = (tmp_path / "crash.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0])["msg"] == "first"
+    assert json.loads(lines[1])["msg"] == "second"

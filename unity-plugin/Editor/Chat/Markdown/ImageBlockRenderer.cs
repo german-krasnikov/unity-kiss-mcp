@@ -21,7 +21,7 @@ namespace UnityMCP.Editor.Chat
             try
             {
                 var path = ResolvePath(src);
-                if (!File.Exists(path))
+                if (!IsImageFile(path) || !File.Exists(path))
                     return AltLabel(alt);
 
                 return BuildImageElement(path, alt);
@@ -73,6 +73,12 @@ namespace UnityMCP.Editor.Chat
             var lbl = new Label(string.IsNullOrEmpty(alt) ? "[image]" : alt);
             lbl.AddToClassList("md-image-alt");
             return lbl;
+        }
+
+        private static bool IsImageFile(string path)
+        {
+            var ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp";
         }
 
         /// <summary>Returns an absolute path. Supports absolute or project-relative paths.</summary>

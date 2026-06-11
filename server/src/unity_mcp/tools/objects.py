@@ -6,22 +6,28 @@ _send = None
 _args = None
 
 
-async def get_component(path: str, type: str, fields: str | None = None) -> str:
+async def get_component(path: str, type: str, fields: str | None = None, full: bool = False) -> str:
     """Component properties as key-value. For MULTIPLE objects, use inspect(paths='a,b,c') instead — 1 call vs N.
-    fields: comma-separated field names to keep (e.g. 'm_Mass,m_LocalPosition') — projects the result to save tokens; shows requested fields even at default values."""
+    fields: comma-separated field names to keep (e.g. 'mass,position') — projects the result to save tokens; shows requested fields even at default values. Aliases: position, rotation, scale, mass, enabled, active, name.
+    full=True: bypass distillation, return raw response."""
+    args: dict = {"path": path, "type": type}
+    if full:
+        args["_no_distill"] = True
     if fields:
-        result = await _send("get_component", {"path": path, "type": type, "_no_strip": True})
+        args["_no_strip"] = True
+        result = await _send("get_component", args)
         return _project_fields(result, fields)
-    return await _send("get_component", {"path": path, "type": type})
+    return await _send("get_component", args)
 
 
-async def inspect(paths: str, components: str | None = None, fields: str | None = None) -> str:
+async def inspect(paths: str, components: str | None = None, fields: str | None = None, full: bool = False) -> str:
     """Get components for multiple objects at once. paths: comma-separated. components: comma-separated types (default: all).
-    fields: comma-separated field names to keep across all objects — projects the result to save tokens."""
+    fields: comma-separated field names to keep across all objects — projects the result to save tokens. full=True: bypass distillation."""
+    extra = {"_no_distill": True} if full else {}
     if fields:
-        result = await _send("inspect", _args(paths=paths, components=components, _no_strip=True))
+        result = await _send("inspect", _args(paths=paths, components=components, _no_strip=True, **extra))
         return _project_fields(result, fields)
-    return await _send("inspect", _args(paths=paths, components=components))
+    return await _send("inspect", _args(paths=paths, components=components, **extra))
 
 
 async def get_components_list(id: int) -> str:
@@ -94,13 +100,16 @@ async def delete_object(id: int | None = None, path: str | None = None, force: b
 
 
 async def manage_component(path: str, type: str, action: str) -> str:
-    """Add or remove a component. action: 'add' or 'remove' ONLY (no 'enable'/'disable' — use set_property with prop='m_Enabled' for that). type: full namespace required (e.g. 'UnityEngine.UI.Button', NOT 'Button')."""
+    """Add or remove a component. action: 'add' or 'remove' ONLY (no 'enable'/'disable' — use set_property with prop='m_Enabled' for that). type: short name (e.g. 'Button') or full namespace (e.g. 'UnityEngine.UI.Button')."""
     return await _send("manage_component", {"path": path, "type": type, "action": action})
 
 
-async def get_object_detail(id: int) -> str:
-    """Get ALL components with ALL values. Heavy. Use get_component for single component."""
-    return await _send("get_object_detail", {"id": id})
+async def get_object_detail(id: int, full: bool = False) -> str:
+    """Get ALL components with ALL values. Heavy. Use get_component for single component. full=True: bypass distillation."""
+    args: dict = {"id": id}
+    if full:
+        args["_no_distill"] = True
+    return await _send("get_object_detail", args)
 
 
 async def set_material(path: str, color: str, shader: str | None = None) -> str:

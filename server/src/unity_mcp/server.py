@@ -256,19 +256,26 @@ def main():
             signal.signal(signal.SIGPIPE, signal.SIG_IGN)
         except (OSError, ValueError):
             pass
+    from unity_mcp.crash_log import log_crash
     transport = os.environ.get("UNITY_MCP_TRANSPORT", "stdio")
     try:
-        if transport == "http":
-            port = int(os.environ.get("UNITY_MCP_HTTP_PORT", "8765"))
-            mcp.run(transport="streamable-http", host="127.0.0.1", port=port)
-        else:
-            mcp.run(transport="stdio")
-    except BrokenPipeError:
+        try:
+            if transport == "http":
+                port = int(os.environ.get("UNITY_MCP_HTTP_PORT", "8765"))
+                mcp.run(transport="streamable-http", host="127.0.0.1", port=port)
+            else:
+                mcp.run(transport="stdio")
+        except BrokenPipeError:
+            pass
+        except OSError as e:
+            import errno
+            if e.errno != errno.EPIPE:
+                raise
+    except (KeyboardInterrupt, SystemExit):
         pass
-    except OSError as e:
-        import errno
-        if e.errno != errno.EPIPE:
-            raise
+    except BaseException as exc:
+        log_crash(exc)
+        raise
 
 
 if __name__ == "__main__":

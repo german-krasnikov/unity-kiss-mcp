@@ -1,7 +1,15 @@
 """Tests for _read_unity_port — filesystem/env/PID mocking only, no global state leaks."""
 import os
 import pytest
+from unittest.mock import patch
 from unity_mcp.server import _read_unity_port
+
+
+@pytest.fixture(autouse=True)
+def _mock_tcp_probe():
+    """Bypass TCP probe in all read_unity_port tests — they test PID/FS logic only."""
+    with patch("unity_mcp.server_filtering._tcp_probe", return_value=True):
+        yield
 
 
 # ---------------------------------------------------------------------------

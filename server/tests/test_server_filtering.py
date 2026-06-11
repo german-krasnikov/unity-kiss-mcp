@@ -284,3 +284,56 @@ async def test_handler_preserves_core_full_schema():
 
     result = _strip_deferred_schemas([tool])
     assert result[0].inputSchema == full
+
+
+# ---------------------------------------------------------------------------
+# A3: _tcp_probe + read_unity_port TCP-probe integration
+# ---------------------------------------------------------------------------
+
+def test_read_unity_port_skips_candidate_if_tcp_probe_fails(tmp_path):
+    """PID alive but TCP refused → skip candidate, return default 9500."""
+    from unittest.mock import patch, MagicMock
+    from pathlib import Path
+
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    port_file = ports_dir / "12345.port"
+    port_file.write_text("9501\n/some/project\nMyProject")
+
+    with (
+        patch("unity_mcp.server_filtering.Path") as mock_path_cls,
+        patch("os.kill"),  # PID alive, no exception
+        patch("unity_mcp.server_filtering._tcp_probe", return_value=False),
+        patch.dict("os.environ", {}, clear=False),
+    ):
+        # Wire Path.home() / ".unity-mcp" / "ports" to our tmp dir
+        mock_home = MagicMock()
+        mock_path_cls.home.return_value = mock_home
+        mock_home.__truediv__ = lambda self, x: tmp_path / x if x == ".unity-mcp" else MagicMock()
+
+        from unity_mcp import server_filtering
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = server_filtering.read_unity_port()
+
+    assert result == 9500
+
+
+def test_read_unity_port_includes_candidate_if_tcp_probe_succeeds(tmp_path):
+    """PID alive and TCP connects → include candidate, return its port."""
+    from pathlib import Path
+    from unittest.mock import patch
+
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    port_file = ports_dir / "12345.port"
+    port_file.write_text("9501\n/some/project\nMyProject")
+
+    with (
+        patch("unity_mcp.server_filtering._tcp_probe", return_value=True),
+        patch("os.kill"),  # PID alive
+        patch.object(Path, "home", return_value=tmp_path),
+    ):
+        from unity_mcp import server_filtering
+        result = server_filtering.read_unity_port()
+
+    assert result == 9501

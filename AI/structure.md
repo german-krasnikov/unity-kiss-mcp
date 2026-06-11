@@ -2,13 +2,13 @@
 
 ```
 unity-kiss-mcp/
-├── server/                     # Python MCP Server (~1726 unit tests)
+├── server/                     # Python MCP Server (~2002 unit tests incl. crash logging)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
-│   │   ├── server_filtering.py # Port discovery (CWD-based), catalog push, tool filtering
-│   │   ├── lockfile.py         # Cross-platform exclusive locking (fcntl on Unix, msvcrt on Windows) + stale server cleanup
+│   │   ├── server_filtering.py # Port discovery + TCP probe (v0.23.0), catalog push, tool filtering
+│   │   ├── lockfile.py         # Cross-platform exclusive locking + zombie detection (v0.23.0)
 │   │   ├── compile_state.py    # CompileStateProbe (heuristic Unity compile detection)
 │   │   ├── middleware.py       # 23-layer middleware pipeline (env-gated UNITY_MCP_MIDDLEWARE=1)
 │   │   ├── middleware_paths.py # PathResolverMixin extracted from middleware.py
@@ -92,7 +92,7 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~1726 unit tests + conftest.py
+│   └── tests/                  # ~2002 unit tests + conftest.py (incl. v0.23.0 crash_log tests)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
 │       ├── test_middleware*.py          # Middleware layers
@@ -116,10 +116,13 @@ unity-kiss-mcp/
 │       ├── CommandRegistry.cs              # Command registration + runtime flag
 │       ├── CommandSchema.cs                # Parameter validation + fuzzy matching
 │       ├── ObjectManager.cs                # CRUD + Undo + SetActive + WireEvent + SetParent
+│       ├── ObjectManager.Properties.cs     # Property setter + auto-redirect (v0.23.0: set_property("active") → SetActive)
+│       ├── ObjectManager.Lookup.cs         # FindType + short-name fallback for custom components (v0.23.0)
 │       ├── ValueParser.cs                  # Parse vectors/quaternions/colors/arrays
 │       ├── InputNormalizer.cs              # Auto-fix component/property hallucinations
 │       ├── HierarchySerializer.cs          # Scene → text tree + MAX_NODES + summary + incremental
 │       ├── ComponentSerializer.cs          # Component → key-value + ObjectReference + UnityEvent
+│       ├── ComponentSerializer.Finder.cs   # #instanceID in all path tools (v0.23.0)
 │       ├── BatchHelper.cs                  # Batch text parser + per-command guards + timeout
 │       ├── RefManager.cs                   # Ephemeral $a-$zz scene refs (702 slots)
 │       ├── ErrorHelper.cs                  # Contextual errors + "did you mean?"
@@ -238,7 +241,7 @@ unity-kiss-mcp/
 │       │   ├── ApproveHelper.cs           # Session management
 │       │   ├── ApproveButtonFactory.cs    # Button builder
 │       │   ├── ChatBinaryResolver.cs      # Cross-platform binary PATH resolution (where.exe, bash -lic, zsh -lc per OS)
-│       │   ├── ChatMcpConfigWriter.cs     # Cross-platform Python command resolution + --mcp-config generation
+│       │   ├── ChatMcpConfigWriter.cs     # Python command resolution + warning on serverDir change (v0.23.0)
 │       │   ├── SlashTemplate.cs           # Template model
 │       │   ├── SlashRegistry.cs           # Template registry
 │       │   ├── SlashPopup.cs              # UIToolkit popup
@@ -267,7 +270,7 @@ unity-kiss-mcp/
 │       │   │   ├── MarkdownBlockRenderer.cs # 8-kind dispatcher
 │       │   │   ├── MarkdownBlockRenderer.Table.cs # Table grid layout (partial)
 │       │   │   ├── MarkdownBlockRenderer.List.cs # Bullet/ordered list (partial)
-│       │   │   ├── ImageBlockRenderer.cs  # PNG/JPG → Texture2D + click-to-open, texture lifecycle
+│       │   │   ├── ImageBlockRenderer.cs  # PNG/JPG → Texture2D + click-to-open (v0.23.0: IsImageFile guard)
 │       │   │   ├── Mermaid/               # Native Mermaid flowchart (no lib, pure parse+layout)
 │       │   │   │   ├── MermaidGraph.cs    # POCO: nodes, edges, direction
 │       │   │   │   ├── MermaidParser.cs   # lines → graph or null
@@ -289,7 +292,8 @@ unity-kiss-mcp/
 │       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs
 │       ├── JsonHelper.cs + StringDistance.cs + UndoGroupHelper.cs
-│       ├── FileOutputHelper.cs + VersionTracker.cs
+│       ├── FileOutputHelper.cs             # ScreenshotsDir = <ProjectRoot>/ScreenShots/ (v0.23.0)
+│       ├── VersionTracker.cs
 │       └── Roslyn/                         # Roslyn compiler for execute_code
 ├── unity-test-project/          # Unity 6000.3 test project (~746 C# tests)
 │   ├── Assets/Tests/Editor/     # NUnit test files
@@ -298,7 +302,12 @@ unity-kiss-mcp/
 │   ├── Assets/Shaders/          # TestGraph.shadergraph
 │   ├── Assets/Scripts/          # Test helpers (GridPlayer, etc.)
 │   └── Packages/manifest.json   # References unity-plugin via file:
-├── scripts/                    # Tooling: changelog SVG generator (gen_changelog_svg.py)
+├── install.py                  # Setup/update/doctor/configure CLI (v0.23.0, 179 lines)
+├── .mcp.json                   # uv-based config template (v0.23.0, no absolute paths)
+├── scripts/                    # Tooling: changelog SVG, force_reset.sh (recovery), test updates
+│   ├── gen_changelog_svg.py    # Changelog → SVG badge
+│   ├── force_reset.sh          # Kill stale servers + clean lockfiles (v0.23.0 recovery)
+│   └── ...                     # Test suite utilities
 ├── AI/                         # Feature knowledge docs + changelog
 ├── .claude/
 │   ├── skills/                 # Technical references

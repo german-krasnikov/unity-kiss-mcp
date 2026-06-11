@@ -73,6 +73,10 @@ Single-connection manager (replaces former multi-connection BridgeManager):
 - `connected` property — shortcut for bridge.connected
 - No `reconnect()` method — reconnection handled by UnityBridge heartbeat loop
 
+### Port Discovery & TCP Probe (server_filtering.py) — v0.23.0
+
+Port discovery reads `~/.unity-mcp/ports/{pid}.port` files. **v0.23.0:** Adds `_tcp_probe(port, timeout=0.2)` — quick TCP handshake to verify port actually listens before returning. Filters out stale discovery files (port written but server not yet bound, or server crashed leaving orphan file). Candidates prioritized: env UNITY_MCP_PORT → CWD project path match → newest mtime → default 9500.
+
 ### CompileStateProbe (compile_state.py)
 
 Simplified detector for Unity C# compile/domain-reload:
@@ -81,18 +85,28 @@ Simplified detector for Unity C# compile/domain-reload:
 - `has_strong_busy_signal()` — state file (authoritative) then lock file fallback
 - `_lock_file_exists()` — checks Unity's BeeDriver Lock file
 
-### Lockfile (lockfile.py)
+### Lockfile (lockfile.py) — v0.23.0 Zombie Detection
 
 Exclusive lock per port at `~/.unity-mcp/server-{port}.lock`:
 - Uses `fcntl.flock` (POSIX exclusive)
+- **Zombie Process Detection (v0.23.0):** New `_is_zombie(pid)` check via `/proc/{pid}/stat` (Linux) or `ps -p` status (macOS/Windows). Stale processes with zombie state are no longer treated as "live" — server startup proceeds without waiting for process cleanup. Fixes `-32000 (server error)` when a previous server process became a zombie.
 - Auto-kills stale `unity_mcp` process (SIGTERM + poll)
 - Prevents multiple MCP servers on same Unity instance
 
-### C# Server (MCPServer.cs)
+### Crash Logging (crash_log.py)
+
+Append-only JSONL crash log for unhandled exceptions:
+- `log_crash(exc, *, log_dir=None)`: module-level function that writes `{"ev":"crash", "exc":"Type", "msg":"...", "tb":"...", "t":timestamp}` to `crash.jsonl` (defaults to `~/.unity-mcp/crash.jsonl`)
+- Auto-creates parent dir, silent on I/O failures
+- Integrated into `main()`: outer try/except catches `BaseException` → calls `log_crash()` → re-raises (preserves clean shutdown for `KeyboardInterrupt`, `SystemExit`, EPIPE)
+- **CrashLogger class**: JSONL append-only logger with rotation (500 entries max, 15MB size limit) — logs disconnect, reconnect events (older feature). Separate from module-level `log_crash()` used for unhandled server exceptions.
+
+### C# Server (MCPServer.cs) — v0.23.0 SO_REUSEPORT Recovery
 
 - TCP listener on port 9500 (configurable via `UNITY_MCP_PORT` env var)
 - Max message size: 10MB
 - SO_KEEPALIVE with platform-specific tuning (idle=60s, interval=10s, count=3; relaxed from 10s/5s to survive macOS App Nap timer coalescing)
+- **SO_REUSEPORT (v0.23.0, macOS/Linux only):** Enables port reuse for rapid reconnect after server crash or process termination. Windows doesn't require it (already has soft TIME_WAIT). Prevents "address already in use" during recovery without waiting for kernel TIME_WAIT timer.
 - Single client mode: new connection disconnects previous
 - Client generation tracking: prevents stale handlers from clearing shared state
 - Lifecycle hardening: `IsRunning` property guarded with try/catch for ObjectDisposedException; `Stop()` wraps listener teardown with try/catch; `OnBeforeReload()` wrapped with try/catch
@@ -143,10 +157,12 @@ Exclusive lock per port at `~/.unity-mcp/server-{port}.lock`:
 - Python connection slot: `server/src/unity_mcp/connection_slot.py`
 - Python compile probe: `server/src/unity_mcp/compile_state.py`
 - Python unity state: `server/src/unity_mcp/unity_state.py`
-- Python lockfile: `server/src/unity_mcp/lockfile.py`
+- Python lockfile: `server/src/unity_mcp/lockfile.py` (with v0.23.0 zombie detection)
 - Python crash log: `server/src/unity_mcp/crash_log.py`
+- Python server filtering: `server/src/unity_mcp/server_filtering.py` (with v0.23.0 TCP probe)
+- Python server wrapper: `server/src/unity_mcp/server.py` (main() crash handler)
 - C#: `unity-plugin/Editor/MCPServer.cs`
-- Tests: `server/tests/test_bridge.py` (37), `server/tests/test_connection_slot.py` (8), `server/tests/test_lockfile.py` (17)
+- Tests: `server/tests/test_bridge.py` (37), `server/tests/test_connection_slot.py` (8), `server/tests/test_lockfile.py` (17), `server/tests/test_crash_log.py` (10), `server/tests/test_server.py` (4 new main() crash tests)
 
 ## Reconnection Strategy
 

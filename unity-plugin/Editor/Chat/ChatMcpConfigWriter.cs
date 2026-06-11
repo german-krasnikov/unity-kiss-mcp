@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Text;
+using UnityEditor;
 using UnityEngine;
 
 namespace UnityMCP.Editor.Chat
@@ -96,6 +97,12 @@ namespace UnityMCP.Editor.Chat
                                "Check the UPM package is installed correctly.");
                 return null;
             }
+
+            const string LastServerDirPref = "UnityMCP_LastServerDir";
+            var lastDir = EditorPrefs.GetString(LastServerDirPref, "");
+            if (!string.IsNullOrEmpty(lastDir) && lastDir != serverDir)
+                Debug.LogWarning($"[MCP] Server directory changed ({lastDir} → {serverDir}). Run: python install.py update");
+            EditorPrefs.SetString(LastServerDirPref, serverDir);
 
             var uvPath        = ResolveUvPath();
             var (cmd, args)   = ResolvePythonCommand(serverDir, uvPath);

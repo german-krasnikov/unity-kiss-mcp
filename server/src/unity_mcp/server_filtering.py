@@ -5,6 +5,7 @@ lives in server.py so tests can mutate srv._disabled_tools_cache directly.
 """
 import logging
 import os
+import socket
 from pathlib import Path
 
 from .tools.gating import filter_by_tier, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
@@ -64,6 +65,15 @@ def filter_tools(tools: list, disabled: set | None) -> list:
     return _strip_deferred_schemas(result)
 
 
+def _tcp_probe(port: int, timeout: float = 0.2) -> bool:
+    """Return True if TCP port accepts connections."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def read_unity_port() -> int:
     """Discover Unity MCP port from discovery files, env var, or default 9500.
 
@@ -85,6 +95,8 @@ def read_unity_port() -> int:
             port = int(lines[0])
             pid = int(f.stem)
             os.kill(pid, 0)
+            if not _tcp_probe(port):
+                continue
             project_path = lines[1] if len(lines) > 1 else ""
             project = lines[2] if len(lines) > 2 else "?"
             candidates.append((f.stat().st_mtime, port, project, pid, project_path))
@@ -93,6 +105,8 @@ def read_unity_port() -> int:
             try:
                 lines = f.read_text().strip().split("\n")
                 port = int(lines[0])
+                if not _tcp_probe(port):
+                    continue
                 project_path = lines[1] if len(lines) > 1 else ""
                 project = lines[2] if len(lines) > 2 else "?"
                 candidates.append((f.stat().st_mtime, port, project, int(f.stem), project_path))

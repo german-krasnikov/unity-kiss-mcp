@@ -1,11 +1,11 @@
-# Unity MCP — Control Unity Editor from Claude Code
+# Unity MCP — Control Unity Editor from Any AI Assistant
 
 <div align="center">
 
 <img src="docs/assets/hero.svg" width="100%" alt="Unity MCP — control Unity from Claude, a live heartbeat status window with a breathing mint-green orb, ECG trace, and TCP packet field">
 
 <a href="https://github.com/german-krasnikov/unity-kiss-mcp">
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=900&color=3AD29F&center=true&vCenter=true&width=760&lines=The+editor's+heartbeat%2C+made+visible.;Control+Unity+from+Claude.;80-95%25+batch+token+savings.;Scene+CRUD+%C2%B7+Animation+%C2%B7+VFX+%C2%B7+PlayTest+DSL." alt="Control Unity from Claude — token-minimized MCP tools — 80-95% batch token savings">
+<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=900&color=3AD29F&center=true&vCenter=true&width=760&lines=The+editor's+heartbeat%2C+made+visible.;Control+Unity+from+Claude%2C+Codex%2C+and+more.;80-95%25+batch+token+savings.;Scene+CRUD+%C2%B7+Animation+%C2%B7+VFX+%C2%B7+PlayTest+DSL." alt="Control Unity from Claude — token-minimized MCP tools — 80-95% batch token savings">
 </a>
 
 </div>
@@ -32,7 +32,7 @@
 
 </div>
 
-> **Let Claude Code control your Unity Editor** — inspect scenes, edit GameObjects, run playtests, and capture screenshots without leaving the chat. Binary TCP protocol with 10–15× token compression and 80–95% batch savings.
+> **Let any MCP-compatible AI assistant control your Unity Editor** — inspect scenes, edit GameObjects, run playtests, and capture screenshots without leaving the chat. Binary TCP protocol with 10–15× token compression and 80–95% batch savings.
 
 <sub>MCP (Model Context Protocol) is Anthropic's open standard for giving AI assistants structured tool access.</sub>
 
@@ -40,13 +40,13 @@
 
 ## Why Unity MCP?
 
-- **Stop alt-tabbing.** Claude inspects your scene, edits components, runs playtests, and captures screenshots without you leaving the chat.
+- **Stop alt-tabbing.** Your AI assistant inspects your scene, edits components, runs playtests, and captures screenshots without you leaving the chat.
 - **Stop burning tokens on boilerplate.** Each `batch` call replaces 5–20 individual round-trips — **80–95% fewer tokens** on the same work.
 - **Stop writing glue code.** Registered tools cover scene CRUD, animation, VFX, UI, shaders, runtime control, and code intelligence — with a plugin seam for your own.
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 91 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 91 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the Claude or Codex CLI directly. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -75,11 +75,11 @@ batch([
 
 ### Architecture
 
-<img src="docs/assets/architecture.svg" width="100%" alt="Architecture: Claude Code → Python MCP Server → TCP :9500 → Unity Editor Plugin">
+<img src="docs/assets/architecture.svg" width="100%" alt="Architecture: MCP Client → Python MCP Server → TCP :9500 → Unity Editor Plugin">
 
 ## Quick Start
 
-**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 6000.0+</kbd> · <kbd>Claude Code</kbd> · TCP port <kbd>9500</kbd> free
+**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 6000.0+</kbd> · <kbd>Claude Code</kbd> or <kbd>Codex CLI</kbd> · TCP port <kbd>9500</kbd> free
 
 **1. Install the Python server**
 
@@ -102,7 +102,10 @@ Add to your project's `Packages/manifest.json`:
 
 Open Unity — wait for `[MCP] Server started on port 9500` in the Console.
 
-**3. Configure Claude Code**
+**3. Configure your MCP client**
+
+<details open>
+<summary><b>Claude Code</b></summary>
 
 Add to `~/.claude/mcp_settings.json`:
 
@@ -119,6 +122,29 @@ Add to `~/.claude/mcp_settings.json`:
 ```
 
 Restart Claude Code. Call `get_hierarchy()` to verify.
+
+</details>
+
+<details>
+<summary><b>Codex CLI</b></summary>
+
+Add to `.codex/config.toml` in your project root:
+
+```toml
+[mcp_servers.unity-mcp]
+command = "python"
+args = ["-m", "unity_mcp.server"]
+cwd = "/absolute/path/to/unity-kiss-mcp/server"
+```
+
+</details>
+
+<details>
+<summary><b>Other MCP clients</b></summary>
+
+Use the standard `mcpServers` JSON block — same structure as Claude Code but in your client's config file. The server uses stdio transport.
+
+</details>
 
 <details>
 <summary><b>Troubleshooting</b></summary>
@@ -140,10 +166,12 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 | Python | 3.12 | 3.10 |
 | OS | macOS | macOS, Windows, Linux |
 | Claude Code | latest | any with MCP support |
+| Codex CLI | latest | any with MCP support |
+| Claude Desktop | latest | any with MCP support |
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 3432 Tests (1904 Python · 1475 Unity · 53 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 3635 Tests (1949 Python · 1633 Unity · 53 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -157,7 +185,9 @@ Restart Claude Code. Call `get_hierarchy()` to verify.
 - **Animation & Timeline** — clips, key management, Timeline assets, Animator states/transitions
 - **VFX & Particles** — particle system CRUD, 11 module presets, shader graph integration
 - **Multi-View Screenshots** — 4-panel grid (Front/Left/Top/Iso), bounding-box overlay, visual regression
+- **Multi-Project Ports** — each Unity project auto-assigns a unique TCP port (9500–9599), CLI and Chat get isolated slots
 - **Capability Gating** — TIER1 core always on; 8 category toggles per-session
+- **Cross-Platform** — Windows, macOS, Linux — binary resolution, lockfile, and venv per platform
 - **Plugin Extensibility** — register your own tools in one file, no cross-imports
 
 <details>
@@ -199,36 +229,59 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
-<summary><b>v0.17.25</b> — 2026-06-06 — 40-architect test audit — 469 new tests, test restructure, 3 bug fixes</summary>
+<summary><b>v0.22.1</b> — 2026-06-11 — Crash logging for unhandled MCP server exceptions</summary>
 
-40-architect parallel test audit across Python + C#. Round 1: 122 tests + 3 bug fixes (thread-safe `ScreenshotCapture`, `EditorCoroutineRunner` double-stop, guarded `query_state` error path). Round 2: 177 tests (error paths, LRU order, serializers). Round 3: 170 tests (edge cases, security, batch guards). Test assembly renamed `Tests` → `UnityMCP.TestProject`. Test project restructured into 10 domain folders. Plugin version 0.17.25.
-
-</details>
-
-<details>
-<summary><b>v0.17.0</b> — 2026-06-05 — full-project code review sprint — 12 waves of fixes across Python + C#</summary>
-
-12-wave autonomous review sprint. 7 critical Python bug fixes, middleware split (941→120 lines), C# thread safety, chat TOCTOU fix, 16-architect final review found 12 additional bugs. All subsystems graded B (up from C/D). Server v0.8.0.
+**Crash Logging for Unhandled Server Exceptions** — Python MCP server now captures unhandled exceptions to `~/.unity-mcp/crash.jsonl` for diagnosis. ` …
 
 </details>
 
 <details>
-<summary><b>v0.16.0</b> — 2026-06-05 — F12 chat UX overhaul — composed inline-chip field + response pills + session clear</summary>
+<summary><b>v0.22.0</b> — 2026-06-11 — Multi-project port auto-assignment + dual-port isolation + PortResolver extraction</summary>
 
-Replaced 466-line overlay stack with composed `InlineChipField` (−806 net lines). Response `[kind:ref]` tags render as pills. Per-kind chip display settings (depth + color). New-session/clear dropdown. +23 tests.
+**Multi-Project Port Configuration (Plugin + Server v0.22.0)** — Unity projects now auto-assign unique MCP ports without manual configuration.
 
 </details>
 
 <details>
-<summary><b>v0.15.8</b> — 2026-06-05 — inline-chips + extensible chip-kind registry — F11</summary>
+<summary><b>v0.21.0</b> — 2026-06-11 — Cross-platform Windows/Linux support + zero manual patching</summary>
 
-`IChipKindProvider` + `ChipKindRegistry` — third-party plugins register own chip kinds (display, payload, navigate) with zero core edits. 8 built-in providers. `ChipKind` enum removed → `KindKey` string identity. PendingTurnState v4 reload survival. 1562 EditMode tests.
+**Cross-Platform Windows/Linux Support (Plugin v0.21.0 + Server)** — Plugin now works on Windows, macOS, and Linux without manual code patches. (1) ** …
+
+</details>
+
+<details>
+<summary><b>v0.20.7</b> — 2026-06-10 — Reload-resume re-sends the full-path chip payload, not short-name mentions (task#10)</summary>
+
+**Reload-Resume Sends Full-Path Chip Payload (Plugin v0.20.7, task#10)** — Fixes silent LLM-context degradation after a mid-turn domain reload.
+
+</details>
+
+<details>
+<summary><b>v0.20.6</b> — 2026-06-10 — Full-path chip payload + always-raw "Show LLM payload" inspector for every turn type</summary>
+
+**Full-Path Chip Payload (Plugin v0.20.6)** — Chips now send their full object/file `Path` to the model instead of the short `DisplayName`. `ChipTextI …
 
 </details>
 
 <details>
 <summary>Older releases</summary>
 
+- **v0.20.0** — 2026-06-10 — Chip-unification Phase 1 — delete SceneNameLinker path, unified @-mention rendering
+- **v0.19.2** — 2026-06-10 — Chat reload double-bubble MAJOR + drag-drop crash guard + clean test console
+- **v0.19.1** — 2026-06-10 — P0/P1 chat UX hardening — ResetTurnFlags DRY, bubble dedup, backend restore race
+- **v0.19.0** — 2026-06-10 — Chat UX F27–F30 — Domain reload + external drag/drop + input height + backend cleanup
+- **v0.18.0** — 2026-06-10 — Chat UX F20–F26 — Stop button, reload survival, AutoScroll, dropdown persist, @Object dedup, direct Clear, drag/drop MonoScript
+- **v0.17.36** — 2026-06-06 — Settings Hub redesign — central hub UI + circuit-node header animation + Claude foldout grouping
+- **v0.17.34** — 2026-06-06 — F25 Phase 2 settings hub — unique thematic header animations per sub-window
+- **v0.17.28** — 2026-06-06 — F23 settings split — 3 focused EditorWindows + Chat event hook
+- **v0.17.20** — 2026-06-06 — 40-architect test audit — 299 new tests total, 3 P0+P1 bug fixes
+- **v0.17.18** — 2026-06-06 — F20–F22 bugfixes — select-all, @mention search, orphan bold
+- **v0.17.17** — 2026-06-05 — F15a-F19 chip redesign — linker disable, leading-space guard, context menus
+- **v0.17.14** — 2026-06-05 — F13–F14 inline-chip architecture + bare-name normalizer + review fixes
+- **v0.17.2** — 2026-06-05 — inline context chips + review fixes (regex + staleness + test DRY)
+- **v0.17.0** — 2026-06-05 — full-project code review sprint — 12 waves of fixes across Python + C#
+- **v0.16.0** — 2026-06-05 — F12 chat UX overhaul — composed inline-chip field + response pills + session clear
+- **v0.15.8** — 2026-06-05 — inline-chips + extensible chip-kind registry — F11
 - **v0.15.0** — 2026-06-04 — chat UX polish sprint — F1–F10 + review-hardening
 - **v0.14.0** — 2026-06-04 — multi-backend agent chat — Claude + Codex via DRY CliBackendBase
 - **v0.7.1** — 2026-06-04 — tech-debt sprint wave 1–3 (Python/C#/Chat) — pure quality
@@ -239,6 +292,7 @@ Replaced 466-line overlay stack with composed `InlineChipField` (−806 net line
 - **v0.10.0** — 2026-06-04 — chat plan/act approve & execute + slash templates
 - **v0.9.0** — 2026-06-04 — chat context resolution + compile gating tool
 - **v0.8.0** — 2026-06-04 — compile auto-fix + editor-state injection + tool ping
+- **v0.7.0** — 2026-06-04 — F4 deferred schema + reload-survival + auto-selection
 - **v0.6.0** — 2026-06-03 — Aura pill + native theme + perms gating
 - **v0.5.0** — 2026-06-03 — chat UX polish — refs, grouping, scroll
 - **v0.4.0** — 2026-06-03 — extensible render: md + mermaid + img

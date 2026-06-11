@@ -8,6 +8,19 @@ namespace UnityMCP.Editor
     {
         public static string SetProperty(string path, string component, string prop, string value, bool dryRun = false)
         {
+            // Intercept "active" / "m_IsActive" BEFORE ResolveComponent
+            var normProp = prop.ToLowerInvariant();
+            if (normProp is "active" or "m_isactive" or "isactive")
+            {
+                if (dryRun)
+                {
+                    var go = ComponentSerializer.FindObjectOrThrow(path);
+                    return $"DRY-RUN: active would change {go.activeSelf} → {value}";
+                }
+                bool active = value is "true" or "True" or "1";
+                return SetActive(path, active);
+            }
+
             var (_, comp) = ResolveComponent(path, component);
 
             var so = new SerializedObject(comp);

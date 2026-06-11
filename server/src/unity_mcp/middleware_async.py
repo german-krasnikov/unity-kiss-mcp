@@ -77,16 +77,12 @@ class MiddlewareAsyncMixin:
         focus = tuple(self._recent_focus)
 
         # Check Haiku cache first (cheap key)
-        if args.get("path"):
-            path_key = args["path"]
-        else:
-            sig_args = {k: v for k, v in sorted(args.items()) if not k.startswith("_") and k != "path"}
-            path_key = json.dumps(sig_args, sort_keys=True)
-        cache_key = (cmd, path_key, focus)
+        sig_args = {k: v for k, v in sorted(args.items()) if not k.startswith("_")}
+        cache_key = (cmd, json.dumps(sig_args, sort_keys=True), focus)
         cached = self._distill_cache.get(cache_key)
         if cached is not None:
             self._distill_cache.move_to_end(cache_key)
-            return f"{cached}\n[DISTILLED haiku-cached; full: re-call with _no_distill=true]"
+            return f"{cached}\n[DISTILLED haiku-cached; full: re-call with full=true]"
 
         res = self._distiller.distill_heuristic(cmd, result, focus)
 
@@ -107,7 +103,7 @@ class MiddlewareAsyncMixin:
         return (
             f"{res.text}\n"
             f"[DISTILLED {res.method} {res.original_size}→{res.distilled_size} chars; "
-            f"full: re-call with _no_distill=true]"
+            f"full: re-call with full=true]"
         )
 
     async def _haiku_to_cache(self, cmd: str, text: str, focus: tuple, cache_key: tuple) -> None:

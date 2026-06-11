@@ -380,3 +380,49 @@ def test_is_unity_mcp_pid_all_fallbacks_fail(monkeypatch):
     with patch("subprocess.check_output", side_effect=OSError("all gone")):
         result = lm._is_unity_mcp_pid(12345)
     assert result is False
+
+
+# ---------------------------------------------------------------------------
+# A1: _is_zombie tests
+# ---------------------------------------------------------------------------
+
+def test_is_zombie_returns_true_for_zombie_process():
+    from unity_mcp.lockfile import _is_zombie
+    with patch("subprocess.check_output", return_value=b"Z\n"):
+        assert _is_zombie(12345) is True
+
+
+def test_is_zombie_returns_false_for_running_process():
+    from unity_mcp.lockfile import _is_zombie
+    with patch("subprocess.check_output", return_value=b"S\n"):
+        assert _is_zombie(12345) is False
+
+
+def test_is_zombie_returns_false_when_ps_fails():
+    from unity_mcp.lockfile import _is_zombie
+    with patch("subprocess.check_output", side_effect=subprocess.CalledProcessError(1, "ps")):
+        assert _is_zombie(12345) is False
+
+
+def test_zombie_pid_does_not_raise_runtime_error(tmp_path):
+    """Zombie PID (alive but zombie state) must NOT raise — fall through to wait loop."""
+    lock_file = tmp_path / "server-9500.lock"
+    lock_file.write_text("54321\n")
+
+    call_count = {"n": 0}
+    def flock_side_effect(fd, op):
+        if op == (fcntl.LOCK_EX | fcntl.LOCK_NB):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise BlockingIOError
+        # Second call succeeds
+
+    with (
+        patch("fcntl.flock", side_effect=flock_side_effect),
+        patch("unity_mcp.lockfile.is_pid_alive", return_value=True),
+        patch("unity_mcp.lockfile._is_zombie", return_value=True),
+        patch("unity_mcp.lockfile._is_unity_mcp_pid", return_value=True),
+        patch("time.sleep"),
+    ):
+        fd = acquire_lock(lock_dir=tmp_path, port=9500)
+        assert fd is not None

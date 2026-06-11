@@ -172,6 +172,9 @@ namespace UnityMCP.Editor
                     {
                         _listener = new TcpListener(IPAddress.Loopback, Port);
                         _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+#if UNITY_EDITOR_OSX || UNITY_EDITOR_LINUX
+                        try { _listener.Server.SetSocketOption(SocketOptionLevel.Socket, (SocketOptionName)0x0200, true); } catch { }
+#endif
                         _listener.Start();
                         break;
                     }
