@@ -3,7 +3,9 @@
 Pure, stateless helpers. State (_disabled_tools_cache, _refresh_tools_lock)
 lives in server.py so tests can mutate srv._disabled_tools_cache directly.
 """
+import logging
 import os
+from pathlib import Path
 
 from .tools.gating import filter_by_tier, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
 from .tools.schema_registry import _registry as _schema_registry
@@ -63,37 +65,69 @@ def filter_tools(tools: list, disabled: set | None) -> list:
 
 
 def read_unity_port() -> int:
-    """Discover Unity MCP port from discovery files, env var, or default 9500."""
+    """Discover Unity MCP port from discovery files, env var, or default 9500.
+
+    Priority: env var → CWD project match → newest mtime → 9500.
+    """
     if os.environ.get("UNITY_MCP_PORT"):
-        return int(os.environ["UNITY_MCP_PORT"])
-    from pathlib import Path
+        try:
+            return int(os.environ["UNITY_MCP_PORT"])
+        except ValueError:
+            pass
     ports_dir = Path.home() / ".unity-mcp" / "ports"
-    if ports_dir.exists():
-        candidates = []
-        for f in ports_dir.glob("*.port"):
+    if not ports_dir.exists():
+        return 9500
+
+    candidates = []
+    for f in ports_dir.glob("*.port"):
+        try:
+            lines = f.read_text().strip().split("\n")
+            port = int(lines[0])
+            pid = int(f.stem)
+            os.kill(pid, 0)
+            project_path = lines[1] if len(lines) > 1 else ""
+            project = lines[2] if len(lines) > 2 else "?"
+            candidates.append((f.stat().st_mtime, port, project, pid, project_path))
+        except PermissionError:
+            # Process alive but owned by another user — keep as candidate
             try:
                 lines = f.read_text().strip().split("\n")
                 port = int(lines[0])
-                pid = int(f.stem)
-                os.kill(pid, 0)
+                project_path = lines[1] if len(lines) > 1 else ""
                 project = lines[2] if len(lines) > 2 else "?"
-                candidates.append((f.stat().st_mtime, port, project, pid))
-            except (ValueError, ProcessLookupError, PermissionError, OSError):
-                try:
-                    f.unlink()
-                except OSError:
-                    pass
-        if candidates:
-            candidates.sort(reverse=True)
-            _, port, project, pid = candidates[0]
-            import logging
-            logging.getLogger("unity_mcp").info(
-                "Auto-discovered Unity '%s' on port %d (pid %d)", project, port, pid)
-            return port
-    return 9500
+                candidates.append((f.stat().st_mtime, port, project, int(f.stem), project_path))
+            except (ValueError, OSError):
+                pass
+        except (ValueError, ProcessLookupError, OSError):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+    if not candidates:
+        return 9500
+
+    # CWD-based selection: prefer project whose path is a prefix of cwd.
+    # If multiple match (nested), prefer longest path.
+    cwd = os.getcwd()
+    cwd_matches = [
+        (len(pp), mtime, port, proj, pid)
+        for mtime, port, proj, pid, pp in candidates
+        if pp and (cwd == pp or cwd.startswith(pp + os.sep))
+    ]
+    if cwd_matches:
+        cwd_matches.sort(reverse=True)  # longest path first, then newest mtime
+        _, _, port, project, pid = cwd_matches[0]
+    else:
+        candidates.sort(reverse=True)  # newest mtime first
+        _, port, project, pid, _ = candidates[0]
+
+    logging.getLogger("unity_mcp").info(
+        "Auto-discovered Unity '%s' on port %d (pid %d)", project, port, pid)
+    return port
 
 
-def install_list_tools_filter(mcp_server, get_slot_fn, get_disabled_cache_fn):
+def install_list_tools_filter(mcp_server, get_disabled_cache_fn):
     """Patch mcp._mcp_server.request_handlers to inject filtering + schema capture."""
     import mcp.types as mcp_types
 
@@ -107,7 +141,6 @@ def install_list_tools_filter(mcp_server, get_slot_fn, get_disabled_cache_fn):
             desc = getattr(t, "description", "") or ""
             ann = getattr(t, "annotations", None)
             _schema_registry.capture(t.name, schema, desc, annotations=ann)
-        slot = get_slot_fn()
         result.root.tools = filter_tools(result.root.tools, get_disabled_cache_fn())
         return result
 

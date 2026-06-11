@@ -7,22 +7,23 @@ MCP-сервер для управления Unity Editor из Claude Code с м
 ## Architecture (для Architect)
 
 ```
-Claude Code ←──stdio──→ Python MCP Server ←──TCP:9500──→ Unity Editor Plugin
-     │                        │                                │
-     │  MCP Protocol          │  Binary protocol               │  Unity API
-     │  (JSON-RPC 2.0)        │  [4B len BE][JSON]             │  (main thread)
-     │                        │                                │
-     │                        ├─ ConnectionSlot (single)       ├─ CommandRouter (async)
-     │                        ├─ Capability Gating (TIER1+cat) ├─ PluginRegistry (IMCPPlugin)
-     │                        ├─ Plugin system (auto-discovery) ├─ CommandRegistry + ValueParser
+Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]──→ Unity Editor Plugin
+     │                        │                                  │
+     │  MCP Protocol          │  Binary protocol                │  Unity API
+     │  (JSON-RPC 2.0)        │  [4B len BE][JSON]              │  (main thread)
+     │                        │                                  │
+     │                        ├─ ConnectionSlot (dual: CLI+Chat) ├─ CommandRouter (async)
+     │                        ├─ Capability Gating (TIER1+cat)   ├─ PluginRegistry (IMCPPlugin)
+     │                        ├─ Plugin system (auto-discovery)  ├─ CommandRegistry + ValueParser
      │                        │  - opt-in disable: env UNITY_MCP_SKIP_PLUGINS=prefix ├─ CommandSchema (validation)
-     │                        ├─ Deferred Schema Loading       ├─ 7 Serializers
-     │                        │  (stub schemas + lazy resolve) ├─ RefManager ($a-$zz)
-     │                        ├─ 23-layer Middleware (opt-in)   ├─ PlaytestRunner + DSL
-     │                        ├─ CompileStateProbe             ├─ RuntimeHelper (Play Mode)
-     │                        ├─ PID Lockfile (exclusive)      ├─ MultiViewCapture (4-panel)
-     │                        └─ Heartbeat (15s, reconnect)    ├─ CodeExecutor (Roslyn)
-     │                                                         └─ Guards (compile/play/runtime/tool)
+     │                        ├─ Deferred Schema Loading         ├─ 7 Serializers
+     │                        │  (stub schemas + lazy resolve)   ├─ RefManager ($a-$zz)
+     │                        ├─ 23-layer Middleware (opt-in)    ├─ PlaytestRunner + DSL
+     │                        ├─ CompileStateProbe               ├─ RuntimeHelper (Play Mode)
+     │                        ├─ PID Lockfile (exclusive)        ├─ MultiViewCapture (4-panel)
+     │                        ├─ Port discovery (CWD-based)      ├─ CodeExecutor (Roslyn)
+     │                        └─ Heartbeat (15s, reconnect)      ├─ PortResolver (dual-port)
+     │                                                           └─ Guards (compile/play/runtime/tool)
 ```
 
 ### Почему такая архитектура
@@ -45,8 +46,10 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:9500──→
    - Tool annotations: readOnlyHint, destructiveHint for MCP compliance
    - Dynamic tool filtering: patches `mcp._mcp_server.request_handlers[ListToolsRequest]` with gating + disabled-set subtraction (hide-disabled-set model, not allowlist)
 
-2. **TCP Bridge** (Python: `bridge.py` + `connection_slot.py` + `lockfile.py` + `compile_state.py`)
-   - **ConnectionSlot**: single UnityBridge connection (connect/reconnect/list)
+2. **TCP Bridge** (Python: `bridge.py` + `connection_slot.py` + `lockfile.py` + `compile_state.py` + `server_filtering.py`)
+   - **ConnectionSlot**: dual per-project connections (CLI main + Chat agent-only) with project-based discovery
+   - **Port Discovery** (`server_filtering.py:read_unity_port`): CWD-based project matching → ~/.unity-mcp/ports/*.port files → env UNITY_MCP_PORT → default 9500. Candidates ranked by project path match (CWD), then mtime. PermissionError (cross-user processes) skipped gracefully, live .port files preserved.
+   - **Fail-Fast Lockfile** (`lockfile.py`): RuntimeError raised on live process (instead of SIGTERM) to let Python server handle reconnection logic cleanly.
    - **UnityBridge**: AsyncIO TCP client, 4-byte BE length prefix JSON
    - Socket: TCP_NODELAY, SO_KEEPALIVE (idle=60s, interval=10s, count=3 on macOS/Linux)
    - **Heartbeat**: 15s interval, raw ping, 3 consecutive failures → close, 2s polling when disconnected (5s when busy). Sole reconnect mechanism.
@@ -60,8 +63,9 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:9500──→
    - Reconnect: cooldown MIN_RECONNECT_INTERVAL=2.0s, ping verification, fires callbacks
    - Max message: 10MB, timeouts: 30s default, 60s compile_preflight/batch, 120s run_tests/run_playtest/fuzz_playtest
 
-3. **Unity Plugin** (C#: 70+ files, ~13400 LOC)
-   - **MCPServer.cs**: TCP listener port 9500, 4-byte BE framing, 10MB max, SO_KEEPALIVE, port discovery file, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, single client, client generation tracking
+3. **Unity Plugin** (C#: 72+ files, ~13600 LOC)
+   - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections
+   - **PortResolver.cs**: Pure testable helpers (ResolvePort, ResolveChatPort, FindFreePort, SavePorts, IsValidPort, ParsePortFromJson) with 25 NUnit tests. Validates 1024–65535 range, skips reserved ports, fallback to OS-assigned via port 0
    - **CommandRouter.cs**: RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutatingCommand/IsRuntimeCommand
    - **PluginRegistry.cs**: Static registry for IMCPPlugin implementations. Plugins register via `[InitializeOnLoad]`. One-way asmdef dependency: external → public.
    - **IMCPPlugin.cs**: Interface — Name, CommandPrefix, RegisterCommands(), OnDomainReload(), AdditionalCommands
@@ -227,7 +231,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - Returns file path + optional manifest (for highlight markers)
 
 ### Agent Chat Backends (C#: CliBackendBase + subclasses, v0.14.0+)
-- **CliBackendBase** (abstract): Shared lifecycle host for CLI-based backends. 4 variation axes: (a) `BuildArgs` (spawn/resume argv + env-key-strip), (b) `ParseLine` (NDJSON line → ChatEvent[]), (c) `BinaryName` (CLI executable), (d) `IsPersistentProcess` (stdin loop vs spawn-per-turn). Owns spawn, drain, accumulate, SessionId, Stop, Dispose — subclasses override only the 4 axes.
+- **CliBackendBase** (abstract): Shared lifecycle host for CLI-based backends. 4 variation axes: (a) `BuildArgs` (spawn/resume argv + env-key-strip), (b) `ParseLine` (NDJSON line → ChatEvent[]), (c) `BinaryName` (CLI executable), (d) `IsPersistentProcess` (stdin loop vs spawn-per-turn). Injects `UNITY_MCP_PORT` env var when spawning child process (reads MCPServer.ServerChatPort from parent). Owns spawn, drain, accumulate, SessionId, Stop, Dispose — subclasses override only the 4 axes.
 - **ClaudeBackend** (ported onto base): Zero behavior change (−65 lines net). Persistent stdin loop (IsPersistentProcess=true), Claude NDJSON parser, `--resume <sessionId>` argv builder. Uses `ChatMcpConfigWriter.GetOrCreateConfigPath()` to generate temporary JSON config + `--mcp-config <path> --strict-mcp-config` flags for isolated MCP server isolation.
 - **CodexAppServerBackend** (only Codex option, v0.14.0+): Persistent Codex session via `codex app-server` (direct stdio, JSON-RPC 2.0). One process per chat session (IsPersistentProcess=true). Protocol: `initialize` → `thread/start` → repeated `turn/start` with `mcpToolCall` items + real token streaming via `item/agentMessage/delta` (240+ deltas/turn). MCP injection via `-c mcp_servers.*` flags at session init. Spike-verified with codex 0.137.0.
 - **CodexAppServerParser**: JSON-RPC 2.0 notification/response parser → ChatEvent (notification item types: mcpToolCall camelCase, agentMessage/delta token stream, turn/completed with usage; thread_id at result.thread.id).

@@ -45,9 +45,35 @@ namespace UnityMCP.Editor
             chatEnable.RegisterValueChangedCallback(e => ChatSettingsHook.SetChatEnabled(e.newValue));
             section.Add(chatEnable);
 
-            var port = new Label($"localhost:{MCPServer.ServerPort}");
-            port.AddToClassList("hub-port-label");
-            section.Add(port);
+            var portField = new IntegerField("Port") { value = MCPServer.ServerPort };
+            portField.AddToClassList("hub-port-label");
+            section.Add(portField);
+
+            var chatPortField = new IntegerField("Chat Port") { value = MCPServer.ServerChatPort };
+            chatPortField.AddToClassList("hub-port-label");
+            section.Add(chatPortField);
+
+            var restartWarning = new Label("Restart required to apply") { visible = false };
+            restartWarning.AddToClassList("hub-port-restart-warning");
+            section.Add(restartWarning);
+
+            portField.RegisterValueChangedCallback(e =>
+            {
+                var v = e.newValue;
+                if (v < 1024 || v > 65535) { portField.SetValueWithoutNotify(e.previousValue); return; }
+                if (v == chatPortField.value) { portField.SetValueWithoutNotify(e.previousValue); return; }
+                MCPServer.SavePorts(v, chatPortField.value);
+                restartWarning.visible = (v != MCPServer.ServerPort || chatPortField.value != MCPServer.ServerChatPort);
+            });
+
+            chatPortField.RegisterValueChangedCallback(e =>
+            {
+                var v = e.newValue;
+                if (v < 1024 || v > 65535) { chatPortField.SetValueWithoutNotify(e.previousValue); return; }
+                if (v == portField.value) { chatPortField.SetValueWithoutNotify(e.previousValue); return; }
+                MCPServer.SavePorts(portField.value, v);
+                restartWarning.visible = (portField.value != MCPServer.ServerPort || v != MCPServer.ServerChatPort);
+            });
 
             return section;
         }

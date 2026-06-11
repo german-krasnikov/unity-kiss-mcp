@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityMCP.Editor;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -121,7 +122,11 @@ namespace UnityMCP.Editor.Chat
         protected virtual void SpawnNewProcess(string binary, string[] args, string[] strip)
         {
             _proc = new ChatProcess();
-            _proc.Spawn(binary, args, strip);
+            var envVars = new Dictionary<string, string>
+            {
+                { "UNITY_MCP_PORT", MCPServer.ServerChatPort.ToString() }
+            };
+            _proc.Spawn(binary, args, strip, envVars);
         }
 
         protected virtual void WriteLineToProc(string line) => _proc?.WriteLine(line);

@@ -50,7 +50,8 @@ namespace UnityMCP.Editor.Chat
 
         internal bool IsRunning => _running && _process != null && !_process.HasExited;
 
-        internal void Spawn(string binaryPath, string[] args, string[] stripEnvKeys)
+        internal void Spawn(string binaryPath, string[] args, string[] stripEnvKeys,
+            Dictionary<string, string> setEnvKeys = null)
         {
             if (IsRunning) return;
 
@@ -96,6 +97,11 @@ namespace UnityMCP.Editor.Chat
             foreach (var key in stripEnvKeys)
                 if (psi.EnvironmentVariables.ContainsKey(key))
                     psi.EnvironmentVariables.Remove(key);
+
+            // Inject env vars (e.g. UNITY_MCP_PORT) for all backends
+            if (setEnvKeys != null)
+                foreach (var kv in setEnvKeys)
+                    psi.EnvironmentVariables[kv.Key] = kv.Value;
 
             _process = Process.Start(psi);
             if (_process == null) throw new InvalidOperationException("Failed to start claude process");

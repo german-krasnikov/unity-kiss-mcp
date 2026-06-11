@@ -138,9 +138,13 @@ def acquire_lock(lock_dir=None, port: int = 9500) -> int:
             # PID data (bytes 0-31) is always readable — outside locked region.
             old_pid = _read_pid_from_fd(fd)
             if old_pid and is_pid_alive(old_pid) and _is_unity_mcp_pid(old_pid):
-                log.info("Killing stale unity_mcp server pid=%d", old_pid)
-                os.kill(old_pid, 15)  # SIGTERM (TerminateProcess on Windows)
-            # Poll until lock is free
+                # Fail-fast: another live session owns this port — don't kill it
+                os.close(fd)
+                raise RuntimeError(
+                    f"Another MCP session (PID {old_pid}) is already connected to port {port}. "
+                    f"Set UNITY_MCP_PORT to target a different Unity instance."
+                )
+            # Dead/zombie lock — wait for it to be released
             deadline = time.monotonic() + _MAX_KILL_WAIT_S
             while time.monotonic() < deadline:
                 time.sleep(_POLL_INTERVAL_S)

@@ -246,7 +246,7 @@ async def resolve_tool_schema(tools: str) -> str:
 
 
 # Install filtering handler — captures schemas + applies gating + disabled-set.
-install_list_tools_filter(mcp, lambda: slot, lambda: _disabled_tools_cache)
+install_list_tools_filter(mcp, lambda: _disabled_tools_cache)
 
 
 def main():

@@ -17,23 +17,51 @@ namespace UnityMCP.Editor
     [InitializeOnLoad]
     public static class MCPServer
     {
+        // ── Per-port client state ─────────────────────────────────────────────
+        private sealed class ClientSlot
+        {
+            internal volatile bool Connected;
+            internal volatile TcpClient Client;
+            internal volatile CancellationTokenSource Cts;
+            internal long Generation;  // OK — Interlocked
+        }
+
         private static TcpListener _listener;
+        private static TcpListener _chatListener;
         private static CancellationTokenSource _cts;
         private static readonly ConcurrentQueue<Action> _mainThreadQueue = new ConcurrentQueue<Action>();
-        private static volatile bool _clientConnected;
-        private static TcpClient _currentClient;
-        private static CancellationTokenSource _clientCts;
-        private static long _clientGeneration;
+        private static readonly ClientSlot _mainSlot = new ClientSlot();
+        private static readonly ClientSlot _chatSlot = new ClientSlot();
         private static volatile bool _shuttingDown;
         private static volatile bool _starting;
         private static volatile bool _isCompiling;
+        private static readonly string PortFilePath =
+            Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "MCP_Port.json"));
         private static readonly int Port = GetPort();
+        private static readonly int ChatPort = GetChatPort();
         private static DateTime _compileStartTime;
+
+        private static string ReadPortFileOrNull()
+        {
+            try { return File.Exists(PortFilePath) ? File.ReadAllText(PortFilePath) : null; }
+            catch { return null; }
+        }
+
         private static int GetPort()
         {
             var env = System.Environment.GetEnvironmentVariable("UNITY_MCP_PORT");
-            return env != null && int.TryParse(env, out var p) ? p : 9500;
+            return PortResolver.ResolvePort(env, ReadPortFileOrNull(), 9500);
         }
+
+        private static int GetChatPort()
+        {
+            var env = System.Environment.GetEnvironmentVariable("UNITY_MCP_CHAT_PORT");
+            return PortResolver.ResolveChatPort(env, ReadPortFileOrNull(), Port, Port + 1);
+        }
+
+        public static void SavePorts(int port, int chatPort)
+            => PortResolver.SavePorts(PortFilePath, port, chatPort);
+
         private const int MaxMessageSize = 10_000_000;
 
         // Per-command timeout overrides (seconds). Default: 25s.
@@ -65,13 +93,29 @@ namespace UnityMCP.Editor
                 catch { return false; }  // ObjectDisposedException during teardown
             }
         }
-        public static bool IsClientConnected => _clientConnected;
+
+        public static bool IsChatListenerRunning
+        {
+            get
+            {
+                try
+                {
+                    var l = _chatListener;
+                    return l != null && l.Server != null && l.Server.IsBound;
+                }
+                catch { return false; }
+            }
+        }
+        public static bool IsClientConnected => _mainSlot.Connected || _chatSlot.Connected;
         public static int ServerPort => Port;
+        public static int ServerChatPort => ChatPort;
 
         private static double _lastWatchdogCheck;
 
         static MCPServer()
         {
+            // Persist auto-assigned ports so they survive domain reload
+            SavePorts(Port, ChatPort);
             EditorApplication.update += ProcessMainThreadQueue;
             EditorApplication.update += WatchdogTick;
             EditorApplication.quitting += OnQuit;
@@ -137,45 +181,50 @@ namespace UnityMCP.Editor
                         _listener = null;
                         if (attempt == 4) throw;
                         Debug.LogWarning($"[MCP] Port {Port} busy, retry {attempt + 1}/5...");
-                        await Task.Delay(500 * (attempt + 1));
+                        await Task.Delay(500 * (attempt + 1), token);
                     }
                 }
 
-                Debug.Log($"[MCP] Server started on port {Port}");
+                // Chat listener — best-effort (non-fatal if chat port is unavailable)
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    try
+                    {
+                        _chatListener = new TcpListener(IPAddress.Loopback, ChatPort);
+                        _chatListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                        _chatListener.Start();
+                        break;
+                    }
+                    catch (SocketException se) when (se.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                    {
+                        try { _chatListener?.Stop(); } catch { }
+                        _chatListener = null;
+                        if (attempt == 2)
+                        {
+                            Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable after 3 attempts: {se.Message}");
+                            break;
+                        }
+                        Debug.LogWarning($"[MCP] Chat port {ChatPort} busy, retry {attempt + 1}/3...");
+                        await Task.Delay(300 * (attempt + 1), token);
+                    }
+                    catch (SocketException se)
+                    {
+                        Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable: {se.Message}");
+                        _chatListener = null;
+                        break;
+                    }
+                }
+
+                Debug.Log($"[MCP] Server started on port {Port} (chat: {ChatPort})");
                 WritePortFile(Port);
                 WriteStateFile("ready");
 
-                while (!token.IsCancellationRequested)
-                {
-                    var client = await AcceptClientAsync(token);
-                    if (client == null)
-                    {
-                        // Listener disposed/superseded or a transient accept error.
-                        // Break if shut down or this loop was orphaned by a newer
-                        // StartAsync (_cts replaced); otherwise back off so we never
-                        // tight-spin on a dead listener → silent 100% CPU, no console.
-                        if (token.IsCancellationRequested || _cts != cts || !IsRunning) break;
-                        await Task.Delay(100, token);
-                        continue;
-                    }
-                    if (client != null)
-                    {
-                        // Cancel old handler BEFORE closing socket — triggers clean
-                        // OperationCanceledException instead of ObjectDisposedException
-                        if (_clientConnected && _currentClient != null)
-                        {
-                            Debug.Log("[MCP] New client — disconnecting previous");
-                            try { _clientCts?.Cancel(); } catch { }
-                            try { _currentClient.Close(); } catch { }
-                        }
-                        try { client.NoDelay = true; } catch { }
-                        ApplyKeepAlive(client.Client);
-                        _currentClient = client;
-                        var gen = Interlocked.Increment(ref _clientGeneration);
-                        _clientCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                        _ = HandleClientAsync(client, gen, _clientCts.Token);
-                    }
-                }
+                // Run both accept loops concurrently — chat loop is optional
+                var mainLoop = RunAcceptLoop(_listener, _mainSlot, "CLI", cts, token);
+                var chatLoop = _chatListener != null
+                    ? RunAcceptLoop(_chatListener, _chatSlot, "Chat", cts, token)
+                    : Task.CompletedTask;
+                await Task.WhenAll(mainLoop, chatLoop);
             }
             catch (Exception e)
             {
@@ -193,6 +242,40 @@ namespace UnityMCP.Editor
                 }
             }
             finally { _starting = false; }
+        }
+
+        private static async Task RunAcceptLoop(TcpListener listener, ClientSlot slot, string label,
+            CancellationTokenSource masterCts, CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                TcpClient client;
+                try { client = await listener.AcceptTcpClientAsync(); }
+                catch (ObjectDisposedException) { break; }
+                catch (Exception e)
+                {
+                    if (token.IsCancellationRequested) break;
+                    Debug.LogError($"[MCP] {label} accept error: {e.Message}");
+                    if (_cts != masterCts || !IsRunning) break;
+                    await Task.Delay(100, token);
+                    continue;
+                }
+
+                // Cancel old handler for THIS slot only — leaves the other slot untouched
+                if (slot.Connected && slot.Client != null)
+                {
+                    Debug.Log($"[MCP] {label}: new client — disconnecting previous");
+                    try { slot.Cts?.Cancel(); } catch { }
+                    try { slot.Client.Close(); } catch { }
+                }
+
+                try { client.NoDelay = true; } catch { }
+                ApplyKeepAlive(client.Client);
+                slot.Client = client;
+                var gen = Interlocked.Increment(ref slot.Generation);
+                slot.Cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+                _ = HandleClientAsync(client, slot, gen, label, slot.Cts.Token);
+            }
         }
 
         private static void ApplyKeepAlive(Socket socket)
@@ -224,30 +307,11 @@ namespace UnityMCP.Editor
 #endif
         }
 
-        private static async Task<TcpClient> AcceptClientAsync(CancellationToken token)
+        private static async Task HandleClientAsync(TcpClient client, ClientSlot slot, long generation,
+            string label, CancellationToken clientToken)
         {
-            try
-            {
-                return await _listener.AcceptTcpClientAsync();
-            }
-            catch (ObjectDisposedException)
-            {
-                return null;
-            }
-            catch (Exception e)
-            {
-                if (!token.IsCancellationRequested)
-                {
-                    Debug.LogError($"[MCP] Accept error: {e.Message}");
-                }
-                return null;
-            }
-        }
-
-        private static async Task HandleClientAsync(TcpClient client, long generation, CancellationToken clientToken)
-        {
-            Debug.Log("[MCP] Client connected");
-            _clientConnected = true;
+            Debug.Log($"[MCP] {label} client connected");
+            slot.Connected = true;
             RefManager.Invalidate();
             try
             {
@@ -349,14 +413,13 @@ namespace UnityMCP.Editor
             }
             finally
             {
-                // Only clear shared state if we are still the active handler.
-                // If a newer client already took over, _clientGeneration > our generation.
-                if (Interlocked.Read(ref _clientGeneration) == generation)
+                // Only clear slot state if we are still the active handler for this slot.
+                if (Interlocked.Read(ref slot.Generation) == generation)
                 {
-                    _clientConnected = false;
-                    _currentClient = null;
+                    slot.Connected = false;
+                    slot.Client = null;
                 }
-                Debug.Log($"[MCP] Client disconnected (gen={generation})");
+                Debug.Log($"[MCP] {label} client disconnected (gen={generation})");
             }
         }
 
@@ -435,20 +498,29 @@ namespace UnityMCP.Editor
             catch { }
         }
 
+        private static void TeardownSlot(ClientSlot slot)
+        {
+            try { slot.Cts?.Cancel(); } catch { }
+            try { slot.Client?.Close(); } catch { }
+            slot.Client = null;
+            slot.Connected = false;
+            try { slot.Cts?.Dispose(); } catch { }
+            slot.Cts = null;
+        }
+
         private static void TeardownCore()
         {
-            try { _clientCts?.Cancel(); } catch { }
-            try { _cts?.Cancel(); } catch { }
-            try { _currentClient?.Close(); } catch { }
-            _currentClient = null;
-            _clientConnected = false;
-            try { _clientCts?.Dispose(); } catch { }
-            _clientCts = null;
+            try { _cts?.Cancel(); } catch { }      // fires linked tokens safely FIRST
+            TeardownSlot(_mainSlot);
+            TeardownSlot(_chatSlot);
             try { _cts?.Dispose(); } catch { }
             _cts = null;
             try { _listener?.Server?.Shutdown(SocketShutdown.Both); } catch { }
             try { _listener?.Stop(); } catch { }
             _listener = null;
+            try { _chatListener?.Server?.Shutdown(SocketShutdown.Both); } catch { }
+            try { _chatListener?.Stop(); } catch { }
+            _chatListener = null;
             EditorApplication.update -= ProcessMainThreadQueue;
             EditorApplication.update -= WatchdogTick;
         }
@@ -476,10 +548,10 @@ namespace UnityMCP.Editor
             _shuttingDown = true;
             WriteStateFile("reloading");
             // Send going_away FIRST — stream still alive, handler still running
-            if (_currentClient != null && _clientConnected)
-            {
-                try { SendGoingAwaySync(_currentClient.GetStream()); } catch { }
-            }
+            if (_mainSlot.Client != null && _mainSlot.Connected)
+                try { SendGoingAwaySync(_mainSlot.Client.GetStream()); } catch { }
+            if (_chatSlot.Client != null && _chatSlot.Connected)
+                try { SendGoingAwaySync(_chatSlot.Client.GetStream()); } catch { }
             TeardownCore();
             // Do NOT delete port file — port stays the same after reload, Python needs it
         }

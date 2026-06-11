@@ -6,7 +6,8 @@ unity-kiss-mcp/
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
-│   │   ├── connection_slot.py  # ConnectionSlot: single connection
+│   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
+│   │   ├── server_filtering.py # Port discovery (CWD-based), catalog push, tool filtering
 │   │   ├── lockfile.py         # Cross-platform exclusive locking (fcntl on Unix, msvcrt on Windows) + stale server cleanup
 │   │   ├── compile_state.py    # CompileStateProbe (heuristic Unity compile detection)
 │   │   ├── middleware.py       # 23-layer middleware pipeline (env-gated UNITY_MCP_MIDDLEWARE=1)
@@ -105,7 +106,8 @@ unity-kiss-mcp/
 │       └── ... + domain tests
 ├── unity-plugin/               # Unity Editor Plugin (72 C# files, ~13400 LOC)
 │   └── Editor/
-│       ├── MCPServer.cs                    # TCP listener, SO_KEEPALIVE, domain reload, state file
+│       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
+│       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, etc.) + 25 tests
 │       ├── CommandRouter.cs                # RegisterAll(), guards, core dispatch (partial class)
 │       ├── CommandRouter.ObjectHandlers.cs # Object mutation handlers (partial class)
 │       ├── CommandRouter.MediaHandlers.cs  # Media/asset handlers (partial class)
@@ -168,6 +170,7 @@ unity-kiss-mcp/
 │       ├── MCPStatusBarWidget.cs          # Injects MCP pill into AppStatusBar via reflection
 │       ├── Tests/                         # Editor tests asmdef (references core)
 │       │   ├── UnityMCP.Editor.Tests.asmdef
+│       │   ├── PortResolverTests.cs       # 25 NUnit tests (port validation, fallback, dual-port edge cases)
 │       │   ├── MCPStatusModelTests.cs     # 14 NUnit tests (state transitions, labels, pills)
 │       │   ├── HubHeaderAnimTests.cs      # 11 NUnit tests (circuit-node animation, packet motion, state logic) (F26)
 │       │   ├── HubCardButtonTests.cs      # NUnit tests (card rendering, click behavior) (F26)
