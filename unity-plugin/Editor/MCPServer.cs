@@ -130,8 +130,9 @@ namespace UnityMCP.Editor
                         WriteStateFile(IsRunning ? "ready" : "restarting");
                 };
             };
-            EditorSceneManager.sceneOpened += (_, _) => RefManager.Invalidate();
-            EditorSceneManager.newSceneCreated += (_, _, _) => RefManager.Invalidate();
+            EditorSceneManager.sceneOpened += (_, _) => { RefManager.Invalidate(); HierarchySerializer.ResetIncrementalCache(); };
+            EditorSceneManager.newSceneCreated += (_, _, _) => { RefManager.Invalidate(); HierarchySerializer.ResetIncrementalCache(); };
+            EditorSceneManager.sceneClosed += _ => { RefManager.Invalidate(); HierarchySerializer.ResetIncrementalCache(); };
             // Delay async start until first update — SynchronizationContext dead in static ctor
             EditorApplication.delayCall += () => StartAsync();
         }

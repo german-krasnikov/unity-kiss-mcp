@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="92 MCP Tools · 3675 Tests (1964 Python · 1658 Unity · 53 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="92 MCP Tools · 3698 Tests (1964 Python · 1681 Unity · 53 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -229,6 +229,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.24.0</b> — 2026-06-12 — Multi-scene hierarchy support + temp test assets refactor</summary>
+
+**Multi-Scene Hierarchy Support (Plugin v0.24.0)** — `get_hierarchy` now handles multiple loaded scenes with scene-aware context headers.
+
+</details>
+
+<details>
 <summary><b>v0.23.13</b> — 2026-06-11 — Unified settings + media viewers + LLM config + review hardening</summary>
 
 **SettingsNavController Hardening (Plugin v0.23.13)** — Timer-based animated transitions between settings pages (iOS-style slide), input-field tab/Esc …
@@ -257,15 +264,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.21.0</b> — 2026-06-11 — Cross-platform Windows/Linux support + zero manual patching</summary>
-
-**Cross-Platform Windows/Linux Support (Plugin v0.21.0 + Server)** — Plugin now works on Windows, macOS, and Linux without manual code patches. (1) ** …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.21.0** — 2026-06-11 — Cross-platform Windows/Linux support + zero manual patching
 - **v0.20.7** — 2026-06-10 — Reload-resume re-sends the full-path chip payload, not short-name mentions (task#10)
 - **v0.20.6** — 2026-06-10 — Full-path chip payload + always-raw "Show LLM payload" inspector for every turn type
 - **v0.20.0** — 2026-06-10 — Chip-unification Phase 1 — delete SceneNameLinker path, unified @-mention rendering

@@ -12,6 +12,7 @@
 
 ### Output Format (default, components=false)
 
+**Single scene:**
 ```
 Main Camera $a
 Directional Light $b
@@ -25,8 +26,24 @@ Player $g
    └─ Sword $j
 ```
 
+**Multiple scenes (with headers):**
+```
+[MainScene]
+Main Camera $a
+Directional Light $b
+GameManager $c
+├─ UIRoot $d
+
+[AdditiveScene]
+Player $e
+├─ Body $f
+└─ WeaponSlot $g
+   └─ Sword $h
+```
+
 ### Output Format (components=true)
 
+**Single scene:**
 ```
 Main Camera [Camera,AudioListener] $a
 Directional Light [Light] $b
@@ -40,10 +57,24 @@ Player [Rigidbody,PlayerController] $g
    └─ Sword [MeshFilter,MeleeWeapon] $j
 ```
 
+**Multiple scenes:**
+```
+[MainScene]
+Main Camera [Camera,AudioListener] $a
+Directional Light [Light] $b
+
+[AdditiveScene]
+Player [Rigidbody,PlayerController] $c
+├─ Body [SkinnedMeshRenderer] $d
+```
+
 ### Format Rules
 
 | Element | Format | Example |
 |---------|--------|---------|
+| Scene header (multi-scene) | `[SceneName]` (single scene = no headers) | `[MainScene]` |
+| Duplicate scene names | disambiguate with parent dir | `[Scene (Assets/Scenes)]` |
+| Unsaved scenes | mark as (unsaved) | `[Scene (unsaved)]` |
 | Name | plain text | `Main Camera` |
 | Short ref | `$a`-`$zz` (702 slots via RefManager) | `$a`, `$ab` |
 | Components | `[Type1,Type2]` (only when `components=true`) | `[Camera,AudioListener]` |
@@ -68,6 +99,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEditor.SceneManagement;
+using UnityEngine.SceneManagement;
 
 namespace UnityMCP.Editor
 {
@@ -78,14 +110,44 @@ namespace UnityMCP.Editor
         public static string Serialize(int depth = 99, string root = null, string filter = null, bool components = false)
         {
             var sb = new StringBuilder();
-            var roots = GetRootObjects(root);
             int nodeCount = 0;
 
-            for (int i = 0; i < roots.Length; i++)
+            if (string.IsNullOrEmpty(root))
             {
-                var isLast = (i == roots.Length - 1);
-                SerializeObject(sb, roots[i], depth, 0, new List<bool>(), isLast, filter, ref nodeCount, components);
-                if (nodeCount >= MAX_NODES) break;
+                var stage = PrefabStageUtility.GetCurrentPrefabStage();
+                if (stage != null)
+                {
+                    SerializeObject(sb, stage.prefabContentsRoot, depth, 0, new List<bool>(), true, filter, ref nodeCount, components);
+                }
+                else
+                {
+                    var scenes = GetAllLoadedSceneRoots();
+                    bool multi = scenes.Count > 1;
+                    foreach (var (name, roots) in scenes)
+                    {
+                        if (nodeCount >= MAX_NODES) break;
+                        if (multi)
+                        {
+                            int headerPos = sb.Length;
+                            sb.AppendLine($"[{name}]");
+                            int beforeCount = nodeCount;
+                            for (int i = 0; i < roots.Length && nodeCount < MAX_NODES; i++)
+                                SerializeObject(sb, roots[i], depth, 0, new List<bool>(), i == roots.Length - 1, filter, ref nodeCount, components);
+                            if (nodeCount == beforeCount) sb.Length = headerPos; // remove phantom header
+                        }
+                        else
+                        {
+                            for (int i = 0; i < roots.Length && nodeCount < MAX_NODES; i++)
+                                SerializeObject(sb, roots[i], depth, 0, new List<bool>(), i == roots.Length - 1, filter, ref nodeCount, components);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                var roots = GetSubtreeRoots(root);
+                for (int i = 0; i < roots.Length && nodeCount < MAX_NODES; i++)
+                    SerializeObject(sb, roots[i], depth, 0, new List<bool>(), i == roots.Length - 1, filter, ref nodeCount, components);
             }
 
             if (nodeCount >= MAX_NODES)
@@ -103,23 +165,55 @@ namespace UnityMCP.Editor
         // 6. if (depth-truncated && has children) sb.Append(" +").Append(descendantCount)
         // 7. Recurse children; at MAX_NODES mid-children → "... +N siblings"
 
+        // Multi-scene support: GetAllLoadedSceneRoots() returns all loaded scenes
+        // When 2+ scenes loaded: emit [SceneName] headers; duplicate names disambiguate with parent dir
+        // When 1 scene: no headers (zero overhead)
+        // Phantom header removal: if multi-scene but scene had no matching objects, remove the header line
+
         // Incremental cache: SerializeIncremental() returns "NO_CHANGE" if hierarchy unchanged
-        // Summary mode: SerializeSummary() returns compact root-level overview
+        // Summary mode: SerializeSummary() returns compact root-level overview + scene stats
         // Subtree: SerializeSubtree(go, depth) for single object
+        // Helper: GetAllLoadedSceneRoots() → List<(name, roots[])> with dedup logic
 
-        private static GameObject[] GetRootObjects(string rootPath)
+        internal static List<(string name, GameObject[] roots)> GetAllLoadedSceneRoots()
         {
-            if (string.IsNullOrEmpty(rootPath))
+            var raw = new List<(Scene scene, GameObject[] roots)>();
+            for (int i = 0; i < SceneManager.sceneCount; i++)
             {
-                // Check prefab stage first
-                var stage = PrefabStageUtility.GetCurrentPrefabStage();
-                if (stage != null)
-                    return new[] { stage.prefabContentsRoot };
-
-                var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-                return scene.GetRootGameObjects();
+                var s = SceneManager.GetSceneAt(i);
+                // Exclude DontDestroyOnLoad virtual scene (runtime only, has no path)
+                if (!s.isLoaded || s.name == "DontDestroyOnLoad") continue;
+                raw.Add((s, s.GetRootGameObjects()));
             }
+            if (raw.Count == 0)
+            {
+                var active = SceneManager.GetActiveScene();
+                return new List<(string, GameObject[])> { (active.name, active.GetRootGameObjects()) };
+            }
+            // Detect duplicate names — disambiguate with directory path
+            var nameCount = new Dictionary<string, int>();
+            foreach (var (s, _) in raw)
+            {
+                nameCount.TryGetValue(s.name, out var c);
+                nameCount[s.name] = c + 1;
+            }
+            var result = new List<(string, GameObject[])>();
+            foreach (var (s, roots) in raw)
+            {
+                string label;
+                if (nameCount[s.name] > 1)
+                    label = string.IsNullOrEmpty(s.path)
+                        ? $"{s.name} (unsaved)"
+                        : $"{s.name} ({System.IO.Path.GetDirectoryName(s.path)})";
+                else
+                    label = s.name;
+                result.Add((label, roots));
+            }
+            return result;
+        }
 
+        private static GameObject[] GetSubtreeRoots(string rootPath)
+        {
             var root = ComponentSerializer.FindObject(rootPath);
             return root != null ? new[] { root } : new GameObject[0];
         }
@@ -266,6 +360,15 @@ Base64-encoded PNG or file path.
 - Incremental cache returns `NO_CHANGE` when unchanged
 - Summary mode (`SerializeSummary`)
 - Version tracking increments on hierarchy change (thread-safe)
+- **Multi-scene support (new, v0.23.23):**
+  - Single scene: no scene headers emitted
+  - Multiple loaded scenes: `[SceneName]` headers for each
+  - Duplicate scene names: disambiguate with parent directory path
+  - Unsaved scenes: mark as `(unsaved)` instead of path
+  - Phantom header removal: if scene matches filter but has no objects, remove header
+  - Root param overrides multi-scene (single object subtree, no headers)
+  - `GetAllLoadedSceneRoots()` excludes DontDestroyOnLoad virtual scene
+  - SerializeSummary works with multi-scene + per-scene node counts
 
 **ComponentSerializer**:
 - Serialize built-in types (Vector3, Color, Quaternion)
@@ -294,7 +397,15 @@ Base64-encoded PNG or file path.
 - [ ] Depth limiting works + `+N` descendant suffix
 - [ ] MAX_NODES=3000 truncation works
 - [ ] Version increments on hierarchy change (thread-safe)
-- [ ] Prefab stage detection in GetRootObjects
+- [ ] Prefab stage detection in Serialize
+- [ ] **Multi-scene checks (v0.23.23):**
+  - [ ] Single scene: no `[SceneName]` headers
+  - [ ] Multiple scenes: headers present for each scene
+  - [ ] Duplicate names: dir path or `(unsaved)` appended to label
+  - [ ] Phantom headers: removed if scene has no matching objects
+  - [ ] Root param: overrides multi-scene (no headers)
+  - [ ] DontDestroyOnLoad: excluded from scene list
+  - [ ] Summary mode: shows per-scene node counts
 
 ## Related
 

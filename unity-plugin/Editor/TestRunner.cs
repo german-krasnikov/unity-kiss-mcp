@@ -74,7 +74,11 @@ namespace UnityMCP.Editor
                 // which shows a modal dialog on dirty untitled scenes. Pre-save to avoid.
                 var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
                 if (scene.isDirty && string.IsNullOrEmpty(scene.path))
-                    EditorSceneManager.SaveScene(scene, "Assets/__mcp_test_temp.unity");
+                {
+                    if (!AssetDatabase.IsValidFolder("Assets/TestsTemp"))
+                        AssetDatabase.CreateFolder("Assets", "TestsTemp");
+                    EditorSceneManager.SaveScene(scene, "Assets/TestsTemp/__mcp_test_temp.unity");
+                }
                 else if (scene.isDirty)
                     EditorSceneManager.SaveScene(scene);
 

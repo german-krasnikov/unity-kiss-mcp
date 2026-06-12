@@ -339,11 +339,12 @@ namespace UnityMCP.Editor.Tests
     public class TimelineSerializerTests
     {
         private TimelineAsset _timeline;
-        private const string AssetPath = "Assets/Tests_TimelineTemp.playable";
+        private const string AssetPath = "Assets/TestsTemp/Tests_TimelineTemp.playable";
 
         [SetUp]
         public void SetUp()
         {
+            TestPaths.EnsureFolder();
             _timeline = ScriptableObject.CreateInstance<TimelineAsset>();
             AssetDatabase.CreateAsset(_timeline, AssetPath);
             AssetDatabase.SaveAssets();
@@ -433,11 +434,12 @@ namespace UnityMCP.Editor.Tests
         // For pure operator parsing, ctrl can be null since we don't hit that branch.
 
         private AnimatorController _ctrl;
-        private const string CtrlPath = "Assets/Tests_AnimCtrlTemp.controller";
+        private const string CtrlPath = "Assets/TestsTemp/Tests_AnimCtrlTemp.controller";
 
         [SetUp]
         public void SetUp()
         {
+            TestPaths.EnsureFolder();
             _ctrl = AnimatorController.CreateAnimatorControllerAtPath(CtrlPath);
         }
 
@@ -524,11 +526,12 @@ namespace UnityMCP.Editor.Tests
     public class AnimatorControllerHelperFindStateTests
     {
         private AnimatorController _ctrl;
-        private const string CtrlPath = "Assets/Tests_AnimCtrlFindState.controller";
+        private const string CtrlPath = "Assets/TestsTemp/Tests_AnimCtrlFindState.controller";
 
         [SetUp]
         public void SetUp()
         {
+            TestPaths.EnsureFolder();
             _ctrl = AnimatorController.CreateAnimatorControllerAtPath(CtrlPath);
         }
 

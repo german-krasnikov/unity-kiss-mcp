@@ -15,7 +15,10 @@ namespace UnityMCP.Editor
                 roots = new[] { go };
             else
             {
-                roots = SceneManager.GetActiveScene().GetRootGameObjects();
+                var allRoots = new System.Collections.Generic.List<GameObject>();
+                foreach (var (_, sceneRoots) in HierarchySerializer.GetAllLoadedSceneRoots())
+                    allRoots.AddRange(sceneRoots);
+                roots = allRoots.ToArray();
             }
 
             var sb = new StringBuilder();

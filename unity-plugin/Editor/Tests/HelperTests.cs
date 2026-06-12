@@ -179,7 +179,8 @@ namespace UnityMCP.Editor.Tests
         public void SaveScene_WithPath_ReturnsThatPath()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var tmpPath = "Assets/_HelperTest_Temp.unity";
+            var tmpPath = TestPaths.TempFolder + "/_HelperTest_Temp.unity";
+            TestPaths.EnsureFolder();
             try
             {
                 var result = SceneHelper.SaveScene(tmpPath);
