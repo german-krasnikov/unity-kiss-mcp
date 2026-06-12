@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using UnityEditor;
 using UnityEngine;
 
 namespace UnityMCP.Editor.Chat
@@ -31,6 +32,20 @@ namespace UnityMCP.Editor.Chat
             if (kindKey == ChipKindKeys.Hierarchy && instanceID != 0)
                 return $"[{kindKey}:{path} #{instanceID}]";
             return $"[{kindKey}:{path}]";
+        }
+
+        /// <summary>
+        /// Full pipeline: Object → bracket ref string. Returns null if object not recognized.
+        /// Reuses ChipKindRegistry.Resolve → provider.Create → FormatChipRef (same as chat LLM path).
+        /// </summary>
+        internal static string FormatAsRef(UnityEngine.Object obj)
+        {
+            if (obj == null) return null;
+            var assetPath = AssetDatabase.GetAssetPath(obj);
+            var provider = ChipKindRegistry.Resolve(obj, assetPath);
+            if (provider == null) return null;
+            var chip = provider.Create(obj, assetPath);
+            return FormatChipRef(chip.KindKey, chip.Path, chip.InstanceID);
         }
 
         /// <summary>
