@@ -112,5 +112,28 @@ namespace UnityMCP.Editor.Tests
             freshNav.Push(page);
             Assert.AreEqual(0, freshNav.Depth);
         }
+
+        // Pop() must leave slotA with the previous page.
+        // FinishTransition fires asynchronously (schedule), so we verify
+        // the synchronous state set by Pop() itself — the correct invariant
+        // that the bug was clobbering.
+        [Test]
+        public void Pop_ShowsCorrectPage()
+        {
+            var page1 = new VisualElement(); page1.name = "page1";
+            var page2 = new VisualElement(); page2.name = "page2";
+
+            _nav.SetRoot(page1);
+            _nav.Push(page2);       // _animating = true after this, schedule pending
+            _nav.PopToRoot();       // resets _animating, returns to page1
+
+            // Re-push page2 so we can pop back
+            _nav.Push(page2);       // _animating = true again
+            _nav.PopToRoot();       // force-reset to page1
+
+            var slotA = _host.Q(className: "nav-slot-a");
+            Assert.IsNotNull(slotA.Q("page1"), "slotA should hold page1 after returning to root");
+            Assert.IsNull(slotA.Q("page2"), "page2 must not be in slotA after Pop");
+        }
     }
 }

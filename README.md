@@ -46,7 +46,7 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 91 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 92 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the Claude or Codex CLI directly. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="91 MCP Tools · 3635 Tests (1949 Python · 1633 Unity · 53 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="92 MCP Tools · 3675 Tests (1964 Python · 1658 Unity · 53 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -229,6 +229,20 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.23.13</b> — 2026-06-11 — Unified settings + media viewers + LLM config + review hardening</summary>
+
+**SettingsNavController Hardening (Plugin v0.23.13)** — Timer-based animated transitions between settings pages (iOS-style slide), input-field tab/Esc …
+
+</details>
+
+<details>
+<summary><b>v0.23.0</b> — 2026-06-11 — Reconnect recovery + installer + unified settings + media viewers + DRY sampling</summary>
+
+**Reconnect Recovery: Zombie Detection + SO_REUSEPORT + TCP Probe (Server + Plugin v0.23.0)** — Fixes `-32000 server error` during rapid reconnection  …
+
+</details>
+
+<details>
 <summary><b>v0.22.1</b> — 2026-06-11 — Crash logging for unhandled MCP server exceptions</summary>
 
 **Crash Logging for Unhandled Server Exceptions** — Python MCP server now captures unhandled exceptions to `~/.unity-mcp/crash.jsonl` for diagnosis. ` …
@@ -250,22 +264,10 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.20.7</b> — 2026-06-10 — Reload-resume re-sends the full-path chip payload, not short-name mentions (task#10)</summary>
-
-**Reload-Resume Sends Full-Path Chip Payload (Plugin v0.20.7, task#10)** — Fixes silent LLM-context degradation after a mid-turn domain reload.
-
-</details>
-
-<details>
-<summary><b>v0.20.6</b> — 2026-06-10 — Full-path chip payload + always-raw "Show LLM payload" inspector for every turn type</summary>
-
-**Full-Path Chip Payload (Plugin v0.20.6)** — Chips now send their full object/file `Path` to the model instead of the short `DisplayName`. `ChipTextI …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.20.7** — 2026-06-10 — Reload-resume re-sends the full-path chip payload, not short-name mentions (task#10)
+- **v0.20.6** — 2026-06-10 — Full-path chip payload + always-raw "Show LLM payload" inspector for every turn type
 - **v0.20.0** — 2026-06-10 — Chip-unification Phase 1 — delete SceneNameLinker path, unified @-mention rendering
 - **v0.19.2** — 2026-06-10 — Chat reload double-bubble MAJOR + drag-drop crash guard + clean test console
 - **v0.19.1** — 2026-06-10 — P0/P1 chat UX hardening — ResetTurnFlags DRY, bubble dedup, backend restore race

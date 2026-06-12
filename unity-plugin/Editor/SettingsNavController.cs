@@ -13,6 +13,7 @@ namespace UnityMCP.Editor
         private VisualElement _rootPage;
         private VisualElement _currentPage;
         private bool _animating;
+        private bool _isPop;
 
         private const long AnimMs = 350;
 
@@ -65,6 +66,7 @@ namespace UnityMCP.Editor
         {
             if (_animating) return;
             if (_currentPage == null) { SetRoot(page); return; }
+            _isPop = false;
             _animating = true;
             _stack.Push(_currentPage);
             _currentPage = page;
@@ -87,6 +89,7 @@ namespace UnityMCP.Editor
         internal void Pop()
         {
             if (_animating || _stack.Count == 0) return;
+            _isPop = true;
             _animating = true;
 
             var prev = _stack.Pop();
@@ -126,7 +129,11 @@ namespace UnityMCP.Editor
 
         private void FinishTransition()
         {
-            if (_slotB.childCount > 0)
+            if (_isPop)
+            {
+                _slotB.Clear();
+            }
+            else if (_slotB.childCount > 0)
             {
                 var page = _slotB[0];
                 _slotB.Remove(page);
