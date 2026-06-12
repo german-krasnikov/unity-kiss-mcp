@@ -1,0 +1,14 @@
+{
+    "name": "UnityMCP.Runtime.TestHelpers",
+    "rootNamespace": "UnityMCP.Editor.Chat.Tests",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

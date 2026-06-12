@@ -19,7 +19,7 @@ namespace UnityMCP.Editor
             return (go, comp);
         }
 
-        public static string CreateObject(string name, string parent, string components, string primitive = null, string prefabPath = null)
+        public static string CreateObject(string name, string parent, string components, string primitive = null, string prefabPath = null, string scene = null)
         {
             GameObject go;
             if (!string.IsNullOrEmpty(prefabPath))
@@ -46,6 +46,14 @@ namespace UnityMCP.Editor
             {
                 go = new GameObject(name);
                 Undo.RegisterCreatedObjectUndo(go, $"Create {name}");
+            }
+
+            if (!string.IsNullOrEmpty(scene))
+            {
+                var targetScene = UnityEngine.SceneManagement.SceneManager.GetSceneByName(scene);
+                if (!targetScene.IsValid())
+                    throw new ArgumentException($"Scene not found: {scene}");
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(go, targetScene);
             }
 
             if (!string.IsNullOrEmpty(parent))

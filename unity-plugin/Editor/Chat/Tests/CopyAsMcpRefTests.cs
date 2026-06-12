@@ -112,6 +112,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var go = MakeGo("Hero");
             go.AddComponent<TestDummyMB>();
             var mb = go.GetComponent<TestDummyMB>();
+            Assert.IsNotNull(mb, "AddComponent<TestDummyMB> must succeed — check TestDummyMB is in a runtime assembly");
             CopyAsMcpRef.CopySelection(new Object[] { mb });
 
             var clipboard = EditorGUIUtility.systemCopyBuffer;

@@ -55,11 +55,29 @@ async def set_property(path: str, component: str, prop: str, value, dry_run: boo
 
 async def create_object(
     name: str, parent: str | None = None, components: str | None = None,
-    primitive: str | None = None, prefab_path: str | None = None
+    primitive: str | None = None, prefab_path: str | None = None,
+    scene: str | None = None,
 ) -> str:
-    """Create new GameObject. primitive: Cube|Sphere|Cylinder|Capsule|Plane|Quad. prefab_path: instantiate from prefab asset."""
+    """Create new GameObject. primitive: Cube|Sphere|Cylinder|Capsule|Plane|Quad. prefab_path: instantiate from prefab asset. scene: create in named loaded scene (omit = active scene)."""
     return await _send("create_object", _args(name=name, parent=parent, components=components,
-                                              primitive=primitive, prefab_path=prefab_path))
+                                              primitive=primitive, prefab_path=prefab_path,
+                                              scene=scene))
+
+
+async def transfer_object(
+    path: str, action: str,
+    target_scene: str | None = None,
+    parent: str | None = None,
+    world_position_stays: bool = True,
+) -> str:
+    """Move or copy a GameObject to another loaded scene. action: move|copy.
+    target_scene: destination scene name. Omit = same scene (copy = duplicate).
+    parent: target parent path in destination scene.
+    world_position_stays: preserve world transform (default True)."""
+    wps = None if world_position_stays else "false"
+    return await _send("transfer_object", _args(
+        path=path, action=action, target_scene=target_scene,
+        parent=parent, world_position_stays=wps))
 
 
 async def set_active(path: str, active: bool) -> str:
@@ -130,6 +148,11 @@ async def set_parent(path: str, parent: str | None = None, world_position_stays:
     return await _send("set_parent", args)
 
 
+async def object_diff(path_a: str, path_b: str) -> str:
+    """Diff two GameObjects (components, properties, children). Cross-scene: 'SceneA:/Julia'."""
+    return await _send("object_diff", {"pathA": path_a, "pathB": path_b})
+
+
 def register(mcp, send, args):
     global _send, _args
     _send = send
@@ -140,6 +163,7 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RO)(find_objects)
     mcp.tool(annotations=_RW_IDEM)(set_property)
     mcp.tool(annotations=_RW)(create_object)
+    mcp.tool(annotations=_RW)(transfer_object)
     mcp.tool(annotations=_RW_IDEM)(set_active)
     mcp.tool(annotations=_RW)(wire_event)
     mcp.tool(annotations=_DEL)(unwire_event)
@@ -149,3 +173,4 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RW_IDEM)(set_material)
     mcp.tool(annotations=_RW)(set_property_delta)
     mcp.tool(annotations=_RW_IDEM)(set_parent)
+    mcp.tool(annotations=_RO)(object_diff)

@@ -112,6 +112,7 @@ namespace UnityMCP.Editor
         private static string ExecGetHierarchy(string args)
         {
             var summary = JsonHelper.ExtractString(args, "summary") == "true";
+            var scene = JsonHelper.ExtractString(args, "scene");
             if (summary)
             {
                 var summaryRoot = JsonHelper.ExtractString(args, "root");
@@ -123,8 +124,8 @@ namespace UnityMCP.Editor
             var components = JsonHelper.ExtractString(args, "components") == "true";
             var incremental = JsonHelper.ExtractString(args, "incremental") == "true";
             return incremental
-                ? HierarchySerializer.SerializeIncremental(depth, root, filter, components)
-                : HierarchySerializer.Serialize(depth, root, filter, components);
+                ? HierarchySerializer.SerializeIncremental(depth, root, filter, components, scene)
+                : HierarchySerializer.Serialize(depth, root, filter, components, scene);
         }
 
         private static string ExecGetComponent(string args)
@@ -197,6 +198,16 @@ namespace UnityMCP.Editor
             return $"{prop} = {actual}";
         }
 
+        private static string ExecTransferObject(string args)
+        {
+            var path = JsonHelper.ExtractString(args, "path");
+            var action = JsonHelper.ExtractString(args, "action");
+            var targetScene = JsonHelper.ExtractString(args, "target_scene");
+            var parent = JsonHelper.ExtractString(args, "parent");
+            var wps = JsonHelper.ExtractString(args, "world_position_stays") != "false";
+            return ObjectManager.TransferObject(path, action, targetScene, parent, wps);
+        }
+
         private static string ExecSetPropertyDelta(string args)
         {
             var path = JsonHelper.ExtractString(args, "path");
@@ -213,8 +224,11 @@ namespace UnityMCP.Editor
             var components = JsonHelper.ExtractString(args, "components");
             var primitive = JsonHelper.ExtractString(args, "primitive");
             var prefabPath = JsonHelper.ExtractString(args, "prefab_path");
-            var path = ObjectManager.CreateObject(name, parent, components, primitive, prefabPath);
-            var go = ComponentSerializer.FindObject(path);
+            var scene = JsonHelper.ExtractString(args, "scene");
+            var path = ObjectManager.CreateObject(name, parent, components, primitive, prefabPath, scene);
+            GameObject go;
+            try { go = ComponentSerializer.FindObject(path); }
+            catch (System.ArgumentException) { go = null; } // duplicate name in scene — GO created, lookup ambiguous
 
             string warn = "";
             if (go != null && !string.IsNullOrEmpty(prefabPath))

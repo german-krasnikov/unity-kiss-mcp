@@ -406,6 +406,11 @@ Base64-encoded PNG or file path.
   - [ ] Root param: overrides multi-scene (no headers)
   - [ ] DontDestroyOnLoad: excluded from scene list
   - [ ] Summary mode: shows per-scene node counts
+- [ ] **Multi-scene API hygiene (skill: `.claude/skills/multi-scene.md`):**
+  - [ ] No raw `SceneManager.sceneCount > 1` — use `SceneContext.Current.IsMulti`
+  - [ ] No hand-built `sceneName + ":/" + path` — use `ComponentSerializer.GetPath(go)`
+  - [ ] Scene iteration uses `SceneContext.Current.Scenes`, not raw `SceneManager.GetSceneAt(i)`
+  - [ ] Each multi-scene test has a single-scene regression counterpart
 
 ## Related
 

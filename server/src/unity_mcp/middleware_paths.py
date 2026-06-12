@@ -3,10 +3,23 @@
 PathResolverMixin is mixed into Middleware; methods bind to the same `self`
 (state lives in Middleware.__init__) — behavior identical to the inline version.
 """
+import re
 import time
 from typing import Optional
 
 from .utils import _levenshtein
+
+_SCENE_HEADER_RE = re.compile(r"^\[(.+)\]$")
+
+
+def _split_scene_qualified(path: str) -> tuple:
+    """'Scene:/foo' -> ('Scene', '/foo'). '/foo' -> ('', '/foo')."""
+    if ":" in path and not path.startswith("$"):
+        idx = path.index(":")
+        rest = path[idx + 1:]
+        if rest.startswith("/"):
+            return path[:idx], rest
+    return "", path
 
 
 class PathResolverMixin:
@@ -16,12 +29,25 @@ class PathResolverMixin:
         if cmd != "get_hierarchy":
             return
         self.known_paths.clear()
+        self.path_to_scene.clear()
         # Parse indented hierarchy into full paths.
         # Each line: optional tree chars + name + " $ref" [+ extras]
         # Indent depth: count leading groups of 3 chars (│  , ├─ , └─ )
         stack: list[str] = []  # names per depth level
+        current_scene = ""
+        base_depth = -1  # normalized base: first object's depth becomes 0
         for line in result.split("\n"):
-            if not line.strip() or "$" not in line:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # Scene header detection: [SceneName] with no $ ref
+            m = _SCENE_HEADER_RE.match(stripped)
+            if m and "$" not in stripped:
+                current_scene = m.group(1)
+                stack = []
+                base_depth = -1  # reset per scene
+                continue
+            if "$" not in line:
                 continue
             # Count indent depth: each level uses exactly 3 chars (│  / ├─ / └─ / spaces)
             i = 0
@@ -31,27 +57,37 @@ class PathResolverMixin:
                 else:
                     break
             depth = i // 3
+            if base_depth < 0:
+                base_depth = depth  # first object sets the baseline
+            rel_depth = depth - base_depth  # 0 = root, 1 = child, etc.
             raw = line[i:].strip()
             if not raw:
                 continue
             name = raw.split("$")[0].strip()
             if not name:
                 continue
-            # Trim stack to parent depth, then append current name
-            stack = stack[:max(0, depth - 1)]
+            # Trim stack to relative depth, then append current name
+            stack = stack[:rel_depth]
             stack.append(name)
             full_path = "/" + "/".join(stack)
             self.known_paths.add(full_path)
+            if current_scene:
+                self.path_to_scene[full_path] = current_scene
 
     def validate_path(self, path: str) -> Optional[str]:
         if not self.known_paths:
             return None
-        if path.startswith("$"):
+        if path.startswith("$") or path.startswith("#"):
             return None
-        if path in self.known_paths:
-            return None
-        sample = ", ".join(sorted(self.known_paths)[:10])
-        return f"⚠ PATH WARNING: '{path}' not in last hierarchy. Known: {sample}"
+        scene, bare = _split_scene_qualified(path)
+        check = bare if scene else path
+        if check not in self.known_paths:
+            sample = ", ".join(sorted(self.known_paths)[:10])
+            return f"⚠ PATH WARNING: '{path}' not in last hierarchy. Known: {sample}"
+        if scene and self.path_to_scene.get(bare) not in (scene, None, ""):
+            actual = self.path_to_scene.get(bare, "?")
+            return f"⚠ PATH WARNING: '{bare}' belongs to scene '{actual}', not '{scene}'"
+        return None
 
     def resolve_path(self, path: str) -> str:
         """Fuzzy-match path against known_paths. Returns best match or original."""

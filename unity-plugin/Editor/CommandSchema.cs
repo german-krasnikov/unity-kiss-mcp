@@ -18,7 +18,7 @@ namespace UnityMCP.Editor
         private static readonly Dictionary<string, ParamDef> Schema = new Dictionary<string, ParamDef>
         {
             // --- Read ---
-            { "get_hierarchy", P(null, "depth", "root", "filter", "components", "summary", "incremental") },
+            { "get_hierarchy", P(null, "depth", "root", "filter", "components", "summary", "incremental", "scene") },
             { "get_component", P("path,type") },
             { "get_components_list", P("id") },
             { "get_object_detail", P("id") },
@@ -26,9 +26,10 @@ namespace UnityMCP.Editor
             { "inspect", P("paths", "components") },
             { "get_console", P(null, "count", "level", "first") },
             { "screenshot", P(null, "width", "height", "camera", "path", "supersample", "angles", "zoom", "offset", "fixed_size", "highlight", "show_colliders", "angle") },
-            { "search_scene", P("query", "root", "limit") },
+            { "search_scene", P("query", "root", "limit", "scene") },
+            { "object_diff", P("pathA,pathB") },
             { "validate_references", P("path", "depth", "ignore_optional", "verbose") },
-            { "run_tests", P(null, "mode") },
+            { "run_tests", P(null, "mode", "filter") },
             { "get_test_results", P(null) },
             { "get_compile_errors", P(null) },
             { "get_spatial_context", P("path", "radius") },
@@ -43,7 +44,8 @@ namespace UnityMCP.Editor
             // --- Write ---
             { "set_property", P("path,component,prop,value", "dry_run") },
             { "set_property_delta", P("path,component,prop,delta") },
-            { "create_object", P("name", "parent", "components", "primitive", "prefab_path") },
+            { "create_object", P("name", "parent", "components", "primitive", "prefab_path", "scene") },
+            { "transfer_object", P("path,action", "target_scene", "parent", "world_position_stays") },
             { "delete_object", P(null, "id", "path", "force") },
             { "set_active", P("path,active") },
             { "wire_event", P("path,component,event,target,method", "arg_type", "arg_value") },

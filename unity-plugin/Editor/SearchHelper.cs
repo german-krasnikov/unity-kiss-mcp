@@ -9,14 +9,14 @@ namespace UnityMCP.Editor
 {
     public static class SearchHelper
     {
-        public static string Search(string query, string root = null, int limit = 50)
+        public static string Search(string query, string root = null, int limit = 50, string scene = null)
         {
             if (string.IsNullOrEmpty(query))
                 throw new ArgumentException("query is required");
 
             var q = ParseQuery(query);
             var results = new List<GameObject>();
-            if (!WalkScene(query, root, q, results, limit, out var notFound, out int totalCount))
+            if (!WalkScene(query, root, q, results, limit, scene, out var notFound, out int totalCount))
                 return notFound;
 
             if (results.Count == 0)
@@ -24,9 +24,13 @@ namespace UnityMCP.Editor
 
             int overflow = (limit > 0 && results.Count >= limit) ? totalCount - results.Count : 0;
 
+            var ctx = SceneContext.Current;
+            bool multi = ctx.IsMulti;
             var sb = new StringBuilder();
             foreach (var go in results)
             {
+                if (multi && go.scene.IsValid())
+                    sb.Append(go.scene.name).Append(":/");
                 sb.Append(go.name).Append(" #").Append(go.GetInstanceID());
                 var compNames = new List<string>();
                 foreach (var c in go.GetComponents<Component>())
@@ -44,7 +48,8 @@ namespace UnityMCP.Editor
         // Returns false + sets notFound hint when root is not found; otherwise populates results.
         // totalCount = all matches found (including those beyond limit).
         private static bool WalkScene(string query, string root, SearchQuery q,
-            List<GameObject> results, int limit, out string notFound, out int totalCount)
+            List<GameObject> results, int limit, string scene,
+            out string notFound, out int totalCount)
         {
             notFound = null;
             totalCount = 0;
@@ -61,10 +66,11 @@ namespace UnityMCP.Editor
             }
             else
             {
-                foreach (var r in SceneManager.GetActiveScene().GetRootGameObjects())
-                {
-                    CollectMatches(r.transform, q, results, limit, ref totalCount);
-                }
+                var ctx = SceneContext.Current;
+                var sceneList = string.IsNullOrEmpty(scene) ? ctx.Scenes : ctx.FilterByScene(scene);
+                foreach (var (_, roots) in sceneList)
+                    foreach (var r in roots)
+                        CollectMatches(r.transform, q, results, limit, ref totalCount);
             }
             return true;
         }
@@ -180,11 +186,15 @@ namespace UnityMCP.Editor
             }
             else
             {
-                var sc = SceneManager.GetActiveScene();
-                ctxName = sc.name;
-                var roots = sc.GetRootGameObjects();
-                total = 0; foreach (var r in roots) total += r.GetComponentsInChildren<Transform>(true).Length;
-                foreach (var r in roots) tops.Add(r.name);
+                var scenes = HierarchySerializer.GetAllLoadedSceneRoots();
+                ctxName = string.Join("+", scenes.ConvertAll(s => s.name));
+                total = 0;
+                foreach (var (_, roots) in scenes)
+                    foreach (var r in roots)
+                    {
+                        total += r.GetComponentsInChildren<Transform>(true).Length;
+                        tops.Add(r.name);
+                    }
             }
             var topStr = tops.Count <= 8 ? string.Join(", ", tops)
                 : string.Join(", ", tops.GetRange(0, 8)) + $", +{tops.Count - 8} more";

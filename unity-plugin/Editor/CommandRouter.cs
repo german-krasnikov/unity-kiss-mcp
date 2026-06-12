@@ -118,6 +118,7 @@ namespace UnityMCP.Editor
                     UndoGroupHelper.SetCommandFallback(cmd);
                     var mode = JsonHelper.ExtractString(argsJson, "mode");
                     var group = JsonHelper.ExtractString(argsJson, "group");
+                    var filter = JsonHelper.ExtractString(argsJson, "filter");
                     TestRunner.Execute(mode, result =>
                     {
                         UndoGroupHelper.EndGroup();
@@ -125,7 +126,7 @@ namespace UnityMCP.Editor
                             tcs.TrySetResult(JsonHelper.FormatResponse(id, false, null, result.Substring(7)));
                         else
                             tcs.TrySetResult(BuildResponse(id, result));
-                    }, group);
+                    }, group, filter);
                     return;
                 }
 
@@ -269,7 +270,11 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "query"),
                 JsonHelper.ExtractString(args, "root"),
                 int.TryParse(JsonHelper.ExtractString(args, "limit") ?? "50",
-                    out var sl) ? sl : 50));
+                    out var sl) ? sl : 50,
+                JsonHelper.ExtractString(args, "scene")));
+            CommandRegistry.Register("object_diff", args => ObjectDiffHelper.Diff(
+                JsonHelper.ExtractString(args, "pathA"),
+                JsonHelper.ExtractString(args, "pathB")));
             CommandRegistry.Register("editor", ExecEditor);
             CommandRegistry.Register("inspect", ExecInspect);
             CommandRegistry.Register("validate_references", args => ValidateReferencesHelper.Validate(
@@ -330,6 +335,7 @@ namespace UnityMCP.Editor
 
             // Write (mutating)
             CommandRegistry.Register("create_object", ExecCreateObject, mutating: true);
+            CommandRegistry.Register("transfer_object", ExecTransferObject, mutating: true);
             CommandRegistry.Register("delete_object", ExecDeleteObject, mutating: true);
             CommandRegistry.Register("set_property", ExecSetProperty, mutating: true);
             CommandRegistry.Register("set_property_delta", ExecSetPropertyDelta, mutating: true);

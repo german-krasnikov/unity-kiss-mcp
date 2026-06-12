@@ -47,6 +47,7 @@ class Middleware(MiddlewareGuardsMixin, MiddlewareReadsMixin, MiddlewareAsyncMix
         self.call_count: int = 0
         self._last_hierarchy_call: int = 0
         self.known_paths: set = set()
+        self.path_to_scene: dict = {}
         self.is_playing: bool = False
         self._last_writes: OrderedDict = OrderedDict()
         self._MAX_WRITES = 128
@@ -122,6 +123,7 @@ class Middleware(MiddlewareGuardsMixin, MiddlewareReadsMixin, MiddlewareAsyncMix
             self.schema_cache.invalidate_all()
         self._component_cache.clear()
         self.known_paths.clear()
+        self.path_to_scene.clear()
         if self._prefetch_cache is not None:
             self._prefetch_cache.clear()
         self._last_hierarchy_full = None

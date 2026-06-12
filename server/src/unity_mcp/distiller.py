@@ -21,6 +21,7 @@ class DistillResult:
 
 _PATH_RE = re.compile(r"(/\S+)")
 _SECTION_RE = re.compile(r"^---\s*(/\S+)\s*---\s*$")
+_SCENE_HEADER_RE = re.compile(r"^\[.+\]$")
 
 
 # Commands too small or destructive to distill
@@ -67,6 +68,9 @@ class ResponseDistiller:
         lines = text.splitlines()
         keep = [False] * len(lines)
         for i, line in enumerate(lines):
+            if _SCENE_HEADER_RE.match(line.strip()):
+                keep[i] = True
+                continue
             paths = _PATH_RE.findall(line)
             if paths and any(self._paths_overlap(p, f) for p in paths for f in focus):
                 keep[i] = True

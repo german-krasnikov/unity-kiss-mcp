@@ -110,6 +110,7 @@ AI/temp/*.md
 .claude/settings.local.json
 AI/Problems/
 .claude/
+.mcp.json
 CLAUDE.md
 PLAN.md
 

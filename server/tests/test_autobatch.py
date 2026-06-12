@@ -157,3 +157,46 @@ async def test_configure_objects_multiple_props(mock_send):
     cmds = _batch_cmds(mock_send)
     assert "component=Transform" in cmds
     assert "component=Health" in cmds
+
+
+# ── configure_objects: multi-scene path support (Bug 3) ───────────────────────
+
+@pytest.mark.asyncio
+async def test_configure_accepts_scene_qualified_path(mock_send):
+    """Bug 3: SceneName:/Player path must not be rejected."""
+    from unity_mcp.tools.autobatch import configure_objects
+    await configure_objects("SceneName:/Player Transform.m_LocalPosition=(1,0,0)")
+    cmds = _batch_cmds(mock_send)
+    assert "set_property path=SceneName:/Player" in cmds
+
+
+@pytest.mark.asyncio
+async def test_configure_still_accepts_bare_path(mock_send):
+    """/Player (no scene prefix) must still work after the fix."""
+    from unity_mcp.tools.autobatch import configure_objects
+    await configure_objects("/Player Transform.m_LocalPosition=(2,0,0)")
+    cmds = _batch_cmds(mock_send)
+    assert "set_property path=/Player" in cmds
+
+
+@pytest.mark.asyncio
+async def test_configure_rejects_invalid_line(mock_send):
+    """Lines without a path token are silently skipped."""
+    from unity_mcp.tools.autobatch import configure_objects
+    result = await configure_objects("not_a_path Transform.x=1")
+    mock_send.assert_not_called()
+    assert "No valid" in result
+
+
+@pytest.mark.asyncio
+async def test_configure_mixed_paths(mock_send):
+    """Both bare and scene-qualified paths can appear in one call."""
+    from unity_mcp.tools.autobatch import configure_objects
+    config = (
+        "/NPC1 Transform.m_LocalPosition=(1,0,0)\n"
+        "Level2:/NPC2 Transform.m_LocalPosition=(3,0,0)"
+    )
+    await configure_objects(config)
+    cmds = _batch_cmds(mock_send)
+    assert "set_property path=/NPC1" in cmds
+    assert "set_property path=Level2:/NPC2" in cmds

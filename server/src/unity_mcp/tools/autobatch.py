@@ -101,7 +101,10 @@ async def configure_objects(config: str) -> str:
 
     for line in config.strip().splitlines():
         line = line.strip()
-        if not line or not line.startswith("/"):
+        if not line:
+            continue
+        first_token = line.split()[0]
+        if not first_token.startswith("/") and ":/" not in first_token:
             continue
         parts = line.split()
         obj_path = parts[0]

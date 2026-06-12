@@ -8,7 +8,7 @@ from unity_mcp.server import (
     set_property, create_object, delete_object, recompile, get_object_detail,
     run_tests, get_test_results, scene, search_scene, set_material, editor, animation, timeline,
     animator, get_enabled_tools, checkpoint, validate_references, compress_hierarchy,
-    set_active, wire_event, unwire_event, screenshot,
+    set_active, wire_event, unwire_event, screenshot, object_diff,
 )
 
 
@@ -1111,3 +1111,49 @@ def test_main_does_not_log_epipe_oserror():
         with patch("unity_mcp.crash_log.log_crash") as mock_log:
             srv.main()  # must not raise
     mock_log.assert_not_called()
+
+
+# ── scene enhancement tools (from test_enhancements.py) ──────────────────────
+
+@pytest.mark.asyncio
+async def test_object_diff_sends_args(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "= (identical)"})
+    result = await object_diff(path_a="/Julia", path_b="SceneB:/Julia")
+    mock_bridge.send.assert_called_once_with(
+        "object_diff", {"pathA": "/Julia", "pathB": "SceneB:/Julia"}, timeout=30.0
+    )
+    assert "identical" in result
+
+
+@pytest.mark.asyncio
+async def test_hierarchy_scene_forwarded(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Player #1"})
+    await get_hierarchy(scene="Gameplay")
+    args = mock_bridge.send.call_args[0][1]
+    assert args.get("scene") == "Gameplay"
+
+
+@pytest.mark.asyncio
+async def test_hierarchy_no_scene_omitted(mock_bridge):
+    """Regression: single-scene callers don't get 'scene' key added."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Player #1"})
+    await get_hierarchy()
+    args = mock_bridge.send.call_args[0][1]
+    assert "scene" not in args
+
+
+@pytest.mark.asyncio
+async def test_search_scene_forwarded(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Enemy #2"})
+    await search_scene(query="Enemy", scene="Level2")
+    args = mock_bridge.send.call_args[0][1]
+    assert args.get("scene") == "Level2"
+
+
+@pytest.mark.asyncio
+async def test_search_no_scene_omitted(mock_bridge):
+    """Regression: default call without scene must not include scene key."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Enemy #2"})
+    await search_scene(query="Enemy")
+    args = mock_bridge.send.call_args[0][1]
+    assert "scene" not in args

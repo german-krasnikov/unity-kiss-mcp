@@ -2,7 +2,7 @@
 
 ## Overview
 
-Python MCP сервер с 89 core registered tools для управления Unity Editor. FastMCP + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically.
+Python MCP сервер с 91 core registered tools для управления Unity Editor. FastMCP + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically.
 
 ## Architecture (для Architect)
 
@@ -18,8 +18,8 @@ server/src/unity_mcp/
 ├── resources.py        # MCP Resources (4 URIs: hierarchy, console, editor, categories)
 ├── tools/
 │   ├── __init__.py     # Tool module registry
-│   ├── objects.py      # get_component/inspect/find/set_property/create/delete/manage_component/set_active/wire_event/unwire_event/set_material/set_parent/set_property_delta
-│   ├── scene.py        # hierarchy, console, compile_errors, screenshot, recompile, run_tests, get_test_results, scene, search_scene, editor, checkpoint, fingerprint, scene_diff, save/load_session, screenshot_baseline/compare, get_changes
+│   ├── objects.py      # get_component/inspect/find/set_property/create/delete/manage_component/set_active/wire_event/unwire_event/set_material/set_parent/set_property_delta/transfer_object/object_diff
+│   ├── scene.py        # hierarchy, console, compile_errors, screenshot, recompile, run_tests, get_test_results, scene (open_additive/close/set_active/list), search_scene, editor, checkpoint, fingerprint, scene_diff, save/load_session, screenshot_baseline/compare, get_changes
 │   ├── code_intel.py   # find_references, compile_preflight, semantic_at, await_compile
 │   ├── runtime.py      # invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 │   ├── batch.py        # batch, references, validate_references + DRY serialization
@@ -45,11 +45,11 @@ server/src/unity_mcp/
     └── __init__.py              # 3-source auto-discovery (pkgutil, entry_points, UNITY_MCP_PLUGIN_DIRS)
 ```
 
-### Tools (90 core)
+### Tools (91 core)
 
-**TIER1 — always visible (39 core):**
+**TIER1 — always visible (41 core):**
 
-Core (24): get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, set_parent, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, do, ask, get_metrics
+Core (26): get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, set_parent, transfer_object, object_diff, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, do, ask, get_metrics
 
 Intent (3): animator_intent, vfx_intent, ui_intent
 

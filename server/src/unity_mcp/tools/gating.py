@@ -27,6 +27,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     "SCENE_EDIT": [
         "find_objects", "get_object_detail", "get_components_list",
         "set_active", "set_material", "set_property_delta",
+        "object_diff", "transfer_object",
     ],
     "COMPONENTS": [
         "wire_event", "unwire_event",

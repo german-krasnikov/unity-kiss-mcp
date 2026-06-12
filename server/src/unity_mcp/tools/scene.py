@@ -50,15 +50,17 @@ def compress_hierarchy(text: str) -> str:
 
 async def get_hierarchy(depth: int = 2, root: str | None = None, filter: str | None = None,
                         components: bool = False, compress: bool = False,
-                        summary: bool = False, incremental: bool = False, full: bool = False) -> str:
-    """Scene hierarchy as text tree. Max 3000 nodes. Use filter/depth to narrow. Set components=true to see component types. Set compress=true to group repeated slots/points/meshes. Set summary=true for compact root-only counts (60-100 tokens). Set incremental=true to get NO_CHANGE if scene unchanged since last call. full=True: bypass distillation."""
+                        summary: bool = False, incremental: bool = False, full: bool = False,
+                        scene: str | None = None) -> str:
+    """Scene hierarchy as text tree. Max 3000 nodes. Use filter/depth to narrow. Set components=true to see component types. Set compress=true to group repeated slots/points/meshes. Set summary=true for compact root-only counts (60-100 tokens). Set incremental=true to get NO_CHANGE if scene unchanged since last call. full=True: bypass distillation. scene: filter to a single scene by name (multi-scene only)."""
     no_distill = {"_no_distill": True} if full else {}
     if summary:
-        return await _send("get_hierarchy", _args(root=root, summary="true", **no_distill))
+        return await _send("get_hierarchy", _args(root=root, summary="true", scene=scene, **no_distill))
     result = await _send("get_hierarchy", _args(
         depth=depth, root=root, filter=filter,
         components="true" if components else None,
         incremental="true" if incremental else None,
+        scene=scene,
         **no_distill))
     if compress:
         result = compress_hierarchy(result)
@@ -133,11 +135,14 @@ _POLL_INTERVAL = 2.0
 _POLL_ATTEMPTS = 30
 
 
-async def run_tests(mode: str = "EditMode") -> str:
-    """Run Unity tests. mode: EditMode or PlayMode."""
+async def run_tests(mode: str = "EditMode", filter: str | None = None) -> str:
+    """Run Unity tests. mode: EditMode or PlayMode. filter: pipe-separated test names."""
     from mcp.server.fastmcp.exceptions import ToolError as _TE
+    args = {"mode": mode}
+    if filter:
+        args["filter"] = filter
     try:
-        return await _send("run_tests", {"mode": mode}, timeout=120.0)
+        return await _send("run_tests", args, timeout=120.0)
     except _TE:
         if mode != "PlayMode":
             raise
@@ -159,17 +164,21 @@ async def get_test_results() -> str:
 
 
 async def scene(action: str, path: str | None = None) -> str:
-    """Scene management. action: new|open|save|discard. path: for open/save."""
+    """Scene management. action: new|open|save|discard|open_additive|close|set_active|list.
+    path: required for open/save/open_additive/close/set_active. list requires no path."""
     return await _send("scene", _args(action=action, path=path))
 
 
-async def search_scene(query: str, root: str | None = None, limit: int = 50) -> str:
+async def search_scene(query: str, root: str | None = None, limit: int = 50,
+                       scene: str | None = None) -> str:
     """Search scene objects. Syntax: name text, t:Component, tag=Tag, layer=N, active=bool. Combine with spaces.
     root: scope search to subtree (path or None for whole scene).
-    limit: max results (default 50; 0=unlimited). Default not sent over wire."""
+    limit: max results (default 50; 0=unlimited). Default not sent over wire.
+    scene: filter to a single scene by name (multi-scene only)."""
     return await _send("search_scene", _args(
         query=query, root=root,
-        limit=str(limit) if limit != 50 else None))
+        limit=str(limit) if limit != 50 else None,
+        scene=scene))
 
 
 async def editor(action: str = "state", path: str | None = None) -> str:

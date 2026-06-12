@@ -46,7 +46,7 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 92 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 94 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the Claude or Codex CLI directly. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="92 MCP Tools · 3710 Tests (1976 Python · 1681 Unity · 53 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="94 MCP Tools · 3860 Tests (2038 Python · 1752 Unity · 70 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -181,7 +181,8 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 - **In-Unity Chat** — Claude/Codex backends, no API key needed, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
 - **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at`
 - **PlayTest DSL** — 21 commands: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
-- **Scene Management** — CRUD, hierarchy inspection, query syntax, diff tracking, checkpoint/restore
+- **Multi-Scene Management** — Load multiple scenes, inspect/edit across scenes, move/copy objects between loaded scenes, unified `object_diff` for cross-scene comparison
+- **Scene CRUD & Tools** — `scene` actions (open_additive, close, set_active, list), hierarchy inspection, query syntax, diff tracking, checkpoint/restore
 - **Animation & Timeline** — clips, key management, Timeline assets, Animator states/transitions
 - **VFX & Particles** — particle system CRUD, 11 module presets, shader graph integration
 - **Multi-View Screenshots** — 4-panel grid (Front/Left/Top/Iso), bounding-box overlay, visual regression
@@ -229,6 +230,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.25.0</b> — 2026-06-12 — Multi-scene CRUD + test filter + compile check workflow</summary>
+
+**Multi-Scene CRUD + Diff (Plugin v0.25.0)** — Cross-scene `transfer_object` (move/copy between scenes), `object_diff` (unified diff of two objects sh …
+
+</details>
+
+<details>
 <summary><b>v0.24.1</b> — 2026-06-12 — Port re-discovery on reconnect + lockfile takeover + 9 new tests</summary>
 
 **Port Re-Discovery on Reconnect (Server v0.24.1)** — UnityBridge now auto-rediscovers Unity's port when reconnecting after a restart.
@@ -257,15 +265,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.22.1</b> — 2026-06-11 — Crash logging for unhandled MCP server exceptions</summary>
-
-**Crash Logging for Unhandled Server Exceptions** — Python MCP server now captures unhandled exceptions to `~/.unity-mcp/crash.jsonl` for diagnosis. ` …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.22.1** — 2026-06-11 — Crash logging for unhandled MCP server exceptions
 - **v0.22.0** — 2026-06-11 — Multi-project port auto-assignment + dual-port isolation + PortResolver extraction
 - **v0.21.0** — 2026-06-11 — Cross-platform Windows/Linux support + zero manual patching
 - **v0.20.7** — 2026-06-10 — Reload-resume re-sends the full-path chip payload, not short-name mentions (task#10)

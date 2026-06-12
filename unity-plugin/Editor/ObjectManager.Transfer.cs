@@ -1,0 +1,65 @@
+using System;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace UnityMCP.Editor
+{
+    internal static partial class ObjectManager
+    {
+        private static Scene FindLoadedScene(string name)
+        {
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var s = SceneManager.GetSceneAt(i);
+                if (s.name == name || s.path == name)
+                    return s;
+            }
+            throw new ArgumentException($"Scene not found or not loaded: {name}");
+        }
+
+        private static void ApplyParent(GameObject go, string newParent, bool worldPositionStays)
+        {
+            if (string.IsNullOrEmpty(newParent)) return;
+            var parentGo = ComponentSerializer.FindObjectOrThrow(newParent);
+            Undo.SetTransformParent(go.transform, parentGo.transform, worldPositionStays, $"Set parent {go.name}");
+        }
+
+        public static string TransferObject(string sourcePath, string action,
+            string targetSceneName, string newParent, bool worldPositionStays)
+        {
+            var go = ComponentSerializer.FindObjectOrThrow(sourcePath);
+            var targetScene = string.IsNullOrEmpty(targetSceneName)
+                ? go.scene
+                : FindLoadedScene(targetSceneName);
+
+            switch (action)
+            {
+                case "move":
+                    Undo.SetTransformParent(go.transform, null, worldPositionStays, $"Unparent {go.name}");
+                    SceneManager.MoveGameObjectToScene(go, targetScene);
+                    ApplyParent(go, newParent, worldPositionStays);
+                    EditorUtility.SetDirty(go);
+                    if (!EditorApplication.isPlaying)
+                        EditorSceneManager.MarkSceneDirty(targetScene);
+                    return $"Moved {sourcePath} → {targetScene.name}";
+
+                case "copy":
+                    var clone = UnityEngine.Object.Instantiate(go);
+                    clone.name = go.name;
+                    clone.transform.SetParent(null, worldPositionStays);
+                    Undo.RegisterCreatedObjectUndo(clone, $"Copy {go.name}");
+                    SceneManager.MoveGameObjectToScene(clone, targetScene);
+                    ApplyParent(clone, newParent, worldPositionStays);
+                    EditorUtility.SetDirty(clone);
+                    if (!EditorApplication.isPlaying)
+                        EditorSceneManager.MarkSceneDirty(targetScene);
+                    return $"Copied {sourcePath} → {targetScene.name}/{ComponentSerializer.GetPath(clone)}";
+
+                default:
+                    throw new ArgumentException($"Invalid action: {action}. Must be move or copy");
+            }
+        }
+    }
+}

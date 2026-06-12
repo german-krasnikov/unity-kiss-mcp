@@ -14,15 +14,17 @@ namespace UnityMCP.Editor
         private static string _lastHierarchy;
         public static void ResetIncrementalCache() => _lastHierarchy = null;
 
-        public static string SerializeIncremental(int depth, string root, string filter, bool components)
+        public static string SerializeIncremental(int depth, string root, string filter, bool components,
+                                                   string scene = null)
         {
-            var current = Serialize(depth, root, filter, components);
+            var current = Serialize(depth, root, filter, components, scene);
             if (_lastHierarchy != null && current == _lastHierarchy) return "NO_CHANGE";
             _lastHierarchy = current;
             return current;
         }
 
-        public static string Serialize(int depth = 99, string root = null, string filter = null, bool components = false)
+        public static string Serialize(int depth = 99, string root = null, string filter = null,
+                                        bool components = false, string scene = null)
         {
             var sb = new StringBuilder();
             int nodeCount = 0;
@@ -36,7 +38,8 @@ namespace UnityMCP.Editor
                 }
                 else
                 {
-                    var scenes = GetAllLoadedSceneRoots();
+                    var ctx = SceneContext.Current;
+                    var scenes = string.IsNullOrEmpty(scene) ? ctx.Scenes : ctx.FilterByScene(scene);
                     bool multi = scenes.Count > 1;
                     foreach (var (name, roots) in scenes)
                     {
@@ -86,8 +89,9 @@ namespace UnityMCP.Editor
                     sb.AppendLine($"  {r.name}{inactive}");
                     return sb.ToString();
                 }
-                var scenes = GetAllLoadedSceneRoots();
-                bool multi = scenes.Count > 1;
+                var ctx = SceneContext.Current;
+                var scenes = ctx.Scenes;
+                bool multi = ctx.IsMulti;
                 foreach (var (name, roots) in scenes)
                 {
                     int total = 0;

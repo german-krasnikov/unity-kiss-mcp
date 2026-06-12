@@ -20,7 +20,10 @@ namespace UnityMCP.Editor.Chat
         public ChipData Create(Object obj, string assetPath)
         {
             var go = (GameObject)obj;
-            return new ChipData(Key, ComponentSerializer.GetPath(go), go.name, go.GetInstanceID());
+            var path = ComponentSerializer.GetPath(go);
+            var sep = path.IndexOf(":/", System.StringComparison.Ordinal);
+            var display = sep >= 0 ? path.Substring(0, sep) + "/" + go.name : go.name;
+            return new ChipData(Key, path, display, go.GetInstanceID());
         }
 
         public string FormatPayload(ChipData chip, ChipPayloadContext ctx)

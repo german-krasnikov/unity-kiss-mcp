@@ -32,21 +32,47 @@ namespace UnityMCP.Editor
                 throw new System.ArgumentException($"Instance ID {path} not found");
             }
 
+            // Scene-qualified path: "SceneName:/RootObj/Child"
+            var sceneIdx = path.IndexOf(":/");
+            if (sceneIdx > 0)
+            {
+                var sceneName = path.Substring(0, sceneIdx);
+                var scenePath = path.Substring(sceneIdx + 2);
+                if (scenePath.StartsWith("/")) scenePath = scenePath.Substring(1);
+                var sceneParts = scenePath.Split('/');
+                var sceneRoot = FindRootInScene(sceneName, sceneParts[0]);
+                if (sceneRoot == null) return null;  // strict scene boundary — no fuzzy cross-scene
+                GameObject current = sceneRoot;
+                for (int i = 1; i < sceneParts.Length; i++)
+                {
+                    Transform child = current.transform.Find(sceneParts[i]);
+                    if (child == null) return null;  // strict scene boundary — no fuzzy cross-scene
+                    current = child.gameObject;
+                }
+                return current;
+            }
+
             if (path.StartsWith("/")) path = path.Substring(1);
             if (string.IsNullOrEmpty(path)) return null;
 
             var parts = path.Split('/');
             var root = FindRoot(parts[0]);
-            if (root == null) return strict ? null : TryFuzzyFind(path, parts);
+            if (root == null)
+            {
+                // Fallback: try whole path as root name (handles slashes in names)
+                root = FindRoot(path);
+                if (root != null) return root;
+                return strict ? null : TryFuzzyFind(path, parts);
+            }
 
-            GameObject current = root;
+            GameObject cur = root;
             for (int i = 1; i < parts.Length; i++)
             {
-                Transform child = current.transform.Find(parts[i]);
+                Transform child = cur.transform.Find(parts[i]);
                 if (child == null) return strict ? null : TryFuzzyFind(path, parts);
-                current = child.gameObject;
+                cur = child.gameObject;
             }
-            return current;
+            return cur;
         }
 
         internal static GameObject FindObjectById(int instanceId)
@@ -61,12 +87,47 @@ namespace UnityMCP.Editor
             if (stage != null && stage.prefabContentsRoot.name == name)
                 return stage.prefabContentsRoot;
 
+            GameObject found = null;
+            string foundScene = null;
+            var ambiguous = new List<string>();
+
             for (int s = 0; s < UnityEngine.SceneManagement.SceneManager.sceneCount; s++)
             {
                 var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(s);
                 if (!scene.isLoaded) continue;
                 foreach (var root in scene.GetRootGameObjects())
-                    if (root.name == name) return root;
+                {
+                    if (root.name == name)
+                    {
+                        if (found == null)
+                        {
+                            found = root;
+                            foundScene = scene.name;
+                        }
+                        else
+                        {
+                            if (ambiguous.Count == 0)
+                                ambiguous.Add($"{foundScene}:/{name}");
+                            ambiguous.Add($"{scene.name}:/{name}");
+                        }
+                    }
+                }
+            }
+            if (ambiguous.Count > 0)
+                throw new System.ArgumentException(
+                    $"Ambiguous: '{name}' exists in {ambiguous.Count} scenes. Use: " + string.Join(" or ", ambiguous));
+            return found;
+        }
+
+        private static GameObject FindRootInScene(string sceneName, string rootName)
+        {
+            for (int s = 0; s < UnityEngine.SceneManagement.SceneManager.sceneCount; s++)
+            {
+                var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(s);
+                if (!scene.isLoaded) continue;
+                if (scene.name != sceneName) continue;
+                foreach (var root in scene.GetRootGameObjects())
+                    if (root.name == rootName) return root;
             }
             return null;
         }
@@ -146,7 +207,7 @@ namespace UnityMCP.Editor
                 path = t.name + "/" + path;
                 t = t.parent;
             }
-            return "/" + path;
+            return SceneContext.Current.QualifyPath(go, path);
         }
     }
 }

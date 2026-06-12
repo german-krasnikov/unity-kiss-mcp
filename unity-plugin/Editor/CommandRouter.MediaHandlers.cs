@@ -97,7 +97,12 @@ namespace UnityMCP.Editor
                 "open" => SceneHelper.OpenScene(JsonHelper.ExtractString(args, "path")),
                 "save" => SceneHelper.SaveScene(JsonHelper.ExtractString(args, "path")),
                 "discard" => SceneHelper.DiscardChanges(),
-                _ => throw new ArgumentException(ErrorHelper.InvalidAction(action, new[] { "new", "open", "save", "discard" }))
+                "open_additive" => SceneHelper.OpenAdditive(JsonHelper.ExtractString(args, "path")),
+                "close" => SceneHelper.CloseScene(JsonHelper.ExtractString(args, "path")),
+                "set_active" => SceneHelper.SetActiveScene(JsonHelper.ExtractString(args, "path")),
+                "list" => SceneHelper.ListScenes(),
+                _ => throw new ArgumentException(ErrorHelper.InvalidAction(action,
+                    new[] { "new", "open", "save", "discard", "open_additive", "close", "set_active", "list" }))
             };
         }
 

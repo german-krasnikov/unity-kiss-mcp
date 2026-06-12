@@ -11,9 +11,13 @@ namespace UnityMCP.Editor
         public static string FindObjects(string name, string tag, string layer, string component)
         {
             var results = new StringBuilder();
-            var scene = SceneManager.GetActiveScene();
-            foreach (var root in scene.GetRootGameObjects())
-                TraverseAndFilter(root.transform, name, tag, layer, component, results);
+            for (int s = 0; s < SceneManager.sceneCount; s++)
+            {
+                var scene = SceneManager.GetSceneAt(s);
+                if (!scene.isLoaded || scene.name == "DontDestroyOnLoad") continue;
+                foreach (var root in scene.GetRootGameObjects())
+                    TraverseAndFilter(root.transform, name, tag, layer, component, results);
+            }
             return results.ToString().TrimEnd('\n');
         }
 

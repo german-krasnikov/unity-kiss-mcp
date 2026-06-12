@@ -48,20 +48,24 @@ namespace UnityMCP.Editor
             if (targetGo == null) throw new ArgumentException(ErrorHelper.ObjectNotFound(path));
 
             var targetId = targetGo.GetInstanceID();
-            var scene = SceneManager.GetActiveScene();
-            var roots = scene.GetRootGameObjects();
             var sb = new StringBuilder();
             int count = 0;
             int scanned = 0;
 
-            foreach (var root in roots)
+            for (int s = 0; s < SceneManager.sceneCount; s++)
             {
-                ScanForReferencesTo(root.transform, targetId, targetGo, sb, ref count, ref scanned);
-                if (scanned >= MAX_SCAN)
+                var scene = SceneManager.GetSceneAt(s);
+                if (!scene.isLoaded || scene.name == "DontDestroyOnLoad") continue;
+                foreach (var root in scene.GetRootGameObjects())
                 {
-                    sb.AppendLine($"(scan limit {MAX_SCAN} reached)");
-                    break;
+                    ScanForReferencesTo(root.transform, targetId, targetGo, sb, ref count, ref scanned);
+                    if (scanned >= MAX_SCAN)
+                    {
+                        sb.AppendLine($"(scan limit {MAX_SCAN} reached)");
+                        break;
+                    }
                 }
+                if (scanned >= MAX_SCAN) break;
             }
 
             sb.Append("found: ").Append(count);

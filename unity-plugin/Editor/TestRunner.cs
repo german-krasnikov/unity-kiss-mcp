@@ -53,7 +53,7 @@ namespace UnityMCP.Editor
         }
 
 #if UNITY_INCLUDE_TESTS
-        public static void Execute(string mode, Action<string> onComplete, string group = null)
+        public static void Execute(string mode, Action<string> onComplete, string group = null, string filter = null)
         {
             if (_isRunning == 1 && EditorApplication.timeSinceStartup - _runStartedAt > 120.0)
                 _isRunning = 0;
@@ -86,9 +86,10 @@ namespace UnityMCP.Editor
                 var collector = new ResultCollector(onComplete, api);
                 api.RegisterCallbacks(collector);
 
-                var filter = new Filter { testMode = ParseMode(mode) };
-                if (!string.IsNullOrEmpty(group)) filter.groupNames = new[] { group };
-                api.Execute(new ExecutionSettings(filter));
+                var f = new Filter { testMode = ParseMode(mode) };
+                if (!string.IsNullOrEmpty(group)) f.groupNames = new[] { group };
+                if (!string.IsNullOrEmpty(filter)) f.groupNames = filter.Split(new[] { '|' }, System.StringSplitOptions.RemoveEmptyEntries);
+                api.Execute(new ExecutionSettings(f));
             }
             catch (Exception e)
             {
@@ -191,7 +192,7 @@ namespace UnityMCP.Editor
             }
         }
 #else
-        public static void Execute(string mode, Action<string> onComplete, string group = null)
+        public static void Execute(string mode, Action<string> onComplete, string group = null, string filter = null)
         {
             onComplete("Error: com.unity.test-framework package not installed");
         }

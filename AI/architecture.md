@@ -227,6 +227,13 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - `ask(question)` — NL read-only question → deterministic route → Haiku summarize
 - `animator_intent`, `vfx_intent`, `ui_intent` — domain-specific NL intent tools (core)
 
+### Test Infrastructure (C#: TestRunner + MultiSceneTestBase, v0.25.0)
+- **TestRunner.cs**: Wraps Unity Test Framework API with SessionState-based pending tracking. Exposes Execute(mode, onComplete, group, **filter**) with pipe-separated test class filtering. **filter="Class1|Class2"** runs ONLY matching groupNames (~2s vs ~65s full suite)
+- **Filter.groupNames** conversion: `filter.Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)` parses pipe-separated class names into UTF framework groupNames array
+- **MultiSceneTestBase** (v0.25.0): Shared DRY base for multi-scene test suites. Saves/restores additive scenes before AddScene() to preserve real scene names (vs Unity temporary names). Captures main scene name in SetUp to unblock NewScene scene-change behavior. Eliminates test-file duplication across MultiSceneFinderTests, MultiSceneHierarchyTests, MultiSceneOperationsTests
+- **ObjectDiffHelper** (v0.25.0): Now compares Transform properties (Position, Rotation, Scale, LocalScale) alongside all other components. Improves object diff accuracy for verification gates
+- **Compile Check Gate** (MANDATORY before NUnit): TCP `get_compile_errors` must pass before running NUnit tests. Unity runs stale DLL on compilation failure; tests invalid against old code. Editor.log unreliable. Implement as: `run_tests(mode="EditMode")` catches compile via early test failure, OR manual `await get_compile_errors()` in Python
+
 ### Playtest System (C#: PlaytestRunner + PlaytestParser)
 - DSL commands (21): MOVE, WAIT, WAIT_UNTIL, ASSERT, ASSERT_CONSOLE_CLEAN, ASSERT_BATCH, ASSERT_NEAR, TELEPORT, SNAPSHOT, INVOKE, SET, LOG, TIMESCALE, CAPTURE, ASSERT_CAPTURED, INVARIANT, ASSERT_CONSERVED, SIMULATE, MONITOR, TRACE_FLOW, ASSERT_CTA
 - PlaytestState tracks state across steps
@@ -477,6 +484,11 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - [ ] Error handling: graceful degradation
 - [ ] Reconnection: heartbeat-driven reconnect
 - [ ] Guards: compile, play mode, runtime, tool enable
+- [ ] **Multi-scene API** (skill: `.claude/skills/multi-scene.md`):
+  - [ ] No raw `SceneManager.sceneCount > 1` — use `SceneContext.Current.IsMulti`
+  - [ ] No hand-built `"sceneName:/" + path` — use `ComponentSerializer.GetPath(go)`
+  - [ ] Scene iteration uses `SceneContext.Current.Scenes`, not raw `GetSceneAt(i)`
+  - [ ] New tool returning paths: tested in both single and multi-scene mode
 
 ## Related
 

@@ -50,11 +50,20 @@ class SceneBrief:
 
         data = f"HIERARCHY:\n{hierarchy}\n\nCONSOLE:\n{console}\n\nSTATE:\n{state}"
 
+        scene_count = hierarchy.count("\n[")
+        if hierarchy.startswith("["):
+            scene_count += 1
+        multi_hint = f" Multi-scene ({scene_count} loaded)." if scene_count > 1 else ""
+        prompt = (
+            f"Describe this Unity scene in 100 tokens for an AI assistant.{multi_hint} "
+            "Include: object count, key patterns, errors, play state."
+        )
+
         svc = SamplingService()
         if not svc.enabled:
             return None
 
-        summary = await svc.summarize(data, _SUMMARY_PROMPT)
+        summary = await svc.summarize(data, prompt)
         if summary:
             self.brief = summary
         return self.brief

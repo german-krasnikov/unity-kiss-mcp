@@ -2,7 +2,7 @@
 
 ```
 unity-kiss-mcp/
-├── server/                     # Python MCP Server (~2002 unit tests incl. crash logging)
+├── server/                     # Python MCP Server (2038 unit tests, 70 live = 2108 total Python)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
@@ -93,19 +93,23 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~2002 unit tests + conftest.py (incl. v0.23.0 crash_log tests)
+│   └── tests/                  # ~2038 unit tests + 104 live tests + conftest.py (incl. v0.24.3 multi-scene tests)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
 │       ├── test_middleware*.py          # Middleware layers
 │       ├── test_batch*.py              # Batch + conflict + timeout
+│       ├── test_multiscene.py          # Multi-scene CRUD, transfer, diff, bugs (305 tests, v0.24.3)
+│       ├── test_transfer_object.py     # transfer_object cross-scene operations (91 tests, v0.24.3)
 │       ├── test_*_intent.py            # Intent tools
 │       ├── test_sampling*.py           # Visual verification
 │       ├── test_visual_*.py            # Visual diff + regression
 │       ├── test_budget_*.py            # Budget/cost tracking
 │       ├── test_scene_brief*.py        # Scene brief
 │       ├── test_screenshot_*.py        # Screenshot features
+│       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
+│       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
 │       └── ... + domain tests
-├── unity-plugin/               # Unity Editor Plugin (72 C# files, ~13400 LOC)
+├── unity-plugin/               # Unity Editor Plugin (75 C# files, ~13600 LOC)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, etc.) + 25 tests
@@ -118,7 +122,10 @@ unity-kiss-mcp/
 │       ├── CommandSchema.cs                # Parameter validation + fuzzy matching
 │       ├── ObjectManager.cs                # CRUD + Undo + SetActive + WireEvent + SetParent
 │       ├── ObjectManager.Properties.cs     # Property setter + auto-redirect (v0.23.0: set_property("active") → SetActive)
+│       ├── ObjectManager.Transfer.cs       # Move/copy objects between scenes (v0.24.3: transfer_object)
 │       ├── ObjectManager.Lookup.cs         # FindType + short-name fallback for custom components (v0.23.0)
+│       ├── SceneContext.cs                 # Multi-scene state centralization: IsMulti, QualifyPath, FilterByScene (v0.24.3)
+│       ├── ObjectDiffHelper.cs             # Unified-diff format for object comparison (~10x token savings) (v0.24.3, v0.25.0: Transform properties)
 │       ├── ValueParser.cs                  # Parse vectors/quaternions/colors/arrays
 │       ├── InputNormalizer.cs              # Auto-fix component/property hallucinations
 │       ├── HierarchySerializer.cs          # Scene → text tree + MAX_NODES + summary + incremental
@@ -146,10 +153,11 @@ unity-kiss-mcp/
 │       ├── UIHelper.cs + LayoutValidator.cs
 │       ├── AssetDatabaseHelper.cs + AssetHelper.cs
 │       ├── ReferenceHelper.cs + ValidateReferencesHelper.cs
-│       ├── SearchHelper.cs
+│       ├── SearchHelper.cs                 # Scene queries + multi-scene scanning (v0.24.3: all-scene support)
+│       ├── SceneHelper.cs                  # Scene management: open additive, close, set active, list (v0.24.3)
 │       ├── ProjectSettingsHelper.cs + MaterialHelper.cs
 │       ├── PrefabHelper.cs + ScriptableObjectHelper.cs
-│       ├── GameStateHelper.cs + TestRunner.cs
+│       ├── GameStateHelper.cs + TestRunner.cs # TestRunner v0.25.0: filter param (pipe-separated class names), SessionState-based pending tracking
 │       ├── ConsoleCapture.cs + CompileErrorCapture.cs + CompileNotifier.cs
 │       ├── FingerprintHelper.cs + ScanHelper.cs + SceneDiffHelper.cs
 │       ├── ChangeWatcher.cs + ColliderChecker.cs + SchemaHelper.cs
@@ -176,6 +184,8 @@ unity-kiss-mcp/
 │       ├── MCPStatusBarWidget.cs          # Injects MCP pill into AppStatusBar via reflection
 │       ├── Tests/                         # Editor tests asmdef (references core)
 │       │   ├── UnityMCP.Editor.Tests.asmdef
+│       │   ├── MultiSceneTestBase.cs      # Base class for multi-scene tests (DRY consolidation v0.24.3+v0.25.0: saves additive scenes, captures main scene name before NewScene)
+│       │   ├── MultiSceneFinderTests.cs   # Object finding across scenes + reference scanning (v0.24.3)
 │       │   ├── PortResolverTests.cs       # 25 NUnit tests (port validation, fallback, dual-port edge cases)
 │       │   ├── MCPStatusModelTests.cs     # 14 NUnit tests (state transitions, labels, pills)
 │       │   ├── HubHeaderAnimTests.cs      # 11 NUnit tests (circuit-node animation, packet motion, state logic) (F26)
@@ -302,7 +312,11 @@ unity-kiss-mcp/
 │       ├── FileOutputHelper.cs             # ScreenshotsDir = <ProjectRoot>/ScreenShots/ (v0.23.0)
 │       ├── VersionTracker.cs
 │       └── Roslyn/                         # Roslyn compiler for execute_code
-├── unity-test-project/          # Unity 6000.3 test project (~746 C# tests)
+│   └── Runtime/                           # Runtime assembly (v0.25.0: test helpers)
+│       ├── UnityMCP.Runtime.TestHelpers.asmdef # Separate assembly for test utilities
+│       └── TestHelpers/
+│           └── TestDummyMB.cs             # Dummy MonoBehaviour for AddComponent<> in editor tests (moved from Editor/Chat/Tests v0.25.0)
+├── unity-test-project/          # Unity 6000.3 test project (2623 NUnit tests incl. Editor + Chat)
 │   ├── Assets/Tests/Editor/     # NUnit test files
 │   ├── Assets/Animations/       # Animation clips + controllers
 │   ├── Assets/Scenes/
