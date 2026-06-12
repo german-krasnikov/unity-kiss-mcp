@@ -73,7 +73,7 @@ async def test_reconnect_closes_previous():
     b1 = make_mock_bridge()
     b2 = make_mock_bridge()
     bridges = iter([b1, b2])
-    with patch("unity_mcp.connection_slot.UnityBridge", side_effect=lambda h, p: next(bridges)):
+    with patch("unity_mcp.connection_slot.UnityBridge", side_effect=lambda h, p, **_: next(bridges)):
         s = ConnectionSlot()
         await s.connect(9500)
         await s.connect(9501)
@@ -100,3 +100,36 @@ async def test_close_noop_when_empty():
     from unity_mcp.connection_slot import ConnectionSlot
     s = ConnectionSlot()
     await s.close()  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_slot_syncs_port_from_bridge():
+    """_sync_port reconnect callback updates slot.port to match bridge._port."""
+    from unity_mcp.connection_slot import ConnectionSlot
+    b = make_mock_bridge()
+    b.add_reconnect_callback = MagicMock()
+    with patch("unity_mcp.connection_slot.UnityBridge", return_value=b):
+        s = ConnectionSlot()
+        await s.connect(9500)
+    # simulate bridge changing port then the _sync_port callback firing
+    b._port = 9501
+    # grab the _sync_port callback (last registered)
+    sync_cb = b.add_reconnect_callback.call_args_list[-1][0][0]
+    sync_cb()
+    assert s.port == 9501
+
+
+@pytest.mark.asyncio
+async def test_slot_fires_on_port_change():
+    """on_port_change(old, new) fires when bridge._port differs from slot._port."""
+    from unity_mcp.connection_slot import ConnectionSlot
+    changes = []
+    b = make_mock_bridge()
+    b.add_reconnect_callback = MagicMock()
+    with patch("unity_mcp.connection_slot.UnityBridge", return_value=b):
+        s = ConnectionSlot(on_port_change=lambda old, new: changes.append((old, new)))
+        await s.connect(9500)
+    b._port = 9501
+    sync_cb = b.add_reconnect_callback.call_args_list[-1][0][0]
+    sync_cb()
+    assert changes == [(9500, 9501)]

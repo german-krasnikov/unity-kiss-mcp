@@ -63,27 +63,30 @@ def test_lockfile_o_cloexec(tmp_path):
 # Kill-and-retake behavior
 # ---------------------------------------------------------------------------
 
-def test_kill_and_retake_raises_for_live_unity_mcp_process(tmp_path):
-    """When lock is held by a live unity_mcp process, raise RuntimeError (fail-fast, no SIGTERM)."""
+def test_takeover_kills_and_acquires_for_live_unity_mcp_process(tmp_path):
+    """When lock is held by a live unity_mcp process, SIGTERM is sent and lock is acquired."""
     lock_file = tmp_path / "server-9500.lock"
-
     fake_pid = 54321
     lock_file.write_text(f"{fake_pid}\n")
 
-    def flock_blocked(fd, op):
+    call_count = {"n": 0}
+    def flock_side_effect(fd, op):
         if op == (fcntl.LOCK_EX | fcntl.LOCK_NB):
-            raise BlockingIOError
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise BlockingIOError
+        # Second call (in wait loop) succeeds
 
     with (
-        patch("fcntl.flock", side_effect=flock_blocked),
+        patch("fcntl.flock", side_effect=flock_side_effect),
         patch("unity_mcp.lockfile._is_unity_mcp_pid", return_value=True),
         patch("unity_mcp.lockfile.is_pid_alive", return_value=True),
-        patch("os.kill") as mock_kill,
+        patch("unity_mcp.lockfile._kill_pid") as mock_kill_pid,
         patch("time.sleep"),
     ):
-        with pytest.raises(RuntimeError, match="already connected to port 9500"):
-            acquire_lock(lock_dir=tmp_path, port=9500)
-        mock_kill.assert_not_called()  # no SIGTERM
+        fd = acquire_lock(lock_dir=tmp_path, port=9500)
+        assert fd is not None
+        mock_kill_pid.assert_called_once_with(fake_pid)
 
 
 def test_stale_lock_no_kill_if_pid_dead(tmp_path):
@@ -157,27 +160,31 @@ def test_raises_runtime_error_when_zombie_lock_never_released(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Fail-fast: raise instead of SIGTERM when live process holds the lock
+# Takeover: send SIGTERM when live process holds the lock
 # ---------------------------------------------------------------------------
 
-def test_fail_fast_error_message_contains_pid(tmp_path):
-    """Error message includes the PID of the live process."""
+def test_takeover_sends_sigterm_and_acquires(tmp_path):
+    """Happy path: old live unity_mcp process blocks lock → SIGTERM sent → lock acquired."""
     lock_file = tmp_path / "server-9500.lock"
     lock_file.write_text("54321\n")
 
-    def flock_blocked(fd, op):
+    call_count = {"n": 0}
+    def flock_side_effect(fd, op):
         if op == (fcntl.LOCK_EX | fcntl.LOCK_NB):
-            raise BlockingIOError
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise BlockingIOError
 
     with (
-        patch("fcntl.flock", side_effect=flock_blocked),
+        patch("fcntl.flock", side_effect=flock_side_effect),
         patch("unity_mcp.lockfile._is_unity_mcp_pid", return_value=True),
         patch("unity_mcp.lockfile.is_pid_alive", return_value=True),
-        patch("os.kill"),
+        patch("unity_mcp.lockfile._kill_pid") as mock_kill_pid,
         patch("time.sleep"),
     ):
-        with pytest.raises(RuntimeError, match="54321"):
-            acquire_lock(lock_dir=tmp_path, port=9500)
+        fd = acquire_lock(lock_dir=tmp_path, port=9500)
+        assert fd is not None
+        mock_kill_pid.assert_called_once_with(54321)
 
 
 def test_dead_zombie_lock_still_cleaned_up(tmp_path):
@@ -426,3 +433,42 @@ def test_zombie_pid_does_not_raise_runtime_error(tmp_path):
     ):
         fd = acquire_lock(lock_dir=tmp_path, port=9500)
         assert fd is not None
+
+
+# ---------------------------------------------------------------------------
+# _kill_pid tests
+# ---------------------------------------------------------------------------
+
+def test_takeover_old_process_doesnt_die(tmp_path):
+    """SIGTERM sent but lock never releases — raises generic RuntimeError."""
+    lock_file = tmp_path / "server-9500.lock"
+    lock_file.write_text("54321\n")
+
+    def flock_always_blocked(fd, op):
+        if op == (fcntl.LOCK_EX | fcntl.LOCK_NB):
+            raise BlockingIOError
+
+    with (
+        patch("fcntl.flock", side_effect=flock_always_blocked),
+        patch("unity_mcp.lockfile._is_unity_mcp_pid", return_value=True),
+        patch("unity_mcp.lockfile.is_pid_alive", return_value=True),
+        patch("unity_mcp.lockfile._kill_pid") as mock_kill_pid,
+        patch("time.sleep"),
+    ):
+        with pytest.raises(RuntimeError, match="Cannot acquire exclusive lock"):
+            acquire_lock(lock_dir=tmp_path, port=9500)
+        assert mock_kill_pid.call_count == 1
+
+
+def test_kill_pid_dead_process():
+    """_kill_pid with dead PID (ProcessLookupError) does not raise."""
+    from unity_mcp.lockfile import _kill_pid
+    with patch("os.kill", side_effect=ProcessLookupError):
+        _kill_pid(99999)  # must not raise
+
+
+def test_kill_pid_permission_error():
+    """_kill_pid with PermissionError does not raise."""
+    from unity_mcp.lockfile import _kill_pid
+    with patch("os.kill", side_effect=PermissionError):
+        _kill_pid(99999)  # must not raise

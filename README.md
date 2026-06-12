@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="92 MCP Tools · 3698 Tests (1964 Python · 1681 Unity · 53 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="92 MCP Tools · 3710 Tests (1976 Python · 1681 Unity · 53 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -229,6 +229,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.24.1</b> — 2026-06-12 — Port re-discovery on reconnect + lockfile takeover + 9 new tests</summary>
+
+**Port Re-Discovery on Reconnect (Server v0.24.1)** — UnityBridge now auto-rediscovers Unity's port when reconnecting after a restart.
+
+</details>
+
+<details>
 <summary><b>v0.24.0</b> — 2026-06-12 — Multi-scene hierarchy support + temp test assets refactor</summary>
 
 **Multi-Scene Hierarchy Support (Plugin v0.24.0)** — `get_hierarchy` now handles multiple loaded scenes with scene-aware context headers.
@@ -257,15 +264,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.22.0</b> — 2026-06-11 — Multi-project port auto-assignment + dual-port isolation + PortResolver extraction</summary>
-
-**Multi-Project Port Configuration (Plugin + Server v0.22.0)** — Unity projects now auto-assign unique MCP ports without manual configuration.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.22.0** — 2026-06-11 — Multi-project port auto-assignment + dual-port isolation + PortResolver extraction
 - **v0.21.0** — 2026-06-11 — Cross-platform Windows/Linux support + zero manual patching
 - **v0.20.7** — 2026-06-10 — Reload-resume re-sends the full-path chip payload, not short-name mentions (task#10)
 - **v0.20.6** — 2026-06-10 — Full-path chip payload + always-raw "Show LLM payload" inspector for every turn type

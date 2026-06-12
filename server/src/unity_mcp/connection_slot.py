@@ -5,11 +5,13 @@ from .bridge import UnityBridge
 
 
 class ConnectionSlot:
-    def __init__(self):
+    def __init__(self, port_discoverer=None, on_port_change=None):
         self._bridge: Optional[UnityBridge] = None
         self._port: int = 9500
         self._host: str = "127.0.0.1"
         self._reconnect_callbacks: list = []
+        self._port_discoverer = port_discoverer
+        self._on_port_change = on_port_change
 
     @property
     def bridge(self) -> Optional[UnityBridge]:
@@ -31,11 +33,21 @@ class ConnectionSlot:
         if self._bridge is not None:
             self._bridge.stop_heartbeat()
             await self._bridge.close()
-        self._bridge = UnityBridge(host, port)
+        self._bridge = UnityBridge(host, port, port_discoverer=self._port_discoverer)
         self._port = port
         self._host = host
         for cb in self._reconnect_callbacks:
             self._bridge.add_reconnect_callback(cb)
+
+        bridge_ref = self._bridge
+        def _sync_port():
+            if bridge_ref._port != self._port:
+                old = self._port
+                self._port = bridge_ref._port
+                if self._on_port_change:
+                    self._on_port_change(old, self._port)
+        self._bridge.add_reconnect_callback(_sync_port)
+
         try:
             await self._bridge.connect()
             self._bridge.start_heartbeat()

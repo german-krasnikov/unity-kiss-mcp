@@ -18,7 +18,7 @@ async def test_lifespan_raises_when_acquire_lock_fails(monkeypatch):
         async def connect(self, *a, **kw): return "no Unity"
         async def close(self): pass
 
-    monkeypatch.setattr(srv, "ConnectionSlot", lambda: FakeSlot())
+    monkeypatch.setattr(srv, "ConnectionSlot", lambda **_: FakeSlot())
     monkeypatch.setattr(srv, "slot", None)
     monkeypatch.setattr(srv, "manager", None)
     monkeypatch.setattr(srv, "_middleware", None)
@@ -48,7 +48,7 @@ async def test_lifespan_releases_lock_on_normal_exit(monkeypatch):
         async def connect(self, *a, **kw): return "no Unity"
         async def close(self): pass
 
-    monkeypatch.setattr(srv, "ConnectionSlot", lambda: FakeSlot())
+    monkeypatch.setattr(srv, "ConnectionSlot", lambda **_: FakeSlot())
     monkeypatch.setattr(srv, "slot", None)
     monkeypatch.setattr(srv, "manager", None)
     monkeypatch.setattr(srv, "_middleware", None)
@@ -97,16 +97,18 @@ async def test_connection_slot_registers_callbacks_on_new_bridge():
     bridges = iter([b1, b2])
     cb = MagicMock()
 
-    with patch("unity_mcp.connection_slot.UnityBridge", side_effect=lambda h, p: next(bridges)):
+    with patch("unity_mcp.connection_slot.UnityBridge", side_effect=lambda h, p, **_: next(bridges)):
         s = ConnectionSlot()
         s.add_reconnect_callback(cb)
         await s.connect(9500)
-        # callbacks must be registered on b1
-        b1.add_reconnect_callback.assert_called_with(cb)
+        # callbacks must be registered on b1: user cb + _sync_port = 2
+        assert b1.add_reconnect_callback.call_count == 2
+        b1.add_reconnect_callback.assert_any_call(cb)
 
         # reconnect to new port → b2 must also get callbacks
         await s.connect(9501)
-        b2.add_reconnect_callback.assert_called_with(cb)
+        assert b2.add_reconnect_callback.call_count == 2
+        b2.add_reconnect_callback.assert_any_call(cb)
 
 
 # ── Fix 5: globals declaration ─────────────────────────────────────────────────

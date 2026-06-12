@@ -48,7 +48,7 @@ async def test_lifespan_cancels_watchdog(monkeypatch):
         async def connect(self, *a, **kw): return "no Unity (fake)"
         async def close(self): pass
 
-    monkeypatch.setattr(srv, "ConnectionSlot", lambda: FakeSlot())
+    monkeypatch.setattr(srv, "ConnectionSlot", lambda **_: FakeSlot())
     monkeypatch.setattr(srv, "slot", None)
     monkeypatch.setattr(srv, "manager", None)
     monkeypatch.setattr(srv, "_middleware", None)
@@ -81,7 +81,7 @@ async def test_lifespan_no_leak_when_features_disabled(monkeypatch):
         async def connect(self, *a, **kw): return "no Unity (fake)"
         async def close(self): pass
 
-    monkeypatch.setattr(srv, "ConnectionSlot", lambda: FakeSlot())
+    monkeypatch.setattr(srv, "ConnectionSlot", lambda **_: FakeSlot())
     # Restore server globals after test — lifespan writes them
     monkeypatch.setattr(srv, "slot", None)
     monkeypatch.setattr(srv, "manager", None)

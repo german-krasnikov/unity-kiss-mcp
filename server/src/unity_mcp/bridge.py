@@ -5,7 +5,7 @@ import select
 import socket
 import struct
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from unity_mcp.bridge_socket import (
     DomainReloadError,
@@ -37,7 +37,8 @@ class UnityBridge(HeartbeatMixin):
     """TCP client for Unity Editor communication."""
 
     def __init__(self, host: str = "127.0.0.1", port: Optional[int] = None,
-                 probe: Optional[CompileStateProbe] = None):
+                 probe: Optional[CompileStateProbe] = None,
+                 port_discoverer: Optional[Callable[[], int]] = None):
         self._host = host
         try:
             self._port = port or int(os.environ.get("UNITY_MCP_PORT", "9500"))
@@ -58,6 +59,7 @@ class UnityBridge(HeartbeatMixin):
         self._ping_failures: int = 0
         self._last_reconnect_at: float = 0.0
         self._min_reconnect_interval: float = MIN_RECONNECT_INTERVAL
+        self._port_discoverer: Optional[Callable[[], int]] = port_discoverer
 
     def add_reconnect_callback(self, fn) -> None:
         self._on_reconnect_callbacks.append(fn)
@@ -180,6 +182,15 @@ class UnityBridge(HeartbeatMixin):
 
     async def _reconnect(self):
         await self.close()
+        if self._port_discoverer is not None:
+            try:
+                new_port = self._port_discoverer()
+                if new_port != self._port:
+                    self._port = new_port
+                    self._probe = CompileStateProbe(
+                        CompileStateProbe.autodetect_project_path(), port=new_port)
+            except Exception:
+                pass
         reader, writer = await asyncio.wait_for(
             asyncio.open_connection(self._host, self._port),
             timeout=CONNECT_TIMEOUT,

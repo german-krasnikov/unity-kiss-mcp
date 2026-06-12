@@ -18,6 +18,16 @@ async def test_reconnect_unity(mock_bridge):
 
 
 @pytest.mark.asyncio
+async def test_reconnect_unity_auto_discovers(mock_bridge):
+    """reconnect_unity(0) auto-discovers port via read_unity_port."""
+    from unity_mcp.tools.connection import reconnect_unity
+    with patch("unity_mcp.tools.connection.read_unity_port", return_value=9501) as mock_disc:
+        result = await reconnect_unity(0)
+    mock_disc.assert_called_once()
+    assert result is not None
+
+
+@pytest.mark.asyncio
 async def test_send_routes_to_active(mock_bridge):
     """Verify _send() uses slot.bridge (which is mock_bridge)."""
     from unity_mcp.server import get_hierarchy

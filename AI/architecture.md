@@ -53,6 +53,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **UnityBridge**: AsyncIO TCP client, 4-byte BE length prefix JSON
    - Socket: TCP_NODELAY, SO_KEEPALIVE (idle=60s, interval=10s, count=3 on macOS/Linux)
    - **Heartbeat**: 15s interval, raw ping, 3 consecutive failures → close, 2s polling when disconnected (5s when busy). Sole reconnect mechanism.
+   - **Port Re-Discovery on Reconnect (v0.24.1)** — `UnityBridge` accepts optional `port_discoverer` callable (typically `read_unity_port`), invoked during `_reconnect()` before TCP connect to detect if Unity moved to a new port. If discoverer returns different port, bridge updates `_port` and recreates CompileStateProbe. Gracefully handles discoverer exceptions (falls back to current port). ConnectionSlot threads discoverer through and adds `_sync_port()` callback to sync port back to slot + trigger server-side lockfile swap (`_on_port_change`). Backward-compatible: no discoverer → normal reconnect.
    - **CompileStateProbe**: heuristic compile/domain-reload detector (state file, PID check)
    - **DomainReloadError**: on Unity `going_away` event → immediate close + busy flag
    - **PID Lockfile**: `~/.unity-mcp/server-{port}.lock`, **cross-platform locking**:

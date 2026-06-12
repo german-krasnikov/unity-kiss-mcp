@@ -1,6 +1,7 @@
 """PID lockfile — exclusive lock, kills old unity_mcp server if needed."""
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -118,6 +119,14 @@ def _is_unity_mcp_pid_win(pid: int) -> bool:
         return False  # fail-safe: don't kill what we can't identify
 
 
+def _kill_pid(pid: int) -> None:
+    """Send SIGTERM (Unix) or TerminateProcess (Windows). Windows is abrupt — no cleanup."""
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
 def is_pid_alive(pid: Optional[int]) -> bool:
     """Return True if the process with given PID exists."""
     if pid is None:
@@ -151,13 +160,9 @@ def acquire_lock(lock_dir=None, port: int = 9500) -> int:
                 break
             # PID data (bytes 0-31) is always readable — outside locked region.
             old_pid = _read_pid_from_fd(fd)
-            if old_pid and is_pid_alive(old_pid) and not _is_zombie(old_pid) and _is_unity_mcp_pid(old_pid):
-                # Fail-fast: another live session owns this port — don't kill it
-                os.close(fd)
-                raise RuntimeError(
-                    f"Another MCP session (PID {old_pid}) is already connected to port {port}. "
-                    f"Set UNITY_MCP_PORT to target a different Unity instance."
-                )
+            if attempt == 0 and old_pid and is_pid_alive(old_pid) and not _is_zombie(old_pid) and _is_unity_mcp_pid(old_pid):
+                log.info("Sending SIGTERM to old MCP session PID %d on port %d", old_pid, port)
+                _kill_pid(old_pid)
             # Dead/zombie lock — wait for it to be released
             deadline = time.monotonic() + _MAX_KILL_WAIT_S
             while time.monotonic() < deadline:

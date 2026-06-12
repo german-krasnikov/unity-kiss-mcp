@@ -165,8 +165,21 @@ async def lifespan(app):
     except (ValueError, OSError):
         unity_port = 9500
     lock_fd = acquire_lock(port=unity_port)  # raises on failure — do not swallow
+
+    def _on_port_change(old_port: int, new_port: int):
+        nonlocal lock_fd
+        old_fd, lock_fd = lock_fd, None
+        try:
+            release_lock(old_fd)
+        except Exception:
+            pass
+        try:
+            lock_fd = acquire_lock(port=new_port)
+        except Exception:
+            pass
+
     try:
-        slot = ConnectionSlot()
+        slot = ConnectionSlot(port_discoverer=_read_unity_port, on_port_change=_on_port_change)
         manager = slot  # backward-compat alias
         _middleware = build_middleware(_send_raw)
         _budget_tracker, _budget_router = init_budget(_middleware)
@@ -209,7 +222,8 @@ async def lifespan(app):
                 pass
         if slot:
             await slot.close()
-        release_lock(lock_fd)
+        if lock_fd is not None:
+            release_lock(lock_fd)
 
 
 mcp = FastMCP("UnityMCP", lifespan=lifespan)
