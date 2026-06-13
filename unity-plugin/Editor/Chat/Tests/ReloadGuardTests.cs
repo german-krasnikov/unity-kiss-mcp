@@ -137,6 +137,21 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsFalse(ReloadGuard.IsLocked);
         }
 
+        // CH4.test.4: watchdog fires and force-unlocks when timeout exceeded
+        [Test]
+        public void WatchdogTick_AfterTimeout_ForceUnlocks()
+        {
+            // Set watchdog to -1 seconds — always exceeded (timeSinceStartup - start > -1 is always true).
+            ReloadGuard.OverrideWatchdogSeconds(-1.0);
+            ReloadGuard.OnTurnStarted();
+            Assert.IsTrue(ReloadGuard.IsLocked, "must be locked before watchdog fires");
+
+            // Invoke WatchdogTick directly — threshold is -1s so it always fires.
+            ReloadGuard.InvokeWatchdogTickForTest();
+
+            Assert.IsFalse(ReloadGuard.IsLocked, "watchdog must force-unlock after timeout");
+        }
+
         // ── Chips persistence ─────────────────────────────────────────────────
 
         [Test]

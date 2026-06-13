@@ -108,7 +108,7 @@ namespace UnityMCP.Editor.Chat
             var (cmd, args)   = ResolvePythonCommand(serverDir, uvPath);
             var json          = BuildClaudeConfigJson(cmd, args);
             var configPath    = Path.Combine(Path.GetTempPath(), ConfigFile);
-            File.WriteAllText(configPath, json, Encoding.UTF8);
+            File.WriteAllText(configPath, json, JsonHelper.Utf8NoBom);
             return configPath;
         }
     }

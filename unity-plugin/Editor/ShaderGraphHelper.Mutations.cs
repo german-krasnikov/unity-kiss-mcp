@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEngine;
 
 namespace UnityMCP.Editor
 {
@@ -19,7 +20,8 @@ namespace UnityMCP.Editor
                 ? RemoveNode(content, blocks, root, nodeId)
                 : AddNode(content, root, nodeType);
             File.WriteAllText(path, content);
-            try { AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate); } catch { }
+            try { AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate); }
+            catch (Exception ex) { Debug.LogWarning($"ShaderGraph import failed for '{path}': {ex.Message}"); }
             return Get(path);
         }
 
@@ -35,7 +37,8 @@ namespace UnityMCP.Editor
                 ? RemoveEdge(content, root, outputNode, outputSlot, inputNode, inputSlot)
                 : AddEdge(content, root, outputNode, outputSlot, inputNode, inputSlot);
             File.WriteAllText(path, content);
-            try { AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate); } catch { }
+            try { AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate); }
+            catch (Exception ex) { Debug.LogWarning($"ShaderGraph import failed for '{path}': {ex.Message}"); }
             return Get(path);
         }
 

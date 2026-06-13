@@ -21,6 +21,8 @@ namespace UnityMCP.Editor
             "Activator", "System.Linq.Expressions.Expression",
             "GetMethods(", "CreateDelegate", "GetTypes(", "GetMembers(",
             "GetProperties(", "GetFields(", "GetConstructors(", ".Assembly",
+            // Singular reflection accessors (bypass via exact field/property name)
+            "GetField(", "GetProperty(", "GetValue(", "SetValue(",
             // Block short-name bypass via using-directives and Environment.Exit (auto-using System)
             "Environment.Exit", "Environment.SetEnvironmentVariable",
             "using System.Diagnostics", "using System.IO", "using System.Net",
@@ -60,9 +62,11 @@ namespace UnityMCP.Editor
 
         internal static void SecurityScan(string code)
         {
+            // Normalize whitespace so newline-split bypass (e.g. "method\n.Invoke(") is caught
+            var normalized = System.Text.RegularExpressions.Regex.Replace(code, @"\s+", " ");
             foreach (var blocked in Blocked)
             {
-                if (code.Contains(blocked))
+                if (normalized.Contains(blocked))
                     throw new InvalidOperationException(
                         $"Security: blocked pattern '{blocked}'. Only UnityEngine/UnityEditor APIs allowed.");
             }

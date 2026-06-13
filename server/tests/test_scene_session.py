@@ -47,7 +47,7 @@ async def test_save_session_calls_bridge_and_writes_file(tmp_path):
     assert "session-context.json" in result or "session saved" in result.lower()
     written = tmp_path / ".claude" / "session-context.json"
     assert written.exists()
-    content = written.read_text()
+    content = written.read_text(encoding="utf-8")
     assert "=== hierarchy ===" in content
     assert "ok" in content
 
@@ -95,7 +95,7 @@ async def test_load_session_happy_path(tmp_path):
     ts = time.time()
     session_path = tmp_path / ".claude" / "session-context.json"
     session_path.parent.mkdir(parents=True)
-    session_path.write_text(f"{ts}\n=== hierarchy ===\nroot\n  child\n")
+    session_path.write_text(f"{ts}\n=== hierarchy ===\nroot\n  child\n", encoding="utf-8")
 
     send = AsyncMock(return_value="current-root\n  updated")
     _wire(send)
@@ -114,7 +114,7 @@ async def test_load_session_happy_path(tmp_path):
 async def test_load_session_corrupt_json_returns_error(tmp_path):
     session_path = tmp_path / ".claude" / "session-context.json"
     session_path.parent.mkdir(parents=True)
-    session_path.write_text("NOTAFLOAT\n=== hierarchy ===\nhier\n")
+    session_path.write_text("NOTAFLOAT\n=== hierarchy ===\nhier\n", encoding="utf-8")
 
     send = AsyncMock(return_value="current")
     _wire(send)

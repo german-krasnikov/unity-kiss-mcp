@@ -92,8 +92,9 @@ namespace UnityMCP.Editor
             sb.Append(time.ToString("F2", CultureInfo.InvariantCulture)).AppendLine("s");
             sb.AppendLine("---");
 
-            // Use AnimationMode to sample
-            AnimationMode.StartAnimationMode();
+            // Use AnimationMode to sample — guard pre-existing session (mirror AnimationHelper.Preview pattern)
+            bool wasActive = AnimationMode.InAnimationMode();
+            if (!wasActive) AnimationMode.StartAnimationMode();
             try
             {
                 AnimationMode.BeginSampling();
@@ -109,7 +110,7 @@ namespace UnityMCP.Editor
                     sb.AppendLine(val.ToString("G4", CultureInfo.InvariantCulture));
                 }
             }
-            finally { AnimationMode.StopAnimationMode(); }
+            finally { if (!wasActive) AnimationMode.StopAnimationMode(); }
             return sb.ToString().TrimEnd('\n');
         }
 

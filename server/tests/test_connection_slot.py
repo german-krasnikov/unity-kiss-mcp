@@ -133,3 +133,17 @@ async def test_slot_fires_on_port_change():
     sync_cb = b.add_reconnect_callback.call_args_list[-1][0][0]
     sync_cb()
     assert changes == [(9500, 9501)]
+
+
+# ── PY1.test.4: connect() must start heartbeat ───────────────────────────────
+
+@pytest.mark.asyncio
+async def test_connect_starts_heartbeat():
+    """connect() must call start_heartbeat() on the bridge after successful connect."""
+    from unity_mcp.connection_slot import ConnectionSlot
+    b = make_mock_bridge()
+    b.start_heartbeat = MagicMock()
+    with patch("unity_mcp.connection_slot.UnityBridge", return_value=b):
+        s = ConnectionSlot()
+        await s.connect(9500)
+    b.start_heartbeat.assert_called_once()

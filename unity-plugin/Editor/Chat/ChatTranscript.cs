@@ -65,12 +65,16 @@ namespace UnityMCP.Editor.Chat
             if (any) bubble.Add(wrap);
             AppendImage(bubble, imagePath);
             row.Add(bubble); Append(row);
-            if (!_restoring) _entries.Add(new TranscriptEntry {
-                EntryKind  = TranscriptEntry.Kind.User,
-                Text       = display,
-                ChipsData  = TranscriptSerializer.SerializeChips(msg.Chips),
-                LlmPayload = string.IsNullOrEmpty(llmPayload) ? null : llmPayload,
-            });
+            if (!_restoring)
+            {
+                _entries.Add(new TranscriptEntry {
+                    EntryKind  = TranscriptEntry.Kind.User,
+                    Text       = display,
+                    ChipsData  = TranscriptSerializer.SerializeChips(msg.Chips),
+                    LlmPayload = string.IsNullOrEmpty(llmPayload) ? null : llmPayload,
+                });
+                if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
+            }
         }
 
         /// <summary>Legacy overload — kept for TryResumePendingTurn and existing tests.
@@ -102,12 +106,16 @@ namespace UnityMCP.Editor.Chat
                 bubble.Add(MixedParagraphRenderer.InlineElement(dt, "msg-text"));
             AppendImage(bubble, imagePath);
             row.Add(bubble); Append(row);
-            if (!_restoring) _entries.Add(new TranscriptEntry {
-                EntryKind  = TranscriptEntry.Kind.User,
-                Text       = text ?? "",
-                ChipsData  = TranscriptSerializer.SerializeChips(chips),
-                LlmPayload = llmPayload,
-            });
+            if (!_restoring)
+            {
+                _entries.Add(new TranscriptEntry {
+                    EntryKind  = TranscriptEntry.Kind.User,
+                    Text       = text ?? "",
+                    ChipsData  = TranscriptSerializer.SerializeChips(chips),
+                    LlmPayload = llmPayload,
+                });
+                if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
+            }
         }
 
         internal void AppendOrExtendAssistant(string token)
@@ -177,10 +185,14 @@ namespace UnityMCP.Editor.Chat
             RenderProgressive(final: true);
             _assistantBubble.userData = _assistantRaw.ToString();
             CopyableText.Attach(_assistantBubble);
-            if (!_restoring) _entries.Add(new TranscriptEntry {
-                EntryKind = TranscriptEntry.Kind.Assistant,
-                Text      = _assistantRaw.ToString(),
-            });
+            if (!_restoring)
+            {
+                _entries.Add(new TranscriptEntry {
+                    EntryKind = TranscriptEntry.Kind.Assistant,
+                    Text      = _assistantRaw.ToString(),
+                });
+                if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
+            }
             _assistantBubble = null; _assistantRow = null; _liveTail = null; _liveTailSrc = null;
             _committed = 0; _assistantRaw.Clear(); _dirty = false;
         }
@@ -259,6 +271,7 @@ namespace UnityMCP.Editor.Chat
             var entries = TranscriptSerializer.Deserialize(data);
             if (entries.Count == 0) return;
             _restoring = true;
+            _entries.Clear(); // idempotent: prevent doubling on second call
             try
             {
                 foreach (var e in entries)

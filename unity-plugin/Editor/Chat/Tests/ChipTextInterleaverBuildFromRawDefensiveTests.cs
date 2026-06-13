@@ -7,7 +7,7 @@ using UnityMCP.Editor.Chat;
 namespace UnityMCP.Editor.Chat.Tests
 {
     [TestFixture]
-    public class BuildFromRawDefensiveTests
+    public class ChipTextInterleaverBuildFromRawDefensiveTests
     {
         [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
         [TearDown] public void TearDown()
@@ -25,7 +25,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── Positive: exact offsets ───────────────────────────────────────────
 
         [Test]
-        public void R_Def1_ExactOffset_SingleChip_StripsCleanly()
+        public void ExactOffset_SingleChip_StripsCleanly()
         {
             var chip = H("/Coll_3", "Collectible_3", 1);
             // raw: "@Collectible_3 test" — chip at offset 0
@@ -38,7 +38,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def2_TwoExactOffsets_BothStripped_TextPreserved()
+        public void TwoExactOffsets_BothStripped_TextPreserved()
         {
             var c1 = H("/Coll_3", "Collectible_3", 1);
             var c2 = H("/Coll_2", "Collectible_2", 2);
@@ -51,7 +51,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def3_ChipStartAndEnd_CleanSegments()
+        public void ChipsAtStartAndEnd_TextSegmentContainsMiddle()
         {
             var c1 = H("/A", "Alpha", 1);
             var c2 = H("/B", "Beta", 2);
@@ -69,7 +69,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def4_ThreeChipsInterleaved_AllStripped()
+        public void ThreeChipsInterleaved_AllMentionsStripped()
         {
             var c1 = H("/A", "A1", 1); var c2 = H("/B", "B2", 2); var c3 = H("/C", "C3", 3);
             // "@A1 x @B2 y @C3"
@@ -84,7 +84,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── Negative/edge: misaligned offsets ────────────────────────────────
 
         [Test]
-        public void R_Def5_OffsetPlusOne_StillStrips()
+        public void OffsetOffByOneHigh_StillStrips()
         {
             var chip = H("/Coll_3", "Collectible_3", 1);
             // raw: "@Collectible_3 test", chip stored at offset 1 (off-by-one: points to 'C')
@@ -96,7 +96,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def6_OffsetMinusOne_StillStrips()
+        public void OffsetOffByOneLow_StillStrips()
         {
             var chip = H("/Coll_3", "Collectible_3", 1);
             // raw: "x@Collectible_3 test", chip at offset 0 (before @)
@@ -108,7 +108,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def7_MentionManuallyEdited_ChipPresent_TextPreserved()
+        public void MentionManuallyEdited_ChipStillTracked()
         {
             var chip = H("/Coll_3", "Collectible_3", 1);
             // User edited "@Collectible_3" to "@Coll" — mention not found
@@ -119,7 +119,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def8_DuplicateDisplayNames_BothStripped()
+        public void DuplicateDisplayNames_BothMentionsStripped()
         {
             var c1 = new ChipData(ChipKindKeys.Hierarchy, "/PathA", "Camera", 1);
             var c2 = new ChipData(ChipKindKeys.Hierarchy, "/PathB", "Camera", 2);
@@ -133,7 +133,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def9_SpacesInDisplayName_Stripped()
+        public void DisplayNameWithSpaces_MentionStripped()
         {
             var chip = H("/Main Camera", "Main Camera", 1);
             var raw = "@Main Camera fix";
@@ -145,7 +145,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def10_OnlyMention_StripsToEmpty()
+        public void OnlyMention_NoTextSegmentsWithAtSign()
         {
             var chip = H("/Player", "Player", 1);
             var msg = ChipTextInterleaver.BuildFromRaw("@Player",
@@ -156,7 +156,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def11_NoSegmentContainsAtChipName()
+        public void TwoChips_NoTextSegmentContainsAtMention()
         {
             var c1 = H("/Coll_3", "Collectible_3", 1);
             var c2 = H("/Coll_2", "Collectible_2", 2);
@@ -176,7 +176,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── VE-tree: AppendUserBubble(UserMessage) label assertions ──────────
 
         [Test]
-        public void R_Def_VE1_AppendUserBubble_ChipAndText_NoAtInLabels()
+        public void AppendUserBubble_ChipAndText_LabelsContainNoAtMention()
         {
             var container  = new VisualElement();
             var transcript = new ChatTranscript(container,
@@ -193,7 +193,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def_VE2_AppendUserBubble_PillPresent_TextPreserved()
+        public void AppendUserBubble_PillRendered_TextLabelPresent()
         {
             var container  = new VisualElement();
             var transcript = new ChatTranscript(container,
@@ -214,7 +214,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void R_Def_VE3_AppendUserBubble_TwoChips_NoBareAtSymbol()
+        public void AppendUserBubble_TwoChips_NoBareatSymbolInLabels()
         {
             var container  = new VisualElement();
             var transcript = new ChatTranscript(container,
@@ -240,7 +240,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── F21: stored offset undershot (wide forward search) ───────────────
 
         [Test]
-        public void R_Def_F21_StoredOffsetUndershot_MentionFoundAndStripped()
+        public void StoredOffsetUndershot_FallbackSearchFindsMention()
         {
             // chip2 stored at offset 16, but @Collectible_3 is actually at position 23
             var c1 = H("/Coll_2", "Collectible_2", 1);
@@ -255,7 +255,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F21b: two chips same name, second offset overshoots — known limitation
         [Test]
-        public void R_Def_F21b_DuplicateNameSecondOvershot_BothChipsPresent()
+        public void DuplicateNameSecondOffsetOvershot_BothChipsPresent()
         {
             var c1 = H("/Cam", "Camera", 1);
             var c2 = H("/Cam2", "Camera", 2);
@@ -269,7 +269,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F21c: exact screenshot — two chips, Cyrillic text between, both mentions stripped
         [Test]
-        public void R_Def_F21c_ExactScreenshot_CyrillicBetween_BothStripped()
+        public void CyrillicTextBetweenTwoChips_BothMentionsStripped()
         {
             var c1 = H("/Coll_1", "Collectible_1", 1);
             var c2 = H("/Coll_2", "Collectible_2", 2);
@@ -288,7 +288,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F21d: full InlineChipField integration with Cyrillic text
         [Test]
-        public void R_Def_F21d_InlineChipField_CyrillicFlow_NoStrayAt()
+        public void InlineChipField_CyrillicTextBetweenChips_NoStrayAtMention()
         {
             var field = new InlineChipField();
             field.AddChip(H("/Coll_1", "Collectible_1", 1));
@@ -309,7 +309,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F21e: display name with space + Cyrillic text
         [Test]
-        public void R_Def_F21e_SpaceInName_CyrillicText_BothStripped()
+        public void SpaceInDisplayName_CyrillicText_BothMentionsStripped()
         {
             var c1 = H("/Coll_2", "Collectible_2", 1);
             var c2 = H("/Main Camera", "Main Camera", 2);
@@ -327,7 +327,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F21f: Trim() shifts offsets — fallback search still finds mentions
         [Test]
-        public void R_Def_F21f_TrimShiftsOffsets_FallbackFinds()
+        public void TrimCausesOffsetShift_FallbackSearchStillFinds()
         {
             var c1 = H("/Coll_1", "Collectible_1", 1);
             var c2 = H("/Coll_2", "Collectible_2", 2);
@@ -343,7 +343,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F21g: large offset drift — fallback search across full remaining text
         [Test]
-        public void R_Def_F21g_LargeOffsetDrift_FallbackFinds()
+        public void LargeOffsetDrift_FallbackSearchFindsAllMentions()
         {
             var c1 = H("/Coll_1", "Collectible_1", 1);
             var c2 = H("/Coll_2", "Collectible_2", 2);
@@ -360,7 +360,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── Regression: exact user scenario ──────────────────────────────────
 
         [Test]
-        public void R_Def12_UserScenario_TwoChips_NoStrayAtMentions()
+        public void TwoChipsWithInterleavedTyping_NoStrayAtMentions()
         {
             var field = new InlineChipField();
             field.AddChip(new ChipData(ChipKindKeys.Hierarchy, "/Collectible_3", "Collectible_3", 1));

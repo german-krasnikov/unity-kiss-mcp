@@ -429,3 +429,29 @@ async def test_wire_event_connected_confirmation_passes():
 async def test_wire_event_empty_response_mismatch():
     result = await reflect("wire_event", {"event": "OnClick"}, "", _dummy_send)
     assert isinstance(result, Mismatch)
+
+
+# ── set_property_delta ────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_set_property_delta_match():
+    resp = _snap({"value_after": "100"})
+    result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_set_property_delta_mismatch():
+    resp = _snap({"value_after": "50"})
+    result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
+    assert isinstance(result, Mismatch)
+    assert "health" in result.msg
+
+
+@pytest.mark.asyncio
+async def test_set_property_delta_empty_snapshot_mismatch():
+    # "ok\n---\n" — snapshot section exists but is empty → no keys → snap={}
+    resp = "ok\n---\n"
+    result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
+    assert isinstance(result, Mismatch)
+    assert "no snapshot" in result.msg

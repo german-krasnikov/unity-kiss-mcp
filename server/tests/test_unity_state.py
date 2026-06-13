@@ -16,7 +16,7 @@ def _write_state_file(tmp_path: Path, port: int, content: str) -> Path:
     state_dir = tmp_path / ".unity-mcp" / "state"
     state_dir.mkdir(parents=True)
     f = state_dir / f"port-{port}.state"
-    f.write_text(content)
+    f.write_text(content, encoding="utf-8")
     return f
 
 

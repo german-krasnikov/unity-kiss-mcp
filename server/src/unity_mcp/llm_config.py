@@ -26,7 +26,7 @@ _DEFAULTS: dict[str, LlmProfile] = {
     "visual_diff":         LlmProfile("haiku", max_turns=2, timeout=25.0),
     "do_intent":           LlmProfile("haiku", max_turns=1, timeout=15.0),
     "summarize":           LlmProfile("haiku", max_turns=1, timeout=15.0),
-    "distiller":           LlmProfile("haiku", max_turns=1, timeout=15.0),
+    "distiller":           LlmProfile("haiku", max_turns=1, timeout=15.0, max_tokens=500),
 }
 
 _overrides: dict[str, LlmProfile] = {}

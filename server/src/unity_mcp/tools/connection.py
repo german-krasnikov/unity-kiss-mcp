@@ -1,6 +1,5 @@
 from mcp.server.fastmcp.exceptions import ToolError
 from ._annotations import RO as _RO, RW_IDEM as _RW_IDEM
-from unity_mcp.server_filtering import read_unity_port
 
 _get_slot = None
 
@@ -20,6 +19,7 @@ async def reconnect_unity(port: int = 0) -> str:
     if s is None:
         raise ToolError("Server not initialized")
     if port <= 0:
+        from unity_mcp.server_filtering import read_unity_port
         port = read_unity_port()
     return await s.connect(port)
 

@@ -176,7 +176,7 @@ class ResponseDistiller:
             f"Extract from this Unity {cmd} output ONLY items related to: {focus_str}\n"
             f"Format: same as input. Drop unrelated items. Mark drops as `... +N hidden`.\n"
             f"DO NOT invent or modify paths.\n\n"
-            f"Input:\n{text[:8000]}"  # cap input
+            f"Input:\n{text[:4000]}"  # cap input
         )
 
         try:

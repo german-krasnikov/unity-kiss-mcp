@@ -382,6 +382,54 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("/Main Camera", m.PositionedChips[0].Chip.Path);
         }
 
+        // ── Group I: AdjustOffsetsAfterTextChangeInclusive (CH3.test.3) ──────────
+
+        // I1: AdjustOffsetsAfterTextChangeInclusive — chip AT changeAt shifts (inclusive semantics)
+        [Test]
+        public void I1_AdjustOffsetsInclusive_ChipAtChangeAt_Shifts()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.AdjustOffsetsAfterTextChangeInclusive(5, +3);
+            Assert.AreEqual(8, m.PositionedChips[0].TextOffset, "chip AT changeAt must shift with inclusive semantics");
+        }
+
+        // I2: AdjustOffsetsAfterTextChangeInclusive — chip BEFORE changeAt stays
+        [Test]
+        public void I2_AdjustOffsetsInclusive_ChipBeforeChangeAt_Stays()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(3, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.AdjustOffsetsAfterTextChangeInclusive(5, +3);
+            Assert.AreEqual(3, m.PositionedChips[0].TextOffset, "chip before changeAt must not shift");
+        }
+
+        // I3: AdjustOffsetsAfterTextChangeInclusive — chip AFTER changeAt also shifts
+        [Test]
+        public void I3_AdjustOffsetsInclusive_ChipAfterChangeAt_Shifts()
+        {
+            var m = new InlineChipModel();
+            m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            m.AdjustOffsetsAfterTextChangeInclusive(5, +3);
+            Assert.AreEqual(13, m.PositionedChips[0].TextOffset, "chip after changeAt must shift");
+        }
+
+        // I4: contrast exclusive vs inclusive at the boundary
+        [Test]
+        public void I4_Exclusive_vs_Inclusive_AtBoundary()
+        {
+            // Exclusive: chip AT position stays; inclusive: chip AT position shifts
+            var mExcl = new InlineChipModel();
+            mExcl.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            mExcl.AdjustOffsetsAfterTextChange(5, +2); // exclusive
+            Assert.AreEqual(5, mExcl.PositionedChips[0].TextOffset, "exclusive: chip at boundary stays");
+
+            var mIncl = new InlineChipModel();
+            mIncl.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
+            mIncl.AdjustOffsetsAfterTextChangeInclusive(5, +2); // inclusive
+            Assert.AreEqual(7, mIncl.PositionedChips[0].TextOffset, "inclusive: chip at boundary shifts");
+        }
+
         // R6: full scenario — chip, type "test", chip, build message, verify segment order.
         [Test]
         public void R6_FullScenario_ChipTypeChip_CorrectSegmentOrder()

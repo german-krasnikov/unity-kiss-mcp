@@ -86,7 +86,7 @@ class UnityBridge(HeartbeatMixin):
         self._ensure_heartbeat()
         self._counter += 1
         msg_id = f"{self._counter:04x}"
-        payload = json.dumps({"id": msg_id, "cmd": cmd, "args": args}).encode("utf-8")
+        payload = json.dumps({"id": msg_id, "cmd": cmd, "args": args}, ensure_ascii=False).encode("utf-8")
         if len(payload) > 10_000_000:
             raise ConnectionError(f"Outbound payload too large: {len(payload)} bytes (max 10MB)")
         header = struct.pack("!I", len(payload))

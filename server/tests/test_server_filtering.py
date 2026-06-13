@@ -187,7 +187,7 @@ async def test_filter_tools_fallback_when_cache_empty():
         bridge.send.reset_mock()
         result = await srv._filter_tools([tool_a], bridge)
         bridge.send.assert_not_called()
-        assert len(result) >= 0  # _apply_gating may filter
+        assert any(t.name == "get_hierarchy" for t in result)
     finally:
         srv._disabled_tools_cache = orig
 
@@ -298,7 +298,7 @@ def test_read_unity_port_skips_candidate_if_tcp_probe_fails(tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     port_file = ports_dir / "12345.port"
-    port_file.write_text("9501\n/some/project\nMyProject")
+    port_file.write_text("9501\n/some/project\nMyProject", encoding="utf-8")
 
     with (
         patch("unity_mcp.server_filtering.Path") as mock_path_cls,
@@ -326,7 +326,7 @@ def test_read_unity_port_includes_candidate_if_tcp_probe_succeeds(tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     port_file = ports_dir / "12345.port"
-    port_file.write_text("9501\n/some/project\nMyProject")
+    port_file.write_text("9501\n/some/project\nMyProject", encoding="utf-8")
 
     with (
         patch("unity_mcp.server_filtering._tcp_probe", return_value=True),
@@ -337,3 +337,82 @@ def test_read_unity_port_includes_candidate_if_tcp_probe_succeeds(tmp_path):
         result = server_filtering.read_unity_port()
 
     assert result == 9501
+
+
+def test_read_unity_port_cyrillic_project_path_parses_correctly(tmp_path):
+    """Cyrillic project path in .port file must parse without mojibake.
+    Discriminating: remove encoding= from server_filtering.py and this test fails
+    (UnicodeDecodeError on cp1251 systems / garbled project field on macOS).
+    Uses write_bytes to avoid test-side EncodingWarning.
+    """
+    from pathlib import Path
+
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    port_file = ports_dir / "12345.port"
+    # Write file as raw UTF-8 bytes — bypasses EncodingWarning gate on test side
+    port_file.write_bytes("9501\n/Users/Иван/MyProject\nМойПроект\n".encode("utf-8"))
+
+    with (
+        patch("unity_mcp.server_filtering._tcp_probe", return_value=True),
+        patch("os.kill"),  # PID alive
+        patch.object(Path, "home", return_value=tmp_path),
+    ):
+        from unity_mcp import server_filtering
+        result = server_filtering.read_unity_port()
+
+    assert result == 9501  # port parsed correctly despite Cyrillic
+
+
+# ---------------------------------------------------------------------------
+# PY2.arch.3: push_catalog must omit empty categories
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_push_catalog_omits_empty_categories():
+    """push_catalog must not send 'CONNECTION:' (or any empty-tools category)."""
+    from unittest.mock import AsyncMock, MagicMock
+    from unity_mcp.server_filtering import push_catalog
+
+    bridge = MagicMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+
+    await push_catalog(bridge)
+
+    bridge.send.assert_called_once()
+    catalog_arg = bridge.send.call_args[1].get("catalog") or bridge.send.call_args[0][1].get("catalog", "")
+    for line in catalog_arg.split("\n"):
+        if ":" in line:
+            cat, tools_str = line.split(":", 1)
+            assert tools_str.strip(), f"Category '{cat}' has empty tools list in catalog"
+
+
+# ---------------------------------------------------------------------------
+# PY3.arch.1: _strip_deferred_schemas must use canonical STUB_SCHEMA (identity)
+# ---------------------------------------------------------------------------
+
+def test_strip_uses_canonical_stub():
+    """Non-core tool's inputSchema after strip must be the exact STUB_SCHEMA object."""
+    from types import SimpleNamespace
+    from unity_mcp.server_filtering import _strip_deferred_schemas
+    from unity_mcp.tools.schema_registry import STUB_SCHEMA
+
+    tool = SimpleNamespace(name="animation", inputSchema={"type": "object", "properties": {}})
+    result = _strip_deferred_schemas([tool])
+    assert result[0].inputSchema is STUB_SCHEMA
+
+
+# ---------------------------------------------------------------------------
+# X4.cross.4: UNITY_MCP_NO_GATING=1 bypasses tier filter
+# ---------------------------------------------------------------------------
+
+def test_no_gating_env_bypasses_filter(monkeypatch):
+    """UNITY_MCP_NO_GATING=1 makes _apply_gating return the original list unchanged."""
+    from types import SimpleNamespace
+    from unity_mcp.server_filtering import _apply_gating
+
+    monkeypatch.setenv("UNITY_MCP_NO_GATING", "1")
+    tools = [SimpleNamespace(name="shader"), SimpleNamespace(name="animation")]
+    result = _apply_gating(tools)
+    assert result is tools

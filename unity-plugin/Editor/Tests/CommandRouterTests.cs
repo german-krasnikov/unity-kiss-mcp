@@ -230,6 +230,107 @@ namespace UnityMCP.Editor.Tests
             Assert.IsEmpty(failures, "Commands missing schema: " + string.Join(", ", failures));
         }
 
+        // ── CS1.test.2: disabled-tool gate is testable via IsToolEnabledFn ───
+
+        [Test]
+        public void Process_DisabledTool_ReturnsDisabledError()
+        {
+            CommandRouter.IsCompiling = () => false;
+            CommandRouter.IsPlayMode  = () => false;
+            CommandRouter.IsToolEnabledFn = _ => false;
+            try
+            {
+                var json = "{\"id\":\"t1\",\"cmd\":\"get_hierarchy\",\"args\":{}}";
+                var result = CommandRouter.Process(json);
+                Assert.IsTrue(result.Contains("\"ok\":false"), result);
+                Assert.IsTrue(result.Contains("disabled in settings"), result);
+            }
+            finally
+            {
+                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsPlayMode  = () => UnityEditor.EditorApplication.isPlaying;
+                CommandRouter.IsToolEnabledFn = MCPSettings.IsToolEnabled;
+            }
+        }
+
+        // ── CS1.test.1: get_disabled_tools / set_tool_catalog have schema ─────
+
+        [Test]
+        public void Schema_GetDisabledTools_HallucinatedParam_Rejected()
+        {
+            var result = CommandSchema.Validate("get_disabled_tools", "{\"hallucinated\":\"x\"}");
+            Assert.IsNotNull(result, "get_disabled_tools must have a schema entry");
+            StringAssert.Contains("Unknown param", result);
+        }
+
+        [Test]
+        public void Schema_SetToolCatalog_HallucinatedParam_Rejected()
+        {
+            var result = CommandSchema.Validate("set_tool_catalog", "{\"hallucinated\":\"x\"}");
+            Assert.IsNotNull(result, "set_tool_catalog must have a schema entry");
+            StringAssert.Contains("Unknown param", result);
+        }
+
+        [Test]
+        public void Schema_SetToolCatalog_ValidCatalogParam_Passes()
+        {
+            var result = CommandSchema.Validate("set_tool_catalog", "{\"catalog\":\"[]\"}");
+            Assert.IsNull(result, result);
+        }
+
+        // ── CS1.test.6: ProcessAsync guard with compiling blocks async cmds ───
+
+        [Test]
+        public void ProcessAsync_RunTests_WhileCompiling_SetsGuardResponse()
+        {
+            CommandRouter.IsCompiling = () => true;
+            try
+            {
+                var tcs = new System.Threading.Tasks.TaskCompletionSource<string>();
+                var json = "{\"id\":\"pa1\",\"cmd\":\"run_tests\",\"args\":{}}";
+                CommandRouter.ProcessAsync(json, tcs);
+                Assert.IsTrue(tcs.Task.IsCompleted, "TCS should be set synchronously when guard fires");
+                var result = tcs.Task.Result;
+                Assert.IsTrue(result.Contains("\"ok\":false"), result);
+                Assert.IsTrue(result.Contains("retry"), result);
+            }
+            finally
+            {
+                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+            }
+        }
+
+        [Test]
+        public void ProcessAsync_WaitUntil_WhileCompiling_SetsGuardResponse()
+        {
+            CommandRouter.IsCompiling = () => true;
+            try
+            {
+                var tcs = new System.Threading.Tasks.TaskCompletionSource<string>();
+                var json = "{\"id\":\"pa2\",\"cmd\":\"wait_until\",\"args\":{\"path\":\"/x\",\"component\":\"C\",\"field\":\"f\",\"value\":\"v\"}}";
+                CommandRouter.ProcessAsync(json, tcs);
+                Assert.IsTrue(tcs.Task.IsCompleted);
+                var result = tcs.Task.Result;
+                Assert.IsTrue(result.Contains("\"ok\":false"), result);
+                Assert.IsTrue(result.Contains("retry"), result);
+            }
+            finally
+            {
+                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+            }
+        }
+
+        // ── CS1.test.7: ExtractString nested-key shadowing ───────────────────
+
+        [Test]
+        public void ExtractString_NestedDuplicate_ReturnsOuterValue()
+        {
+            // depth<=1 guard must prevent reading "cmd" from inside "args"
+            var json = "{\"cmd\":\"outer\",\"args\":{\"cmd\":\"inner\"}}";
+            var result = JsonHelper.ExtractString(json, "cmd");
+            Assert.AreEqual("outer", result);
+        }
+
         // ── CommandSchema.ExtractKeys ─────────────────────────────────────────
 
         [Test]

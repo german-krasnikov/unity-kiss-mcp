@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 DiffMode = Literal["auto", "pixel", "structural", "targeted",
-                   "ui_layout", "animation", "color", "position"]
+                   "ui_layout", "animation", "color", "position", "regression"]
 
 DIFF_PROMPTS = {
     "general": "Compare BEFORE (image 1) and AFTER (image 2). List semantic changes only:\n- <change>\nIgnore anti-aliasing/jitter. If no semantic change: 'NO_CHANGE'. Max 5 bullets.",

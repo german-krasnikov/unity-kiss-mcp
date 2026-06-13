@@ -99,6 +99,7 @@ def _is_unity_mcp_pid_win(pid: int) -> bool:
         out = subprocess.check_output(
             [
                 "powershell", "-NoProfile", "-Command",
+                f"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
                 f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine",
             ],
             stderr=subprocess.DEVNULL,
@@ -193,7 +194,7 @@ def read_pid_from_port_file(port: int) -> Optional[int]:
         return None
     for f in ports_dir.glob("*.port"):
         try:
-            lines = f.read_text().strip().split("\n")
+            lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
             if int(lines[0]) == port:
                 return int(f.stem)
         except (ValueError, IndexError, OSError):

@@ -160,3 +160,21 @@ async def test_distill_haiku_handles_exception():
     assert result is None
 
 
+@pytest.mark.asyncio
+async def test_distill_haiku_cli_args_include_max_tokens():
+    """distiller LlmProfile must have max_tokens set to cap output cost."""
+    from unity_mcp.llm_config import get_profile
+    profile = get_profile("distiller")
+    args = profile.to_cli_args()
+    assert "--max-tokens" in args, "distiller profile must include --max-tokens"
+
+
+def test_distill_haiku_input_capped_at_4000():
+    """distill_haiku must cap input to 4000 chars, not 8000."""
+    import inspect
+    from unity_mcp import distiller as mod
+    src = inspect.getsource(mod.ResponseDistiller.distill_haiku)
+    # 8000 must not appear; 4000 must
+    assert "8000" not in src, "input cap must be 4000, not 8000"
+    assert "4000" in src, "input must be capped at 4000"
+

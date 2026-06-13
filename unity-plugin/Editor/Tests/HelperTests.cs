@@ -8,6 +8,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace UnityMCP.Editor.Tests
 {
@@ -18,8 +19,8 @@ namespace UnityMCP.Editor.Tests
     {
         private Material _mat;
 
-        // FormatProperty signature: (Material mat, string name, ShaderUtil.ShaderPropertyType type)
-        private static string Invoke(Material mat, string name, ShaderUtil.ShaderPropertyType type)
+        // FormatProperty signature: (Material mat, string name, ShaderPropertyType type)
+        private static string Invoke(Material mat, string name, ShaderPropertyType type)
         {
             var method = typeof(MaterialHelper).GetMethod(
                 "FormatProperty",
@@ -45,7 +46,7 @@ namespace UnityMCP.Editor.Tests
         public void FormatProperty_Color_ContainsColorTag()
         {
             _mat.SetColor("_Color", Color.red);
-            var result = Invoke(_mat, "_Color", ShaderUtil.ShaderPropertyType.Color);
+            var result = Invoke(_mat, "_Color", ShaderPropertyType.Color);
             StringAssert.Contains("[Color]", result);
             StringAssert.Contains("_Color", result);
         }
@@ -55,7 +56,7 @@ namespace UnityMCP.Editor.Tests
         public void FormatProperty_Float_ContainsFloatTag()
         {
             _mat.SetFloat("_Glossiness", 0.5f);
-            var result = Invoke(_mat, "_Glossiness", ShaderUtil.ShaderPropertyType.Float);
+            var result = Invoke(_mat, "_Glossiness", ShaderPropertyType.Float);
             StringAssert.Contains("[Float]", result);
             StringAssert.Contains("_Glossiness", result);
         }
@@ -65,7 +66,7 @@ namespace UnityMCP.Editor.Tests
         public void FormatProperty_Range_ContainsFloatTag()
         {
             _mat.SetFloat("_Glossiness", 0.3f);
-            var result = Invoke(_mat, "_Glossiness", ShaderUtil.ShaderPropertyType.Range);
+            var result = Invoke(_mat, "_Glossiness", ShaderPropertyType.Range);
             StringAssert.Contains("[Float]", result);
         }
 
@@ -79,7 +80,7 @@ namespace UnityMCP.Editor.Tests
                 System.Threading.Thread.CurrentThread.CurrentCulture =
                     new System.Globalization.CultureInfo("de-DE");
                 _mat.SetFloat("_Glossiness", 0.75f);
-                var result = Invoke(_mat, "_Glossiness", ShaderUtil.ShaderPropertyType.Float);
+                var result = Invoke(_mat, "_Glossiness", ShaderPropertyType.Float);
                 // Should not use comma as decimal separator
                 StringAssert.DoesNotContain("0,75", result);
                 StringAssert.Contains("0.75", result);
@@ -94,7 +95,7 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void FormatProperty_Texture_ContainsTextureTag()
         {
-            var result = Invoke(_mat, "_MainTex", ShaderUtil.ShaderPropertyType.TexEnv);
+            var result = Invoke(_mat, "_MainTex", ShaderPropertyType.Texture);
             StringAssert.Contains("[Texture]", result);
             StringAssert.Contains("_MainTex", result);
         }
@@ -104,7 +105,7 @@ namespace UnityMCP.Editor.Tests
         public void FormatProperty_Vector_ContainsVectorTag()
         {
             _mat.SetVector("_EmissionColor", new Vector4(1f, 0f, 0f, 1f));
-            var result = Invoke(_mat, "_EmissionColor", ShaderUtil.ShaderPropertyType.Vector);
+            var result = Invoke(_mat, "_EmissionColor", ShaderPropertyType.Vector);
             StringAssert.Contains("[Vector]", result);
             StringAssert.Contains("_EmissionColor", result);
         }
@@ -114,7 +115,7 @@ namespace UnityMCP.Editor.Tests
         public void FormatProperty_Unknown_ContainsQuestionMark()
         {
             // Use a cast to an out-of-range enum value to hit the default branch
-            var unknownType = (ShaderUtil.ShaderPropertyType)99;
+            var unknownType = (ShaderPropertyType)99;
             var result = Invoke(_mat, "_SomeProp", unknownType);
             StringAssert.Contains("?", result);
             StringAssert.Contains("_SomeProp", result);

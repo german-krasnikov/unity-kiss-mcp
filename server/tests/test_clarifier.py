@@ -3,7 +3,7 @@ from collections import deque
 from unity_mcp.clarifier import Disambiguator, _levenshtein
 
 
-def test_levenshtein_basic():
+def test_levenshtein_identity_substitution_and_insert_distances():
     assert _levenshtein("abc", "abc") == 0
     assert _levenshtein("abc", "abd") == 1
     assert _levenshtein("", "abc") == 3

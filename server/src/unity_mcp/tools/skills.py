@@ -31,8 +31,8 @@ async def save_skill(name: str, description: str, code: str) -> str:
     skill = {"name": name, "description": description, "code": code,
              "kind": _detect_kind(code),
              "created": time.strftime("%Y-%m-%d %H:%M"), "used_count": 0}
-    with open(os.path.join(_skills_dir(), f"{name}.json"), "w") as f:
-        json.dump(skill, f)
+    with open(os.path.join(_skills_dir(), f"{name}.json"), "w", encoding="utf-8") as f:
+        json.dump(skill, f, ensure_ascii=False)
     return f"Skill saved: {name} — {description}"
 
 
@@ -42,7 +42,7 @@ async def use_skill(name: str, params: str | None = None) -> str:
     path = os.path.join(_skills_dir(), f"{name}.json")
     if not os.path.exists(path):
         return await list_skills()
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         skill = json.load(f)
     code = skill["code"]
     if params:
@@ -53,8 +53,8 @@ async def use_skill(name: str, params: str | None = None) -> str:
                 code = code.replace(f"${{{k.strip()}}}", v.strip())
     skill["used_count"] = skill.get("used_count", 0) + 1
     skill["last_used"] = time.strftime("%Y-%m-%d %H:%M")
-    with open(path, "w") as f:
-        json.dump(skill, f)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(skill, f, ensure_ascii=False)
     if skill.get("kind", _detect_kind(code)) == "csharp":
         return await _send("execute_code", {"code": code, "undo_label": f"skill:{name}"})
     return await _send("batch", {"commands": code})
@@ -68,7 +68,7 @@ async def list_skills() -> str:
     for fname in sorted(os.listdir(_skills_dir())):
         if not fname.endswith(".json"):
             continue
-        with open(os.path.join(_skills_dir(), fname)) as fh:
+        with open(os.path.join(_skills_dir(), fname), encoding="utf-8") as fh:
             s = json.load(fh)
         skills.append(f"{s['name']} [{s.get('kind', '?')}]: {s['description']} (used {s.get('used_count', 0)}x)")
     return "\n".join(skills) if skills else "No skills saved yet. Use save_skill to create one."
@@ -86,7 +86,7 @@ async def apply_template(name: str, params: str | None = None) -> str:
             available = [f[:-3] for f in os.listdir(template_dir) if f.endswith(".cs")]
             return f"Template '{name}' not found. Available: {', '.join(available) or 'none'}"
         return f"No templates directory. Create .claude/templates/{name}.cs"
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         code = f.read()
     if params:
         # Split on commas not inside parentheses
@@ -104,7 +104,7 @@ async def save_template(name: str, code: str) -> str:
     template_dir = os.path.join(os.getcwd(), ".claude", "templates")
     os.makedirs(template_dir, exist_ok=True)
     path = os.path.join(template_dir, f"{name}.cs")
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(code)
     return f"Template saved: {path}"
 

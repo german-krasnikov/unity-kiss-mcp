@@ -19,7 +19,7 @@ def _mock_tcp_probe():
 def _make_port_file(ports_dir, pid: int, port: int, project: str = "MyProject", mtime: float = 1000.0):
     """Write a <pid>.port file and set its mtime."""
     f = ports_dir / f"{pid}.port"
-    f.write_text(f"{port}\n\n{project}\n")
+    f.write_text(f"{port}\n\n{project}\n", encoding="utf-8")
     os.utime(f, (mtime, mtime))
     return f
 
@@ -28,7 +28,7 @@ def _make_port_file_with_path(ports_dir, pid: int, port: int, project_path: str,
                                project: str = "MyProject", mtime: float = 1000.0):
     """Write a <pid>.port file with a real project path on line 1 (C# format)."""
     f = ports_dir / f"{pid}.port"
-    f.write_text(f"{port}\n{project_path}\n{project}\n")
+    f.write_text(f"{port}\n{project_path}\n{project}\n", encoding="utf-8")
     os.utime(f, (mtime, mtime))
     return f
 
@@ -188,7 +188,7 @@ def test_malformed_port_file_skipped(monkeypatch, tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     bad = ports_dir / "notanint.port"
-    bad.write_text("broken\n")
+    bad.write_text("broken\n", encoding="utf-8")
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     monkeypatch.setattr("os.kill", lambda pid, sig: None)
     # int(lines[0]) where lines[0]="broken" → ValueError → skip
@@ -200,7 +200,7 @@ def test_malformed_port_content_skipped(monkeypatch, tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     bad = ports_dir / "1234.port"
-    bad.write_text("notaport\n")
+    bad.write_text("notaport\n", encoding="utf-8")
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     monkeypatch.setattr("os.kill", lambda pid, sig: None)
     # int("notaport") → ValueError → skip
@@ -217,7 +217,7 @@ def test_lockfile_without_project_line(monkeypatch, tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     f = ports_dir / "5555.port"
-    f.write_text("9505\n")  # only one line — no project
+    f.write_text("9505\n", encoding="utf-8")  # only one line — no project
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     monkeypatch.setattr("os.kill", lambda pid, sig: None)
     assert _read_unity_port() == 9505

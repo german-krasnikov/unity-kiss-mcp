@@ -50,8 +50,18 @@ class Executor:
                 fixed = await self._svc.generate(fix_prompt)
                 fixed, _ = normalize(fixed, "dsl")
                 if fixed:
-                    # Fix 11: validate retry plan before executing
-                    err = validate_plan(fixed, scene_paths or set())
+                    # Validate retry plan with enriched paths (include objects declared in original plan)
+                    validate_plan(plan, scene_paths or set())  # side-effect: builds declared_paths
+                    from ..utils import parse_kv_line as _pkv
+                    enriched: set[str] = set(scene_paths or set())
+                    for ln in plan.strip().splitlines():
+                        cmd, kv = _pkv(ln.strip())
+                        if cmd == "create_object":
+                            nm = kv.get("name", "")
+                            par = kv.get("parent", "")
+                            p_norm = (par if par.startswith("/") else f"/{par}") if par else ""
+                            enriched.add(f"{p_norm}/{nm}" if p_norm else f"/{nm}")
+                    err = validate_plan(fixed, enriched)
                     if err:
                         return result_str  # validation failed — return original result
                     retry = await self._send("batch", {"commands": fixed, "on_error": "continue"})

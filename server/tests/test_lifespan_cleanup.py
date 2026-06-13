@@ -97,3 +97,26 @@ async def test_lifespan_no_leak_when_features_disabled(monkeypatch):
     tasks_after = {t for t in asyncio.all_tasks() if not t.done()}
     leaked = tasks_after - tasks_before - {asyncio.current_task()}
     assert not leaked, f"Baseline leak: {[t.get_name() for t in leaked]}"
+
+
+# ---------------------------------------------------------------------------
+# X4.cross.1: UNITY_MCP_MIDDLEWARE=1 alone does not enable visual-verify;
+# both UNITY_MCP_MIDDLEWARE=1 AND UNITY_MCP_VISUAL_VERIFY=1 are required.
+# ---------------------------------------------------------------------------
+
+def test_sampling_service_enabled_requires_visual_verify(monkeypatch):
+    """SamplingService.enabled is False with only MIDDLEWARE=1 set."""
+    monkeypatch.setenv("UNITY_MCP_MIDDLEWARE", "1")
+    monkeypatch.delenv("UNITY_MCP_VISUAL_VERIFY", raising=False)
+    from unity_mcp.sampling import SamplingService
+    svc = SamplingService()
+    assert not svc.enabled, "MIDDLEWARE alone must not activate visual-verify"
+
+
+def test_sampling_service_enabled_with_both_envs(monkeypatch):
+    """SamplingService.enabled is True when both MIDDLEWARE=1 and VISUAL_VERIFY=1 are set."""
+    monkeypatch.setenv("UNITY_MCP_MIDDLEWARE", "1")
+    monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
+    from unity_mcp.sampling import SamplingService
+    svc = SamplingService()
+    assert svc.enabled, "MIDDLEWARE + VISUAL_VERIFY must enable visual-verify"

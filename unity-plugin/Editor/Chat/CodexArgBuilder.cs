@@ -87,7 +87,7 @@ namespace UnityMCP.Editor.Chat
             => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
         /// <summary>Build a TOML inline array of strings: "-m","unity_mcp.server"</summary>
-        private static string BuildTomlStringArray(string[] items)
+        internal static string BuildTomlStringArray(string[] items)
         {
             if (items == null || items.Length == 0) return "";
             var parts = new string[items.Length];

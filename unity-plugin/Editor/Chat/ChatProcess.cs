@@ -112,7 +112,7 @@ namespace UnityMCP.Editor.Chat
             // which mangles non-ASCII (Cyrillic → '?'). BaseStream wrapping works on every
             // .NET profile (ProcessStartInfo.StandardInputEncoding is .NET Standard 2.1-only).
             var utf8 = new System.Text.UTF8Encoding(false);
-            _stdin   = new StreamWriter(_process.StandardInput.BaseStream, utf8) { AutoFlush = true };
+            _stdin   = new StreamWriter(_process.StandardInput.BaseStream, utf8) { AutoFlush = true, NewLine = "\n" };  // LF-only: stream-json contract; covered by integration, not unit test
             _running = true;
 
             _readerThread = new Thread(ReadLoop) { IsBackground = true, Name = "ChatProcess.Reader" };

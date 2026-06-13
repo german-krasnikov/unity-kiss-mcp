@@ -349,6 +349,22 @@ async def test_run_tests_editmode_does_not_catch_disconnect(mock_bridge):
 
 
 @pytest.mark.asyncio
+async def test_run_tests_playmode_tool_error_on_poll_swallowed(mock_bridge):
+    """run_tests PlayMode: ToolError from every get_test_results poll is swallowed; result is error string."""
+    mock_bridge.send = AsyncMock(side_effect=ToolError("disconnected"))
+
+    import unity_mcp.tools.scene as _scene
+    _scene._POLL_INTERVAL = 0
+    _scene._POLL_ATTEMPTS = 3
+    try:
+        result = await run_tests(mode="PlayMode")
+    finally:
+        _scene._POLL_INTERVAL = 2.0
+        _scene._POLL_ATTEMPTS = 30
+    assert result.startswith("Error:")
+
+
+@pytest.mark.asyncio
 async def test_scene_new_calls_bridge(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Untitled"})
     result = await scene(action="new")
@@ -1069,6 +1085,15 @@ async def test_screenshot_angle_omitted_when_none(mock_bridge):
     assert "angle" not in args
 
 
+@pytest.mark.asyncio
+async def test_screenshot_describe_early_return_when_no_file_path(mock_bridge):
+    """screenshot with describe= returns verbatim when result has no 'Data saved to:'."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "screenshot failed: camera unavailable"})
+    result = await screenshot(describe="auto")
+    assert "[img:" not in result
+    assert "camera unavailable" in result
+
+
 # ── main() crash-logging tests ────────────────────────────────────────────────
 
 def test_main_logs_base_exception(monkeypatch):
@@ -1157,3 +1182,196 @@ async def test_search_no_scene_omitted(mock_bridge):
     await search_scene(query="Enemy")
     args = mock_bridge.send.call_args[0][1]
     assert "scene" not in args
+
+
+# ---------------------------------------------------------------------------
+# PY2.test.1: _send_raw CancelledError → ToolError
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_send_raw_cancelled_error_raises_tool_error(mock_bridge):
+    """CancelledError from bridge.send → ToolError('Operation cancelled')."""
+    import asyncio
+    from unity_mcp.server import _send_raw
+    mock_bridge.send = AsyncMock(side_effect=asyncio.CancelledError())
+    with pytest.raises(ToolError, match="Operation cancelled"):
+        await _send_raw("ping", {})
+
+
+# ---------------------------------------------------------------------------
+# PY2.test.2: ConnectionError → UNITY_UNAVAILABLE ToolError
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_send_raw_connection_error_produces_unity_unavailable_tool_error(mock_bridge):
+    """ConnectionRefusedError + busy probe → ToolError with [UNITY_UNAVAILABLE]."""
+    from unity_mcp.server import _send_raw
+    mock_bridge.send = AsyncMock(side_effect=ConnectionRefusedError("refused"))
+    probe = MagicMock()
+    probe.has_strong_busy_signal.return_value = True
+    probe.estimated_remaining_s.return_value = 5.0
+    mock_bridge._probe = probe
+    with pytest.raises(ToolError, match=r"\[UNITY_UNAVAILABLE\]"):
+        await _send_raw("ping", {})
+
+
+# ---------------------------------------------------------------------------
+# PY2.test.3: _refresh_tools_cache skips when lock already held
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_refresh_tools_cache_skips_when_lock_held():
+    """Second call while lock is held must not call bridge.send."""
+    import asyncio
+    import unity_mcp.server as srv
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+
+    orig_lock = srv._refresh_tools_lock
+    try:
+        lock = asyncio.Lock()
+        srv._refresh_tools_lock = lock
+        async with lock:  # hold the lock
+            await srv._refresh_tools_cache(bridge)
+        bridge.send.assert_not_called()
+    finally:
+        srv._refresh_tools_lock = orig_lock
+
+
+# ---------------------------------------------------------------------------
+# X4.cross.2: main() with UNITY_MCP_TRANSPORT=http
+# ---------------------------------------------------------------------------
+
+def test_main_http_transport(monkeypatch):
+    """UNITY_MCP_TRANSPORT=http → mcp.run called with transport='streamable-http'."""
+    import unity_mcp.server as srv
+    monkeypatch.setenv("UNITY_MCP_TRANSPORT", "http")
+    with patch("unity_mcp.server.mcp.run") as mock_run:
+        srv.main()
+    mock_run.assert_called_once_with(
+        transport="streamable-http", host="127.0.0.1", port=8765
+    )
+
+
+# ---------------------------------------------------------------------------
+# PY1.arch.2: _on_port_change acquire failure must log a warning
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_on_port_change_acquire_failure_logs_warning(monkeypatch):
+    """_on_port_change must log.warning when acquire_lock raises on new port."""
+    import logging
+    import unity_mcp.server as srv
+
+    call_count = [0]
+    def fake_acquire(port):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return 99  # initial acquire succeeds
+        raise RuntimeError("lock busy")
+
+    monkeypatch.setattr("unity_mcp.server.acquire_lock", fake_acquire)
+    monkeypatch.setattr("unity_mcp.server.release_lock", lambda fd: None)
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+
+    captured_slot = [None]
+
+    class FakeSlot:
+        bridge = None
+        connected = False
+        port = 9500
+        _cbs = []
+
+        def __init__(self, **kwargs):
+            self._on_port_change = kwargs.get("on_port_change")
+            captured_slot[0] = self
+
+        async def connect(self, *a, **kw): return "ok"
+        async def close(self): pass
+
+    monkeypatch.setattr(srv, "ConnectionSlot", FakeSlot)
+    monkeypatch.setattr(srv, "slot", None)
+    monkeypatch.setattr(srv, "manager", None)
+    monkeypatch.setattr(srv, "_middleware", None)
+
+    warnings = []
+
+    class CapHandler(logging.Handler):
+        def emit(self, record):
+            if record.levelno >= logging.WARNING:
+                warnings.append(record.getMessage())
+
+    handler = CapHandler()
+    log = logging.getLogger("unity_mcp.server")
+    log.addHandler(handler)
+    log.setLevel(logging.WARNING)
+    try:
+        class FakeApp: pass
+        async with srv.lifespan(FakeApp()):
+            captured_slot[0]._on_port_change(9500, 9501)
+    except Exception:
+        pass
+    finally:
+        log.removeHandler(handler)
+
+    assert warnings, "Expected a warning when acquire_lock fails on port change"
+    assert any("9501" in w or "lock" in w.lower() or "port" in w.lower() for w in warnings)
+
+
+# ---------------------------------------------------------------------------
+# PY2.test.4: _on_reconnect debounce limits rapid refresh calls
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_lifespan_on_reconnect_throttles_refresh(monkeypatch):
+    """Two reconnect callbacks within <5s must result in at most one refresh call."""
+    import asyncio
+    import unity_mcp.server as srv
+
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+    bridge.start_heartbeat = MagicMock()
+    bridge.stop_heartbeat = MagicMock()
+
+    reconnect_cbs = []
+
+    _bridge = bridge
+
+    class FakeSlot:
+        def __init__(self, **kwargs): pass
+
+        @property
+        def bridge(self): return _bridge
+        connected = True
+        port = 9500
+
+        def add_reconnect_callback(self, cb): reconnect_cbs.append(cb)
+        async def connect(self, *a, **kw): return "ok"
+        async def close(self): pass
+
+    monkeypatch.setattr(srv, "ConnectionSlot", FakeSlot)
+    monkeypatch.setattr(srv, "slot", None)
+    monkeypatch.setattr(srv, "manager", None)
+    monkeypatch.setattr(srv, "_middleware", None)
+
+    class FakeApp: pass
+    async with srv.lifespan(FakeApp()):
+        # Reset call count after initial connect
+        bridge.send.reset_mock()
+        # Fire reconnect twice rapidly
+        for cb in reconnect_cbs:
+            cb()
+        for cb in reconnect_cbs:
+            cb()
+        await asyncio.sleep(0.05)
+
+    disabled_calls = [c for c in bridge.send.call_args_list if c[0][0] == "get_disabled_tools"]
+    # Debounce: 2 rapid fires → at most 1 refresh sent
+    assert len(disabled_calls) <= 1, f"Debounce failed: {len(disabled_calls)} calls"

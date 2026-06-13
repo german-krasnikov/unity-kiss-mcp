@@ -9,8 +9,14 @@ namespace UnityMCP.Editor
     {
         public static string ObjectNotFound(string path)
         {
-            var scene = SceneManager.GetActiveScene();
-            var roots = scene.GetRootGameObjects();
+            // Collect roots from ALL loaded scenes (multi-scene aware)
+            var rootList = new System.Collections.Generic.List<GameObject>();
+            for (int s = 0; s < SceneManager.sceneCount; s++)
+            {
+                var sc = SceneManager.GetSceneAt(s);
+                if (sc.isLoaded) rootList.AddRange(sc.GetRootGameObjects());
+            }
+            var roots = rootList.ToArray();
             var sb = new StringBuilder();
             sb.Append("'").Append(path).Append("' not found. Root objects: ");
 

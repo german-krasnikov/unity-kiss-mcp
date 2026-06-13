@@ -90,10 +90,14 @@ namespace UnityMCP.Editor
             switch (property.propertyType)
             {
                 case SerializedPropertyType.Integer:
+                case SerializedPropertyType.LayerMask:
                     if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal))
                         throw new ArgumentException($"Invalid int: '{value}'");
                     property.intValue = intVal; break;
-                case SerializedPropertyType.Float: property.floatValue = float.Parse(value, CultureInfo.InvariantCulture); break;
+                case SerializedPropertyType.Float:
+                    if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var fVal))
+                        throw new ArgumentException($"Invalid float: '{value}'");
+                    property.floatValue = fVal; break;
                 case SerializedPropertyType.Boolean: property.boolValue = ParseBool(value); break;
                 case SerializedPropertyType.String: property.stringValue = value; break;
                 case SerializedPropertyType.Vector2: property.vector2Value = ParseVector2(value); break;
@@ -137,7 +141,7 @@ namespace UnityMCP.Editor
             {
                 if (!int.TryParse(value.Substring(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var instanceId))
                     throw new ArgumentException($"Invalid instance ID: {value}");
-                var resolved = EditorUtility.InstanceIDToObject(instanceId);
+                var resolved = EditorUtility.EntityIdToObject(instanceId);
                 if (resolved == null)
                     throw new ArgumentException($"No object found for instance ID: {value}");
                 property.objectReferenceValue = resolved;

@@ -336,7 +336,7 @@ def _make_dll(tmp_path: Path, mtime: float) -> Path:
 def _make_cs(parent: Path, mtime: float, name: str = "Foo.cs") -> Path:
     parent.mkdir(parents=True, exist_ok=True)
     cs = parent / name
-    cs.write_text("class Foo {}")
+    cs.write_text("class Foo {}", encoding="utf-8")
     os.utime(cs, (mtime, mtime))
     return cs
 

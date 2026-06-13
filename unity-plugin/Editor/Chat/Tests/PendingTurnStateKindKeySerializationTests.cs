@@ -7,12 +7,12 @@ using UnityMCP.Editor.Chat;
 namespace UnityMCP.Editor.Chat.Tests
 {
     [TestFixture]
-    public class PendingTurnStateV4Tests
+    public class PendingTurnStateKindKeySerializationTests
     {
         // ── v4 KindKeys roundtrip ─────────────────────────────────────────────
 
         [Test]
-        public void RoundTrip_V4_KindKeys_Preserved()
+        public void Serialize_KindKeys_RoundTripsCleanly()
         {
             var orig = new PendingTurnState(
                 sessionId: "s", pendingText: "t",
@@ -29,7 +29,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void RoundTrip_V4_ChipPaths_AlsoPreserved()
+        public void Serialize_ChipPaths_RoundTripsCleanly()
         {
             var orig = new PendingTurnState(
                 sessionId: "s", pendingText: "t",
@@ -44,7 +44,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void V4_BackwardCompat_V3ChipLine_EmptyKindKey()
+        public void Deserialize_LegacyV3ChipLine_KindKeyDefaultsToEmpty()
         {
             // Simulate a v3 chip line (just PathB64, no pipe separator)
             var pathB64 = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Assets/foo.fbx"));
@@ -60,7 +60,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void V4_NoKindKeys_DefaultsToEmptyArray()
+        public void Deserialize_MissingKindKeys_DefaultsToEmptyString()
         {
             var orig = new PendingTurnState("s", "t", new[] { "/P" }, false, "", "Idle");
             var rt = PendingTurnState.Deserialize(orig.Serialize());

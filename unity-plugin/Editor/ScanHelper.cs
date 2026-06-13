@@ -7,7 +7,7 @@ namespace UnityMCP.Editor
     {
         public static string Scan()
         {
-            var allGOs = Object.FindObjectsOfType<GameObject>();
+            var allGOs = Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
             int total = allGOs.Length;
             int colliders = 0, triggers = 0, audio = 0, lights = 0,
                 rigidbodies = 0, canvas = 0, nav = 0;

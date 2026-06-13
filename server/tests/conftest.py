@@ -1,6 +1,20 @@
+import os
+import sys
+import warnings
+
+# PYTHONWARNDEFAULTENCODING must be set BEFORE interpreter starts — os.environ here is too late.
+# Run with: PYTHONWARNDEFAULTENCODING=1 pytest tests/
+# The filterwarnings = ["error::EncodingWarning"] in pyproject.toml turns warnings into errors
+# when the env-var gate is active.
+if sys.flags.warn_default_encoding == 0:
+    warnings.warn(
+        "Encoding gate inactive — run: PYTHONWARNDEFAULTENCODING=1 pytest",
+        UserWarning,
+        stacklevel=1,
+    )
+
 import asyncio
 import json
-import os
 import re as _re
 import struct
 import shutil

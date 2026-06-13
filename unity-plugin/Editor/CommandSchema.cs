@@ -91,6 +91,8 @@ namespace UnityMCP.Editor
             { "ping", P(null) },
             { "get_version", P(null) },
             { "get_enabled_tools", P(null) },
+            { "get_disabled_tools", P(null) },
+            { "set_tool_catalog", P(null, "catalog") },
             { "compile_status", P(null) },
         };
 

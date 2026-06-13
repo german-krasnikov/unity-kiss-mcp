@@ -167,7 +167,7 @@ namespace UnityMCP.Editor
 
         private static GameObject FindOrCreateCanvas()
         {
-            var existing = UnityEngine.Object.FindObjectOfType<Canvas>();
+            var existing = UnityEngine.Object.FindFirstObjectByType<Canvas>();
             if (existing != null) return existing.gameObject;
 
             var go = MakeCanvas("Canvas");
@@ -188,7 +188,7 @@ namespace UnityMCP.Editor
 
         private static void EnsureEventSystem()
         {
-            if (UnityEngine.Object.FindObjectOfType<EventSystem>() != null) return;
+            if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null) return;
             var es = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
             Undo.RegisterCreatedObjectUndo(es, "Create EventSystem");
         }

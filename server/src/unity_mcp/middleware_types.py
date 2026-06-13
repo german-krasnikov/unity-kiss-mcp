@@ -18,6 +18,7 @@ WRITE_CMDS = {
     "batch", "animation", "timeline", "animator", "particle", "shader",
     "material", "prefab", "scriptable_object", "asset", "scene",
     "create_ui", "execute_code", "menu", "project_settings", "set_parent", "unwire_event",
+    "transfer_object",
 }
 
 READ_CMDS = {

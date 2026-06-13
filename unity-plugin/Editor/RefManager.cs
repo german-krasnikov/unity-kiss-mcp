@@ -15,6 +15,9 @@ namespace UnityMCP.Editor
             var id = go.GetInstanceID();
             if (_idToRef.TryGetValue(id, out var existing)) return existing;
             var r = GenerateRef(_counter++);
+            // Ring-wrap: evict old GO's _idToRef entry before overwriting the slot
+            if (_refToObj.TryGetValue(r, out var old) && old != null)
+                _idToRef.Remove(old.GetInstanceID());
             _refToObj[r] = go;
             _idToRef[id] = r;
             return r;

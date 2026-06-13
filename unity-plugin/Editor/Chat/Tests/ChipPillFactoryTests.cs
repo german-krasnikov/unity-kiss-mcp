@@ -11,8 +11,8 @@ namespace UnityMCP.Editor.Chat.Tests
     [TestFixture]
     public class ChipPillFactoryTests
     {
-        [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
-        [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();
+        [SetUp]    public void SetUp()    { ChipKindRegistry.ResetToBuiltIns(); ChipPillFactory.ColorResolver = null; }
+        [TearDown] public void TearDown() { ChipKindRegistry.ResetToBuiltIns(); ChipPillFactory.ColorResolver = null; }
 
         // ── Label presence ────────────────────────────────────────────────────
 

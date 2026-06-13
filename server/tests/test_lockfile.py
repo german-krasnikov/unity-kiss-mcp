@@ -18,7 +18,7 @@ def test_acquire_creates_file_with_pid(tmp_path):
     fd = acquire_lock(lock_dir=tmp_path, port=9500)
     lock_file = tmp_path / "server-9500.lock"
     assert lock_file.exists()
-    assert int(lock_file.read_text().strip()) == os.getpid()
+    assert int(lock_file.read_text(encoding="utf-8").strip()) == os.getpid()
     release_lock(fd)
 
 
@@ -35,7 +35,7 @@ def test_acquire_after_release(tmp_path):
     release_lock(fd1)
     fd2 = acquire_lock(lock_dir=tmp_path, port=9500)
     lock_file = tmp_path / "server-9500.lock"
-    assert int(lock_file.read_text().strip()) == os.getpid()
+    assert int(lock_file.read_text(encoding="utf-8").strip()) == os.getpid()
     release_lock(fd2)
 
 
@@ -67,7 +67,7 @@ def test_takeover_kills_and_acquires_for_live_unity_mcp_process(tmp_path):
     """When lock is held by a live unity_mcp process, SIGTERM is sent and lock is acquired."""
     lock_file = tmp_path / "server-9500.lock"
     fake_pid = 54321
-    lock_file.write_text(f"{fake_pid}\n")
+    lock_file.write_text(f"{fake_pid}\n", encoding="utf-8")
 
     call_count = {"n": 0}
     def flock_side_effect(fd, op):
@@ -92,7 +92,7 @@ def test_takeover_kills_and_acquires_for_live_unity_mcp_process(tmp_path):
 def test_stale_lock_no_kill_if_pid_dead(tmp_path):
     """If lock is held but PID is dead (stale), no SIGTERM is sent — just retake."""
     lock_file = tmp_path / "server-9500.lock"
-    lock_file.write_text("54321\n")
+    lock_file.write_text("54321\n", encoding="utf-8")
 
     call_count = {"n": 0}
     def flock_side_effect(fd, op):
@@ -117,7 +117,7 @@ def test_stale_lock_no_kill_if_pid_dead(tmp_path):
 def test_kill_only_unity_mcp_processes(tmp_path):
     """If lock holder is NOT a unity_mcp process, do not kill it."""
     lock_file = tmp_path / "server-9500.lock"
-    lock_file.write_text("54321\n")
+    lock_file.write_text("54321\n", encoding="utf-8")
 
     call_count = {"n": 0}
     def flock_side_effect(fd, op):
@@ -142,7 +142,7 @@ def test_kill_only_unity_mcp_processes(tmp_path):
 def test_raises_runtime_error_when_zombie_lock_never_released(tmp_path):
     """If a zombie lock can't be acquired after waiting, raise RuntimeError."""
     lock_file = tmp_path / "server-9500.lock"
-    lock_file.write_text("54321\n")
+    lock_file.write_text("54321\n", encoding="utf-8")
 
     def flock_always_blocked(fd, op):
         if op == (fcntl.LOCK_EX | fcntl.LOCK_NB):
@@ -166,7 +166,7 @@ def test_raises_runtime_error_when_zombie_lock_never_released(tmp_path):
 def test_takeover_sends_sigterm_and_acquires(tmp_path):
     """Happy path: old live unity_mcp process blocks lock → SIGTERM sent → lock acquired."""
     lock_file = tmp_path / "server-9500.lock"
-    lock_file.write_text("54321\n")
+    lock_file.write_text("54321\n", encoding="utf-8")
 
     call_count = {"n": 0}
     def flock_side_effect(fd, op):
@@ -190,7 +190,7 @@ def test_takeover_sends_sigterm_and_acquires(tmp_path):
 def test_dead_zombie_lock_still_cleaned_up(tmp_path):
     """Zombie lock (dead PID) is cleaned up — lock acquired, no error raised."""
     lock_file = tmp_path / "server-9500.lock"
-    lock_file.write_text("54321\n")
+    lock_file.write_text("54321\n", encoding="utf-8")
 
     call_count = {"n": 0}
     def flock_side(fd, op):
@@ -240,7 +240,7 @@ def test_read_pid_from_port_file(tmp_path):
     ports_dir.mkdir(parents=True)
     pid = 12345
     port_file = ports_dir / f"{pid}.port"
-    port_file.write_text("9500\n/path/to/project\nMyProject")
+    port_file.write_text("9500\n/path/to/project\nMyProject", encoding="utf-8")
     with patch.object(Path, "home", return_value=tmp_path):
         result = read_pid_from_port_file(9500)
     assert result == pid
@@ -284,7 +284,7 @@ def test_read_pid_from_port_file_corrupt_json(tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     bad_file = ports_dir / "12345.port"
-    bad_file.write_text("not-a-port\n/path/to/project")
+    bad_file.write_text("not-a-port\n/path/to/project", encoding="utf-8")
     with patch.object(Path, "home", return_value=tmp_path):
         result = read_pid_from_port_file(9500)
     assert result is None
@@ -295,7 +295,7 @@ def test_read_pid_from_port_file_non_integer_stem(tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     bad_file = ports_dir / "abc.port"
-    bad_file.write_text("9500\n/path/to/project")
+    bad_file.write_text("9500\n/path/to/project", encoding="utf-8")
     with patch.object(Path, "home", return_value=tmp_path):
         result = read_pid_from_port_file(9500)
     assert result is None
@@ -411,10 +411,28 @@ def test_is_zombie_returns_false_when_ps_fails():
         assert _is_zombie(12345) is False
 
 
+# ---------------------------------------------------------------------------
+# Encoding discriminating: Cyrillic path in port file round-trips
+# Discriminating: remove encoding= from lockfile.py and this fails on cp1251 systems.
+# Uses write_bytes to avoid test-side EncodingWarning gate.
+# ---------------------------------------------------------------------------
+
+def test_read_pid_from_port_file_cyrillic_path_does_not_crash(tmp_path):
+    """Port file with Cyrillic project path parses successfully (no UnicodeDecodeError)."""
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    port_file = ports_dir / "99999.port"
+    # Raw UTF-8 bytes — no write_text to avoid triggering EncodingWarning gate on test side
+    port_file.write_bytes("9500\n/Users/Иван/МойПроект\nМойПроект\n".encode("utf-8"))
+    with patch.object(Path, "home", return_value=tmp_path):
+        pid = read_pid_from_port_file(9500)
+    assert pid == 99999  # stem parsed correctly even with Cyrillic in content
+
+
 def test_zombie_pid_does_not_raise_runtime_error(tmp_path):
     """Zombie PID (alive but zombie state) must NOT raise — fall through to wait loop."""
     lock_file = tmp_path / "server-9500.lock"
-    lock_file.write_text("54321\n")
+    lock_file.write_text("54321\n", encoding="utf-8")
 
     call_count = {"n": 0}
     def flock_side_effect(fd, op):
@@ -442,7 +460,7 @@ def test_zombie_pid_does_not_raise_runtime_error(tmp_path):
 def test_takeover_old_process_doesnt_die(tmp_path):
     """SIGTERM sent but lock never releases — raises generic RuntimeError."""
     lock_file = tmp_path / "server-9500.lock"
-    lock_file.write_text("54321\n")
+    lock_file.write_text("54321\n", encoding="utf-8")
 
     def flock_always_blocked(fd, op):
         if op == (fcntl.LOCK_EX | fcntl.LOCK_NB):

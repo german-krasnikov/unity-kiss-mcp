@@ -31,7 +31,7 @@ def read_state_for_port(port: int) -> Optional[UnityState]:
     """Read Unity state from ~/.unity-mcp/state/port-{port}.state."""
     path = Path.home() / ".unity-mcp" / "state" / f"port-{port}.state"
     try:
-        lines = path.read_text().strip().split("\n")
+        lines = path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
         if len(lines) < 2:
             return None
         return UnityState(state=lines[0], timestamp=float(lines[1]))

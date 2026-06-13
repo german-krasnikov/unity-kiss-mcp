@@ -126,7 +126,7 @@ namespace UnityMCP.Editor
 
         public static string CaptureSceneOverview(int width, int height, bool topDown)
         {
-            var allRenderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
+            var allRenderers = UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
             var bounds = allRenderers.Length > 0 ? allRenderers[0].bounds : new Bounds(Vector3.zero, Vector3.one * 20f);
             foreach (var r in allRenderers) bounds.Encapsulate(r.bounds);
             float maxDim = Mathf.Max(Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z), 1f);

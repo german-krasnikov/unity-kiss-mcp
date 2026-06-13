@@ -53,7 +53,11 @@ namespace UnityMCP.Editor
             var raw = GetCatalog();
             if (!string.IsNullOrEmpty(raw))
             {
-                try { return CatalogParser.Parse(raw); }
+                try
+                {
+                    var parsed = CatalogParser.Parse(raw);
+                    if (parsed.Count > 0) return parsed;
+                }
                 catch { /* fall through */ }
             }
             return _defaultCatalog;

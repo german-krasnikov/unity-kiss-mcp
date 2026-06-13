@@ -178,7 +178,7 @@ async def test_batch_set_property_then_query(play_session):
 # 5. run_playtest DSL
 # ---------------------------------------------------------------------------
 
-async def test_run_playtest_basic_dsl(play_session):
+async def test_run_playtest_primary_dsl_verbs_all_succeed(play_session):
     """run_playtest: TIMESCALE, INVOKE, WAIT, ASSERT, LOG all succeed."""
     await _reset(play_session)
     script = f"""

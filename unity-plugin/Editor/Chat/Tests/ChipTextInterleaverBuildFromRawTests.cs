@@ -8,7 +8,7 @@ using UnityMCP.Editor.Chat;
 namespace UnityMCP.Editor.Chat.Tests
 {
     [TestFixture]
-    public class ChipDuplicateFixTests
+    public class ChipTextInterleaverBuildFromRawTests
     {
         [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
         [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();

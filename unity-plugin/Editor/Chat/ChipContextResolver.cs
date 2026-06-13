@@ -87,7 +87,8 @@ namespace UnityMCP.Editor.Chat
             return sb.ToString();
         }
 
-        /// <summary>1 chip → Full depth; 2+ chips → Summary for each.</summary>
+#if UNITY_INCLUDE_TESTS
+        /// <summary>1 chip → Full depth; 2+ chips → Summary for each. Test-only — no production callers.</summary>
         internal static string ResolveAll(List<string> chipPaths)
         {
             if (chipPaths == null || chipPaths.Count == 0) return "";
@@ -100,6 +101,7 @@ namespace UnityMCP.Editor.Chat
             }
             return sb.ToString();
         }
+#endif
 
         internal static string ResolveOne(string chipPath, ChipDepth depth, int budgetOverride = -1)
         {

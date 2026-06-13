@@ -399,23 +399,56 @@ async def test_send_timeout_raises():
 
 @pytest.mark.asyncio
 async def test_concurrent_sends_with_dead_connection():
-    """Concurrent sends when writer=None don't race on reconnect."""
-    def make_response(msg_id):
-        resp = {"id": msg_id, "ok": True, "data": "OK"}
-        payload = json.dumps(resp).encode("utf-8")
-        header = struct.pack("!I", len(payload))
-        return [header, payload]
+    """Concurrent sends when writer=None don't race on reconnect.
 
-    # New counter behavior (no lock on increment): all 3 sends get IDs 0001-0003 before any I/O.
-    # cmd1 acquires I/O lock first → reconnect ping uses counter=0004 (id="rc0004", ok checked not id).
-    # After reconnect: cmd1 sends 0001, cmd2 sends 0002, cmd3 sends 0003.
-    # Responses: ping consumed by reconnect, then 0001, 0002, 0003.
-    ping_hdr, ping_pay = ping_response()
-    all_responses = [ping_hdr, ping_pay] + make_response("0001") + make_response("0002") + make_response("0003")
+    Design note: counter increment is sync (outside I/O lock) so IDs are
+    assigned before any task yields. I/O lock serialises reconnect + write +
+    read. The mock echoes whatever ID it received, making the test
+    order-independent — no hardcoded "0001"/"0002"/"0003".
+    """
+    # Queue of pre-built (header, payload) response pairs, filled on drain()
+    response_queue: asyncio.Queue = asyncio.Queue()
+    # Partial state for readexactly: None means next call is a header read
+    pending_payload: list[bytes | None] = [None]
+
+    async def fake_readexactly(n: int) -> bytes:
+        if pending_payload[0] is not None:
+            # Second call in pair: return the payload
+            pay = pending_payload[0]
+            pending_payload[0] = None
+            return pay
+        # First call in pair (n==4): get next response pair from queue
+        hdr, pay = await response_queue.get()
+        pending_payload[0] = pay
+        return hdr
+
+    frames_buf: list[bytes] = []
+
+    def fake_write(data: bytes) -> None:
+        frames_buf.append(data)
+
+    async def fake_drain() -> None:
+        # Parse accumulated writes, build echo responses, enqueue them
+        buf = b"".join(frames_buf)
+        frames_buf.clear()
+        offset = 0
+        while offset + 4 <= len(buf):
+            length = struct.unpack("!I", buf[offset:offset + 4])[0]
+            offset += 4
+            if offset + length > len(buf):
+                break
+            frame = buf[offset:offset + length]
+            offset += length
+            msg = json.loads(frame)
+            resp = {"id": msg["id"], "ok": True, "data": "pong" if msg.get("cmd") == "ping" else "OK"}
+            pay = json.dumps(resp).encode("utf-8")
+            await response_queue.put((struct.pack("!I", len(pay)), pay))
 
     reader = AsyncMock()
+    reader.readexactly = AsyncMock(side_effect=fake_readexactly)
     writer = make_writer()
-    reader.readexactly = AsyncMock(side_effect=all_responses)
+    writer.write = Mock(side_effect=fake_write)
+    writer.drain = AsyncMock(side_effect=fake_drain)
 
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()

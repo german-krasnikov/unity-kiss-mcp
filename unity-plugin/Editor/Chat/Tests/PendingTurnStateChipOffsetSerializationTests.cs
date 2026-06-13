@@ -6,11 +6,11 @@ using UnityMCP.Editor.Chat;
 namespace UnityMCP.Editor.Chat.Tests
 {
     [TestFixture]
-    public class PendingTurnStateV5Tests
+    public class PendingTurnStateChipOffsetSerializationTests
     {
         // E1: v5 roundtrip — offsets preserved
         [Test]
-        public void E1_V5_RoundTrip_OffsetsPreserved()
+        public void Serialize_ChipTextOffsets_RoundTripsCleanly()
         {
             var orig = new PendingTurnState(
                 "sess", "hello", new[] { "/Player", "/Enemy" },
@@ -26,7 +26,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // E2: v4 deserialized → offsets default to 0, no throw
         [Test]
-        public void E2_V4_Deserialized_OffsetsDefaultZero()
+        public void Deserialize_LegacyV4Blob_OffsetsDefaultToZero()
         {
             // Build a v4 string: PathB64|KindKeyB64 (no offset)
             var v4 = new PendingTurnState(
@@ -51,7 +51,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // E3: v3 deserialized → offsets default to 0, no throw
         [Test]
-        public void E3_V3_Deserialized_OffsetsDefaultZero()
+        public void Deserialize_LegacyV3Blob_OffsetsDefaultToZero()
         {
             // v3 format: chip line has only PathB64 (no pipe at all)
             var v4 = new PendingTurnState(
@@ -75,7 +75,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // E4: zero offset chips survive roundtrip
         [Test]
-        public void E4_ZeroOffsets_RoundTrip()
+        public void ZeroOffsets_RoundTripsCleanly()
         {
             var orig = new PendingTurnState(
                 "s", "t", new[] { "/A", "/B" },
@@ -90,7 +90,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // E5: null offsets in constructor → serializes with 0
         [Test]
-        public void E5_NullOffsets_SerializesAsZero()
+        public void NullOffsets_SerializeAsZero()
         {
             var orig = new PendingTurnState(
                 "s", "t", new[] { "/A" },
@@ -104,7 +104,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // E6: existing KindKey tests still work (regression guard)
         [Test]
-        public void E6_ExistingFieldsUnchanged()
+        public void AllPriorFields_UnchangedAfterAddingOffsets()
         {
             var orig = new PendingTurnState(
                 "sess-xyz", "hello world", new[] { "/P", "/E" },

@@ -36,15 +36,15 @@ class LessonStore:
 
     def load(self) -> None:
         try:
-            data = json.loads(self.path.read_text())
+            data = json.loads(self.path.read_text(encoding="utf-8", errors="replace"))
             self._lessons = {k: Lesson(**v) for k, v in data.items()}
         except Exception:
             self._lessons = {}
 
     def flush(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({k: asdict(v) for k, v in self._lessons.items()}))
+        tmp = self.path.with_suffix(f".tmp.{os.getpid()}")
+        tmp.write_text(json.dumps({k: asdict(v) for k, v in self._lessons.items()}, ensure_ascii=False), encoding="utf-8")
         tmp.replace(self.path)
 
     def add(self, lesson: Lesson) -> None:

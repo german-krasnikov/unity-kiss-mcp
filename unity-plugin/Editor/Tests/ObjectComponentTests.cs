@@ -12,7 +12,7 @@ namespace UnityMCP.Editor.Tests
         [TearDown]
         public void TearDown()
         {
-            foreach (var go in Object.FindObjectsOfType<GameObject>())
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
                 if (go.name == "DupObj")
                     Object.DestroyImmediate(go);
         }

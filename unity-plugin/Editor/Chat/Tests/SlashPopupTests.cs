@@ -98,5 +98,50 @@ namespace UnityMCP.Editor.Chat.Tests
 
             Assert.AreEqual(10, _popup.VisibleCount, "All 10 items must be rendered — no MaxVisible cap");
         }
+
+        // CH5.test.3: MoveUp() wraps around, and ApplySelected() applies current index
+
+        [Test]
+        public void MoveUp_FromIndex0_WrapsToLast()
+        {
+            _popup.Show(SlashRegistry.Builtins);
+            // Start at 0, MoveUp once → wraps to last index
+            _popup.MoveUp();
+            Assert.AreEqual(SlashRegistry.Builtins.Length - 1, _popup.SelectedIndex,
+                "MoveUp from index 0 must wrap to last item");
+        }
+
+        [Test]
+        public void ApplySelected_AppliesCurrentlySelectedTemplate()
+        {
+            var templates = new[]
+            {
+                new SlashTemplate("a", "Prefill A.", ContextGather.None),
+                new SlashTemplate("b", "Prefill B.", ContextGather.None),
+            };
+            _popup.Show(templates);
+            _popup.MoveDown(); // select index 1
+
+            _popup.ApplySelected();
+
+            Assert.AreEqual("Prefill B.", _field.value,
+                "ApplySelected must apply the currently selected template (index 1)");
+        }
+
+        [Test]
+        public void ApplySelected_EmptyItems_NoThrow()
+        {
+            // Show with empty, then ApplySelected — must not throw
+            _popup.Show(new SlashTemplate[0]);
+            Assert.DoesNotThrow(() => _popup.ApplySelected());
+        }
+
+        [Test]
+        public void Show_EmptyItems_DoesNotRender()
+        {
+            _popup.Show(new SlashTemplate[0]);
+            Assert.IsFalse(_popup.IsVisible, "empty item list must not show popup");
+            Assert.AreEqual(0, _popup.VisibleCount);
+        }
     }
 }

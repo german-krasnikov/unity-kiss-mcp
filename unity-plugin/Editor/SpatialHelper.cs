@@ -74,7 +74,7 @@ namespace UnityMCP.Editor
             var transforms = new List<Transform>();
             if (string.IsNullOrEmpty(root) || root == "/")
             {
-                foreach (var go in Object.FindObjectsOfType<GameObject>())
+                foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
                     if (go.transform.parent == null) transforms.Add(go.transform);
             }
             else
@@ -149,7 +149,7 @@ namespace UnityMCP.Editor
             GameObject best = null;
             float bestDist = float.MaxValue;
 
-            foreach (var go in Object.FindObjectsOfType<GameObject>())
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
             {
                 if (go == from) continue;
                 if (!string.IsNullOrEmpty(componentFilter))
@@ -202,7 +202,7 @@ namespace UnityMCP.Editor
 
             var sb = new StringBuilder();
             int count = 0;
-            foreach (var go in Object.FindObjectsOfType<GameObject>())
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
             {
                 if (go == fromObj || (fromObj != null && go.transform.IsChildOf(fromObj.transform))) continue;
                 float dist = Vector3.Distance(fromPos, go.transform.position);

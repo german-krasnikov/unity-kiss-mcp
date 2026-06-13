@@ -68,6 +68,8 @@ namespace UnityMCP.Editor
                     case "MOVE":
                         step.Type = StepType.Move;
                         int toIdx = Array.FindIndex(tokens, t => t.ToUpperInvariant() == "TO");
+                        if (toIdx < 0 || toIdx + 1 >= tokens.Length)
+                            throw new ArgumentException("MOVE syntax: MOVE [path] TO x,y,z");
                         step.Path = toIdx > 1 ? tokens[1] : null;
                         var posStr = tokens[toIdx + 1];
                         var f = ValueParser.ParseFloats(posStr, 3);

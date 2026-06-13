@@ -1,0 +1,144 @@
+// CS4.test.6 + CS4.test.8 — PlaytestRunner.ResolveCharacterPath and BuildReport coverage.
+// EditMode safe. ResolveCharacterPath uses GameObject.Find (works in EditMode).
+// BuildReport is pure string logic + Time.realtimeSinceStartup + PlaytestMonitorRegistry (EditMode safe).
+using System.Collections.Generic;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace UnityMCP.Editor.Tests
+{
+    [TestFixture]
+    public class PlaytestRunnerTests
+    {
+        // ── ResolveCharacterPath ──────────────────────────────────────────────
+
+        [Test]
+        public void ResolveCharacterPath_NullConfig_NoPlayerInScene_ReturnsDefaultPlayer()
+        {
+            // No config, no scene objects → last-resort "/Player"
+            var result = PlaytestRunner.ResolveCharacterPath(null);
+            Assert.AreEqual("/Player", result);
+        }
+
+        [Test]
+        public void ResolveCharacterPath_ConfigPath_TakesPriorityOverScene()
+        {
+            // Config with characterPath="/Hero" overrides scene search
+            var config = ScriptableObject.CreateInstance<PlaytestConfig>();
+            config.characterPath = "/Hero";
+            var go = new GameObject("Player"); // scene has Player but config wins
+            try
+            {
+                var result = PlaytestRunner.ResolveCharacterPath(config);
+                Assert.AreEqual("/Hero", result);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(config);
+            }
+        }
+
+        [Test]
+        public void ResolveCharacterPath_NoConfig_PlayerInScene_ReturnsSlashPlayer()
+        {
+            var go = new GameObject("Player");
+            try
+            {
+                var result = PlaytestRunner.ResolveCharacterPath(null);
+                Assert.AreEqual("/Player", result);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void ResolveCharacterPath_NoConfig_CharacterInScene_ReturnsSlashCharacter()
+        {
+            var go = new GameObject("Character");
+            try
+            {
+                var result = PlaytestRunner.ResolveCharacterPath(null);
+                Assert.AreEqual("/Character", result);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void ResolveCharacterPath_EmptyConfigPath_FallsBackToSceneSearch()
+        {
+            var config = ScriptableObject.CreateInstance<PlaytestConfig>();
+            config.characterPath = ""; // empty — should fall through to scene search
+            var go = new GameObject("Player");
+            try
+            {
+                var result = PlaytestRunner.ResolveCharacterPath(config);
+                Assert.AreEqual("/Player", result);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(config);
+            }
+        }
+
+        // ── BuildReport ───────────────────────────────────────────────────────
+
+        [Test]
+        public void BuildReport_AllPassed_ReturnsOkCompact()
+        {
+            // No failures, no SNAPSHOT/ABORTED lines → compact "PLAYTEST: 3/3 (Xs) OK"
+            var results = new List<string>
+            {
+                "[1] ASSERT /X|C|f == 1 — PASS (1)",
+                "[2] WAIT 1s — done",
+                "[3] ASSERT /Y|C|g == 2 — PASS (2)"
+            };
+            var report = PlaytestRunner.BuildReport(results, 3, 0, Time.realtimeSinceStartup - 0.1f);
+            StringAssert.Contains("3/3", report);
+            StringAssert.Contains("OK", report);
+            // Compact form: should not contain line breaks (no detail lines)
+            Assert.IsFalse(report.Contains('\n'), $"Expected compact report, got:\n{report}");
+        }
+
+        [Test]
+        public void BuildReport_WithFail_IncludesFailLine()
+        {
+            var results = new List<string>
+            {
+                "[1] ASSERT /X|C|f == 1 — FAIL (99)"
+            };
+            var report = PlaytestRunner.BuildReport(results, 0, 1, Time.realtimeSinceStartup - 0.1f);
+            StringAssert.Contains("FAIL", report);
+            StringAssert.Contains("0/1", report);
+        }
+
+        [Test]
+        public void BuildReport_WithAborted_IncludesAbortedLine()
+        {
+            var results = new List<string>
+            {
+                "[1] ABORTED: Play Mode stopped"
+            };
+            var report = PlaytestRunner.BuildReport(results, 0, 0, Time.realtimeSinceStartup - 0.1f);
+            StringAssert.Contains("ABORTED", report);
+        }
+
+        [Test]
+        public void BuildReport_WithSnapshot_IncludesSnapshotLine()
+        {
+            var results = new List<string>
+            {
+                "[1] SNAPSHOT\nhp=100"
+            };
+            // Snapshot forces expanded format even with no failures
+            var report = PlaytestRunner.BuildReport(results, 1, 0, Time.realtimeSinceStartup - 0.1f);
+            StringAssert.Contains("SNAPSHOT", report);
+        }
+    }
+}

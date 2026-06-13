@@ -69,7 +69,7 @@ for _ in range(20):
         p.wait(timeout=30)
         assert p.returncode == 0, f"subprocess {p.pid} failed"
 
-    text = budget_path.read_text()
+    text = budget_path.read_text(encoding="utf-8")
     data = json.loads(text)  # must not raise — file integrity guaranteed
     assert isinstance(data.get("spent"), (int, float)), \
         f"corrupted: spent={data.get('spent')!r}"

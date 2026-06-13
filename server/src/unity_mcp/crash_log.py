@@ -22,8 +22,8 @@ def log_crash(exc: BaseException, *, log_dir=None) -> None:
             "msg": str(exc),
             "tb": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
         }
-        with path.open("a") as f:
-            f.write(json.dumps(entry) + "\n")
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except Exception:
         pass
 
@@ -47,11 +47,11 @@ class CrashLogger:
     def _rotate(self, max_entries: int) -> None:
         try:
             size = self._path.stat().st_size if self._path.exists() else 0
-            lines = self._path.read_text().splitlines()
+            lines = self._path.read_text(encoding="utf-8", errors="replace").splitlines()
             lines = [l for l in lines if l.strip()]
             if len(lines) >= max_entries or size > self.MAX_BYTES:
                 keep = lines[-(max_entries // 2):]
-                self._path.write_text("\n".join(keep) + "\n")
+                self._path.write_text("\n".join(keep) + "\n", encoding="utf-8")
         except Exception:
             pass
 
@@ -62,8 +62,8 @@ class CrashLogger:
             if self._path.exists() and self._path.stat().st_size > self.MAX_BYTES:
                 self._rotate(500)
             entry["t"] = time.time()
-            with self._path.open("a") as f:
-                f.write(json.dumps(entry) + "\n")
+            with self._path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception:
             pass
 

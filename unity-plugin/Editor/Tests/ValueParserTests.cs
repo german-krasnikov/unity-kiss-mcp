@@ -1,0 +1,210 @@
+// NUnit tests for ValueParser — CS2.test.2 + CS2.arch.6/CS2.test.9 (Float bug regression).
+using NUnit.Framework;
+using UnityEditor;
+using UnityEngine;
+
+namespace UnityMCP.Editor.Tests
+{
+    [TestFixture]
+    public class ValueParserTests
+    {
+        // ── ParseBool ─────────────────────────────────────────────────────────
+
+        [Test]
+        public void ParseBool_True_CaseInsensitive()
+        {
+            Assert.IsTrue(ValueParser.ParseBool("true"));
+            Assert.IsTrue(ValueParser.ParseBool("TRUE"));
+            Assert.IsTrue(ValueParser.ParseBool("True"));
+            Assert.IsTrue(ValueParser.ParseBool("1"));
+        }
+
+        [Test]
+        public void ParseBool_False_CaseInsensitive()
+        {
+            Assert.IsFalse(ValueParser.ParseBool("false"));
+            Assert.IsFalse(ValueParser.ParseBool("FALSE"));
+            Assert.IsFalse(ValueParser.ParseBool("False"));
+            Assert.IsFalse(ValueParser.ParseBool("0"));
+        }
+
+        [Test]
+        public void ParseBool_Empty_ThrowsArgumentException()
+        {
+            Assert.Throws<System.ArgumentException>(() => ValueParser.ParseBool(""));
+        }
+
+        [Test]
+        public void ParseBool_Invalid_ThrowsArgumentException()
+        {
+            Assert.Throws<System.ArgumentException>(() => ValueParser.ParseBool("yes"));
+        }
+
+        // ── ParseColor ────────────────────────────────────────────────────────
+
+        [Test]
+        public void ParseColor_HexFormat_RGBA()
+        {
+            var c = ValueParser.ParseColor("#FF0000FF");
+            Assert.AreEqual(1f, c.r, 0.01f);
+            Assert.AreEqual(0f, c.g, 0.01f);
+            Assert.AreEqual(0f, c.b, 0.01f);
+            Assert.AreEqual(1f, c.a, 0.01f);
+        }
+
+        [Test]
+        public void ParseColor_HexWithoutHash_RGB()
+        {
+            var c = ValueParser.ParseColor("00FF00");
+            Assert.AreEqual(0f, c.r, 0.01f);
+            Assert.AreEqual(1f, c.g, 0.01f);
+            Assert.AreEqual(0f, c.b, 0.01f);
+        }
+
+        [Test]
+        public void ParseColor_RgbTuple_Floats()
+        {
+            var c = ValueParser.ParseColor("(0.5, 0.25, 0.1)");
+            Assert.AreEqual(0.5f, c.r, 0.01f);
+            Assert.AreEqual(0.25f, c.g, 0.01f);
+            Assert.AreEqual(0.1f, c.b, 0.01f);
+            Assert.AreEqual(1f, c.a, 0.01f);
+        }
+
+        [Test]
+        public void ParseColor_InvalidHex_ThrowsArgumentException()
+        {
+            Assert.Throws<System.ArgumentException>(() => ValueParser.ParseColor("#ZZZZZZ"));
+        }
+
+        // ── SplitArrayValues ─────────────────────────────────────────────────
+
+        [Test]
+        public void SplitArrayValues_NestedParens_CountsCorrectly()
+        {
+            var r = ValueParser.SplitArrayValues("[(0,1),(2,3)]");
+            Assert.AreEqual(2, r.Length);
+            Assert.AreEqual("(0,1)", r[0]);
+            Assert.AreEqual("(2,3)", r[1]);
+        }
+
+        [Test]
+        public void SplitArrayValues_SimpleList_SplitsOnComma()
+        {
+            var r = ValueParser.SplitArrayValues("[a, b, c]");
+            Assert.AreEqual(3, r.Length);
+        }
+
+        [Test]
+        public void SplitArrayValues_Empty_ReturnsEmpty()
+        {
+            Assert.AreEqual(0, ValueParser.SplitArrayValues("[]").Length);
+            Assert.AreEqual(0, ValueParser.SplitArrayValues("").Length);
+        }
+
+        // ── SetPropertyValue — Float branch (CS2.arch.6 / CS2.test.9) ────────
+
+        [Test]
+        public void SetPropertyValue_Float_ValidInput_Succeeds()
+        {
+            var go = new GameObject("VP_FloatTest");
+            go.AddComponent<Light>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<Light>());
+                var prop = so.FindProperty("m_Intensity");
+                Assert.IsNotNull(prop, "m_Intensity must exist on Light");
+                ValueParser.SetPropertyValue(prop, "2.5");
+                so.ApplyModifiedProperties();
+                Assert.AreEqual(2.5f, go.GetComponent<Light>().intensity, 0.001f);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void SetPropertyValue_Float_InvalidInput_ThrowsArgumentException()
+        {
+            var go = new GameObject("VP_FloatBad");
+            go.AddComponent<Light>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<Light>());
+                var prop = so.FindProperty("m_Intensity");
+                Assert.IsNotNull(prop);
+                Assert.Throws<System.ArgumentException>(() => ValueParser.SetPropertyValue(prop, "not_a_float"));
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // ── SetPropertyValue — Integer branch ─────────────────────────────────
+
+        [Test]
+        public void SetPropertyValue_Integer_ValidInput_Succeeds()
+        {
+            var go = new GameObject("VP_IntTest");
+            go.AddComponent<Camera>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<Camera>());
+                var prop = so.FindProperty("m_CullingMask");
+                Assert.IsNotNull(prop, "m_CullingMask must exist on Camera");
+                ValueParser.SetPropertyValue(prop, "5");
+                so.ApplyModifiedProperties();
+                Assert.AreEqual(5, go.GetComponent<Camera>().cullingMask);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void SetPropertyValue_Integer_InvalidInput_ThrowsArgumentException()
+        {
+            var go = new GameObject("VP_IntBad");
+            go.AddComponent<Camera>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<Camera>());
+                var prop = so.FindProperty("m_CullingMask");
+                Assert.IsNotNull(prop);
+                Assert.Throws<System.ArgumentException>(() => ValueParser.SetPropertyValue(prop, "xyz"));
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // ── SetPropertyValue — Bool branch ────────────────────────────────────
+
+        [Test]
+        public void SetPropertyValue_Bool_SetsCorrectly()
+        {
+            var go = new GameObject("VP_BoolTest");
+            go.AddComponent<Light>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<Light>());
+                var prop = so.FindProperty("m_Enabled");
+                Assert.IsNotNull(prop, "m_Enabled must exist on Light");
+                ValueParser.SetPropertyValue(prop, "false");
+                so.ApplyModifiedProperties();
+                Assert.IsFalse(go.GetComponent<Light>().enabled);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // ── SetPropertyValue — String branch ──────────────────────────────────
+
+        [Test]
+        public void SetPropertyValue_String_SetsName()
+        {
+            var go = new GameObject("VP_StrTest");
+            try
+            {
+                var so = new SerializedObject(go);
+                var prop = so.FindProperty("m_Name");
+                Assert.IsNotNull(prop, "m_Name must exist on GameObject");
+                ValueParser.SetPropertyValue(prop, "NewName");
+                so.ApplyModifiedProperties();
+                Assert.AreEqual("NewName", go.name);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+    }
+}

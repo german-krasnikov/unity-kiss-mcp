@@ -10,16 +10,8 @@ namespace UnityMCP.Editor
         public static void Register(IMCPPlugin plugin)
         {
             if (_plugins.Any(p => p.Name == plugin.Name)) return;
-            try
-            {
-                plugin.RegisterCommands();
-                _plugins.Add(plugin);
-                UnityEngine.Debug.Log($"[MCP] Plugin registered: {plugin.Name}");
-            }
-            catch (System.Exception e)
-            {
-                UnityEngine.Debug.LogError($"[MCP] Plugin '{plugin.Name}' failed to register: {e.Message}");
-            }
+            _plugins.Add(plugin);
+            UnityEngine.Debug.Log($"[MCP] Plugin registered: {plugin.Name}");
         }
 
         public static void RegisterAllPlugins()

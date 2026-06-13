@@ -10,7 +10,7 @@ async def test_apply_template_not_found(tmp_path, mock_bridge):
     """Returns available list when template not found."""
     tdir = tmp_path / ".claude" / "templates"
     tdir.mkdir(parents=True)
-    (tdir / "other.cs").write_text("// code")
+    (tdir / "other.cs").write_text("// code", encoding="utf-8")
     with patch("unity_mcp.tools.skills.os.getcwd", return_value=str(tmp_path)):
         result = await apply_template("missing")
     assert "missing" in result
@@ -32,7 +32,7 @@ async def test_save_template_creates_file(tmp_path, mock_bridge):
         result = await save_template("level_setup", "var go = new GameObject();")
     expected = tmp_path / ".claude" / "templates" / "level_setup.cs"
     assert expected.exists()
-    assert expected.read_text() == "var go = new GameObject();"
+    assert expected.read_text(encoding="utf-8") == "var go = new GameObject();"
     assert "level_setup" in result
 
 
@@ -41,8 +41,8 @@ async def test_list_templates(tmp_path, mock_bridge):
     """Returns saved template names."""
     tdir = tmp_path / ".claude" / "templates"
     tdir.mkdir(parents=True)
-    (tdir / "level_setup.cs").write_text("// level")
-    (tdir / "arena.cs").write_text("// arena")
+    (tdir / "level_setup.cs").write_text("// level", encoding="utf-8")
+    (tdir / "arena.cs").write_text("// arena", encoding="utf-8")
     with patch("unity_mcp.tools.skills.os.getcwd", return_value=str(tmp_path)):
         result = await list_templates()
     assert "level_setup" in result
@@ -62,7 +62,7 @@ async def test_apply_template_with_params(tmp_path, mock_bridge):
     """Replaces ${key} placeholders in template code."""
     tdir = tmp_path / ".claude" / "templates"
     tdir.mkdir(parents=True)
-    (tdir / "spawn.cs").write_text("var go = new GameObject(\"${name}\"); go.transform.position = ${pos};")
+    (tdir / "spawn.cs").write_text("var go = new GameObject(\"${name}\"); go.transform.position = ${pos};", encoding="utf-8")
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
     with patch("unity_mcp.tools.skills.os.getcwd", return_value=str(tmp_path)):
         await apply_template("spawn", "name=Player,pos=(0,1,0)")
@@ -77,7 +77,7 @@ async def test_apply_template_calls_execute_code(tmp_path, mock_bridge):
     """apply_template sends execute_code command."""
     tdir = tmp_path / ".claude" / "templates"
     tdir.mkdir(parents=True)
-    (tdir / "setup.cs").write_text("return \"done\";")
+    (tdir / "setup.cs").write_text("return \"done\";", encoding="utf-8")
     mock_bridge.send.return_value = {"ok": True, "data": "done"}
     with patch("unity_mcp.tools.skills.os.getcwd", return_value=str(tmp_path)):
         result = await apply_template("setup")

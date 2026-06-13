@@ -14,6 +14,7 @@ namespace UnityMCP.Editor
         // Testable compilation state (defaults to real EditorApplication state)
         internal static Func<bool> IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
         internal static Func<bool> IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
+        internal static Func<string, bool> IsToolEnabledFn = MCPSettings.IsToolEnabled;
 
         // Feature 3: recent command history for smart checkpoint naming
         internal static readonly Queue<string> _recentCmds = new Queue<string>();
@@ -47,7 +48,7 @@ namespace UnityMCP.Editor
                 return JsonHelper.FormatResponse(id, false, null, "Play mode active — changes will be lost. Stop play mode first.");
             if (!IsPlayMode() && CommandRegistry.IsRuntime(cmd))
                 return JsonHelper.FormatResponse(id, false, null, "Not in Play Mode. Use editor(action='play') first.");
-            if (!IsAlwaysAllowed(cmd) && !MCPSettings.IsToolEnabled(cmd))
+            if (!IsAlwaysAllowed(cmd) && !IsToolEnabledFn(cmd))
                 return JsonHelper.FormatResponse(id, false, null, $"Tool '{cmd}' is disabled in settings");
             return null;
         }

@@ -77,7 +77,7 @@ namespace UnityMCP.Editor
 
         internal static GameObject FindObjectById(int instanceId)
         {
-            var obj = EditorUtility.InstanceIDToObject(instanceId);
+            var obj = EditorUtility.EntityIdToObject(instanceId);
             return obj as GameObject;
         }
 

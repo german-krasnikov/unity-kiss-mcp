@@ -16,7 +16,7 @@ def test_lesson_store_load_missing_file_empty(tmp_path):
 
 def test_lesson_store_load_corrupt_file_empty(tmp_path):
     p = tmp_path / "lessons.json"
-    p.write_text("NOT JSON{{{")
+    p.write_text("NOT JSON{{{}", encoding="utf-8")
     store = LessonStore(p)
     assert store._lessons == {}
 
@@ -45,15 +45,38 @@ def test_lesson_store_add_updates_hits_if_exists(tmp_path):
     assert store._lessons["sig1"].hits == 5
 
 
+def test_lesson_store_flush_uses_per_pid_tmp(tmp_path):
+    """flush() must write to a per-PID tmp path, not a shared bare .tmp."""
+    p = tmp_path / "lessons.json"
+    store = LessonStore(p)
+    store.add(Lesson("x1", "cmd", "pat", "err", "fix", 1, time.time()))
+
+    written_paths = []
+    original_write_text = Path.write_text
+
+    def capturing_write(self, data, *a, **kw):
+        written_paths.append(str(self))
+        return original_write_text(self, data, *a, **kw)
+
+    with patch("os.getpid", return_value=9999), \
+         patch.object(Path, "write_text", capturing_write):
+        store.flush()
+
+    # Must use PID suffix, never bare .tmp
+    assert any("9999" in p for p in written_paths), f"no PID suffix in {written_paths}"
+    assert not any(p.endswith(".tmp") and "9999" not in p for p in written_paths), \
+        f"bare .tmp used: {written_paths}"
+
+
 def test_lesson_store_atomic_write_no_corrupt(tmp_path):
     """flush() writes to tmp then renames — verify final file is valid JSON."""
     p = tmp_path / "lessons.json"
     store = LessonStore(p)
     store.add(Lesson("x1", "cmd", "pat", "err", "fix", 1, time.time()))
     store.flush()
-    assert json.loads(p.read_text())  # valid JSON
+    assert json.loads(p.read_text(encoding="utf-8"))  # valid JSON
     # Compact contract: no pretty-print newlines after the opening brace
-    content = p.read_text()
+    content = p.read_text(encoding="utf-8")
     assert '\n' not in content.split('{')[1][:10], "lessons.json must be compact (no indent=2)"
 
 

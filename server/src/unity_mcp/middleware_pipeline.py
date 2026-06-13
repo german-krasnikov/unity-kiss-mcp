@@ -37,6 +37,9 @@ def wrap_send(send_fn, mw: Optional["Middleware"] = None):
         if mw._prefetch_cache is not None and cmd in _READ_CACHEABLE:
             _pre_cached = mw._prefetch_cache.get(cmd, args)
             if _pre_cached is not None:
+                # Cache hit while HALF_OPEN: evidence system is healthy → heal circuit
+                if mw.circuit.state == mw.circuit.HALF_OPEN:
+                    mw.circuit.record_success()
                 if _pre_cached.startswith("[CACHED:"):
                     return _pre_cached
                 return f"[CACHED]\n{_pre_cached}"
@@ -50,7 +53,7 @@ def wrap_send(send_fn, mw: Optional["Middleware"] = None):
 
         def _early_return(val):
             if _probe_active:
-                mw.circuit.release_probe()
+                mw.circuit.record_success()
             return val
 
         # Play mode auto-routing

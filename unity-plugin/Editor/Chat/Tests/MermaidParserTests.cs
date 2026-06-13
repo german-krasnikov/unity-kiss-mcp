@@ -149,5 +149,28 @@ namespace UnityMCP.Editor.Chat.Tests
             var g = MermaidParser.TryParse(new[] { "graph TD", "A-->|Hello<br/>World|B" });
             Assert.AreEqual("Hello\nWorld", g.Edges[0].Label);
         }
+
+        // ── CH5.test.4: A-- text -->B inline-edge-text path ──────────────────
+
+        [Test]
+        public void InlineEdgeText_DashTextDash_Parsed()
+        {
+            // "A-- text -->B" style: inline text between dashes, no pipe syntax
+            var g = MermaidParser.TryParse(new[] { "graph TD", "A-- yes -->B" });
+            Assert.IsNotNull(g);
+            Assert.AreEqual(1, g.Edges.Count, "must parse exactly one edge");
+            Assert.AreEqual("A", g.Edges[0].From);
+            Assert.AreEqual("B", g.Edges[0].To);
+        }
+
+        [Test]
+        public void InlineEdgeText_DashTextDash_NodeIdCorrectlyStripped()
+        {
+            // The 'A' segment in "A-- text -->" must be extracted as node id 'A', not 'A-- text'
+            var g = MermaidParser.TryParse(new[] { "graph TD", "Start-- check -->End" });
+            Assert.IsNotNull(g);
+            Assert.AreEqual("Start", g.Edges[0].From);
+            Assert.AreEqual("End",   g.Edges[0].To);
+        }
     }
 }

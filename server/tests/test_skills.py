@@ -20,13 +20,13 @@ async def test_save_skill_creates_file(skills_dir):
     assert result == "Skill saved: test_skill — Does something"
     path = skills_dir / "test_skill.json"
     assert path.exists()
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     assert data["name"] == "test_skill"
     assert data["description"] == "Does something"
     assert data["code"] == "var go = new GameObject();"
     assert data["used_count"] == 0
     # Compact contract: skill file must be a single line (no embedded newlines in JSON)
-    content = (skills_dir / "test_skill.json").read_text()
+    content = (skills_dir / "test_skill.json").read_text(encoding="utf-8")
     assert content.count('\n') == 0, "skill JSON must be compact (no indent=2)"
 
 
@@ -83,7 +83,7 @@ async def test_use_skill_increments_count(skills_dir, mock_bridge):
     await use_skill("countable")
     await use_skill("countable")
     path = skills_dir / "countable.json"
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     assert data["used_count"] == 2
 
 
@@ -100,14 +100,14 @@ async def test_use_skill_param_substitution(skills_dir, mock_bridge):
 @pytest.mark.asyncio
 async def test_save_skill_stores_kind_csharp(skills_dir):
     await save_skill("cs_skill", "Does C#", "UnityEditor.AssetDatabase.Refresh();")
-    data = json.loads((skills_dir / "cs_skill.json").read_text())
+    data = json.loads((skills_dir / "cs_skill.json").read_text(encoding="utf-8"))
     assert data["kind"] == "csharp"
 
 
 @pytest.mark.asyncio
 async def test_save_skill_stores_kind_batch(skills_dir):
     await save_skill("batch_skill2", "Does batch", "set_property path=Cube pos=1,2,3")
-    data = json.loads((skills_dir / "batch_skill2.json").read_text())
+    data = json.loads((skills_dir / "batch_skill2.json").read_text(encoding="utf-8"))
     assert data["kind"] == "batch"
 
 
@@ -122,7 +122,7 @@ async def test_use_skill_routes_by_stored_kind_not_heuristic(skills_dir, mock_br
         "created": "2026-01-01 00:00", "used_count": 0,
     }
     skills_dir.mkdir(exist_ok=True)
-    (skills_dir / "tricky.json").write_text(json.dumps(skill_data))
+    (skills_dir / "tricky.json").write_text(json.dumps(skill_data), encoding="utf-8")
     await use_skill("tricky")
     call_args = mock_bridge.send.call_args[0]
     assert call_args[0] == "execute_code"

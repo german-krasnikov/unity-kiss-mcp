@@ -29,12 +29,12 @@ class CostTracker:
             with _filelocked(self._path):
                 if not self._path.exists():
                     return {}
-                text = self._path.read_text()
+                text = self._path.read_text(encoding="utf-8")
             data = json.loads(text)
             if not isinstance(data.get("spent"), (int, float, type(None))):
                 return {}
             return data
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
             return {}
 
     def _save(self) -> "tuple[bool, str]":
@@ -46,7 +46,7 @@ class CostTracker:
                 # NOTE: if process crashes between write and os.replace, ~/.unity-mcp/budget.tmp.<PID>
                 # orphans. Cleanup intentionally omitted — files are small and rare. Manual cleanup OK.
                 tmp = self._path.with_suffix(f".tmp.{os.getpid()}")
-                tmp.write_text(json.dumps(self._daily_state))
+                tmp.write_text(json.dumps(self._daily_state, ensure_ascii=False), encoding="utf-8")
                 os.replace(tmp, self._path)
             return (True, "")
         except OSError as e:

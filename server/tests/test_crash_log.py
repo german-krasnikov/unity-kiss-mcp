@@ -24,7 +24,7 @@ def test_log_disconnect_writes_jsonl(tmp_path):
     logger = CrashLogger(log_dir=tmp_path)
     logger.log_disconnect(cmd="set_property", retry=0, error_type="ConnectionError",
                           unity_busy=False, port=9500)
-    lines = (tmp_path / "crash.jsonl").read_text().strip().splitlines()
+    lines = (tmp_path / "crash.jsonl").read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
     entry = json.loads(lines[0])
     assert entry["ev"] == "disconnect"
@@ -38,7 +38,7 @@ def test_log_disconnect_writes_jsonl(tmp_path):
 def test_log_reconnect_writes_jsonl(tmp_path):
     logger = CrashLogger(log_dir=tmp_path)
     logger.log_reconnect(outage_s=6.66, retries=2, port=9500)
-    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
+    entry = json.loads((tmp_path / "crash.jsonl").read_text(encoding="utf-8").strip())
     assert entry["ev"] == "reconnect"
     assert abs(entry["outage_s"] - 6.66) < 0.01
     assert entry["retries"] == 2
@@ -50,7 +50,7 @@ def test_entries_have_timestamp(tmp_path):
     logger = CrashLogger(log_dir=tmp_path)
     logger.log_disconnect(cmd="x", retry=0, error_type="E", unity_busy=False, port=9500)
     after = time.time()
-    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
+    entry = json.loads((tmp_path / "crash.jsonl").read_text(encoding="utf-8").strip())
     assert before - 1 <= entry["t"] <= after + 1
 
 
@@ -58,20 +58,20 @@ def test_rotation_truncates_on_init(tmp_path):
     log_file = tmp_path / "crash.jsonl"
     # Write 600 lines
     lines = [json.dumps({"ev": "disconnect", "i": i}) for i in range(600)]
-    log_file.write_text("\n".join(lines) + "\n")
+    log_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     logger = CrashLogger(log_dir=tmp_path, max_entries=500)
-    count = len(log_file.read_text().strip().splitlines())
+    count = len(log_file.read_text(encoding="utf-8").strip().splitlines())
     assert count == 250  # max_entries // 2
 
 
 def test_no_rotation_under_limit(tmp_path):
     log_file = tmp_path / "crash.jsonl"
     lines = [json.dumps({"ev": "disconnect", "i": i}) for i in range(100)]
-    log_file.write_text("\n".join(lines) + "\n")
+    log_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     CrashLogger(log_dir=tmp_path, max_entries=500)
-    count = len(log_file.read_text().strip().splitlines())
+    count = len(log_file.read_text(encoding="utf-8").strip().splitlines())
     assert count == 100
 
 
@@ -124,7 +124,7 @@ def test_log_crash_writes_ev_crash(tmp_path):
     """T1: log_crash writes ev=crash entry to crash.jsonl."""
     exc = RuntimeError("boom")
     log_crash(exc, log_dir=tmp_path)
-    lines = (tmp_path / "crash.jsonl").read_text().strip().splitlines()
+    lines = (tmp_path / "crash.jsonl").read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
     entry = json.loads(lines[0])
     assert entry["ev"] == "crash"
@@ -138,7 +138,7 @@ def test_log_crash_includes_traceback(tmp_path):
         raise ValueError("trace me")
     except ValueError as exc:
         log_crash(exc, log_dir=tmp_path)
-    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
+    entry = json.loads((tmp_path / "crash.jsonl").read_text(encoding="utf-8").strip())
     assert "tb" in entry
     assert "ValueError" in entry["tb"]
 
@@ -148,7 +148,7 @@ def test_log_crash_includes_timestamp(tmp_path):
     before = time.time()
     log_crash(RuntimeError("ts"), log_dir=tmp_path)
     after = time.time()
-    entry = json.loads((tmp_path / "crash.jsonl").read_text().strip())
+    entry = json.loads((tmp_path / "crash.jsonl").read_text(encoding="utf-8").strip())
     assert before - 1 <= entry["t"] <= after + 1
 
 
@@ -170,7 +170,7 @@ def test_log_crash_appends_preserves_existing(tmp_path):
     """T6: log_crash appends — existing entries preserved."""
     log_crash(RuntimeError("first"), log_dir=tmp_path)
     log_crash(RuntimeError("second"), log_dir=tmp_path)
-    lines = (tmp_path / "crash.jsonl").read_text().strip().splitlines()
+    lines = (tmp_path / "crash.jsonl").read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 2
     assert json.loads(lines[0])["msg"] == "first"
     assert json.loads(lines[1])["msg"] == "second"

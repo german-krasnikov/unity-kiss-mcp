@@ -11,7 +11,7 @@ namespace UnityMCP.Editor.Chat.Tests
     {
         // F1: v6 roundtrip — full-path payload preserved verbatim (paths + bracket block).
         [Test]
-        public void F1_V6_RoundTrip_PayloadPreserved()
+        public void Serialize_LlmPayload_RoundTripsCleanly()
         {
             var payload = "look at @/Env/Player\n[hierarchy:/Env/Player#1234]";
             var orig = new PendingTurnState(
@@ -27,7 +27,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F2: payload independent of display text — both survive distinctly.
         [Test]
-        public void F2_PayloadDistinctFromDisplayText()
+        public void LlmPayload_IndependentOfDisplayText_BothPreserved()
         {
             var orig = new PendingTurnState(
                 "s", "@Player hi", new[] { "/Env/Player" },
@@ -43,7 +43,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F3: null payload in ctor → serializes as empty, deserializes to "".
         [Test]
-        public void F3_NullPayload_SerializesAsEmpty()
+        public void NullLlmPayload_SerializesAsEmptyString()
         {
             var orig = new PendingTurnState(
                 "s", "t", new[] { "/A" },
@@ -57,7 +57,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F4: BACKWARD-COMPAT — a v5 blob (no payload field) deserializes with empty payload, no crash.
         [Test]
-        public void F4_V5Blob_NoPayloadField_FallsBackToEmpty()
+        public void Deserialize_LegacyV5Blob_LlmPayloadDefaultsToEmpty()
         {
             // Build a v5 blob, then strip the trailing header field to simulate pre-v6 persisted state.
             var v6 = new PendingTurnState(
@@ -83,7 +83,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F5: payload with embedded newlines survives (base64-encoded, line format safe).
         [Test]
-        public void F5_MultilinePayload_SurvivesRoundTrip()
+        public void MultilinePayload_SurvivesRoundTrip()
         {
             var payload = "line1 @/X\nline2\n[hierarchy:/X#9]\n[component:/X/Rb#9]";
             var orig = new PendingTurnState(
@@ -98,7 +98,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // F6: regression — every other v5 field still round-trips with the new field present.
         [Test]
-        public void F6_AllPriorFieldsUnchanged()
+        public void AllPriorFields_UnchangedAfterAddingLlmPayload()
         {
             var orig = new PendingTurnState(
                 "sess-xyz", "hello world", new[] { "/P", "/E" },

@@ -9,7 +9,7 @@ import socket
 from pathlib import Path
 
 from .tools.gating import filter_by_tier, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
-from .tools.schema_registry import _registry as _schema_registry
+from .tools.schema_registry import _registry as _schema_registry, STUB_SCHEMA
 
 # Core tools keep full schemas; all others get stub schema on ListTools.
 _SCHEMA_KEEP_FULL: frozenset[str] = _CORE_TOOLS
@@ -32,8 +32,7 @@ def _strip_deferred_schemas(tools: list) -> list:
         return tools
     for t in tools:
         if t.name not in _SCHEMA_KEEP_FULL:
-            # Fresh dict per tool — avoids shared-singleton mutation bugs
-            t.inputSchema = {"type": "object"}
+            t.inputSchema = STUB_SCHEMA
     return tools
 
 
@@ -49,6 +48,7 @@ async def push_catalog(bridge_) -> None:
         catalog_str = "\n".join(
             f"{cat}:{','.join(tools)}"
             for cat, tools in categories.items()
+            if tools
         )
         await bridge_.send("set_tool_catalog", {"catalog": catalog_str}, timeout=5.0)
     except Exception:
@@ -91,7 +91,7 @@ def read_unity_port() -> int:
     candidates = []
     for f in ports_dir.glob("*.port"):
         try:
-            lines = f.read_text().strip().split("\n")
+            lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
             port = int(lines[0])
             pid = int(f.stem)
             os.kill(pid, 0)
@@ -103,7 +103,7 @@ def read_unity_port() -> int:
         except PermissionError:
             # Process alive but owned by another user — keep as candidate
             try:
-                lines = f.read_text().strip().split("\n")
+                lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
                 port = int(lines[0])
                 if not _tcp_probe(port):
                     continue

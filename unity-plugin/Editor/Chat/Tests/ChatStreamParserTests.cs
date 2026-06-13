@@ -301,6 +301,69 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("toolu_xyz", sink[0].ToolId);
         }
 
+        // ── CH2.test.2: ParseContentBlockStart returns null for non-tool_use blocks ──
+
+        [Test]
+        public void ParseLine_ContentBlockStart_TextType_ReturnsNull()
+        {
+            // type='text' content_block_start must return null (not a ToolStart)
+            const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"text\"}}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNull(result, "content_block_start with type='text' must return null");
+        }
+
+        [Test]
+        public void ParseLine_ContentBlockStart_UnknownType_ReturnsNull()
+        {
+            const string line = "{\"type\":\"stream_event\",\"event\":{\"type\":\"content_block_start\",\"content_block\":{\"type\":\"thinking\"}}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNull(result, "content_block_start with unknown type must return null");
+        }
+
+        [Test]
+        public void ParseLine_SystemInitNoSubtype_ReturnsNull()
+        {
+            // system event with unknown subtype must return null (not SessionInit)
+            const string line = "{\"type\":\"system\",\"subtype\":\"unknown_event\",\"data\":{}}";
+            var result = ChatStreamParser.ParseLine(line);
+            Assert.IsNull(result, "system event with unknown subtype must return null");
+        }
+
+        // ── CH2.test.3: ParseAll skips non-tool_result items in mixed array ──────
+
+        [Test]
+        public void ParseAll_MixedContentArray_SkipsNonToolResult()
+        {
+            // Content array has text item first, then a tool_result — only the latter must emit
+            const string line =
+                "{\"type\":\"user\",\"message\":{\"content\":[" +
+                "{\"type\":\"text\",\"text\":\"some context\"}," +
+                "{\"type\":\"tool_result\",\"tool_use_id\":\"id_x\",\"content\":\"output\"}" +
+                "]}}";
+
+            var sink = new List<ChatEvent>();
+            ChatStreamParser.ParseInto(line, sink);
+
+            Assert.AreEqual(1, sink.Count, "must emit only the tool_result item, skipping text");
+            Assert.AreEqual(ChatEventKind.ToolResult, sink[0].Kind);
+            Assert.AreEqual("id_x", sink[0].ToolId);
+        }
+
+        [Test]
+        public void ParseAll_ArrayWithNoToolResult_EmitsNothing()
+        {
+            const string line =
+                "{\"type\":\"user\",\"message\":{\"content\":[" +
+                "{\"type\":\"text\",\"text\":\"just text\"}," +
+                "{\"type\":\"image\",\"source\":{}}" +
+                "]}}";
+
+            var sink = new List<ChatEvent>();
+            ChatStreamParser.ParseInto(line, sink);
+
+            Assert.AreEqual(0, sink.Count, "no tool_result → must emit nothing");
+        }
+
         // ── string content starting with '[' must NOT be parsed as array ─────────
 
         [Test]

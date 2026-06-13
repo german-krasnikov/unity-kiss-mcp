@@ -12,9 +12,11 @@ HIGH_BLAST_CMDS = {"delete_object", "scene", "batch"}
 
 
 class ProactiveWatchdog:
-    def __init__(self, send_fn: Callable, *, interval: int = 5):
+    def __init__(self, send_fn: Callable, *, interval: int = 5,
+                 budget_gate: Callable[[], bool] = lambda: True):
         self._send = send_fn
         self.interval = interval
+        self._budget_gate = budget_gate
         self._counter: int = 0
         self._pending_alert: Optional[str] = None
         self._last_alert_hash: Optional[int] = None
@@ -28,6 +30,8 @@ class ProactiveWatchdog:
         self._counter += 1
         if self._counter >= threshold:
             self._counter = 0
+            if not self._budget_gate():
+                return
             if self._task is None or self._task.done():
                 try:
                     self._task = asyncio.get_running_loop().create_task(self._scan())

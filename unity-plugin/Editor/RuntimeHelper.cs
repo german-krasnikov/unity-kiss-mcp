@@ -138,12 +138,22 @@ namespace UnityMCP.Editor
             EditorApplication.update += Tick;
         }
 
-        public static void MoveTo(string path, string args, float timeout, TaskCompletionSource<string> tcs)
+        public static void MoveTo(string path, string args, float timeout, TaskCompletionSource<string> tcs,
+            PlaytestConfig config = null)
         {
             var go = ComponentSerializer.FindObject(path);
             if (go == null) { tcs.TrySetResult($"Error: '{path}' not found"); return; }
 
-            var moveComp = FindMoveComponent(go);
+            // Load config once — avoids 2-3 redundant AssetDatabase.FindAssets calls per move
+            if (config == null)
+            {
+                var guids = UnityEditor.AssetDatabase.FindAssets("t:PlaytestConfig");
+                if (guids.Length > 0)
+                    config = UnityEditor.AssetDatabase.LoadAssetAtPath<PlaytestConfig>(
+                        UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]));
+            }
+
+            var moveComp = FindMoveComponent(go, config);
             if (moveComp == null) { tcs.TrySetResult($"Error: no movement component found on '{path}'"); return; }
             var comp = moveComp;
 
@@ -153,7 +163,7 @@ namespace UnityMCP.Editor
             var floats = ValueParser.ParseFloats(args, 3);
             var target = new Vector3(floats[0], floats[1], floats[2]);
 
-            var moveName = GetConfiguredMoveMethod();
+            var moveName = GetConfiguredMoveMethod(config);
             if (string.IsNullOrEmpty(moveName))
                 moveName = comp.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
                     .FirstOrDefault(m => m.GetParameters().Length == 2
@@ -259,16 +269,10 @@ namespace UnityMCP.Editor
         internal static Component FindComponentInternal(GameObject go, string typeName) => FindComponent(go, typeName);
         internal static string ReadFieldInternal(Component comp, string fieldName) => ReadField(comp, fieldName);
 
-        private static Component FindMoveComponent(GameObject go)
+        private static Component FindMoveComponent(GameObject go, PlaytestConfig config)
         {
-            var guids = UnityEditor.AssetDatabase.FindAssets("t:PlaytestConfig");
-            if (guids.Length > 0)
-            {
-                var config = UnityEditor.AssetDatabase.LoadAssetAtPath<PlaytestConfig>(
-                    UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]));
-                if (config != null && !string.IsNullOrEmpty(config.moveComponent))
-                    return FindComponent(go, config.moveComponent);
-            }
+            if (config != null && !string.IsNullOrEmpty(config.moveComponent))
+                return FindComponent(go, config.moveComponent);
             // Fallback: find any component with a method matching (Vector3, Action<bool>) signature
             return go.GetComponents<Component>()
                 .FirstOrDefault(c => c != null && c.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance)
@@ -277,17 +281,9 @@ namespace UnityMCP.Editor
                         && m.GetParameters()[1].ParameterType == typeof(Action<bool>)));
         }
 
-        private static string GetConfiguredMoveMethod()
+        private static string GetConfiguredMoveMethod(PlaytestConfig config)
         {
-            var guids = UnityEditor.AssetDatabase.FindAssets("t:PlaytestConfig");
-            if (guids.Length > 0)
-            {
-                var config = UnityEditor.AssetDatabase.LoadAssetAtPath<PlaytestConfig>(
-                    UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]));
-                if (config != null && !string.IsNullOrEmpty(config.moveMethod))
-                    return config.moveMethod;
-            }
-            return null;
+            return config != null && !string.IsNullOrEmpty(config.moveMethod) ? config.moveMethod : null;
         }
 
         private static Component FindComponent(GameObject go, string typeName)

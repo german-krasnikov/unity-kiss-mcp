@@ -135,7 +135,7 @@ def test_batch_allows_invoke_method():
     import re
     from pathlib import Path
     path = str(Path(__file__).parents[2] / "unity-plugin" / "Editor" / "BatchHelper.cs")
-    src = open(path).read()
+    src = open(path, encoding="utf-8").read()
     # Find the async-blocklist condition line
     match = re.search(r'if \(cmd == "wait_until"[^)]+\)', src)
     assert match, "async blocklist line not found"
@@ -147,7 +147,7 @@ def test_batch_blocks_run_playtest():
     import re
     from pathlib import Path
     path = str(Path(__file__).parents[2] / "unity-plugin" / "Editor" / "BatchHelper.cs")
-    src = open(path).read()
+    src = open(path, encoding="utf-8").read()
     match = re.search(r'if \(cmd == "wait_until"[^)]+\)', src)
     assert match, "async blocklist line not found"
     assert "run_playtest" in match.group(), "run_playtest must be in async blocklist"
@@ -321,3 +321,53 @@ def test_list_connections_survives_filter_when_disabled_cache_cold():
     tool = _make_tool("list_connections")
     result = gating.filter_by_tier([tool])
     assert result == [tool], "list_connections must survive filter_by_tier with cold session"
+
+
+# --- TDD audit PY3.test.1/2 + PY2.arch.2: themed tools hidden by default ---
+
+def test_themed_tools_hidden_by_default():
+    """get_test_results, object_diff, set_llm_config, transfer_object are in _THEMED_CATEGORIES
+    but must be in _ALL_KNOWN so filter_by_tier gates them (not passes as unknown plugins)."""
+    from unity_mcp.tools import gating
+    gating.reset()
+    for name in ["get_test_results", "object_diff", "set_llm_config", "transfer_object"]:
+        tool = _make_tool(name)
+        result = gating.filter_by_tier([tool])
+        assert result == [], f"{name} must be gated (hidden) by default, not pass as unknown plugin"
+
+
+def test_orphaned_tools_are_in_ALL_KNOWN():
+    """Themed tools must be in _ALL_KNOWN so is_deferred() and filter_by_tier work correctly."""
+    from unity_mcp.tools.gating import _ALL_KNOWN
+    for name in ["get_test_results", "object_diff", "set_llm_config", "transfer_object"]:
+        assert name in _ALL_KNOWN, f"{name} must be in _ALL_KNOWN"
+
+
+# --- TDD audit PY3.test.3: resolve_tool_schema ---
+
+def test_resolve_tool_schema_in_ALL_KNOWN():
+    """resolve_tool_schema is FORCE_VISIBLE + _CORE_TOOLS; must also be in _ALL_KNOWN
+    so filter_by_tier exercises is_visible/FORCE_VISIBLE path, not unknown-plugin passthrough."""
+    from unity_mcp.tools.gating import _ALL_KNOWN
+    assert "resolve_tool_schema" in _ALL_KNOWN
+
+
+def test_resolve_tool_schema_survives_filter():
+    """resolve_tool_schema passes filter_by_tier via FORCE_VISIBLE, not unknown passthrough."""
+    from unity_mcp.tools import gating
+    gating.reset()
+    tool = _make_tool("resolve_tool_schema")
+    assert gating.filter_by_tier([tool]) == [tool]
+
+
+# --- TDD audit X5.cross.2: disabled_set overrides session enable ---
+
+def test_filter_tools_disabled_set_overrides_session_enable():
+    """enable_category('animation') + disabled={'animation'} → animation tool is hidden."""
+    from unity_mcp.tools import gating
+    from unity_mcp.server_filtering import filter_tools
+    gating.reset()
+    gating.enable_category("animation")
+    tool = _make_tool("animation")
+    result = filter_tools([tool], {"animation"})
+    assert result == [], "disabled set must suppress session-enabled tools"

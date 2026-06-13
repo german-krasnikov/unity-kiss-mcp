@@ -115,7 +115,12 @@ TIER1: set[str] = {
 }
 
 # All known tool names across all tiers
-_ALL_KNOWN: set[str] = TIER1 | {n for s in CATEGORIES.values() for n in s}
+_ALL_KNOWN: set[str] = (
+    TIER1
+    | {n for s in CATEGORIES.values() for n in s}
+    | {n for s in _THEMED_CATEGORIES.values() for n in s}
+    | _CORE_TOOLS
+)
 
 _session_enabled: set[str] = set()
 

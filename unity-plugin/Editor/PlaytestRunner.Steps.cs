@@ -60,7 +60,7 @@ namespace UnityMCP.Editor
                     phase = Phase.Moving;
                     var charPath = step.Path ?? ResolveCharacterPath(config);
                     _moveTcs = new TaskCompletionSource<string>();
-                    RuntimeHelper.MoveTo(charPath, $"{step.Position.x},{step.Position.y},{step.Position.z}", 15f, _moveTcs);
+                    RuntimeHelper.MoveTo(charPath, $"{step.Position.x},{step.Position.y},{step.Position.z}", 15f, _moveTcs, config);
                     break;
 
                 case StepType.Snapshot:

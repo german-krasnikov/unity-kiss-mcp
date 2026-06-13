@@ -101,6 +101,35 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("/found/codex", result);
         }
 
+        // CH1.arch.3: per-binary negative cache — arbitrary binary must not re-probe (fix test)
+        [Test]
+        public void Resolve_Codex_NegativeCache_DoesNotReprobe()
+        {
+            var callCount = 0;
+            ChatBinaryResolver.WhichOverride = _ => { callCount++; return null; };
+
+            ChatBinaryResolver.Resolve("codex"); // first probe → callCount==1
+            ChatBinaryResolver.Resolve("codex"); // must hit cache → callCount stays 1
+
+            Assert.AreEqual(1, callCount, "WhichOverride must only be called once for the same binary (negative cache)");
+        }
+
+        [Test]
+        public void Resolve_DifferentBinaries_ProbeEachOnce()
+        {
+            var calls = new System.Collections.Generic.List<string>();
+            ChatBinaryResolver.WhichOverride = b => { calls.Add(b); return null; };
+
+            ChatBinaryResolver.Resolve("codex");
+            ChatBinaryResolver.Resolve("codex"); // should not re-probe
+            ChatBinaryResolver.Resolve("uv");
+            ChatBinaryResolver.Resolve("uv");    // should not re-probe
+
+            Assert.AreEqual(2, calls.Count, "two distinct binaries must each be probed exactly once");
+            CollectionAssert.Contains(calls, "codex");
+            CollectionAssert.Contains(calls, "uv");
+        }
+
         // ── PickWindowsPath ───────────────────────────────────────────────────
 
         [Test]

@@ -1,5 +1,18 @@
+import importlib
+import subprocess
+import sys
 import pytest
 from unittest.mock import AsyncMock, Mock, patch
+
+
+def test_server_filtering_importable_in_isolation():
+    """server_filtering must import without circular ImportError (PY2.arch.1)."""
+    venv_python = sys.executable
+    result = subprocess.run(
+        [venv_python, "-c", "import unity_mcp.server_filtering"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, f"Circular import: {result.stderr}"
 
 
 @pytest.mark.asyncio
@@ -19,9 +32,9 @@ async def test_reconnect_unity(mock_bridge):
 
 @pytest.mark.asyncio
 async def test_reconnect_unity_auto_discovers(mock_bridge):
-    """reconnect_unity(0) auto-discovers port via read_unity_port."""
+    """reconnect_unity(0) auto-discovers port via read_unity_port (lazy import)."""
     from unity_mcp.tools.connection import reconnect_unity
-    with patch("unity_mcp.tools.connection.read_unity_port", return_value=9501) as mock_disc:
+    with patch("unity_mcp.server_filtering.read_unity_port", return_value=9501) as mock_disc:
         result = await reconnect_unity(0)
     mock_disc.assert_called_once()
     assert result is not None

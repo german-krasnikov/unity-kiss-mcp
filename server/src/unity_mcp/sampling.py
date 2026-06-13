@@ -84,7 +84,7 @@ class SamplingService:
         try:
             with METRICS.timer("sampling.latency_ms"):
                 stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-            result = stdout.decode().strip() or None
+            result = stdout.decode("utf-8", errors="replace").strip() or None  # utf-8 contract; covered by integration tests, not unit
             if result:
                 METRICS.inc("sampling.success")
                 est_in = sum(len(a) for a in args if isinstance(a, str)) // 4

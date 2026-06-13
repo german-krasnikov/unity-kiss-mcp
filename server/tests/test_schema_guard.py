@@ -419,3 +419,75 @@ async def test_exception_fail_open():
     )
     assert result is None
     assert METRICS._counters.get("validate.error", 0) == before + 1
+
+
+# ── PY3.test.4: _validate_set_property early-exit branches ───────────────────
+
+@pytest.mark.asyncio
+async def test_dollar_path_skips_validation():
+    """path='$obj' → skip validation, no TCP call."""
+    mw, cache, guard = make_guard()
+    mw._component_cache["$obj"] = {"Health"}
+    result = await guard.validate(
+        "set_property",
+        {"path": "$obj", "component": "Health", "prop": "hpp", "value": "1"},
+        None,  # send_fn=None proves no TCP call attempted
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_m_prefix_prop_skipped():
+    """prop='m_LocalPosition' → skip validation (Unity internal field)."""
+    mw, cache, guard = make_guard()
+    mw._component_cache["/Player"] = {"Transform"}
+    result = await guard.validate(
+        "set_property",
+        {"path": "/Player", "component": "Transform", "prop": "m_LocalPosition", "value": "0,0,0"},
+        None,  # send_fn=None proves no TCP call attempted
+    )
+    assert result is None
+
+
+# ── PY3.test.5: wire_event early-exit branches ───────────────────────────────
+
+@pytest.mark.asyncio
+async def test_wire_event_missing_target_path():
+    """wire_event without target_path → None (early exit, no TCP)."""
+    mw, cache, guard = make_guard()
+    result = await guard.validate(
+        "wire_event",
+        {"target_component": "ButtonHandler"},
+        None,
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_wire_event_missing_target_component():
+    """wire_event without target_component → None (early exit, no TCP)."""
+    mw, cache, guard = make_guard()
+    result = await guard.validate(
+        "wire_event",
+        {"target_path": "/Button"},
+        None,
+    )
+    assert result is None
+
+
+# ── PY3.test.6: wire_event invalid component blocked ─────────────────────────
+
+@pytest.mark.asyncio
+async def test_wire_event_invalid_component_blocked():
+    """wire_event with typo in target_component (lev≤2) → block envelope."""
+    mw, cache, guard = make_guard()
+    mw._component_cache["/Button"] = {"ButtonHandler"}
+    result = await guard.validate(
+        "wire_event",
+        {"target_path": "/Button", "target_component": "ButtonHandlr"},  # lev=1
+        fake_send,
+    )
+    assert result is not None
+    assert "[INVALID:" in result
+    assert "ButtonHandler" in result
+    assert "[BYPASS:" in result

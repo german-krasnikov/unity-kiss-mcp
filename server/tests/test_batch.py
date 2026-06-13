@@ -152,6 +152,15 @@ async def test_batch_empty_commands_list(mock_bridge, bridge_response):
 
 
 @pytest.mark.asyncio
+async def test_batch_minimum_timeout_clamped_to_1000ms(mock_bridge, bridge_response):
+    """timeout<=6.0 clamps timeout_ms to 1000 (minimum floor)."""
+    bridge_response(data="[0] ok")
+    await batch(commands="x", timeout=5.0)
+    call_args = mock_bridge.send.call_args[0]
+    assert call_args[1]["timeout_ms"] == 1000  # max(1000, (5-5)*1000) = max(1000, 0) = 1000
+
+
+@pytest.mark.asyncio
 async def test_validate_references_ignore_optional_sent(mock_bridge):
     """validate_references with ignore_optional=True sends ignore_optional flag."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "0 ERROR, 3 OK"})

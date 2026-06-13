@@ -121,7 +121,7 @@ def test_metrics_jsonl_enabled_writes_file(tmp_path, monkeypatch):
     m._close()
     log = tmp_path / "metrics.jsonl"
     assert log.exists()
-    content = log.read_text()
+    content = log.read_text(encoding="utf-8")
     assert "test_event" in content
     assert "bar" in content
 

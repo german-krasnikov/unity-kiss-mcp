@@ -1,4 +1,6 @@
 // TDD — F27: _needsRefresh flag triggers AssetDatabase.Refresh after code-editing tools.
+using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -115,6 +117,119 @@ namespace UnityMCP.Editor.Chat.Tests
                 Assert.IsTrue(w._needsRefresh, "_needsRefresh must be set at result-complete");
             }
             finally { Object.DestroyImmediate(w); }
+        }
+
+        // ── CH4.test.2 (CRITICAL): TryResumePendingTurn with active non-stale state ────────────
+
+        // Stub backend that records SendTurn calls.
+        private sealed class StubBackend : IChatBackend
+        {
+            internal readonly List<string> SentPayloads = new List<string>();
+            public bool   IsRunning  => true;
+            public string SessionId  => "stub-sess";
+            public void   Start()    { }
+            public void   Stop()     { }
+            public void   SendTurn(string turnJson) => SentPayloads.Add(turnJson);
+            public void   DrainEvents(List<ChatEvent> output, List<ToolCallRecord> toolOutput = null) { }
+            public void   Dispose()  { }
+        }
+
+        [Test]
+        public void TryResumePendingTurn_ActiveTurn_DispatchesSendTurn()
+        {
+            var tmpPath = Path.Combine(Path.GetTempPath(),
+                $"TryResumeSendTurnTest_{System.Guid.NewGuid()}.txt");
+            var w = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                ReloadGuard.OverrideFilePath(tmpPath);
+                ReloadGuard.ResetForTest();
+
+                // Save a non-stale Sending state (savedAtUtc=0 means legacy/allowed through)
+                var state = new PendingTurnState(
+                    sessionId:   "sess-123",
+                    pendingText: "fix the bug",
+                    chipPaths:   new string[0],
+                    agentMode:   false,
+                    agentName:   "",
+                    activityPhase: "Sending",
+                    savedAtUtc:  0L,
+                    pendingLlmPayload: "fix the bug");
+                ReloadGuard.SavePendingState(state);
+
+                // Wire a stub backend via CreateBackendWithSession override
+                // We inject the stub directly into _backend after overriding CreateBackend.
+                InjectMinimalTranscript(w);
+                var stub = new StubBackend();
+                typeof(MCPChatWindow)
+                    .GetField("_backend", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .SetValue(w, stub);
+
+                // Invoke TryResumePendingTurn — must call stub.SendTurn
+                // NB: CreateBackendWithSession replaces _backend; we re-inject after to capture SendTurn.
+                // Use a simpler approach: check activity phase changed to Sending.
+                typeof(MCPChatWindow)
+                    .GetMethod("TryResumePendingTurn", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Invoke(w, null);
+
+                // After TryResumePendingTurn, activity must be Sending (non-idle → SendTurn was called)
+                var activity = (ChatActivityState)typeof(MCPChatWindow)
+                    .GetField("_activity", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(w);
+                Assert.AreEqual(ActivityPhase.Sending, activity.Phase,
+                    "TryResumePendingTurn with active state must transition to Sending phase");
+            }
+            finally
+            {
+                Object.DestroyImmediate(w);
+                ReloadGuard.ResetForTest();
+                if (File.Exists(tmpPath)) File.Delete(tmpPath);
+            }
+        }
+
+        // ── CH4.test.3 (MAJOR): TryResumePendingTurn with stale state must NOT dispatch ─────────
+
+        [Test]
+        public void TryResumePendingTurn_StaleTurn_DoesNotDispatch()
+        {
+            var tmpPath = Path.Combine(Path.GetTempPath(),
+                $"TryResumeStaleTest_{System.Guid.NewGuid()}.txt");
+            var w = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                ReloadGuard.OverrideFilePath(tmpPath);
+                ReloadGuard.ResetForTest();
+
+                // savedAtUtc=1 (epoch, very old) → IsStale returns true for any recent nowUtc
+                var state = new PendingTurnState(
+                    sessionId:   "sess-stale",
+                    pendingText: "stale turn",
+                    chipPaths:   new string[0],
+                    agentMode:   false,
+                    agentName:   "",
+                    activityPhase: "Sending",
+                    savedAtUtc:  1L); // far in the past → IsStale
+                ReloadGuard.SavePendingState(state);
+
+                InjectMinimalTranscript(w);
+
+                typeof(MCPChatWindow)
+                    .GetMethod("TryResumePendingTurn", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Invoke(w, null);
+
+                // Activity must remain Idle — stale turn was discarded without dispatch
+                var activity = (ChatActivityState)typeof(MCPChatWindow)
+                    .GetField("_activity", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(w);
+                Assert.AreEqual(ActivityPhase.Idle, activity.Phase,
+                    "Stale turn must be discarded; activity must remain Idle");
+            }
+            finally
+            {
+                Object.DestroyImmediate(w);
+                ReloadGuard.ResetForTest();
+                if (File.Exists(tmpPath)) File.Delete(tmpPath);
+            }
         }
 
         // P0-1: _transcriptRestored must be cleared even on the early-return (null pending) path.

@@ -397,7 +397,8 @@ def test_load_plugin_dirs_calls_check_api_version(tmp_path, monkeypatch):
     plugin_file = tmp_path / "fake_plugin.py"
     plugin_file.write_text(
         "REQUIRED_API_VERSION = 999\n"
-        "def register(mcp, send, args): pass\n"
+        "def register(mcp, send, args): pass\n",
+        encoding="utf-8",
     )
     monkeypatch.setenv("UNITY_MCP_PLUGIN_DIRS", str(tmp_path))
     monkeypatch.setenv("UNITY_MCP_SKIP_PLUGINS", "")
@@ -426,7 +427,7 @@ def test_load_plugin_dirs_calls_check_api_version(tmp_path, monkeypatch):
 
 # ── F16: error deduplication ──────────────────────────────────────────────────
 
-def test_f16_error_dedup_first_is_full():
+def test_error_dedup_first_occurrence_returns_full_message():
     """F16: first occurrence of an error must return full message."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -434,7 +435,7 @@ def test_f16_error_dedup_first_is_full():
     assert result == "Error: path not found"
 
 
-def test_f16_error_dedup_second_is_collapsed():
+def test_error_dedup_second_identical_error_returns_repeated_form():
     """F16: second identical error must return collapsed '(repeated 2x)' form."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -443,7 +444,7 @@ def test_f16_error_dedup_second_is_collapsed():
     assert result.startswith("(repeated 2x)")
 
 
-def test_f16_error_dedup_different_cmd_not_collapsed():
+def test_error_dedup_same_text_different_cmd_not_collapsed():
     """F16: same error text for different cmd must NOT be collapsed."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -452,7 +453,7 @@ def test_f16_error_dedup_different_cmd_not_collapsed():
     assert not result.startswith("(repeated")
 
 
-def test_f16_error_dedup_resets_on_session_reset():
+def test_error_dedup_cleared_on_reset_session():
     """F16: _error_dedup must be cleared on reset_session."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -463,7 +464,7 @@ def test_f16_error_dedup_resets_on_session_reset():
 
 
 @pytest.mark.asyncio
-async def test_f16_success_payload_with_error_substring_not_deduped():
+async def test_error_dedup_ignores_success_payload_containing_error_substring():
     """F16-regression: a SUCCESS read whose payload merely contains 'Error' must NOT be
     deduped/truncated on repeat. Dedup is gated on the protocol-ok flag, not a substring scan."""
     from unity_mcp.middleware import Middleware, wrap_send
@@ -481,7 +482,7 @@ async def test_f16_success_payload_with_error_substring_not_deduped():
     assert not r2.startswith("(repeated"), "2nd identical SUCCESS read must not be collapsed"
 
 
-def test_f16_dedup_full_message_distinct_long_errors():
+def test_error_dedup_long_errors_differing_past_char80_are_distinct():
     """F16: two errors differing only past char 80 must be treated as distinct (full-key)."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -493,7 +494,7 @@ def test_f16_dedup_full_message_distinct_long_errors():
     assert result == base + "B", "full message preserved (no truncation)"
 
 
-def test_f16_dedup_dict_bounded():
+def test_error_dedup_dict_stays_bounded_over_long_session():
     """F16: _error_dedup must stay bounded (no unbounded growth across a long session)."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -503,7 +504,7 @@ def test_f16_dedup_dict_bounded():
 
 
 @pytest.mark.asyncio
-async def test_f16_recorder_not_fooled_by_error_substring():
+async def test_lesson_recorder_classifies_by_ok_flag_not_error_substring():
     """F16-regression: the LessonRecorder must classify on the protocol ok-flag, not a
     substring scan. A SUCCESS read whose payload contains 'Error' (get_console logs) repeated
     must NOT accumulate as a failure (which would emit a bogus lesson after 3)."""
@@ -524,7 +525,7 @@ async def test_f16_recorder_not_fooled_by_error_substring():
 
 # ── F05: circuit breaker is_ready_fn + cache above circuit ───────────────────
 
-def test_f05_circuit_ready_fn_transitions_open_to_half_open():
+def test_circuit_ready_fn_true_transitions_open_to_half_open():
     """F05: is_ready_fn returning True in OPEN state → transitions to HALF_OPEN."""
     from unity_mcp.middleware import CircuitBreaker
     ready_calls = [0]
@@ -543,7 +544,7 @@ def test_f05_circuit_ready_fn_transitions_open_to_half_open():
     assert ready_calls[0] == 1
 
 
-def test_f05_circuit_ready_fn_none_uses_cooldown():
+def test_circuit_ready_fn_none_uses_time_based_cooldown():
     """F05: without is_ready_fn, OPEN state uses time-based cooldown."""
     from unity_mcp.middleware import CircuitBreaker
     cb = CircuitBreaker(threshold=1, cooldown=9999.0)  # no is_ready_fn
@@ -552,7 +553,7 @@ def test_f05_circuit_ready_fn_none_uses_cooldown():
     assert cb.state == CircuitBreaker.OPEN
 
 
-def test_f05_circuit_ready_fn_false_stays_open():
+def test_circuit_ready_fn_false_stays_open():
     """F05: is_ready_fn returning False must not transition to HALF_OPEN."""
     from unity_mcp.middleware import CircuitBreaker
     cb = CircuitBreaker(threshold=1, cooldown=9999.0, is_ready_fn=lambda: False)
@@ -561,7 +562,7 @@ def test_f05_circuit_ready_fn_false_stays_open():
     assert cb.state == CircuitBreaker.OPEN
 
 
-def test_f05_circuit_ready_fn_exception_is_ignored():
+def test_circuit_ready_fn_exception_falls_through_to_cooldown():
     """F05: is_ready_fn raising must not crash allow_request; falls through to cooldown."""
     from unity_mcp.middleware import CircuitBreaker
     def bad_fn():
@@ -573,7 +574,7 @@ def test_f05_circuit_ready_fn_exception_is_ignored():
 
 
 @pytest.mark.asyncio
-async def test_f05_cache_served_when_circuit_open():
+async def test_prefetch_cache_hit_served_when_circuit_open():
     """F05: PrefetchCache hit for cacheable read must be served even when circuit OPEN."""
     from unity_mcp.middleware import Middleware, CircuitBreaker
     from unity_mcp.prefetch_cache import PrefetchCache
@@ -600,7 +601,7 @@ async def test_f05_cache_served_when_circuit_open():
 
 
 @pytest.mark.asyncio
-async def test_f05_non_cacheable_blocked_when_circuit_open():
+async def test_non_cacheable_write_blocked_when_circuit_open():
     """F05: non-cacheable command must still be blocked when circuit OPEN."""
     import time
     from unity_mcp.middleware import Middleware, CircuitBreaker
@@ -621,7 +622,7 @@ async def test_f05_non_cacheable_blocked_when_circuit_open():
 # ── F17: negative path cache ─────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_f17_negative_path_cache_skips_tcp():
+async def test_negative_path_cache_skips_tcp_on_second_unknown_path_call():
     """F17: second unknown-path call within TTL must NOT invoke send_fn (cache hit)."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -643,7 +644,7 @@ async def test_f17_negative_path_cache_skips_tcp():
 
 
 @pytest.mark.asyncio
-async def test_f17_negative_path_cache_expires():
+async def test_negative_path_cache_queries_tcp_again_after_ttl():
     """F17: after TTL expires, unknown path must query TCP again."""
     import time as time_mod
     from unity_mcp.middleware import Middleware
@@ -668,7 +669,7 @@ async def test_f17_negative_path_cache_expires():
 
 
 @pytest.mark.asyncio
-async def test_f17_negative_path_cache_cleared_on_reset():
+async def test_negative_path_cache_cleared_on_reset_session():
     """F17: reset_session must clear negative path cache."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -685,7 +686,7 @@ async def test_f17_negative_path_cache_cleared_on_reset():
 
 
 @pytest.mark.asyncio
-async def test_f17_not_for_known_paths():
+async def test_negative_path_cache_ignores_known_paths():
     """F17: known paths must not be added to negative cache."""
     from unity_mcp.middleware import Middleware
     mw = Middleware()
@@ -703,7 +704,7 @@ async def test_f17_not_for_known_paths():
 
 
 @pytest.mark.asyncio
-async def test_f17_tcp_failure_does_not_poison_cache():
+async def test_transient_tcp_failure_does_not_add_path_to_negative_cache():
     """F17-regression: a transient TCP failure (send raises) must NOT add the path to the
     negative cache — 'absent' and 'unreachable' are different. Else a blip blocks the path 10s."""
     from unity_mcp.middleware import Middleware
@@ -719,7 +720,7 @@ async def test_f17_tcp_failure_does_not_poison_cache():
 
 
 @pytest.mark.asyncio
-async def test_f17_write_invalidates_negative_cache():
+async def test_write_command_drops_negative_path_cache():
     """F17-regression: a write (create/rename) may make a previously-absent path resolvable,
     so any write must drop the negative cache."""
     import time as time_mod
@@ -739,7 +740,7 @@ async def test_f17_write_invalidates_negative_cache():
 
 # ── F01-qw: ping timeout, counter lock removal, watchdog gather ───────────────
 
-def test_f01_raw_ping_default_timeout_5s():
+def test_raw_ping_default_timeout_is_5s():
     """F01: _raw_ping default timeout must be 5.0s (reduced from 10.0)."""
     import inspect
     from unity_mcp.bridge import UnityBridge
@@ -747,7 +748,7 @@ def test_f01_raw_ping_default_timeout_5s():
     assert sig.parameters["timeout"].default == 5.0
 
 
-def test_f01_heartbeat_ping_timeout_5s():
+def test_heartbeat_tick_calls_raw_ping_with_5s_timeout():
     """F01: _heartbeat_tick must call _raw_ping with timeout=5 (not 20)."""
     import inspect
     from unity_mcp.bridge import UnityBridge
@@ -757,7 +758,7 @@ def test_f01_heartbeat_ping_timeout_5s():
 
 
 @pytest.mark.asyncio
-async def test_f01_watchdog_scan_runs_sends_concurrently():
+async def test_watchdog_scan_dispatches_pings_concurrently():
     """F01-behavioral: _scan must dispatch its two probes concurrently (gather), not serially.
     Detected by observing both sends in-flight at the same time."""
     import asyncio
@@ -779,7 +780,7 @@ async def test_f01_watchdog_scan_runs_sends_concurrently():
 
 
 @pytest.mark.asyncio
-async def test_f01_send_concurrent_unique_ids():
+async def test_concurrent_sends_use_unique_message_ids():
     """F01-behavioral: with the inner counter lock removed, concurrent send() calls must still
     get unique message IDs (asyncio single-thread → counter++ atomic between awaits)."""
     import asyncio, json

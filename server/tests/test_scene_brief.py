@@ -107,3 +107,33 @@ async def test_scene_brief_ensure_returns_none_when_disabled():
 
     result = await brief.ensure(fake_send)
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_scene_brief_ensure_send_raw_raises(monkeypatch):
+    """ensure() must return None (not propagate) when send_raw raises."""
+    monkeypatch.setenv("UNITY_MCP_SCENE_BRIEF", "1")
+    brief = _make_brief()
+
+    async def failing_send(cmd, args, **kw):
+        raise RuntimeError("TCP down")
+
+    result = await brief.ensure(failing_send)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_scene_brief_ensure_sampling_disabled(monkeypatch):
+    """ensure() returns None when SamplingService is not enabled."""
+    monkeypatch.setenv("UNITY_MCP_SCENE_BRIEF", "1")
+    brief = _make_brief()
+
+    async def fake_send(cmd, args, **kw):
+        return "data"
+
+    with patch("unity_mcp.scene_brief.SamplingService") as MockSvc:
+        instance = MockSvc.return_value
+        instance.enabled = False
+        result = await brief.ensure(fake_send)
+
+    assert result is None

@@ -30,6 +30,9 @@ testpaths = ["tests"]
 pythonpath = ["src", "tests"]
 asyncio_mode = "auto"
 python_files = "test_*.py"
+filterwarnings = [
+    "error::EncodingWarning",
+]
 markers = [
     "live: requires running Unity Editor with MCP plugin on :9500",
     "live_haiku: also calls real claude CLI (~$0.001/call) — opt-in via 'pytest -m \"live and live_haiku\"'",

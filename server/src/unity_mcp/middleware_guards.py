@@ -192,5 +192,5 @@ class MiddlewareGuardsMixin:
                 "t": round(time.time(), 2), "cmd": cmd,
                 "args": {k: v for k, v in args.items() if v is not None},
                 "result": result[:200],
-            }) + "\n")
+            }, ensure_ascii=False) + "\n")
             self._mutation_log.flush()

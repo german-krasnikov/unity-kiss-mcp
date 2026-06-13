@@ -46,7 +46,7 @@ class MetricsRegistry:
         try:
             os.makedirs(log_dir, exist_ok=True)
             path = os.path.join(log_dir, "metrics.jsonl")
-            self._jsonl_f = open(path, "a")
+            self._jsonl_f = open(path, "a", encoding="utf-8")
             atexit.register(self._close)
         except Exception:
             self._jsonl_f = None
@@ -87,7 +87,7 @@ class MetricsRegistry:
         if not self._jsonl_f:
             return
         try:
-            line = json.dumps({"t": time.time(), "kind": kind, **fields})
+            line = json.dumps({"t": time.time(), "kind": kind, **fields}, ensure_ascii=False)
             self._jsonl_f.write(line + "\n")
             self._jsonl_f.flush()
         except Exception:

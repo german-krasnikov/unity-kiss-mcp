@@ -189,21 +189,30 @@ namespace UnityMCP.Editor
             refs.Add(entry);
         }
 
-        private static string ClassifyRef(string ownerPath, GameObject referenced)
+        internal static string ClassifyRef(string ownerPath, GameObject referenced)
         {
             var refPath = ComponentSerializer.GetPath(referenced);
             if (refPath == ownerPath) return "self";
             if (refPath.StartsWith(ownerPath + "/")) return "child";
             if (ownerPath.StartsWith(refPath + "/")) return "parent";
 
-            // Same root object = sibling
-            var ownerRoot = ownerPath.IndexOf('/', 1);
-            var refRoot = refPath.IndexOf('/', 1);
+            // Same root object = sibling; skip scene-qualifier prefix "SceneName:/" first
+            var ownerSearchFrom = SkipScenePrefix(ownerPath);
+            var refSearchFrom   = SkipScenePrefix(refPath);
+            var ownerRoot = ownerPath.IndexOf('/', ownerSearchFrom);
+            var refRoot   = refPath.IndexOf('/', refSearchFrom);
             var ownerRootPart = ownerRoot > 0 ? ownerPath.Substring(0, ownerRoot) : ownerPath;
-            var refRootPart = refRoot > 0 ? refPath.Substring(0, refRoot) : refPath;
+            var refRootPart   = refRoot   > 0 ? refPath.Substring(0, refRoot)     : refPath;
             if (ownerRootPart == refRootPart) return "sibling";
 
             return "external";
+        }
+
+        /// <summary>Returns the index after "SceneName:/" if present, otherwise 1.</summary>
+        private static int SkipScenePrefix(string path)
+        {
+            var sep = path.IndexOf(":/", StringComparison.Ordinal);
+            return sep >= 0 ? sep + 2 : 1;
         }
 
         private static void ScanForReferencesTo(Transform t, int targetId, GameObject targetGo, StringBuilder sb, ref int count, ref int scanned)

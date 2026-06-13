@@ -396,6 +396,25 @@ async def test_summarizer_exception_during_haiku_propagates():
 
 
 # ---------------------------------------------------------------------------
+# 21. Summarizer — passes feature='summarize' to generate (PY5.arch.3)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_summarizer_passes_summarize_feature_to_generate():
+    """summarize() must pass feature='summarize' so budget router applies correct gating."""
+    from unity_mcp.ask.summarizer import Summarizer
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(return_value="summary")
+
+    s = Summarizer(svc)
+    await s.summarize("any errors?", ["x" * 250], hint="hint")
+    svc.generate.assert_called_once()
+    call_kwargs = svc.generate.call_args.kwargs
+    assert call_kwargs.get("feature") == "summarize", f"Expected feature='summarize', got: {call_kwargs}"
+
+
+# ---------------------------------------------------------------------------
 # 19. AskExecutor — empty plan returns empty list (P2)
 # ---------------------------------------------------------------------------
 

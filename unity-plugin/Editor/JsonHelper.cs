@@ -4,6 +4,10 @@ namespace UnityMCP.Editor
 {
     public static partial class JsonHelper
     {
+        /// <summary>UTF-8 without BOM. Use for all File.WriteAllText calls — the static
+        /// <c>Encoding.UTF8</c> emits a BOM that breaks Node JSON.parse and Unity importer.</summary>
+        internal static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false, true);
+
         private static int FindKeyIndex(string json, string needle)
         {
             bool inString = false;
@@ -134,6 +138,14 @@ namespace UnityMCP.Editor
                         case 'n':  sb.Append('\n'); i++; break;
                         case 'r':  sb.Append('\r'); i++; break;
                         case 't':  sb.Append('\t'); i++; break;
+                        case 'u':
+                            if (i + 5 < s.Length)
+                            {
+                                sb.Append((char)System.Convert.ToInt32(s.Substring(i + 2, 4), 16));
+                                i += 5;
+                            }
+                            else sb.Append(s[i]);
+                            break;
                         default:   sb.Append(s[i]); break;
                     }
                 }

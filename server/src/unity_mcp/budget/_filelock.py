@@ -20,7 +20,7 @@ def locked(path: Path):
     """
     sentinel = path.with_suffix(path.suffix + ".lock")
     sentinel.parent.mkdir(parents=True, exist_ok=True)
-    f = open(sentinel, "w")
+    f = open(sentinel, "w", encoding="utf-8")
     try:
         if sys.platform == "win32":
             import msvcrt  # deferred: win32-only, functional only on Windows

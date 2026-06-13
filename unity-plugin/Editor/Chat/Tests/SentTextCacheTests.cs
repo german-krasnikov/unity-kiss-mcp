@@ -4,7 +4,9 @@
 //   FIX B: TryResumePendingTurn calls ReloadGuard.OnTurnStarted()
 //           so a reload mid-resume is locked, symmetric with DispatchTurn.
 using System.IO;
+using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -124,6 +126,56 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(ReloadGuard.IsLocked,
                 "reload must be blocked while resumed turn is live");
             ReloadGuard.ResetForTest(); // cleanup
+        }
+
+        // ── CH4.test.1 (CRITICAL): SaveStateBeforeReload writes sentLlmCache to PendingLlmPayload ──
+
+        [Test]
+        public void SaveStateBeforeReload_ActiveTurn_WritesLlmCacheToPayload()
+        {
+            var tmpPath = Path.Combine(Path.GetTempPath(),
+                $"SaveStateLlmTest_{System.Guid.NewGuid()}.txt");
+            var w = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                ReloadGuard.OverrideFilePath(tmpPath);
+                ReloadGuard.ResetForTest();
+
+                // Set _sentLlmCache to known LLM payload via reflection
+                const string llmPayload = "@/Env/Player\n[hierarchy:/Env/Player #1]";
+                var llmCacheField = typeof(MCPChatWindow)
+                    .GetField("_sentLlmCache", BindingFlags.NonPublic | BindingFlags.Instance);
+                var cache = (SentTextCache)llmCacheField.GetValue(w);
+                cache.Set(llmPayload);
+
+                // Set _sentTextCache to a display text
+                var textCacheField = typeof(MCPChatWindow)
+                    .GetField("_sentTextCache", BindingFlags.NonPublic | BindingFlags.Instance);
+                var textCache = (SentTextCache)textCacheField.GetValue(w);
+                textCache.Set("@/Env/Player");
+
+                // Put activity in Sending phase (non-idle) via reflection
+                var actField = typeof(MCPChatWindow)
+                    .GetField("_activity", BindingFlags.NonPublic | BindingFlags.Instance);
+                var activity = (ChatActivityState)actField.GetValue(w);
+                activity.Send();
+
+                // Invoke SaveStateBeforeReload
+                typeof(MCPChatWindow)
+                    .GetMethod("SaveStateBeforeReload", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Invoke(w, null);
+
+                var loaded = ReloadGuard.LoadPendingState();
+                Assert.IsNotNull(loaded, "state must be saved when turn is active");
+                Assert.AreEqual(llmPayload, loaded.Value.PendingLlmPayload,
+                    "PendingLlmPayload must equal _sentLlmCache value for non-idle turns");
+            }
+            finally
+            {
+                Object.DestroyImmediate(w);
+                ReloadGuard.ResetForTest();
+                if (File.Exists(tmpPath)) File.Delete(tmpPath);
+            }
         }
     }
 }

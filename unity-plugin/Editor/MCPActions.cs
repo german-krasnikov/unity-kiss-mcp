@@ -20,7 +20,7 @@ namespace UnityMCP.Editor
             // Source-of-truth: server/src/unity_mcp/lockfile.py
             var lockFile = Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                ".unity-mcp", "server-9500.lock");
+                ".unity-mcp", $"server-{MCPServer.ServerPort}.lock");
 
             if (!File.Exists(lockFile))
             {

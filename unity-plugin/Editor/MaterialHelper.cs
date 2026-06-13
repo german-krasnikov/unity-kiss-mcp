@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace UnityMCP.Editor
 {
@@ -67,27 +68,27 @@ namespace UnityMCP.Editor
             var sb = new StringBuilder();
             sb.AppendLine($"Shader: {mat.shader.name}");
 
-            int count = ShaderUtil.GetPropertyCount(mat.shader);
+            int count = mat.shader.GetPropertyCount();
             for (int i = 0; i < count; i++)
             {
-                var name = ShaderUtil.GetPropertyName(mat.shader, i);
-                var type = ShaderUtil.GetPropertyType(mat.shader, i);
+                var name = mat.shader.GetPropertyName(i);
+                var type = mat.shader.GetPropertyType(i);
                 sb.AppendLine(FormatProperty(mat, name, type));
             }
             return sb.ToString().TrimEnd();
         }
 
-        private static string FormatProperty(Material mat, string name, ShaderUtil.ShaderPropertyType type)
+        private static string FormatProperty(Material mat, string name, ShaderPropertyType type)
         {
             return type switch
             {
-                ShaderUtil.ShaderPropertyType.Color =>
+                ShaderPropertyType.Color =>
                     $"{name}: {mat.GetColor(name)} [Color]",
-                ShaderUtil.ShaderPropertyType.Float or ShaderUtil.ShaderPropertyType.Range =>
+                ShaderPropertyType.Float or ShaderPropertyType.Range =>
                     $"{name}: {mat.GetFloat(name).ToString("G4", CultureInfo.InvariantCulture)} [Float]",
-                ShaderUtil.ShaderPropertyType.TexEnv =>
+                ShaderPropertyType.Texture =>
                     $"{name}: {AssetDatabase.GetAssetPath(mat.GetTexture(name))} [Texture]",
-                ShaderUtil.ShaderPropertyType.Vector =>
+                ShaderPropertyType.Vector =>
                     $"{name}: {mat.GetVector(name)} [Vector]",
                 _ => $"{name}: ? [{type}]"
             };
@@ -112,30 +113,7 @@ namespace UnityMCP.Editor
             }
 
             Undo.RecordObject(mat, "Set Material Property");
-            var type = mat.shader.GetPropertyType(idx);
-            switch (type)
-            {
-                case UnityEngine.Rendering.ShaderPropertyType.Float:
-                case UnityEngine.Rendering.ShaderPropertyType.Range:
-                    mat.SetFloat(prop, float.Parse(value, CultureInfo.InvariantCulture));
-                    break;
-                case UnityEngine.Rendering.ShaderPropertyType.Color:
-                    mat.SetColor(prop, ValueParser.ParseColor(value));
-                    break;
-                case UnityEngine.Rendering.ShaderPropertyType.Vector:
-                    mat.SetVector(prop, ValueParser.ParseVector4Lenient(value));
-                    break;
-                case UnityEngine.Rendering.ShaderPropertyType.Texture:
-                    var tex = AssetDatabase.LoadAssetAtPath<Texture>(value);
-                    if (tex == null) throw new InvalidOperationException($"Texture not found: {value}");
-                    mat.SetTexture(prop, tex);
-                    break;
-                case UnityEngine.Rendering.ShaderPropertyType.Int:
-                    if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var matIntVal))
-                        throw new ArgumentException($"Invalid int: '{value}'");
-                    mat.SetInt(prop, matIntVal);
-                    break;
-            }
+            ShaderHelper.ApplyProperty(mat, prop, mat.shader.GetPropertyType(idx), value);
 
             EditorUtility.SetDirty(mat);
             return "ok";
@@ -184,11 +162,11 @@ namespace UnityMCP.Editor
         {
             var mat = ResolveMaterial(args);
             var sb = new StringBuilder();
-            int count = ShaderUtil.GetPropertyCount(mat.shader);
+            int count = mat.shader.GetPropertyCount();
             for (int i = 0; i < count; i++)
             {
-                var name = ShaderUtil.GetPropertyName(mat.shader, i);
-                var type = ShaderUtil.GetPropertyType(mat.shader, i);
+                var name = mat.shader.GetPropertyName(i);
+                var type = mat.shader.GetPropertyType(i);
                 sb.AppendLine($"{name}: {type}");
             }
             return sb.ToString().TrimEnd();

@@ -218,7 +218,7 @@ async def test_executor_partial_failure_retries_once():
         scene_paths={"/Ghost"},
     )
     assert call_count == 2
-    assert result is not None
+    assert result == "ok: 1 ops"
 
 
 # ---------------------------------------------------------------------------
@@ -282,6 +282,89 @@ async def test_do_dry_run_e2e():
         result = await do("add a cube", dry_run=True)
         mock_send.assert_not_called()
         assert "create_object" in result or "dry" in result.lower() or "plan" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# 12a. _extract_paths unit test (PY5.test.5)
+# ---------------------------------------------------------------------------
+
+def test_extract_paths_from_hierarchy():
+    from unity_mcp.tools.do_tool import _extract_paths
+    hierarchy = "/Root\n  /Root/Child\n  !/Root/Inactive"
+    result = _extract_paths(hierarchy)
+    assert result == {"/Root", "/Root/Child", "/Root/Inactive"}
+
+
+# ---------------------------------------------------------------------------
+# 12c. do() blocks forbidden plan (X5.cross.1)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_do_e2e_invalid_plan_blocked():
+    from unity_mcp.tools.do_tool import do
+
+    with (
+        patch("unity_mcp.tools.do_tool._send", new_callable=AsyncMock) as mock_send,
+        patch("unity_mcp.tools.do_tool._sampling") as mock_svc,
+        patch("unity_mcp.tools.do_tool._get_scene_brief", new_callable=AsyncMock) as mock_brief,
+    ):
+        mock_brief.return_value = ""
+        mock_svc.generate = AsyncMock(return_value="delete_object path=/X")
+
+        result = await do("delete a cube")
+        assert result.startswith("INVALID PLAN:"), result
+        mock_send.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 12b. do() returns error when Haiku unavailable (PY5.test.2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_do_returns_error_when_haiku_unavailable():
+    from unity_mcp.tools.do_tool import do
+
+    with (
+        patch("unity_mcp.tools.do_tool._send", new_callable=AsyncMock) as mock_send,
+        patch("unity_mcp.tools.do_tool._sampling") as mock_svc,
+        patch("unity_mcp.tools.do_tool._get_scene_brief", new_callable=AsyncMock) as mock_brief,
+    ):
+        mock_brief.return_value = ""
+        mock_svc.generate = AsyncMock(return_value=None)
+
+        result = await do("add a cube")
+        assert "ERROR" in result
+        mock_send.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# 13a. Executor — retry accepts path created in first pass (PY5.arch.2)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_executor_retry_accepts_path_created_in_first_pass():
+    """Retry plan targeting a path created in original plan must not be rejected by validator."""
+    from unity_mcp.do_intent.executor import Executor
+
+    call_count = 0
+
+    async def fake_send(cmd, args):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return "[1] ok: created\n[2] err: set_property path=/NewCube component=Transform prop=m_LocalPosition value=(1,0,0): not found"
+        return "ok: 1 ops"
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(return_value="set_property path=/NewCube component=Transform prop=m_LocalPosition value=(1,0,0)")
+
+    original_plan = "create_object name=NewCube\nset_property path=/NewCube component=Transform prop=m_LocalPosition value=(1,0,0)"
+    ex = Executor(fake_send, sampling=svc)
+    result = await ex.execute(original_plan, original_intent="create cube and move it", scene_paths=set())
+
+    # send must be called twice: original + retry (not rejected by validator)
+    assert call_count == 2, f"Expected 2 send calls, got {call_count}"
+    assert result == "ok: 1 ops"
 
 
 # ---------------------------------------------------------------------------

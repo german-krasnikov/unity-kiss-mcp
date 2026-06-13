@@ -87,22 +87,28 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         // H14b: "Show LLM payload" menu and send path share the same seam (ResolveAllTyped).
-        // Verify a built-in Script chip produces identical bytes from menu reveal vs send.
+        // Verify a built-in Script chip produces identical bytes from menu reveal vs the
+        // underlying provider.FormatPayload path (two distinct code paths must converge).
         [Test]
         public void Symmetry_MenuReveal_MatchesSendPath_ForScriptChip()
         {
             var chip = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo.cs", 0);
             var cfg  = new ChipConfig();
 
-            // Both menu reveal ("Show LLM payload") and send path call this same function.
+            // Send/menu-reveal path: aggregator pipeline
             var menuPayload = ChipContextResolver.ResolveAllTyped(new List<ChipData> { chip }, cfg);
-            var sendPayload = ChipContextResolver.ResolveAllTyped(new List<ChipData> { chip }, cfg);
 
-            Assert.AreEqual(menuPayload, sendPayload,
-                "menu reveal and send path must produce byte-for-byte identical payload");
+            // Provider path: invoke provider.FormatPayload directly (the underlying seam)
+            var provider = ChipKindRegistry.ForKey(ChipKindKeys.Script);
+            Assert.IsNotNull(provider, "Script provider must be registered");
+            var depth    = cfg.DepthFor(ChipKindKeys.Script);
+            var ctx      = new ChipPayloadContext(depth, "");
+            var sendPayload = provider.FormatPayload(chip, ctx);
+
+            Assert.AreEqual(sendPayload, menuPayload,
+                "menu reveal (ResolveAllTyped) and provider.FormatPayload must converge");
             StringAssert.Contains("[script:Assets/Foo.cs]", menuPayload,
                 "script chip must emit [script:path] bracket with no extra wrapping");
-            // No extra prefix, no wrapping — bracket must be the complete line
             Assert.AreEqual("[script:Assets/Foo.cs]", menuPayload.Trim());
         }
 

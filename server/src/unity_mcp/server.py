@@ -1,7 +1,9 @@
 import asyncio
+import logging
 import os
 import time
 os.environ.setdefault("UNITY_MCP_DISTILL", "1")
+log = logging.getLogger("unity_mcp.server")
 from contextlib import asynccontextmanager
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
@@ -176,8 +178,8 @@ async def lifespan(app):
             pass
         try:
             lock_fd = acquire_lock(port=new_port)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("Failed to acquire lock for new port %d: %s", new_port, exc)
 
     try:
         slot = ConnectionSlot(port_discoverer=_read_unity_port, on_port_change=_on_port_change)

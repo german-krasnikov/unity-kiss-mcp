@@ -836,3 +836,65 @@ def test_connected_property_no_msg_dontwait():
     assert result is True
     # recv was called with exactly MSG_PEEK — no MSG_DONTWAIT
     mock_sock.recv.assert_called_once_with(1, socket.MSG_PEEK)
+
+
+# ── PY1.test.2: lock-held skip-ping branch ───────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_heartbeat_skips_ping_when_lock_held():
+    """_heartbeat_tick skips _raw_ping when _lock is already held."""
+    reader = AsyncMock()
+    writer = make_writer()
+    ping_calls = [0]
+
+    async def counting_ping(timeout=5.0):
+        ping_calls[0] += 1
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+        bridge._raw_ping = counting_ping
+
+        # Hold the lock while one tick fires
+        await bridge._lock.acquire()
+        try:
+            with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
+                await bridge._heartbeat_tick(0.01)
+        finally:
+            bridge._lock.release()
+
+    assert ping_calls[0] == 0, "ping must not fire when _lock is held"
+
+
+# ── PY1.test.3: 3 consecutive ping failures without dead PID → close ─────────
+
+@pytest.mark.asyncio
+async def test_heartbeat_closes_after_3_ping_failures():
+    """3 consecutive OSError ping failures with live PID → close (no immediate close)."""
+    reader = AsyncMock()
+    writer = make_writer()
+    close_calls = [0]
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge.connect()
+
+        async def failing_ping(timeout=5.0):
+            raise OSError("ping failed")
+
+        async def counting_close():
+            close_calls[0] += 1
+
+        bridge._raw_ping = failing_ping
+        with patch.object(bridge._probe, "is_process_dead", return_value=False), \
+             patch.object(bridge, "close", side_effect=counting_close):
+            with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
+                # Tick 1 — failures=1, no close
+                await bridge._heartbeat_tick(0.01)
+                assert close_calls[0] == 0
+                # Tick 2 — failures=2, no close
+                await bridge._heartbeat_tick(0.01)
+                assert close_calls[0] == 0
+                # Tick 3 — failures=3 >= 3 → close
+                await bridge._heartbeat_tick(0.01)
+                assert close_calls[0] == 1, "should close after 3rd consecutive failure"

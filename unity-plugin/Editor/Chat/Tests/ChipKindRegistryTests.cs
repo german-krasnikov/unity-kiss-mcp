@@ -95,15 +95,15 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(ChipKindRegistry.ForKey(ChipKindKeys.Hierarchy));
         }
 
-        // (i) All 8 built-ins present after reset
+        // (i) All 9 built-ins present after reset (Folder was the 9th — CH3.test.1 fix)
         [Test]
-        public void RegisterBuiltIns_All8Keys_Present()
+        public void RegisterBuiltIns_All9Keys_Present()
         {
             var allKeys = new[]
             {
-                ChipKindKeys.Hierarchy, ChipKindKeys.Scene, ChipKindKeys.Script,
-                ChipKindKeys.Prefab, ChipKindKeys.Material, ChipKindKeys.Texture,
-                ChipKindKeys.ScriptableObject, ChipKindKeys.Asset
+                ChipKindKeys.Hierarchy, ChipKindKeys.Folder, ChipKindKeys.Scene,
+                ChipKindKeys.Script, ChipKindKeys.Prefab, ChipKindKeys.Material,
+                ChipKindKeys.Texture, ChipKindKeys.ScriptableObject, ChipKindKeys.Asset
             };
             foreach (var key in allKeys)
                 Assert.IsNotNull(ChipKindRegistry.ForKey(key), $"Built-in key '{key}' missing");

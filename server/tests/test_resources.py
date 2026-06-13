@@ -59,3 +59,16 @@ def test_resources_registered():
     assert "unity://console/errors" in registered_uris
     assert "unity://editor/state" in registered_uris
     assert "unity://tools/categories" in registered_uris
+
+
+# ---------------------------------------------------------------------------
+# PY2.test.5: _safe_send exception-swallowing returns '[disconnected: ...]'
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_safe_send_returns_disconnected_on_exception():
+    """_send raising RuntimeError → scene_hierarchy() returns '[disconnected: ...]'."""
+    from unity_mcp import resources
+    resources._send = AsyncMock(side_effect=RuntimeError("gone"))
+    result = await resources.scene_hierarchy()
+    assert result.startswith("[disconnected:"), f"Expected '[disconnected:', got: {result!r}"

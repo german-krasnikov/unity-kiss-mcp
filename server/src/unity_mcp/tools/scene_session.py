@@ -16,7 +16,7 @@ async def save_session() -> str:
     path = os.path.join(os.getcwd(), ".claude", "session-context.json")
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(f"{time.time()}\n=== hierarchy ===\n{hierarchy}\n")
     except OSError as e:
         return f"Failed to save session: {e}"
@@ -29,7 +29,7 @@ async def load_session() -> str:
     if not os.path.exists(path):
         return "No previous session found."
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         ts_str, _, hier = content.partition("\n=== hierarchy ===\n")
         ts = float(ts_str.strip())

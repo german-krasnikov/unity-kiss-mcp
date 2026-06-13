@@ -59,6 +59,9 @@ def _write_codex_config() -> None:
         "startup_timeout_sec = 10\n"
         "tool_timeout_sec = 120\n"
         "enabled = true\n"
+        "\n[mcp_servers.unity-mcp.env]\n"
+        'PYTHONUTF8 = "1"\n',
+        encoding="utf-8",
     )
     print(f"  Wrote {CODEX_CONFIG}")
 
@@ -121,14 +124,14 @@ def cmd_doctor(_args: argparse.Namespace) -> None:
 
     paths_ok = False
     if CODEX_CONFIG.exists():
-        content = CODEX_CONFIG.read_text()
+        content = CODEX_CONFIG.read_text(encoding="utf-8")
         paths_ok = str(py) in content
     ok(".codex/config.toml paths correct", paths_ok)
 
     mcp_ok = False
     if MCP_JSON.exists():
         try:
-            data = json.loads(MCP_JSON.read_text())
+            data = json.loads(MCP_JSON.read_text(encoding="utf-8"))
             mcp_ok = "unity" in data.get("mcpServers", {})
         except Exception:
             pass
@@ -152,10 +155,12 @@ def cmd_configure(args: argparse.Namespace) -> None:
             "unity": {
                 "command": "uv",
                 "args": ["run", "--directory", str(SERVER_DIR), "unity-mcp"],
+                "env": {"PYTHONUTF8": "1"},
             }
         }
     }
-    target.write_text(json.dumps(config, indent=2) + "\n")
+    target.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n",
+                      encoding="utf-8")
     print(f"Wrote {target}")
 
 

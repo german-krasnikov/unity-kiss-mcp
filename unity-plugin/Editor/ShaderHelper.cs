@@ -1,3 +1,4 @@
+// v0.25.4: use ValueParser.ParseColor for lenient color input in ApplyProperty
 using System;
 using System.Globalization;
 using System.IO;
@@ -110,7 +111,7 @@ namespace UnityMCP.Editor
                 ? BuildPreset(preset, shaderName)
                 : code;
 
-            File.WriteAllText(path, shaderCode, Encoding.UTF8);
+            WriteShaderFile(path, shaderCode);
             AssetDatabase.ImportAsset(path);
 
             var shader = AssetDatabase.LoadAssetAtPath<Shader>(path);
@@ -123,6 +124,9 @@ namespace UnityMCP.Editor
 
             return ShaderSerializer.Serialize(path, null);
         }
+
+        internal static void WriteShaderFile(string path, string source) =>
+            File.WriteAllText(path, source, JsonHelper.Utf8NoBom);
 
         /// <summary>Set material property on scene object's renderer.</summary>
         public static string SetProperty(string path, string prop, string value)
@@ -189,14 +193,12 @@ namespace UnityMCP.Editor
             return -1;
         }
 
-        static void ApplyProperty(Material mat, string prop, UnityEngine.Rendering.ShaderPropertyType type, string value)
+        internal static void ApplyProperty(Material mat, string prop, UnityEngine.Rendering.ShaderPropertyType type, string value)
         {
             switch (type)
             {
                 case UnityEngine.Rendering.ShaderPropertyType.Color:
-                    if (!ColorUtility.TryParseHtmlString(value, out var col))
-                        throw new ArgumentException($"Invalid color '{value}'. Use #RRGGBB or #RRGGBBAA");
-                    mat.SetColor(prop, col);
+                    mat.SetColor(prop, ValueParser.ParseColor(value));
                     break;
                 case UnityEngine.Rendering.ShaderPropertyType.Float:
                 case UnityEngine.Rendering.ShaderPropertyType.Range:

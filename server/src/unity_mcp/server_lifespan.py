@@ -79,6 +79,8 @@ def init_budget(mw: Optional[Middleware]) -> tuple:
 
     router = BudgetRouter(tracker, _hit_rate)
     _init_budget_sampling(tracker, router)
+    if mw is not None and mw.watchdog is not None:
+        mw.watchdog._budget_gate = lambda: router.should_run("watchdog", 0.3).run
     return tracker, router
 
 

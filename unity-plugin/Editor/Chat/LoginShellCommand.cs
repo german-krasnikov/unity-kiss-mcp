@@ -1,6 +1,7 @@
 // Pure helper — no UnityEngine deps, fully NUnit-testable.
 // Builds safe zsh -lc argv: binary/path passed as positional arg, never interpolated into script body.
 using System.Diagnostics;
+using System.Text;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -29,6 +30,7 @@ namespace UnityMCP.Editor.Chat
                 UseShellExecute        = false,
                 RedirectStandardOutput = true,
                 CreateNoWindow         = true,
+                StandardOutputEncoding = new UTF8Encoding(false),  // cp1251 safety
             };
     }
 }

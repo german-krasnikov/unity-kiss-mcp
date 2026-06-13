@@ -1,8 +1,10 @@
 // Resolves absolute paths to CLI binaries (claude, codex, uv, …).
 // Platform dispatch: where.exe (Windows), bash -lic (Linux), /bin/zsh -lc (macOS).
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -13,13 +15,14 @@ namespace UnityMCP.Editor.Chat
         internal const string PrefKey      = "UnityMCP_Chat_ClaudePath";
         internal const string CodexPrefKey = "UnityMCP_Chat_Path_codex";
 
-        private static string _cached;
-        private static bool   _probed;
+        // Per-binary negative cache: key = binary name, value = resolved path (null = not found).
+        // Populated on first probe per binary; cleared by ResetCacheForTests.
+        private static readonly Dictionary<string, string> _cache = new Dictionary<string, string>();
 
 #if UNITY_INCLUDE_TESTS
         // Seam: inject in tests instead of spawning a shell (mirrors FindObjectOverride pattern)
         internal static Func<string, string> WhichOverride;
-        internal static void ResetCacheForTests() { _cached = null; _probed = false; }
+        internal static void ResetCacheForTests() { _cache.Clear(); }
 #endif
 
         /// <summary>
@@ -32,17 +35,18 @@ namespace UnityMCP.Editor.Chat
             var pref = EditorPrefs.GetString(PrefKey, "");
             if (!string.IsNullOrEmpty(pref)) return pref;
 
-            if (!forceRefresh && _probed) return _cached;
+            if (!forceRefresh && _cache.ContainsKey("claude")) return _cache["claude"];
 
-            _cached = WhichViaSh("claude");
-            _probed = true;
-            return _cached;
+            var result = WhichViaSh("claude");
+            _cache["claude"] = result;
+            return result;
         }
 
         /// <summary>
-        /// Resolve an arbitrary CLI binary by name via login shell (no PrefKey/cache).
+        /// Resolve an arbitrary CLI binary by name via login shell.
         /// For "claude" delegates to <see cref="Resolve()"/> to honour EditorPrefs + cache.
-        /// For other binaries, checks a per-binary EditorPrefs key first.
+        /// For other binaries, checks a per-binary EditorPrefs key first, then caches result.
+        /// Negative results are cached per binary name to avoid repeated shell probes.
         /// </summary>
         internal static string Resolve(string binaryName)
         {
@@ -53,7 +57,12 @@ namespace UnityMCP.Editor.Chat
             var overridePref = EditorPrefs.GetString(overrideKey, "");
             if (!string.IsNullOrEmpty(overridePref)) return overridePref;
 
-            return WhichViaSh(binaryName);
+            // Per-binary negative cache: probe once, then reuse result.
+            if (_cache.TryGetValue(binaryName, out var cached)) return cached;
+
+            var result = WhichViaSh(binaryName);
+            _cache[binaryName] = result;
+            return result;
         }
 
         private static string WhichViaSh(string binary)
@@ -72,6 +81,7 @@ namespace UnityMCP.Editor.Chat
                             UseShellExecute        = false,
                             RedirectStandardOutput = true,
                             CreateNoWindow         = true,
+                            StandardOutputEncoding = new UTF8Encoding(false),  // cp1251 safety: Cyrillic in %PATH%
                         };
                         // CWD-hijack mitigation (MITRE T1574.008)
                         psi.EnvironmentVariables["NoDefaultCurrentDirectoryInExePath"] = "1";
@@ -89,6 +99,8 @@ namespace UnityMCP.Editor.Chat
                             RedirectStandardOutput = true,
                             RedirectStandardError  = true,  // suppress "no job control" warning
                             CreateNoWindow         = true,
+                            StandardOutputEncoding = new UTF8Encoding(false),  // cp1251 safety
+                            StandardErrorEncoding  = new UTF8Encoding(false),
                         };
                         break;
 

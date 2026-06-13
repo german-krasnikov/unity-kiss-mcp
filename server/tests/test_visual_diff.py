@@ -366,6 +366,78 @@ async def test_screenshot_compare_uses_visual_diff(tmp_path, mock_bridge):
 
 
 @pytest.mark.asyncio
+async def test_visual_diff_targeted_sanitizes_question(tmp_path):
+    """targeted mode strips control chars and caps question at 300 chars."""
+    from unity_mcp.visual_diff import visual_diff
+    from PIL import Image
+
+    a = tmp_path / "a.png"
+    b = tmp_path / "b.png"
+    Image.new("RGB", (10, 10), (20, 30, 40)).save(a)
+    Image.new("RGB", (10, 10), (200, 100, 50)).save(b)
+
+    captured_prompt: list[str] = []
+
+    async def fake_verify(before, after, prompt, *, feature="visual_diff"):
+        captured_prompt.append(prompt)
+        return "YES it changed."
+
+    mock_svc = MagicMock()
+    mock_svc.verify_visual_diff = fake_verify
+
+    long_question = "A" * 400 + "\x00evil\nstuff"
+    await visual_diff(str(a), str(b), mode="targeted", question=long_question, sampling=mock_svc)
+
+    assert captured_prompt, "verify_visual_diff was not called"
+    prompt = captured_prompt[0]
+    assert "\x00" not in prompt, "null byte must be stripped"
+    assert "{question}" not in prompt, "{question} placeholder must be replaced"
+    # The question is truncated to 300 chars; verify the injected segment is bounded
+    # Find what was injected: the prompt template starts with "Question: "
+    q_start = prompt.index("Question: ") + len("Question: ")
+    injected = prompt[q_start:].split("\n")[0]
+    assert len(injected) <= 300, f"injected question too long: {len(injected)}"
+
+
+@pytest.mark.asyncio
+async def test_visual_diff_targeted_truncates_long_question(tmp_path):
+    """targeted mode caps question at 300 chars exactly."""
+    from unity_mcp.visual_diff import visual_diff
+    from PIL import Image
+
+    a = tmp_path / "a.png"
+    b = tmp_path / "b.png"
+    Image.new("RGB", (10, 10), (21, 31, 41)).save(a)
+    Image.new("RGB", (10, 10), (201, 101, 51)).save(b)
+
+    captured: list[str] = []
+
+    async def fake_verify(before, after, prompt, *, feature="visual_diff"):
+        captured.append(prompt)
+        return "YES."
+
+    mock_svc = MagicMock()
+    mock_svc.verify_visual_diff = fake_verify
+
+    await visual_diff(str(a), str(b), mode="targeted", question="X" * 500, sampling=mock_svc)
+
+    assert captured
+    # After [:300] the question is exactly 300 'X' chars
+    assert "X" * 300 in captured[0]
+    assert "X" * 301 not in captured[0]
+
+
+def test_diff_mode_literal_matches_runtime_whitelist():
+    """DiffMode Literal must include 'regression' (valid runtime mode)."""
+    from typing import get_args
+    from unity_mcp.visual_diff_pixel import DiffMode
+    modes = set(get_args(DiffMode))
+    expected = {"auto", "pixel", "structural", "targeted", "ui_layout",
+                "animation", "color", "position", "regression"}
+    assert modes == expected, f"Missing from DiffMode: {expected - modes}"
+
+
+@pytest.mark.asyncio
 async def test_pixel_threshold_negative_rejected(tmp_path):
     from unity_mcp.visual_diff import visual_diff
     a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n\x1a\n")

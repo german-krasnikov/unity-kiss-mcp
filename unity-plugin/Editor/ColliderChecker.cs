@@ -11,7 +11,7 @@ namespace UnityMCP.Editor
                 return CheckPath(path);
 
             var issues = new List<string>();
-            foreach (var go in Object.FindObjectsOfType<GameObject>())
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
                 CollectIssues(go, issues);
 
             return issues.Count == 0 ? "OK: no collider issues" : string.Join("\n", issues);

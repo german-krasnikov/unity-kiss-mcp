@@ -59,3 +59,16 @@ def test_compress_report_snapshot_kept():
     result = _compress_report(report)
     assert "SNAPSHOT" in result
     assert "hp=100" in result
+
+
+@pytest.mark.parametrize("marker,stripped_pattern", [
+    ("— done", "done"),
+    ("— ok", "— ok"),
+    ("— PASS", "PASS"),
+])
+def test_compress_report_strips_all_pass_markers(marker, stripped_pattern):
+    """All three passing markers (— PASS, — done, — ok) are stripped from output."""
+    report = f"PLAYTEST: 2/2\n[1] STEP {marker} (1.2s)\n[2] ASSERT — FAIL"
+    result = _compress_report(report)
+    assert stripped_pattern not in result
+    assert "FAIL" in result

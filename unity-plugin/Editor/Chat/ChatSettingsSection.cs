@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -90,12 +91,15 @@ namespace UnityMCP.Editor.Chat
                     RedirectStandardOutput = true,
                     RedirectStandardError  = true,
                     CreateNoWindow         = true,
+                    StandardOutputEncoding = new UTF8Encoding(false),  // cp1251 safety
+                    StandardErrorEncoding  = new UTF8Encoding(false),
                 };
             }
             else
             {
                 psi = LoginShellCommand.Create("\"$1\" auth status", binary);
-                psi.RedirectStandardError = true;
+                psi.RedirectStandardError  = true;
+                psi.StandardErrorEncoding  = new UTF8Encoding(false);  // cp1251 safety
             }
 
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>

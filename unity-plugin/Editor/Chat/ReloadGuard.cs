@@ -18,7 +18,7 @@ namespace UnityMCP.Editor.Chat
 
         // Watchdog: auto-unlock after ~120s to prevent a hung turn blocking all reloads.
         private static double _lockStartTime;
-        private const double  WatchdogSeconds = 120.0;
+        private static double _watchdogSeconds = 120.0;
 
         internal static bool IsLocked => _lockDepth > 0;
 
@@ -57,7 +57,7 @@ namespace UnityMCP.Editor.Chat
                 EditorApplication.update -= WatchdogTick;
                 return;
             }
-            if (EditorApplication.timeSinceStartup - _lockStartTime > WatchdogSeconds)
+            if (EditorApplication.timeSinceStartup - _lockStartTime > _watchdogSeconds)
                 ForceUnlock();
         }
 
@@ -98,12 +98,19 @@ namespace UnityMCP.Editor.Chat
 
         internal static void OverrideFilePath(string path) => _filePath = path;
 
+        /// <summary>Override the watchdog timeout for tests. Set to 0 to fire immediately.</summary>
+        internal static void OverrideWatchdogSeconds(double s) => _watchdogSeconds = s;
+
         internal static void ResetForTest()
         {
             // Reset in-memory counter without touching Unity API
             // (tests run without domain reload machinery).
             _lockDepth = 0;
+            _watchdogSeconds = 120.0; // restore default
             EditorApplication.update -= WatchdogTick; // prevent stale delegate accumulation across tests
         }
+
+        /// <summary>Expose WatchdogTick for tests to invoke directly without waiting for the timer.</summary>
+        internal static void InvokeWatchdogTickForTest() => WatchdogTick();
     }
 }

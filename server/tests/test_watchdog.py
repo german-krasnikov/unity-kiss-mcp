@@ -6,6 +6,49 @@ from unittest.mock import AsyncMock
 from unity_mcp.watchdog import ProactiveWatchdog
 
 
+# ── budget_gate ─────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_watchdog_skips_scan_when_budget_gate_returns_false():
+    """budget_gate=False must prevent _scan from being called.
+
+    Fails if the budget_gate branch is removed: _scan would be scheduled and
+    awaited, incrementing AsyncMock call count above zero.
+    """
+    scan_called = []
+
+    async def fake_scan():
+        scan_called.append(True)
+
+    send = AsyncMock(return_value="")
+    wd = ProactiveWatchdog(send, interval=1, budget_gate=lambda: False)
+    wd._scan = fake_scan  # intercept before task creation
+    wd.maybe_trigger("delete_object")
+    await asyncio.sleep(0)  # give event loop a turn
+    assert not scan_called, "_scan must not run when budget_gate returns False"
+
+
+@pytest.mark.asyncio
+async def test_watchdog_runs_scan_when_budget_gate_returns_true():
+    """budget_gate=True (default) must allow _scan to be scheduled and run.
+
+    Fails if the budget_gate branch is removed entirely: this test would still
+    pass — but removing the False-branch would break the other test, making
+    both together a coherent pair. This test validates the positive path.
+    """
+    scan_called = []
+
+    async def fake_scan():
+        scan_called.append(True)
+
+    send = AsyncMock(return_value="")
+    wd = ProactiveWatchdog(send, interval=1, budget_gate=lambda: True)
+    wd._scan = fake_scan
+    wd.maybe_trigger("delete_object")
+    await asyncio.sleep(0)  # let task run
+    assert scan_called, "_scan must run when budget_gate returns True"
+
+
 # ── maybe_trigger() ─────────────────────────────────────────────────────────
 
 def test_maybe_trigger_ignores_read_cmds():
@@ -108,6 +151,35 @@ async def test_watchdog_cancel_already_done_is_noop():
     await asyncio.sleep(0)  # run
     assert wd._task.done()
     await wd.cancel()  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_scan_console_only_error():
+    """Non-empty console with clean refs must produce a 'console:' alert."""
+    async def send(cmd, args, **kw):
+        if cmd == "validate_references":
+            return ""  # no ref errors
+        return "NullRef exception in Update"
+    wd = ProactiveWatchdog(send)
+    await wd._scan()
+    assert wd._pending_alert is not None
+    assert "console:" in wd._pending_alert
+
+
+@pytest.mark.asyncio
+async def test_scan_both_issues_in_alert():
+    """Both ref ERROR and non-empty console must both appear in the alert."""
+    async def send(cmd, args, **kw):
+        if cmd == "validate_references":
+            return "ERROR: broken ref /Player"
+        return "crash in Update"
+    wd = ProactiveWatchdog(send)
+    await wd._scan()
+    assert wd._pending_alert is not None
+    parts = wd._pending_alert.split("; ")
+    assert len(parts) >= 2
+    assert any("console:" in p for p in parts)
+    assert any("ERROR" in p for p in parts)
 
 
 @pytest.mark.asyncio

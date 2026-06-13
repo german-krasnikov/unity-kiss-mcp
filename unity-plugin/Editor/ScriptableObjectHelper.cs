@@ -123,7 +123,7 @@ namespace UnityMCP.Editor
                 .FirstOrDefault(t => t.Name == name || t.FullName == name);
         }
 
-        private static string SerializedPropertyToString(SerializedProperty p)
+        internal static string SerializedPropertyToString(SerializedProperty p)
         {
             switch (p.propertyType)
             {
@@ -149,7 +149,9 @@ namespace UnityMCP.Editor
                 }
                 case SerializedPropertyType.Color:      return $"#{ColorUtility.ToHtmlStringRGBA(p.colorValue)}";
                 case SerializedPropertyType.ObjectReference:
-                    return p.objectReferenceValue != null ? AssetDatabase.GetAssetPath(p.objectReferenceValue) : "null";
+                    if (p.objectReferenceValue == null) return "null";
+                    var assetPath = AssetDatabase.GetAssetPath(p.objectReferenceValue);
+                    return !string.IsNullOrEmpty(assetPath) ? assetPath : p.objectReferenceValue.name;
                 default: return p.type;
             }
         }

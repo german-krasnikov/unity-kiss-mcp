@@ -80,13 +80,34 @@ namespace UnityMCP.Editor
                 case "shape": SetShape(ps, prop, value); break;
                 case "noise": SetNoise(ps, prop, value); break;
                 case "renderer": SetRenderer(ps, prop, value); break;
-                case "coloroverlifetime": var c = ps.colorOverLifetime; c.enabled = PB(value); break;
-                case "sizeoverlifetime": var s = ps.sizeOverLifetime; s.enabled = PB(value); break;
-                case "velocityoverlifetime": var v2 = ps.velocityOverLifetime; v2.enabled = PB(value); break;
-                case "rotationoverlifetime": var r = ps.rotationOverLifetime; r.enabled = PB(value); break;
-                case "trails": var t = ps.trails; t.enabled = PB(value); break;
-                case "collision": var co = ps.collision; co.enabled = PB(value); break;
+                case "coloroverlifetime":
+                case "sizeoverlifetime":
+                case "velocityoverlifetime":
+                case "rotationoverlifetime":
+                case "trails":
+                case "collision":
+                    if (!string.Equals(prop, "enabled", StringComparison.OrdinalIgnoreCase))
+                        throw new ArgumentException($"Module '{module}' only supports prop='enabled'. Got '{prop}'");
+                    SetModuleEnabled(ps, module, PB(value));
+                    break;
                 default: throw new ArgumentException($"Unknown module '{module}'. Valid: main, emission, shape, noise, renderer, colorOverLifetime, sizeOverLifetime, velocityOverLifetime, rotationOverLifetime, trails, collision.");
+            }
+        }
+
+        // Internal test-seam: exposes SetModuleProperty for unit tests
+        internal static void SetPropertyDirect(ParticleSystem ps, string module, string prop, string value)
+            => SetModuleProperty(ps, module, prop, value);
+
+        static void SetModuleEnabled(ParticleSystem ps, string module, bool enabled)
+        {
+            switch (module.ToLowerInvariant())
+            {
+                case "coloroverlifetime":     var c = ps.colorOverLifetime; c.enabled = enabled; break;
+                case "sizeoverlifetime":      var s = ps.sizeOverLifetime; s.enabled = enabled; break;
+                case "velocityoverlifetime":  var v = ps.velocityOverLifetime; v.enabled = enabled; break;
+                case "rotationoverlifetime":  var r = ps.rotationOverLifetime; r.enabled = enabled; break;
+                case "trails":                var t = ps.trails; t.enabled = enabled; break;
+                case "collision":             var co = ps.collision; co.enabled = enabled; break;
             }
         }
 

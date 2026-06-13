@@ -192,7 +192,7 @@ namespace UnityMCP.Editor
             // Fall back to first object with the move component type
             var moveComp = config?.moveComponent;
             if (string.IsNullOrEmpty(moveComp)) return "/Player";
-            foreach (var go in UnityEngine.Object.FindObjectsOfType<GameObject>())
+            foreach (var go in UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
             {
                 if (go.GetComponent(moveComp) != null)
                     return "/" + go.name;

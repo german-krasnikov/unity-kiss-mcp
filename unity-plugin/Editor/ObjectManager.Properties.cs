@@ -91,6 +91,7 @@ namespace UnityMCP.Editor
                     break;
                 }
                 case SerializedPropertyType.Integer:
+                case SerializedPropertyType.LayerMask:
                 {
                     var d = int.Parse(delta.TrimStart('+'));
                     property.intValue += d;

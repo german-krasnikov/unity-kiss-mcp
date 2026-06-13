@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="94 MCP Tools · 3860 Tests (2038 Python · 1752 Unity · 70 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="94 MCP Tools · 4154 Tests (2121 Python · 1963 Unity · 70 Live) · 80-95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -230,6 +230,20 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.25.13</b> — 2026-06-12 — UTF-8 encoding fixes round-3 (grey-zones closed)</summary>
+
+**UTF-8 Encoding Round-3 (Server + Plugin v0.25.13)** — **(C1: Python test I/O gates)** All bare `open(..., "r")` in test suite now explicit `encoding …
+
+</details>
+
+<details>
+<summary><b>v0.25.12</b> — 2026-06-12 — UTF-8 encoding fixes + safety tests + grey-zone audit round-2</summary>
+
+**UTF-8 Everywhere (Server + Plugin v0.25.12)** — **(Round 1)** Python file I/O and C# Windows codepage safety hardening.
+
+</details>
+
+<details>
 <summary><b>v0.25.0</b> — 2026-06-12 — Multi-scene CRUD + test filter + compile check workflow</summary>
 
 **Multi-Scene CRUD + Diff (Plugin v0.25.0)** — Cross-scene `transfer_object` (move/copy between scenes), `object_diff` (unified diff of two objects sh …
@@ -251,22 +265,10 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.23.13</b> — 2026-06-11 — Unified settings + media viewers + LLM config + review hardening</summary>
-
-**SettingsNavController Hardening (Plugin v0.23.13)** — Timer-based animated transitions between settings pages (iOS-style slide), input-field tab/Esc …
-
-</details>
-
-<details>
-<summary><b>v0.23.0</b> — 2026-06-11 — Reconnect recovery + installer + unified settings + media viewers + DRY sampling</summary>
-
-**Reconnect Recovery: Zombie Detection + SO_REUSEPORT + TCP Probe (Server + Plugin v0.23.0)** — Fixes `-32000 server error` during rapid reconnection  …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.23.13** — 2026-06-11 — Unified settings + media viewers + LLM config + review hardening
+- **v0.23.0** — 2026-06-11 — Reconnect recovery + installer + unified settings + media viewers + DRY sampling
 - **v0.22.1** — 2026-06-11 — Crash logging for unhandled MCP server exceptions
 - **v0.22.0** — 2026-06-11 — Multi-project port auto-assignment + dual-port isolation + PortResolver extraction
 - **v0.21.0** — 2026-06-11 — Cross-platform Windows/Linux support + zero manual patching

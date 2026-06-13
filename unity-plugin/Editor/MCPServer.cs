@@ -76,7 +76,7 @@ namespace UnityMCP.Editor
                 { "test_step", 30 },
             };
 
-        private static int GetCommandTimeout(string cmd)
+        internal static int GetCommandTimeout(string cmd)
         {
             return CommandTimeouts.TryGetValue(cmd, out var t) ? t : 25;
         }
@@ -400,7 +400,7 @@ namespace UnityMCP.Editor
                                 tcs.TrySetCanceled();
                             else
                                 tcs.TrySetResult(
-                                    $"{{\"id\":\"{msgId}\",\"ok\":false,\"err\":\"Command '{cmdName}' timed out after {timeoutSec}s (Unity main thread blocked). Retry.\",\"retry\":2000}}");
+                                    $"{{\"id\":\"{JsonHelper.EscapeJson(msgId)}\",\"ok\":false,\"err\":\"Command '{JsonHelper.EscapeJson(cmdName)}' timed out after {timeoutSec}s (Unity main thread blocked). Retry.\",\"retry\":2000}}");
                         });
                         var result = await tcs.Task;
                         await SendAsync(stream, result, clientToken);

@@ -68,21 +68,22 @@ namespace UnityMCP.Editor.Chat
             return container;
         }
 
-        private static VisualElement AltLabel(string alt)
+        internal static VisualElement AltLabel(string alt)
         {
             var lbl = new Label(string.IsNullOrEmpty(alt) ? "[image]" : alt);
             lbl.AddToClassList("md-image-alt");
             return lbl;
         }
 
-        private static bool IsImageFile(string path)
+        internal static bool IsImageFile(string path)
         {
+            if (path == null) return false;
             var ext = Path.GetExtension(path).ToLowerInvariant();
             return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp";
         }
 
         /// <summary>Returns an absolute path. Supports absolute or project-relative paths.</summary>
-        private static string ResolvePath(string src)
+        internal static string ResolvePath(string src)
         {
             if (Path.IsPathRooted(src)) return src;
             return Path.Combine(Directory.GetCurrentDirectory(), src);

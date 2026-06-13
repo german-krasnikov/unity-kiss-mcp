@@ -115,7 +115,9 @@ namespace UnityMCP.Editor.Chat
 
             foreach (var pc in sorted)
             {
-                string mention = "@" + pc.Chip.DisplayName;
+                // Include trailing space so mention.Length matches the full extent occupied in raw text.
+                // InlineChipField always injects "@Name " (with space), so this is always the correct unit.
+                string mention = "@" + pc.Chip.DisplayName + " ";
                 int chipRawOffset = System.Math.Clamp(pc.TextOffset, rawPos, rawText.Length);
 
                 // Validate mention at expected offset; if misaligned, search nearby (handles off-by-one).
@@ -143,25 +145,23 @@ namespace UnityMCP.Editor.Chat
                     if (foundAt > rawPos)
                         cleanText.Append(rawText, rawPos, foundAt - rawPos);
                     cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
-                    int mentionWithSpace    = foundAt + mention.Length + 1;
-                    int mentionWithoutSpace = foundAt + mention.Length;
-                    if (mentionWithSpace <= rawText.Length)
-                        rawPos = mentionWithSpace;
-                    else if (mentionWithoutSpace <= rawText.Length)
-                        rawPos = mentionWithoutSpace;
-                    else
-                        rawPos = foundAt + mention.Length;
+                    // mention already includes the trailing space — advance rawPos past the full mention.
+                    rawPos = System.Math.Min(foundAt + mention.Length, rawText.Length);
                 }
                 else
                 {
                     // Mention not found near expected offset — search all remaining text (F24).
+                    // Also try without trailing space for chips at end-of-string (no space present).
+                    string mentionNoSpace = mention.TrimEnd();
                     int globalIdx = rawText.IndexOf(mention, rawPos, System.StringComparison.Ordinal);
+                    if (globalIdx < 0)
+                        globalIdx = rawText.IndexOf(mentionNoSpace, rawPos, System.StringComparison.Ordinal);
                     if (globalIdx >= 0)
                     {
                         if (globalIdx > rawPos)
                             cleanText.Append(rawText, rawPos, globalIdx - rawPos);
                         cleanChips.Add(new PositionedChip(pc.Chip, cleanText.Length));
-                        int afterMention = globalIdx + mention.Length;
+                        int afterMention = globalIdx + mentionNoSpace.Length;
                         rawPos = afterMention < rawText.Length && rawText[afterMention] == ' '
                             ? afterMention + 1 : afterMention;
                     }

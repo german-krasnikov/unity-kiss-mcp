@@ -48,7 +48,7 @@ namespace UnityMCP.Editor.Chat
             args.Add("-c");
             args.Add($"mcp_servers.unity.command=\"{CodexArgBuilder.TomlEscapeString(_pythonCommand ?? CodexArgBuilder.PythonFallback)}\"");
             args.Add("-c");
-            args.Add($"mcp_servers.unity.args=[{BuildTomlArray(_pythonArgs)}]");
+            args.Add($"mcp_servers.unity.args=[{CodexArgBuilder.BuildTomlStringArray(_pythonArgs)}]");
             args.Add("-c");
             args.Add($"mcp_servers.unity.startup_timeout_sec={_startupTimeoutSec}");
 
@@ -61,9 +61,10 @@ namespace UnityMCP.Editor.Chat
 
         protected override void SpawnNewProcess(string binary, string[] args, string[] strip)
         {
+            // Increment _nextId before spawn so tests can assert on it even if Spawn throws.
+            var id = ++_nextId;
             base.SpawnNewProcess(binary, args, strip);
             // Send initialize immediately after spawn (fire-and-forget; response is ignored)
-            var id = ++_nextId;
             base.WriteLineToProc(
                 $"{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"initialize\"," +
                 $"\"params\":{{\"clientInfo\":{{\"name\":\"unity-mcp\",\"version\":\"1\"}}}}}}");
@@ -123,7 +124,7 @@ namespace UnityMCP.Editor.Chat
         }
 
         // Extract raw text from UserTurnBuilder envelope: {"message":{"content":[{"text":"..."}]}}
-        private static string ExtractPromptText(string turnJson)
+        internal static string ExtractPromptText(string turnJson)
         {
             var msg     = JsonHelper.ExtractObject(turnJson, "message");
             var content = JsonHelper.ExtractArray(msg, "content");
@@ -140,13 +141,5 @@ namespace UnityMCP.Editor.Chat
 #endif
         }
 
-        private static string BuildTomlArray(string[] items)
-        {
-            if (items == null || items.Length == 0) return "";
-            var parts = new string[items.Length];
-            for (int i = 0; i < items.Length; i++)
-                parts[i] = $"\"{CodexArgBuilder.TomlEscapeString(items[i])}\"";
-            return string.Join(",", parts);
-        }
     }
 }

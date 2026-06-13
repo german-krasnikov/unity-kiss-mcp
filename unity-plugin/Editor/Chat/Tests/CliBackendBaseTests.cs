@@ -208,5 +208,46 @@ namespace UnityMCP.Editor.Chat.Tests
             _b.Start();
             Assert.AreEqual(1, _b.SpawnCallCount, "Second Start must be a no-op when already running");
         }
+
+        // CH1.test.7: SendTurn persistent-process, not running → auto-starts then writes
+        [Test]
+        public void SendTurn_Persistent_NotRunning_AutoStartsThenWrites()
+        {
+            _b._persistent     = true;
+            _b.SimulateRunning = false; // not running — must auto-start
+
+            _b.SendTurn("my-payload");
+
+            Assert.AreEqual(1, _b.SpawnCallCount,   "must spawn when not running");
+            Assert.AreEqual(1, _b.WriteLineCallCount, "must write to process after spawning");
+            Assert.AreEqual("my-payload", _b.LastWrittenLine);
+        }
+
+        // X5.cross.5: DrainEvents ToolCallAccumulator pipeline — start+args+result produces complete record
+        [Test]
+        public void DrainEvents_FullToolPipeline_ArgsAndResultInRecord()
+        {
+            _b.ParseLineFunc = (line, s) =>
+            {
+                if (line == "start")  s.Add(ChatEvent.ToolStart("read_file", "", "id_r"));
+                if (line == "args")   s.Add(ChatEvent.ToolArgsComplete());
+                if (line == "result") s.Add(ChatEvent.ToolResult("id_r", "file contents", true));
+                return true;
+            };
+            _b.LinesToDrain.Enqueue("start");
+            _b.LinesToDrain.Enqueue("args");
+            _b.LinesToDrain.Enqueue("result");
+            _b._proc = new ChatProcess();
+
+            var toolOut = new List<ToolCallRecord>();
+            _b.DrainEvents(new List<ChatEvent>(), toolOut);
+
+            Assert.AreEqual(3, toolOut.Count, "must emit 3 tool records (start, args-complete, result)");
+            var final = toolOut[toolOut.Count - 1];
+            Assert.AreEqual("read_file",      final.Name);
+            Assert.AreEqual("file contents",  final.ResultText);
+            Assert.IsTrue(final.IsOk,         "IsOk must be true for successful result");
+            Assert.IsTrue(final.HasResult,     "HasResult must be true after result event");
+        }
     }
 }

@@ -247,7 +247,7 @@ def test_all_three_tools_registered_in_tier1():
 
 def test_fixture_file_exists():
     """roslyn_responses.txt fixture exists and has expected sections."""
-    text = FIXTURES.read_text()
+    text = FIXTURES.read_text(encoding="utf-8")
     assert "find_references" in text
     assert "compile_preflight" in text
     assert "semantic_at" in text

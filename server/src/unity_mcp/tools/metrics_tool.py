@@ -9,12 +9,12 @@ async def get_metrics(format: str = "text", reset: bool = False) -> str:
     if reset:
         snap = METRICS.snapshot_and_reset()
         if format == "json":
-            return _json.dumps(snap)
+            return _json.dumps(snap, ensure_ascii=False)
         # Format from the captured snapshot — METRICS already cleared
         # Use a temporary registry for formatting
         return _format_snapshot(snap)
     if format == "json":
-        return _json.dumps(METRICS.snapshot())
+        return _json.dumps(METRICS.snapshot(), ensure_ascii=False)
     return METRICS.format_report()
 
 
