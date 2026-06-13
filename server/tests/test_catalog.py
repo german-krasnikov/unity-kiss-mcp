@@ -163,7 +163,6 @@ def test_drift_guard_all_public_tools_in_catalog():
 # Cycle 6: _push_catalog sends correct command
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_push_catalog_sends_set_tool_catalog():
     from unity_mcp.server import _push_catalog
     mock_bridge = AsyncMock()
@@ -175,7 +174,6 @@ async def test_push_catalog_sends_set_tool_catalog():
     assert call_args[0][0] == "set_tool_catalog"
 
 
-@pytest.mark.asyncio
 async def test_push_catalog_sends_text_format():
     from unity_mcp.server import _push_catalog
     mock_bridge = AsyncMock()
@@ -199,7 +197,7 @@ async def test_push_catalog_sends_text_format():
         _json.loads(catalog_str)
 
 
-@pytest.mark.asyncio
+# no-assert: crash guard
 async def test_push_catalog_silent_on_failure():
     """_push_catalog must not raise even if bridge.send fails."""
     from unity_mcp.server import _push_catalog

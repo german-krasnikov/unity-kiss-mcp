@@ -1,5 +1,3 @@
-// CS4.test.4 — ScreenshotCapture.FindCamera coverage via the public Capture API.
-// EditMode safe — creates real Camera GameObjects.
 using NUnit.Framework;
 using UnityEngine;
 

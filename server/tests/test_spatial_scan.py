@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.tools.spatial import spatial_query, scan_scene
 
 
-@pytest.mark.asyncio
 async def test_spatial_raycast_sends_command(mock_bridge):
     """raycast action sends path + target to spatial_query."""
     mock_bridge.send.return_value = {"ok": True, "data": "CLEAR (no hits)"}
@@ -16,7 +15,6 @@ async def test_spatial_raycast_sends_command(mock_bridge):
     assert sent["target"] == "/Wall"
 
 
-@pytest.mark.asyncio
 async def test_spatial_map_sends_command(mock_bridge):
     """spatial_map action sends cell_size param."""
     mock_bridge.send.return_value = {"ok": True, "data": "# Map: XZ, cell=2m, 10x10"}
@@ -26,7 +24,6 @@ async def test_spatial_map_sends_command(mock_bridge):
     assert sent["cell_size"] == "2.0"
 
 
-@pytest.mark.asyncio
 async def test_spatial_raycast_with_layer_mask(mock_bridge):
     """raycast action passes layer_mask param."""
     mock_bridge.send.return_value = {"ok": True, "data": "BLOCKED: 1 hit"}
@@ -38,7 +35,6 @@ async def test_spatial_raycast_with_layer_mask(mock_bridge):
 
 # ─── error paths ──────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_spatial_query_error_raises_tool_error(mock_bridge):
     """spatial_query raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
@@ -46,7 +42,6 @@ async def test_spatial_query_error_raises_tool_error(mock_bridge):
         await spatial_query(action="nearest", path="/Missing")
 
 
-@pytest.mark.asyncio
 async def test_scan_scene_error_raises_tool_error(mock_bridge):
     """scan_scene raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Scene not loaded"})

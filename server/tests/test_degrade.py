@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 # ── Test 1: all steps fail → no_fallback surface marker ──────────────────────
 
-@pytest.mark.asyncio
 async def test_all_steps_fail_no_fallback():
     from unity_mcp.degrade import degrade, wrap_degraded
     from unity_mcp.metrics import METRICS
@@ -25,7 +24,6 @@ async def test_all_steps_fail_no_fallback():
 
 # ── Test 2: first step succeeds → no metrics, no marker ──────────────────────
 
-@pytest.mark.asyncio
 async def test_first_step_succeeds_no_metrics():
     from unity_mcp.degrade import degrade
     from unity_mcp.metrics import METRICS
@@ -40,7 +38,6 @@ async def test_first_step_succeeds_no_metrics():
 
 # ── Test 3: mix async and sync steps ─────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_async_and_sync_steps():
     from unity_mcp.degrade import degrade
 
@@ -58,7 +55,6 @@ async def test_async_and_sync_steps():
 
 # ── Test 4: step raises exception → caught, treated as failure ────────────────
 
-@pytest.mark.asyncio
 async def test_step_raises_exception_caught():
     from unity_mcp.degrade import degrade
     from unity_mcp.metrics import METRICS
@@ -90,7 +86,6 @@ async def test_step_raises_exception_caught():
 
 # ── Test 5: env UNITY_MCP_DEGRADE_DISABLED=1 → exception bubbles raw ─────────
 
-@pytest.mark.asyncio
 async def test_env_disabled_propagates_exception(monkeypatch):
     from unity_mcp.degrade import degrade
     monkeypatch.setenv("UNITY_MCP_DEGRADE_DISABLED", "1")
@@ -104,7 +99,6 @@ async def test_env_disabled_propagates_exception(monkeypatch):
 
 # ── Test 6: budget RouteDecision run=False → degraded marker ─────────────────
 
-@pytest.mark.asyncio
 async def test_budget_skip_as_degradation():
     from unity_mcp.degrade import degrade, wrap_degraded
     from unity_mcp.metrics import METRICS
@@ -152,7 +146,6 @@ def test_pixeldiff_unavailable_format():
 
 # ── Test 8: reflect skipped on [DEGRADED: prefix ─────────────────────────────
 
-@pytest.mark.asyncio
 async def test_reflect_skipped_on_degraded_output(monkeypatch):
     from unity_mcp.middleware import wrap_send
 
@@ -172,7 +165,6 @@ async def test_reflect_skipped_on_degraded_output(monkeypatch):
 
 # ── Test 9: counter cardinality — one feature × N steps ──────────────────────
 
-@pytest.mark.asyncio
 async def test_counter_cardinality_per_step():
     from unity_mcp.degrade import degrade
     from unity_mcp.metrics import METRICS
@@ -197,7 +189,6 @@ async def test_counter_cardinality_per_step():
 
 # ── Test 10: event log format ─────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_event_log_format():
     from unity_mcp.degrade import degrade
     from unity_mcp.metrics import METRICS
@@ -234,7 +225,6 @@ def test_wrap_degraded_prefix_not_doubled():
 
 # ── Test 13: disabled mode falls through None to next rung ───────────────────
 
-@pytest.mark.asyncio
 async def test_disabled_mode_falls_through_on_none(monkeypatch):
     """#2: DEGRADE_DISABLED=1 + first step returns None → second step runs, returns 'ok', no marker."""
     from unity_mcp.degrade import degrade
@@ -250,7 +240,6 @@ async def test_disabled_mode_falls_through_on_none(monkeypatch):
 
 # ── Test 14: disabled mode exception still propagates raw ─────────────────────
 
-@pytest.mark.asyncio
 async def test_disabled_mode_propagates_exception_raw(monkeypatch):
     """#2: DEGRADE_DISABLED=1 + step raises → exception propagates, not suppressed."""
     from unity_mcp.degrade import degrade
@@ -265,7 +254,6 @@ async def test_disabled_mode_propagates_exception_raw(monkeypatch):
 
 # ── Test 15: disabled mode → METRICS.event NOT fired ─────────────────────────
 
-@pytest.mark.asyncio
 async def test_disabled_mode_no_metrics_event(monkeypatch):
     """Pattern E: UNITY_MCP_DEGRADE_DISABLED=1 → METRICS.event is never called,
     even when a step falls (returns None)."""
@@ -286,7 +274,6 @@ async def test_disabled_mode_no_metrics_event(monkeypatch):
     assert events == [], f"Expected no events, got {events}"
 
 
-@pytest.mark.asyncio
 async def test_disabled_mode_no_metrics_event_all_fail(monkeypatch):
     """Pattern E: all steps fail in disabled mode → still no METRICS.event."""
     from unity_mcp.degrade import degrade
@@ -308,7 +295,6 @@ async def test_disabled_mode_no_metrics_event_all_fail(monkeypatch):
 
 # ── Test 16: empty steps list → ("", None), no metrics ──────────────────────
 
-@pytest.mark.asyncio
 async def test_empty_steps_list_returns_empty_name_none():
     """degrade() with no steps returns ('', None) and emits no metrics."""
     from unity_mcp.degrade import degrade
@@ -325,7 +311,6 @@ async def test_empty_steps_list_returns_empty_name_none():
 
 # ── Test 17: disabled + async step falls through correctly ───────────────────
 
-@pytest.mark.asyncio
 async def test_disabled_async_step_falls_through(monkeypatch):
     """DEGRADE_DISABLED=1 with async step that returns None → next step runs."""
     from unity_mcp.degrade import degrade
@@ -345,7 +330,6 @@ async def test_disabled_async_step_falls_through(monkeypatch):
 
 # ── Test 12: all steps raise → last step name returned, counter=1 ─────────────
 
-@pytest.mark.asyncio
 async def test_all_steps_raise_all_caught():
     from unity_mcp.degrade import degrade
     from unity_mcp.metrics import METRICS

@@ -1,5 +1,4 @@
 """Tests for SchemaRegistry — capture/get_full/format_text."""
-import pytest
 from typing import Optional
 
 

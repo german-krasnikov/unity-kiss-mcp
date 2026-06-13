@@ -40,7 +40,6 @@ def _reset_send():
     _ci._send = original
 
 
-@pytest.mark.asyncio
 async def test_already_idle_returns_errors_immediately():
     errors = "Assets/Scripts/Foo.cs(12,5): error CS0103: 'bar' does not exist"
     _ci._send = _make_send(["idle|8.2"], errors_response=errors)
@@ -48,21 +47,18 @@ async def test_already_idle_returns_errors_immediately():
     assert errors in result
 
 
-@pytest.mark.asyncio
 async def test_already_idle_clean_returns_clean_message():
     _ci._send = _make_send(["idle|5.2"], errors_response="")
     result = await _ci.await_compile(timeout=60.0)
     assert result == "compile clean (5.2s)"
 
 
-@pytest.mark.asyncio
 async def test_compiling_then_idle_polls_until_done():
     _ci._send = _make_send(["compiling|1.0", "compiling|2.0", "idle|3.1"], errors_response="")
     result = await _ci.await_compile(timeout=60.0)
     assert result == "compile clean (3.1s)"
 
 
-@pytest.mark.asyncio
 async def test_domain_reload_disconnect_waits_and_retries():
     """ConnectionError during compile_status → retry loop."""
     call_count = 0
@@ -82,7 +78,6 @@ async def test_domain_reload_disconnect_waits_and_retries():
     assert call_count == 2
 
 
-@pytest.mark.asyncio
 async def test_domain_reload_error_waits_and_retries():
     """DomainReloadError (is-a ConnectionError) → retry loop."""
     call_count = 0
@@ -101,7 +96,6 @@ async def test_domain_reload_error_waits_and_retries():
     assert result == "compile clean (6.5s)"
 
 
-@pytest.mark.asyncio
 async def test_timeout_returns_best_effort():
     """Timeout while compiling → timeout message + best-effort errors."""
     async def _send(cmd, args=None, **kwargs):
@@ -116,7 +110,6 @@ async def test_timeout_returns_best_effort():
     assert "CS0001" in result
 
 
-@pytest.mark.asyncio
 async def test_multiple_disconnects_within_timeout():
     call_count = 0
 
@@ -135,7 +128,6 @@ async def test_multiple_disconnects_within_timeout():
     assert call_count == 3
 
 
-@pytest.mark.asyncio
 async def test_timeout_zero_idle_returns_errors():
     """timeout=0, status idle → fetches errors (exactly 2 calls: status + errors)."""
     call_count = 0
@@ -153,7 +145,6 @@ async def test_timeout_zero_idle_returns_errors():
     assert "some error" in result
 
 
-@pytest.mark.asyncio
 async def test_timeout_zero_compiling_returns_still_compiling():
     """timeout=0, status compiling → 'still compiling', no errors call."""
     call_count = 0
@@ -174,7 +165,6 @@ def test_registered_as_readonly_tool():
     assert "await_compile" in TIER1
 
 
-@pytest.mark.asyncio
 async def test_malformed_status_treated_as_idle():
     """Status not matching 'state|number' → treated as idle."""
     _ci._send = _make_send(["unexpected_garbage_response"], errors_response="")
@@ -182,7 +172,6 @@ async def test_malformed_status_treated_as_idle():
     assert "compile clean" in result
 
 
-@pytest.mark.asyncio
 async def test_get_errors_connection_failure_returns_clean():
     """compile_status idle, get_compile_errors raises ConnectionError → 'compile clean'."""
     _ci._send = _make_send(["idle|2.0"], errors_response=ConnectionError("tcp gone"))
@@ -190,7 +179,6 @@ async def test_get_errors_connection_failure_returns_clean():
     assert "compile clean" in result
 
 
-@pytest.mark.asyncio
 async def test_get_errors_tool_error_propagates():
     """compile_status idle, get_compile_errors raises ToolError → must propagate."""
     _ci._send = _make_send(["idle|2.0"], errors_response=ToolError("malformed response"))

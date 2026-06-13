@@ -1,6 +1,5 @@
 """Tests for PrefetchCache.put_synthetic — preimage caching from reflect snapshots."""
 import time
-import pytest
 from unity_mcp.prefetch_cache import PrefetchCache
 
 

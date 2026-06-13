@@ -2,7 +2,6 @@
 import os
 import re
 import time
-import pytest
 from unittest.mock import AsyncMock, patch
 
 # ToolHinter is in hinter.py — not yet created (Red phase)
@@ -190,7 +189,6 @@ def test_adoption_increments_metric():
 
 # ── Test 8: integration — middleware appends hint ─────────────────────────────
 
-@pytest.mark.asyncio
 async def test_middleware_appends_hint_string():
     """Drive 3 get_component through wrap_send → last result contains [HINT:."""
     from unity_mcp.middleware import wrap_send, Middleware
@@ -226,7 +224,6 @@ def test_disabled_via_env():
 
 # ── Test 10: skip on DEGRADED marker ─────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_skip_on_degraded_marker():
     """Result starting with [DEGRADED: → middleware does NOT append hint."""
     from unity_mcp.middleware import wrap_send, Middleware
@@ -279,7 +276,6 @@ def test_redundant_verify_read():
 
 # ── Test 13: predicate exception caught ──────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_predicate_exception_caught():
     """Malicious pattern that raises → middleware catches, hinter.error incremented, no exception."""
     from unity_mcp.middleware import wrap_send, Middleware

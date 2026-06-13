@@ -1,5 +1,3 @@
-// CS4.arch.2 + CS4.test.3 — SecurityScan whitespace-bypass + missing singular reflection patterns.
-// EditMode safe — no Unity API needed.
 using NUnit.Framework;
 
 namespace UnityMCP.Editor.Tests

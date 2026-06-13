@@ -1,6 +1,7 @@
 // TDD — ComponentSerializer type branches + Finder + HierarchySerializer format.
 // EditMode tests — run in Unity Test Runner (Window > General > Test Runner > EditMode).
 // All branches covered via real SerializedProperty from built-in Unity components.
+using System.Collections.Generic;
 using System.Globalization;
 using NUnit.Framework;
 using UnityEditor;
@@ -12,12 +13,19 @@ namespace UnityMCP.Editor.Tests
     public class ComponentSerializerGetPropertyValueTests
     {
         private GameObject _go;
+        private List<GameObject> _toDestroy = new List<GameObject>();
 
         [SetUp]
         public void SetUp() => _go = new GameObject("CSerializerTest");
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_go);
+        public void TearDown()
+        {
+            foreach (var go in _toDestroy)
+                if (go != null) Object.DestroyImmediate(go);
+            _toDestroy.Clear();
+            Object.DestroyImmediate(_go);
+        }
 
         // ── helpers ──────────────────────────────────────────────────────────
 
@@ -226,8 +234,8 @@ namespace UnityMCP.Editor.Tests
             // Access m_Children array size on Transform (children list)
             var t = _go.transform;
             // Add 2 children
-            var c1 = new GameObject("child1"); c1.transform.SetParent(t);
-            var c2 = new GameObject("child2"); c2.transform.SetParent(t);
+            var c1 = new GameObject("child1"); c1.transform.SetParent(t); _toDestroy.Add(c1);
+            var c2 = new GameObject("child2"); c2.transform.SetParent(t); _toDestroy.Add(c2);
 
             var so = new SerializedObject(t);
             var childrenProp = so.FindProperty("m_Children");
@@ -253,9 +261,6 @@ namespace UnityMCP.Editor.Tests
                 Assert.AreEqual("2", ComponentSerializer.GetPropertyValueString(sizeProp));
             else
                 Assert.Pass("ArraySize property not directly accessible on this Unity version — skipped");
-
-            Object.DestroyImmediate(c1);
-            Object.DestroyImmediate(c2);
         }
 
         // ── Generic/non-array — fallback <type> branch ───────────────────────
@@ -284,12 +289,19 @@ namespace UnityMCP.Editor.Tests
     public class ComponentSerializerFinderTests
     {
         private GameObject _go;
+        private List<GameObject> _toDestroy = new List<GameObject>();
 
         [SetUp]
         public void SetUp() => _go = new GameObject("CSFinderTest");
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_go);
+        public void TearDown()
+        {
+            foreach (var go in _toDestroy)
+                if (go != null) Object.DestroyImmediate(go);
+            _toDestroy.Clear();
+            Object.DestroyImmediate(_go);
+        }
 
         // ── StripNamespace ────────────────────────────────────────────────────
 
@@ -355,9 +367,9 @@ namespace UnityMCP.Editor.Tests
         {
             var child = new GameObject("CSChild");
             child.transform.SetParent(_go.transform);
+            _toDestroy.Add(child);
             var result = ComponentSerializer.GetPath(child);
             Assert.AreEqual("/CSFinderTest/CSChild", result);
-            Object.DestroyImmediate(child);
         }
 
         [Test]
@@ -365,9 +377,8 @@ namespace UnityMCP.Editor.Tests
         {
             var child = new GameObject("A"); child.transform.SetParent(_go.transform);
             var grand = new GameObject("B"); grand.transform.SetParent(child.transform);
+            _toDestroy.Add(child); // grand is destroyed with child
             Assert.AreEqual("/CSFinderTest/A/B", ComponentSerializer.GetPath(grand));
-            Object.DestroyImmediate(child);
-            // grand is destroyed with child
         }
 
         // ── FindObjectById ────────────────────────────────────────────────────
@@ -431,6 +442,7 @@ namespace UnityMCP.Editor.Tests
     public class HierarchySerializerFormatTests
     {
         private GameObject _root;
+        private List<GameObject> _toDestroy = new List<GameObject>();
 
         [SetUp]
         public void SetUp()
@@ -440,7 +452,13 @@ namespace UnityMCP.Editor.Tests
         }
 
         [TearDown]
-        public void TearDown() => Object.DestroyImmediate(_root);
+        public void TearDown()
+        {
+            foreach (var go in _toDestroy)
+                if (go != null) Object.DestroyImmediate(go);
+            _toDestroy.Clear();
+            Object.DestroyImmediate(_root);
+        }
 
         // ── SerializeSubtree ──────────────────────────────────────────────────
 
@@ -460,9 +478,9 @@ namespace UnityMCP.Editor.Tests
         {
             var child = new GameObject("HSChild");
             child.transform.SetParent(_root.transform);
+            _toDestroy.Add(child);
             var result = HierarchySerializer.SerializeSubtree(_root, depth: 1);
             Assert.IsTrue(result.Contains("HSChild"), $"Child missing: '{result}'");
-            Object.DestroyImmediate(child);
         }
 
         [Test]
@@ -470,23 +488,21 @@ namespace UnityMCP.Editor.Tests
         {
             var child = new GameObject("HSInactive");
             child.transform.SetParent(_root.transform);
+            _toDestroy.Add(child);
             child.SetActive(false);
             var result = HierarchySerializer.SerializeSubtree(_root, depth: 1);
             Assert.IsTrue(result.Contains(" !"), $"Inactive marker '!' missing: '{result}'");
-            Object.DestroyImmediate(child);
         }
 
         [Test]
         public void SerializeSubtree_MultipleChildren_TreeCharsPresent()
         {
-            var c1 = new GameObject("A"); c1.transform.SetParent(_root.transform);
-            var c2 = new GameObject("B"); c2.transform.SetParent(_root.transform);
+            var c1 = new GameObject("A"); c1.transform.SetParent(_root.transform); _toDestroy.Add(c1);
+            var c2 = new GameObject("B"); c2.transform.SetParent(_root.transform); _toDestroy.Add(c2);
             var result = HierarchySerializer.SerializeSubtree(_root, depth: 1);
             // Should use ├─ or └─ connectors
             Assert.IsTrue(result.Contains("├─") || result.Contains("└─"),
                 $"Tree connectors missing: '{result}'");
-            Object.DestroyImmediate(c1);
-            Object.DestroyImmediate(c2);
         }
 
         [Test]
@@ -494,9 +510,9 @@ namespace UnityMCP.Editor.Tests
         {
             var child = new GameObject("OnlyChild");
             child.transform.SetParent(_root.transform);
+            _toDestroy.Add(child);
             var result = HierarchySerializer.SerializeSubtree(_root, depth: 1);
             Assert.IsTrue(result.Contains("└─"), $"└─ missing for last child: '{result}'");
-            Object.DestroyImmediate(child);
         }
 
         [Test]
@@ -504,10 +520,10 @@ namespace UnityMCP.Editor.Tests
         {
             var child = new GameObject("Parent"); child.transform.SetParent(_root.transform);
             var grand = new GameObject("Grand"); grand.transform.SetParent(child.transform);
+            _toDestroy.Add(child); // grand is destroyed with child
             // depth=0 → child has +1 descendant marker
             var result = HierarchySerializer.SerializeSubtree(_root, depth: 0);
             Assert.IsTrue(result.Contains("+"), $"Descendant count marker missing: '{result}'");
-            Object.DestroyImmediate(child);
         }
 
         // ── SerializeIncremental ──────────────────────────────────────────────
@@ -528,10 +544,10 @@ namespace UnityMCP.Editor.Tests
         {
             HierarchySerializer.SerializeIncremental(99, "/" + _root.name, null, false);
             var child = new GameObject("NewChild"); child.transform.SetParent(_root.transform);
+            _toDestroy.Add(child);
             var result = HierarchySerializer.SerializeIncremental(99, "/" + _root.name, null, false);
             Assert.AreNotEqual("NO_CHANGE", result, "Expected updated hierarchy after adding child");
             Assert.IsTrue(result.Contains("NewChild"));
-            Object.DestroyImmediate(child);
         }
 
         // ── components flag ───────────────────────────────────────────────────
@@ -558,9 +574,9 @@ namespace UnityMCP.Editor.Tests
         public void SerializeSummary_WithChildren_ShowsChildCount()
         {
             var c = new GameObject("C1"); c.transform.SetParent(_root.transform);
+            _toDestroy.Add(c);
             var result = HierarchySerializer.SerializeSummary("/" + _root.name);
             Assert.IsTrue(result.Contains("1"), $"Child count missing: '{result}'");
-            Object.DestroyImmediate(c);
         }
 
         [Test]

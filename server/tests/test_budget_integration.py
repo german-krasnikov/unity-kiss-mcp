@@ -1,6 +1,5 @@
 """TDD: Budget integration — SamplingService gating + budget_status tool."""
 import os
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
 from unity_mcp.budget.cost_tracker import CostTracker
@@ -11,7 +10,6 @@ def make_tracker(tmp_path, session_cap=1.0, day_cap=5.0):
     return CostTracker(path=tmp_path / "b.json", session_cap=session_cap, day_cap=day_cap)
 
 
-@pytest.mark.asyncio
 async def test_sampling_records_cost_on_success(tmp_path):
     """After a successful sampling call, budget tracker should have > 0 spent."""
     import unity_mcp.sampling as sm
@@ -36,7 +34,6 @@ async def test_sampling_records_cost_on_success(tmp_path):
         sm.init_budget(None, None)
 
 
-@pytest.mark.asyncio
 async def test_sampling_skips_on_budget_exceeded(tmp_path):
     """When budget is 95%+ and feature is low-priority, skip call entirely."""
     import unity_mcp.sampling as sm
@@ -56,7 +53,6 @@ async def test_sampling_skips_on_budget_exceeded(tmp_path):
         sm.init_budget(None, None)
 
 
-@pytest.mark.asyncio
 async def test_budget_status_tool_returns_text(tmp_path):
     """budget_status returns formatted string after init."""
     from unity_mcp.tools import budget_tool
@@ -69,7 +65,6 @@ async def test_budget_status_tool_returns_text(tmp_path):
     assert "day=$" in result
 
 
-@pytest.mark.asyncio
 async def test_budget_status_disabled_message():
     """budget_status without init returns disabled message."""
     from unity_mcp.tools import budget_tool
@@ -78,7 +73,6 @@ async def test_budget_status_disabled_message():
     assert "disabled" in result.lower() or "budget" in result.lower()
 
 
-@pytest.mark.asyncio
 async def test_verify_visual_without_image_charges_text_only(tmp_path):
     """verify_visual with no screenshot must NOT add image token overhead."""
     import unity_mcp.sampling as sm
@@ -109,7 +103,6 @@ async def test_verify_visual_without_image_charges_text_only(tmp_path):
         sm.init_budget(None, None)
 
 
-@pytest.mark.asyncio
 async def test_budget_disabled_via_env(tmp_path):
     """UNITY_MCP_BUDGET_DISABLED=1 bypasses routing entirely."""
     import unity_mcp.sampling as sm

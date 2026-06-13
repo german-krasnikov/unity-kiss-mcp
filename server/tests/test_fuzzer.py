@@ -1,4 +1,3 @@
-import pytest
 from unity_mcp.fuzzer import generate_script, shrink_script
 
 

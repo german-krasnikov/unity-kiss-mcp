@@ -56,7 +56,6 @@ async def _wait_unity_recovery():
         await asyncio.sleep(2.0)
 
 
-@pytest.mark.asyncio
 async def test_reconnect_after_recompile_with_heartbeat(bridge):
     """Trigger recompile, verify heartbeat-driven reconnect + commands work after."""
     r = await bridge.send("ping", {})
@@ -76,7 +75,6 @@ async def test_reconnect_after_recompile_with_heartbeat(bridge):
         bridge.stop_heartbeat()
 
 
-@pytest.mark.asyncio
 async def test_fresh_bridge_connects_after_recompile():
     """A brand new bridge can connect after Unity has recompiled (no heartbeat)."""
     assert await _wait_fresh_connect(), "Unity not up before fresh-bridge test"

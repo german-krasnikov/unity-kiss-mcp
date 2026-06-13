@@ -1,19 +1,8 @@
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+from helpers import make_mock_bridge
 
 
-def make_mock_bridge(connected: bool = True):
-    b = MagicMock()
-    b.connect = AsyncMock()
-    b.close = AsyncMock()
-    b.send = AsyncMock(return_value={"ok": True})
-    b.connected = connected
-    b.stop_heartbeat = MagicMock()
-    return b
-
-
-@pytest.mark.asyncio
 async def test_initial_state():
     from unity_mcp.connection_slot import ConnectionSlot
     s = ConnectionSlot()
@@ -22,7 +11,6 @@ async def test_initial_state():
     assert s.port == 9500
 
 
-@pytest.mark.asyncio
 async def test_connect_creates_bridge():
     from unity_mcp.connection_slot import ConnectionSlot
     b = make_mock_bridge()
@@ -35,7 +23,6 @@ async def test_connect_creates_bridge():
     b.connect.assert_awaited_once()
 
 
-@pytest.mark.asyncio
 async def test_connect_stores_port():
     from unity_mcp.connection_slot import ConnectionSlot
     b = make_mock_bridge()
@@ -45,7 +32,6 @@ async def test_connect_stores_port():
     assert s.port == 9501
 
 
-@pytest.mark.asyncio
 async def test_connected_reflects_bridge_state():
     from unity_mcp.connection_slot import ConnectionSlot
     b = make_mock_bridge(connected=True)
@@ -55,7 +41,6 @@ async def test_connected_reflects_bridge_state():
     assert s.connected is True
 
 
-@pytest.mark.asyncio
 async def test_connect_unavailable_returns_registered():
     from unity_mcp.connection_slot import ConnectionSlot
     b = make_mock_bridge()
@@ -67,7 +52,6 @@ async def test_connect_unavailable_returns_registered():
     assert s.bridge is b  # bridge still stored
 
 
-@pytest.mark.asyncio
 async def test_reconnect_closes_previous():
     from unity_mcp.connection_slot import ConnectionSlot
     b1 = make_mock_bridge()
@@ -82,7 +66,6 @@ async def test_reconnect_closes_previous():
     assert s.bridge is b2
 
 
-@pytest.mark.asyncio
 async def test_close_clears_bridge():
     from unity_mcp.connection_slot import ConnectionSlot
     b = make_mock_bridge()
@@ -95,14 +78,14 @@ async def test_close_clears_bridge():
     b.close.assert_awaited()
 
 
-@pytest.mark.asyncio
+# no-assert: crash guard
 async def test_close_noop_when_empty():
+    """Verifies ConnectionSlot.close() does not raise when no bridge is set."""
     from unity_mcp.connection_slot import ConnectionSlot
     s = ConnectionSlot()
     await s.close()  # must not raise
 
 
-@pytest.mark.asyncio
 async def test_slot_syncs_port_from_bridge():
     """_sync_port reconnect callback updates slot.port to match bridge._port."""
     from unity_mcp.connection_slot import ConnectionSlot
@@ -119,7 +102,6 @@ async def test_slot_syncs_port_from_bridge():
     assert s.port == 9501
 
 
-@pytest.mark.asyncio
 async def test_slot_fires_on_port_change():
     """on_port_change(old, new) fires when bridge._port differs from slot._port."""
     from unity_mcp.connection_slot import ConnectionSlot
@@ -137,7 +119,6 @@ async def test_slot_fires_on_port_change():
 
 # ── PY1.test.4: connect() must start heartbeat ───────────────────────────────
 
-@pytest.mark.asyncio
 async def test_connect_starts_heartbeat():
     """connect() must call start_heartbeat() on the bridge after successful connect."""
     from unity_mcp.connection_slot import ConnectionSlot
@@ -147,3 +128,50 @@ async def test_connect_starts_heartbeat():
         s = ConnectionSlot()
         await s.connect(9500)
     b.start_heartbeat.assert_called_once()
+
+
+# ── reconnect callbacks on new bridge ────────────────────────────────────────
+
+def test_connection_slot_stores_callbacks():
+    """ConnectionSlot must expose a way to register/re-register reconnect callbacks."""
+    from unity_mcp.connection_slot import ConnectionSlot
+    from unittest.mock import MagicMock
+    s = ConnectionSlot()
+    cb = MagicMock()
+    s.add_reconnect_callback(cb)
+    assert cb in s._reconnect_callbacks
+
+
+async def test_connection_slot_registers_callbacks_on_new_bridge():
+    """Callbacks registered on slot are applied to every new bridge created by connect()."""
+    from unity_mcp.connection_slot import ConnectionSlot
+    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import patch
+
+    b1 = MagicMock()
+    b1.connect = AsyncMock()
+    b1.close = AsyncMock()
+    b1.connected = True
+    b1.stop_heartbeat = MagicMock()
+    b1.add_reconnect_callback = MagicMock()
+
+    b2 = MagicMock()
+    b2.connect = AsyncMock()
+    b2.close = AsyncMock()
+    b2.connected = True
+    b2.stop_heartbeat = MagicMock()
+    b2.add_reconnect_callback = MagicMock()
+
+    bridges = iter([b1, b2])
+    cb = MagicMock()
+
+    with patch("unity_mcp.connection_slot.UnityBridge", side_effect=lambda h, p, **_: next(bridges)):
+        s = ConnectionSlot()
+        s.add_reconnect_callback(cb)
+        await s.connect(9500)
+        assert b1.add_reconnect_callback.call_count == 2
+        b1.add_reconnect_callback.assert_any_call(cb)
+
+        await s.connect(9501)
+        assert b2.add_reconnect_callback.call_count == 2
+        b2.add_reconnect_callback.assert_any_call(cb)

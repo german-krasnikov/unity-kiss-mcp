@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 # ── PY6.test.1: Live cache-collision test (replaces tautological key-diff tests) ─
 
-@pytest.mark.asyncio
 async def test_distill_cache_no_cross_type_collision(monkeypatch):
     """Cache entry for Transform must NOT be returned for Rigidbody query."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -42,7 +41,6 @@ async def test_distill_cache_no_cross_type_collision(monkeypatch):
 
 # ── PY6.test.6: maybe_inject_state exception swallowed silently ───────────────
 
-@pytest.mark.asyncio
 async def test_maybe_inject_state_exception_swallowed():
     """When send_fn raises on get_hierarchy, result is unchanged and no exception propagates."""
     from unity_mcp.middleware import Middleware
@@ -69,7 +67,6 @@ def test_write_cmds_includes_transfer_object():
     assert "transfer_object" in WRITE_CMDS
 
 
-@pytest.mark.asyncio
 async def test_hierarchy_diff_resets_after_transfer_object(monkeypatch):
     """After transfer_object, get_hierarchy must return fresh tree (not [DIFF])."""
     monkeypatch.setenv("UNITY_MCP_VALIDATE", "0")
@@ -106,7 +103,6 @@ async def test_hierarchy_diff_resets_after_transfer_object(monkeypatch):
 
 # ── X3.cross.4: maybe_inject_state guarded when UNITY_MCP_MIDDLEWARE is off ──
 
-@pytest.mark.asyncio
 async def test_auto_state_off_by_default(monkeypatch):
     """10 sequential set_property calls must NOT produce AUTO STATE when UNITY_MCP_AUTO_STATE=0."""
     monkeypatch.delenv("UNITY_MCP_MIDDLEWARE", raising=False)
@@ -138,7 +134,6 @@ async def test_auto_state_off_by_default(monkeypatch):
 
 # ── X4.cross.3: UNITY_MCP_DISTILL_HAIKU=1 activates SamplingService ─────────
 
-@pytest.mark.asyncio
 async def test_distill_haiku_env_gate_activates(monkeypatch):
     """UNITY_MCP_DISTILL_HAIKU=1 initializes _distiller with a SamplingService."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -180,7 +175,6 @@ async def test_distill_haiku_env_gate_activates(monkeypatch):
 
 # ── X5.cross.3: _haiku_to_cache end-to-end ───────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_haiku_to_cache_populates_cache(monkeypatch):
     """_haiku_to_cache populates _distill_cache; next _maybe_distill returns cached result."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")

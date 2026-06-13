@@ -1,6 +1,4 @@
 // Byte-level encoding tests for UTF-8 no-BOM correctness.
-// CS1: JsonHelper.Utf8NoBom — the encoding constant used by all file writers.
-// CS2: ChatMcpConfigWriter tests → Chat/Tests/ChatMcpConfigWriterEncodingTests.cs
 // EditMode only — no scene load needed.
 using System;
 using System.IO;
@@ -75,7 +73,6 @@ namespace UnityMCP.Editor.Tests
             Assert.AreNotEqual(0xEF, bytes[0], "File must not start with UTF-8 BOM");
         }
 
-        // CS2: ChatMcpConfigWriter tests → Chat/Tests/ChatMcpConfigWriterEncodingTests.cs
         // CS3: ChatProcess._stdin NewLine="\n" — covered by integration test.
 
         private static bool ContainsSequence(byte[] haystack, byte[] needle)

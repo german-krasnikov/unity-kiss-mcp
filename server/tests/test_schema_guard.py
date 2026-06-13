@@ -34,7 +34,6 @@ def make_guard():
 
 # ── 1. Valid passthrough ──────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_valid_passthrough():
     """comp in cache, prop in schema → None (pass)."""
     mw, cache, guard = make_guard()
@@ -51,7 +50,6 @@ async def test_valid_passthrough():
 
 # ── 2. Invalid component lev≤2 → block ───────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_invalid_component_lev2_block():
     """'Healt' (lev=1 from 'Health') → block envelope contains 'Health'."""
     mw, cache, guard = make_guard()
@@ -70,7 +68,6 @@ async def test_invalid_component_lev2_block():
 
 # ── 3. Invalid component lev>5 → pass ────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_invalid_component_lev6_pass():
     """'QuantumFlux' (lev>>5 from 'Health') → None (let Unity error)."""
     mw, cache, guard = make_guard()
@@ -86,7 +83,6 @@ async def test_invalid_component_lev6_pass():
 
 # ── 4. Invalid prop → block ───────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_invalid_prop_block():
     """Known comp, prop 'hpp' (lev=1 from 'hp') → block, suggests 'hp'."""
     mw, cache, guard = make_guard()
@@ -106,7 +102,6 @@ async def test_invalid_prop_block():
 
 # ── 5. _no_validate bypass ────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_no_validate_arg_bypass():
     """args['_no_validate']=True → None even with bad input."""
     mw, cache, guard = make_guard()
@@ -146,7 +141,6 @@ def test_env_bypass(monkeypatch):
 
 # ── 7. Cache hit — no fetch ───────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_cache_hit_no_fetch():
     """Second validate of same comp → 0 send_fn invocations."""
     mw, cache, guard = make_guard()
@@ -173,7 +167,6 @@ async def test_cache_hit_no_fetch():
 
 # ── 8. Cache invalidate → cache miss on next call ─────────────────────────────
 
-@pytest.mark.asyncio
 async def test_cache_invalidate_recompile():
     """invalidate_all → next call hits cache_miss (fetch is called)."""
     from unity_mcp.metrics import METRICS
@@ -208,7 +201,6 @@ async def test_cache_invalidate_recompile():
 
 # ── 9. ObjectReference value → skip validation ───────────────────────────────
 
-@pytest.mark.asyncio
 async def test_objectref_value_skipped():
     """value='/Other/Obj' → no validation attempted, returns None."""
     mw, cache, guard = make_guard()
@@ -230,7 +222,6 @@ async def test_objectref_value_skipped():
 
 # ── #1 manage_component add envelope must have [KNOWN:] line ─────────────────
 
-@pytest.mark.asyncio
 async def test_manage_add_envelope_has_known_line():
     """_validate_manage_add returns 4-line envelope with [KNOWN:] line (#1)."""
     mw, cache, guard = make_guard()
@@ -253,7 +244,6 @@ async def test_manage_add_envelope_has_known_line():
 
 # ── #2 no_validate (no underscore) does NOT bypass guard ─────────────────────
 
-@pytest.mark.asyncio
 async def test_manage_add_bare_no_validate_does_not_bypass():
     """no_validate (without underscore) is not a bypass flag — guard still blocks."""
     mw, cache, guard = make_guard()
@@ -275,7 +265,6 @@ async def test_manage_add_bare_no_validate_does_not_bypass():
 
 # ── #5 wire_event valid target passthrough ────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_wire_event_valid_target_passthrough():
     """wire_event with valid target_component in cache → returns None (#5)."""
     mw, cache, guard = make_guard()
@@ -291,7 +280,6 @@ async def test_wire_event_valid_target_passthrough():
 
 # ── #4b strengthen test_no_validate_arg_bypass ────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_no_validate_arg_bypass_calls_bridge():
     """_no_validate=True → SchemaGuard does NOT block; bridge fires for valid component (#4).
 
@@ -373,7 +361,6 @@ def test_schema_cache_parse_skips_comment_lines():
 
 # ── P2: SchemaGuard with unknown command ──────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_guard_unknown_command_returns_none():
     """Unknown command (not set_property/manage_component/wire_event) → None (pass-through)."""
     mw, cache, guard = make_guard()
@@ -385,7 +372,6 @@ async def test_guard_unknown_command_returns_none():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_guard_batch_command_returns_none():
     """'batch' command → None (pass-through, not a mutation guard target)."""
     mw, cache, guard = make_guard()
@@ -399,7 +385,6 @@ async def test_guard_batch_command_returns_none():
 
 # ── 10. Exception in send_fn → fail-open ─────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_exception_fail_open():
     """Broken send_fn raises → returns None, validate.error counter incremented."""
     from unity_mcp.metrics import METRICS
@@ -423,7 +408,6 @@ async def test_exception_fail_open():
 
 # ── PY3.test.4: _validate_set_property early-exit branches ───────────────────
 
-@pytest.mark.asyncio
 async def test_dollar_path_skips_validation():
     """path='$obj' → skip validation, no TCP call."""
     mw, cache, guard = make_guard()
@@ -436,7 +420,6 @@ async def test_dollar_path_skips_validation():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_m_prefix_prop_skipped():
     """prop='m_LocalPosition' → skip validation (Unity internal field)."""
     mw, cache, guard = make_guard()
@@ -451,7 +434,6 @@ async def test_m_prefix_prop_skipped():
 
 # ── PY3.test.5: wire_event early-exit branches ───────────────────────────────
 
-@pytest.mark.asyncio
 async def test_wire_event_missing_target_path():
     """wire_event without target_path → None (early exit, no TCP)."""
     mw, cache, guard = make_guard()
@@ -463,7 +445,6 @@ async def test_wire_event_missing_target_path():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_wire_event_missing_target_component():
     """wire_event without target_component → None (early exit, no TCP)."""
     mw, cache, guard = make_guard()
@@ -477,7 +458,6 @@ async def test_wire_event_missing_target_component():
 
 # ── PY3.test.6: wire_event invalid component blocked ─────────────────────────
 
-@pytest.mark.asyncio
 async def test_wire_event_invalid_component_blocked():
     """wire_event with typo in target_component (lev≤2) → block envelope."""
     mw, cache, guard = make_guard()

@@ -36,7 +36,6 @@ def _wire(send):
 
 # ── save_session ──────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_save_session_calls_bridge_and_writes_file(tmp_path):
     send = AsyncMock(return_value="ok")
     _wire(send)
@@ -52,7 +51,6 @@ async def test_save_session_calls_bridge_and_writes_file(tmp_path):
     assert "ok" in content
 
 
-@pytest.mark.asyncio
 async def test_save_session_bridge_called_once(tmp_path):
     send = AsyncMock(return_value="data")
     _wire(send)
@@ -63,7 +61,6 @@ async def test_save_session_bridge_called_once(tmp_path):
     assert send.call_count == 1  # only get_hierarchy; no console, no editor_state
 
 
-@pytest.mark.asyncio
 async def test_save_session_oserror_returns_error_string(tmp_path):
     send = AsyncMock(return_value="ok")
     _wire(send)
@@ -78,7 +75,6 @@ async def test_save_session_oserror_returns_error_string(tmp_path):
 
 # ── load_session ──────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_load_session_missing_file_returns_no_session(tmp_path):
     send = AsyncMock(return_value="current-hierarchy")
     _wire(send)
@@ -90,7 +86,6 @@ async def test_load_session_missing_file_returns_no_session(tmp_path):
     send.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_load_session_happy_path(tmp_path):
     ts = time.time()
     session_path = tmp_path / ".claude" / "session-context.json"
@@ -110,7 +105,6 @@ async def test_load_session_happy_path(tmp_path):
     send.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_load_session_corrupt_json_returns_error(tmp_path):
     session_path = tmp_path / ".claude" / "session-context.json"
     session_path.parent.mkdir(parents=True)

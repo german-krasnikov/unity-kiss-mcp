@@ -1,9 +1,9 @@
 using System.Linq;
-using System.Reflection;
 using NUnit.Framework;
 
 namespace UnityMCP.Editor.Tests
 {
+    [TestFixture]
     public class CodeExecutorSecurityTests
     {
         // ── Blocked patterns ─────────────────────────────────────────────────
@@ -95,13 +95,6 @@ namespace UnityMCP.Editor.Tests
 
         // ── IsAllowedAssembly ────────────────────────────────────────────────
 
-        private static readonly MethodInfo _isAllowedAssemblyMethod =
-            typeof(CodeExecutor).GetMethod("IsAllowedAssembly",
-                BindingFlags.NonPublic | BindingFlags.Static);
-
-        private bool CallIsAllowed(Assembly a) =>
-            (bool)_isAllowedAssemblyMethod.Invoke(null, new object[] { a });
-
         [TestCase("mscorlib")]
         [TestCase("netstandard")]
         [TestCase("System")]
@@ -112,30 +105,27 @@ namespace UnityMCP.Editor.Tests
         [TestCase("UnityEditor.CoreModule")]
         public void IsAllowedAssembly_AllowedName_ReturnsTrue(string asmName)
         {
-            Assert.IsNotNull(_isAllowedAssemblyMethod, "IsAllowedAssembly not found");
             var target = System.AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == asmName);
             Assert.IsNotNull(target, $"Assembly '{asmName}' not loaded in test domain");
-            Assert.IsTrue(CallIsAllowed(target), $"Expected '{asmName}' to be allowed");
+            Assert.IsTrue(CodeExecutor.IsAllowedAssembly(target), $"Expected '{asmName}' to be allowed");
         }
 
         [Test]
         public void IsAllowedAssembly_TestAssembly_ReturnsFalse()
         {
-            Assert.IsNotNull(_isAllowedAssemblyMethod, "IsAllowedAssembly not found");
             // UnityMCP.Editor.Tests is not in the allowlist
-            var testAsm = Assembly.GetExecutingAssembly();
-            Assert.IsFalse(CallIsAllowed(testAsm),
+            var testAsm = System.Reflection.Assembly.GetExecutingAssembly();
+            Assert.IsFalse(CodeExecutor.IsAllowedAssembly(testAsm),
                 $"Expected '{testAsm.GetName().Name}' to NOT be allowed");
         }
 
         [Test]
         public void IsAllowedAssembly_UnityMCPEditorPlugin_ReturnsFalse()
         {
-            Assert.IsNotNull(_isAllowedAssemblyMethod, "IsAllowedAssembly not found");
             // The plugin assembly itself (UnityMCP.Editor) is not in the allowlist
             var pluginAsm = typeof(CodeExecutor).Assembly;
-            Assert.IsFalse(CallIsAllowed(pluginAsm),
+            Assert.IsFalse(CodeExecutor.IsAllowedAssembly(pluginAsm),
                 $"Expected '{pluginAsm.GetName().Name}' to NOT be allowed");
         }
     }

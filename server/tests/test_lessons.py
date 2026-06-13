@@ -1,7 +1,6 @@
 """Tests for LessonStore + LessonRecorder."""
 import json
 import time
-import pytest
 from pathlib import Path
 from unittest.mock import patch, mock_open
 from unity_mcp.lessons import Lesson, LessonStore, LessonRecorder

@@ -1,5 +1,4 @@
 """Tests for HierarchyDiff — _maybe_diff_hierarchy method on Middleware."""
-import pytest
 from unity_mcp.middleware import Middleware
 
 
@@ -44,9 +43,8 @@ def test_call_id_increments():
     assert mw._hierarchy_call_id >= 2
 
 
-def test_no_distill_bypasses_diff():
+async def test_no_distill_bypasses_diff():
     """_no_distill=True in args skips diff and returns full hierarchy."""
-    import asyncio
     import os
     os.environ["UNITY_MCP_VALIDATE"] = "0"
     from unity_mcp.middleware import wrap_send, Middleware
@@ -64,15 +62,11 @@ def test_no_distill_bypasses_diff():
 
     wrapped = wrap_send(mock_send, mw)
 
-    async def run():
-        # First call populates diff state
-        r1 = await wrapped("get_hierarchy", {"summary": "true"})
-        # Second call without _no_distill → diff
-        r2 = await wrapped("get_hierarchy", {"summary": "true"})
-        # Third call with _no_distill → full hierarchy (no diff applied)
-        r3 = await wrapped("get_hierarchy", {"summary": "true", "_no_distill": True})
-        return r1, r2, r3
-
-    r1, r2, r3 = asyncio.get_event_loop().run_until_complete(run())
+    # First call populates diff state
+    r1 = await wrapped("get_hierarchy", {"summary": "true"})
+    # Second call without _no_distill → diff
+    r2 = await wrapped("get_hierarchy", {"summary": "true"})
+    # Third call with _no_distill → full hierarchy (no diff applied)
+    r3 = await wrapped("get_hierarchy", {"summary": "true", "_no_distill": True})
     # r2 may be diff or NO_CHANGE; r3 must not contain [DIFF
     assert "[DIFF" not in r3

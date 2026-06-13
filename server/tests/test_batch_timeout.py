@@ -1,8 +1,6 @@
-import pytest
 from unity_mcp.server import batch
 
 
-@pytest.mark.asyncio
 async def test_batch_passes_timeout_ms(mock_bridge, bridge_response):
     """Non-default timeout → timeout_ms present in args sent to bridge."""
     bridge_response(data="ok:1")
@@ -11,7 +9,6 @@ async def test_batch_passes_timeout_ms(mock_bridge, bridge_response):
     assert "timeout_ms" in args
 
 
-@pytest.mark.asyncio
 async def test_batch_default_timeout_30s(mock_bridge, bridge_response):
     """Default timeout=30 → timeout_ms absent (token economy; C# defaults to 25000)."""
     bridge_response(data="ok:1")
@@ -20,7 +17,6 @@ async def test_batch_default_timeout_30s(mock_bridge, bridge_response):
     assert "timeout_ms" not in args
 
 
-@pytest.mark.asyncio
 async def test_batch_custom_timeout(mock_bridge, bridge_response):
     """timeout=60 → timeout_ms=55000."""
     bridge_response(data="ok:1")

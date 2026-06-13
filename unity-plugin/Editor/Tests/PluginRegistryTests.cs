@@ -52,7 +52,7 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Register_ThenRegisterAllPlugins_RegisterCommandsCalledOnce()
         {
-            // CS5.arch.2 fix: Register() must NOT call RegisterCommands();
+            // Register() must NOT call RegisterCommands();
             // only RegisterAllPlugins() should call it — exactly once.
             var plugin = new FakePlugin("TestPlugin");
 

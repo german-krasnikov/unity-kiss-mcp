@@ -95,7 +95,6 @@ def test_get_categories():
     assert isinstance(cats["animation"], (set, frozenset))
 
 
-@pytest.mark.asyncio
 async def test_discover_tools_lists_categories():
     from unity_mcp.tools.gating import discover_tools, reset
     reset()
@@ -104,7 +103,6 @@ async def test_discover_tools_lists_categories():
     assert "runtime" in result
 
 
-@pytest.mark.asyncio
 async def test_discover_tools_enables():
     from unity_mcp.tools.gating import discover_tools, is_visible, reset
     reset()
@@ -112,7 +110,6 @@ async def test_discover_tools_enables():
     assert is_visible("animation")
 
 
-@pytest.mark.asyncio
 async def test_discover_tools_browse_only():
     from unity_mcp.tools.gating import discover_tools, is_visible, reset
     reset()

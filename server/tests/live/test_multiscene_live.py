@@ -1,29 +1,14 @@
 """Live integration tests for multi-scene support."""
-import re
 import uuid
 
 import pytest
 import pytest_asyncio
 
-from tests.live.conftest import _destroy
+from tests.live.conftest import _destroy, _ok, _iid
 
 _TEMP_FOLDER = "Assets/TestsTemp"
 
 pytestmark = pytest.mark.live
-
-
-def _ok(result) -> str:
-    d = result.get("data", "") if isinstance(result, dict) else str(result)
-    err = result.get("err", "") if isinstance(result, dict) else ""
-    ok = result.get("ok", True) if isinstance(result, dict) else True
-    assert ok, f"cmd failed: {err or d}"
-    return d
-
-
-def _iid(text: str) -> str:
-    m = re.search(r'#(-?\d+)', text)
-    assert m, f"No instance ID in: {text}"
-    return m.group(0)
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +64,6 @@ async def additive_obj(bridge, additive_scene):
 # Tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_hierarchy_shows_scene_headers(bridge, additive_obj, additive_scene):
     """get_hierarchy should show scene name headers with bracket notation."""
     r = await bridge.send("get_hierarchy", {})
@@ -88,7 +72,6 @@ async def test_hierarchy_shows_scene_headers(bridge, additive_obj, additive_scen
     assert additive_scene in data, f"Additive scene '{additive_scene}' not in hierarchy:\n{data}"
 
 
-@pytest.mark.asyncio
 async def test_search_finds_in_additive(bridge, additive_obj):
     """search_scene should find the object created in the additive scene."""
     obj_name, _ = additive_obj
@@ -97,7 +80,6 @@ async def test_search_finds_in_additive(bridge, additive_obj):
     assert obj_name in data, f"'{obj_name}' not found in search results:\n{data}"
 
 
-@pytest.mark.asyncio
 async def test_search_has_scene_prefix(bridge, additive_obj, additive_scene):
     """search_scene results should include 'SceneName:/' path prefix."""
     obj_name, _ = additive_obj
@@ -106,7 +88,6 @@ async def test_search_has_scene_prefix(bridge, additive_obj, additive_scene):
     assert ":/" in data, f"No scene-qualified path (SceneName:/) in:\n{data}"
 
 
-@pytest.mark.asyncio
 async def test_get_component_scene_qualified(bridge, additive_obj, additive_scene):
     """get_component with 'SceneName:/ObjName' path should return Transform data."""
     obj_name, _ = additive_obj
@@ -116,7 +97,6 @@ async def test_get_component_scene_qualified(bridge, additive_obj, additive_scen
     assert "position" in data.lower(), f"No position in Transform data:\n{data}"
 
 
-@pytest.mark.asyncio
 async def test_ambiguity_error(bridge, additive_obj, additive_scene):
     """Same object name in two scenes should trigger an ambiguity error."""
     obj_name, _ = additive_obj
@@ -132,7 +112,6 @@ async def test_ambiguity_error(bridge, additive_obj, additive_scene):
         await _destroy(bridge, obj_name)
 
 
-@pytest.mark.asyncio
 async def test_instance_id_cross_scene(bridge, additive_obj):
     """get_component with #instanceId should work regardless of scene."""
     _, iid = additive_obj
@@ -141,7 +120,6 @@ async def test_instance_id_cross_scene(bridge, additive_obj):
     assert "position" in data.lower(), f"No position in Transform data:\n{data}"
 
 
-@pytest.mark.asyncio
 async def test_slash_in_name_via_iid(bridge, additive_scene):
     """Object with '/' in name should be findable by instance ID."""
     slash_name = f"Live_slash/{uuid.uuid4().hex[:6]}"

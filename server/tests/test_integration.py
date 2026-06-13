@@ -12,7 +12,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.bridge import UnityBridge
 
 
-@pytest.mark.asyncio
 async def test_full_roundtrip_send_receive(mock_unity_server):
     """Send command to real TCP server and receive response."""
     bridge = UnityBridge(port=mock_unity_server.port)
@@ -26,7 +25,6 @@ async def test_full_roundtrip_send_receive(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_multiple_commands_sequential(mock_unity_server):
     """Send 3 commands in sequence, all return correct responses."""
     mock_unity_server.set_response("cmd1", "result1")
@@ -47,7 +45,6 @@ async def test_multiple_commands_sequential(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_server_returns_error(mock_unity_server):
     """Server returns error response, bridge returns it correctly."""
     responses = {}
@@ -86,7 +83,6 @@ async def test_server_returns_error(mock_unity_server):
     await server.wait_closed()
 
 
-@pytest.mark.asyncio
 async def test_large_payload(mock_unity_server):
     """Send large args dict, verify received correctly."""
     large_data = {f"key_{i}": f"value_{i}" * 100 for i in range(100)}
@@ -106,8 +102,7 @@ async def test_large_payload(mock_unity_server):
 
 # ─── write-tool ok=False → ToolError ─────────────────────────────────────────
 
-@pytest.mark.asyncio
-async def test_set_active_error_raises_tool_error(mock_bridge):
+async def test_set_active_error_raises_tool_error_integration(mock_bridge):
     """set_active raises ToolError when Unity returns ok=False."""
     from unity_mcp.tools.objects import set_active
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
@@ -115,8 +110,7 @@ async def test_set_active_error_raises_tool_error(mock_bridge):
         await set_active("/Missing", True)
 
 
-@pytest.mark.asyncio
-async def test_wire_event_error_raises_tool_error(mock_bridge):
+async def test_wire_event_error_raises_tool_error_integration(mock_bridge):
     """wire_event raises ToolError when Unity returns ok=False."""
     from unity_mcp.tools.objects import wire_event
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Event field not found"})
@@ -124,8 +118,7 @@ async def test_wire_event_error_raises_tool_error(mock_bridge):
         await wire_event("/Btn", "Button", "onClick", "/Target", "SetActive")
 
 
-@pytest.mark.asyncio
-async def test_unwire_event_error_raises_tool_error(mock_bridge):
+async def test_unwire_event_error_raises_tool_error_integration(mock_bridge):
     """unwire_event raises ToolError when Unity returns ok=False."""
     from unity_mcp.tools.objects import unwire_event
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "No listeners found"})
@@ -133,8 +126,7 @@ async def test_unwire_event_error_raises_tool_error(mock_bridge):
         await unwire_event("/Btn", "Button", "onClick")
 
 
-@pytest.mark.asyncio
-async def test_set_material_error_raises_tool_error(mock_bridge):
+async def test_set_material_error_raises_tool_error_integration(mock_bridge):
     """set_material raises ToolError when Unity returns ok=False."""
     from unity_mcp.tools.objects import set_material
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Renderer not found"})

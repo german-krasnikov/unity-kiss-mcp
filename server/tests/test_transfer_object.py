@@ -1,9 +1,7 @@
 """TDD tests for transfer_object tool and create_object scene param."""
-import pytest
 from unittest.mock import AsyncMock
 
 
-@pytest.mark.asyncio
 async def test_transfer_move_sends_correct_args(mock_bridge):
     """move action sends path, action, target_scene to Unity."""
     mock_bridge.send.return_value = {"ok": True, "data": "Moved /Enemy to AdditiveScene"}
@@ -16,7 +14,6 @@ async def test_transfer_move_sends_correct_args(mock_bridge):
     assert "Moved" in result
 
 
-@pytest.mark.asyncio
 async def test_transfer_copy_sends_correct_args(mock_bridge):
     """copy action sends path, action, target_scene to Unity."""
     mock_bridge.send.return_value = {"ok": True, "data": "Copied /Player to Level2"}
@@ -28,7 +25,6 @@ async def test_transfer_copy_sends_correct_args(mock_bridge):
     assert sent["target_scene"] == "Level2"
 
 
-@pytest.mark.asyncio
 async def test_transfer_with_parent_sends_parent(mock_bridge):
     """parent param is forwarded when set."""
     mock_bridge.send.return_value = {"ok": True, "data": "Moved /Obj to Scene2"}
@@ -38,7 +34,6 @@ async def test_transfer_with_parent_sends_parent(mock_bridge):
     assert sent["parent"] == "/Container"
 
 
-@pytest.mark.asyncio
 async def test_transfer_world_position_stays_false(mock_bridge):
     """world_position_stays=False is forwarded as 'false' string."""
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
@@ -48,7 +43,6 @@ async def test_transfer_world_position_stays_false(mock_bridge):
     assert sent["world_position_stays"] == "false"
 
 
-@pytest.mark.asyncio
 async def test_transfer_world_position_stays_default_omitted(mock_bridge):
     """world_position_stays=True (default) is omitted from args (no-op default)."""
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
@@ -59,7 +53,6 @@ async def test_transfer_world_position_stays_default_omitted(mock_bridge):
     assert "world_position_stays" not in sent
 
 
-@pytest.mark.asyncio
 async def test_transfer_no_target_scene_omitted(mock_bridge):
     """target_scene=None is omitted (same-scene duplicate)."""
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
@@ -69,7 +62,6 @@ async def test_transfer_no_target_scene_omitted(mock_bridge):
     assert "target_scene" not in sent
 
 
-@pytest.mark.asyncio
 async def test_create_object_scene_forwarded(mock_bridge):
     """scene param is forwarded to create_object command."""
     mock_bridge.send.return_value = {"ok": True, "data": "Created /Enemy"}
@@ -80,7 +72,6 @@ async def test_create_object_scene_forwarded(mock_bridge):
     assert sent["name"] == "Enemy"
 
 
-@pytest.mark.asyncio
 async def test_create_object_no_scene_omitted(mock_bridge):
     """Regression: scene=None must NOT appear in args (single-scene unchanged behavior)."""
     mock_bridge.send.return_value = {"ok": True, "data": "Created /Obj"}

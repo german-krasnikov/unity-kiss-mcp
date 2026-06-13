@@ -1,6 +1,7 @@
 // TDD — ChipSequence additional tests (Wave 1).
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.ChipTestHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -23,7 +24,6 @@ namespace UnityMCP.Editor.Chat.Tests
             ChipPillFactory.ColorResolver = null;
         }
 
-        private static ChipData H(string path, string name, int id = 0) => ChipTestHelpers.H(path, name, id);
         private void InsertChip(ChipData c) => ChipTestHelpers.InsertChip(_chipField, c);
         private void SetCursor(int p) => ChipTestHelpers.SetCursor(_chipField, p);
         private void Type(string t) => ChipTestHelpers.Type(_chipField, t);

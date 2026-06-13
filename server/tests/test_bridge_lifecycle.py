@@ -26,7 +26,6 @@ from helpers import make_writer, make_idle_probe, ping_response
 # Fix 1: close() — shutdown + null-first
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_close_calls_socket_shutdown():
     """close() must call shutdown(SHUT_RDWR) on underlying socket."""
     mock_sock = Mock()
@@ -41,7 +40,6 @@ async def test_close_calls_socket_shutdown():
     mock_sock.shutdown.assert_called_once_with(socket.SHUT_RDWR)
 
 
-@pytest.mark.asyncio
 async def test_close_nulls_writer_before_closing():
     """self._writer must be None before wait_closed() is awaited."""
     writer_state_during_wait = []
@@ -65,7 +63,6 @@ async def test_close_nulls_writer_before_closing():
     assert writer_state_during_wait[0] is None, "writer must be nulled before wait_closed"
 
 
-@pytest.mark.asyncio
 async def test_close_survives_wait_closed_timeout():
     """close() returns even if wait_closed hangs (timeout=2s in impl)."""
     writer = make_writer()
@@ -91,7 +88,6 @@ async def test_close_survives_wait_closed_timeout():
 # Fix 2: _reconnect() — assign-after-success
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_reconnect_assigns_after_success():
     """After successful ping, self._writer must be the new writer."""
     ping_hdr, ping_pay = ping_response()
@@ -109,7 +105,6 @@ async def test_reconnect_assigns_after_success():
     assert bridge._reader is new_reader
 
 
-@pytest.mark.asyncio
 async def test_reconnect_closes_new_socket_on_ping_failure():
     """If ping fails, new writer must be closed and self._writer stays None."""
     new_reader = AsyncMock()

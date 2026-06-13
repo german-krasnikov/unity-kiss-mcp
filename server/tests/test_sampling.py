@@ -1,6 +1,5 @@
 """Tests for MCP sampling tools: auto_fix, smart_build, SamplingService.generate."""
 import os
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from unity_mcp.sampling import SamplingService
 from unity_mcp.tools.codegen import auto_fix, smart_build
@@ -18,7 +17,6 @@ def _make_ctx(sampling_result=None, sampling_error=None):
     return ctx
 
 
-@pytest.mark.asyncio
 async def test_generate_returns_text_on_success(monkeypatch):
     """P1-10: SamplingService.generate happy path — returns text from _run."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
@@ -28,7 +26,6 @@ async def test_generate_returns_text_on_success(monkeypatch):
     assert result == "generated text"
 
 
-@pytest.mark.asyncio
 async def test_auto_fix_no_errors(mock_bridge):
     mock_bridge.send.side_effect = [
         {"ok": True, "data": ""},                         # get_console
@@ -39,7 +36,6 @@ async def test_auto_fix_no_errors(mock_bridge):
     assert "No errors" in result
 
 
-@pytest.mark.asyncio
 async def test_auto_fix_with_errors_no_sampling(mock_bridge):
     mock_bridge.send.side_effect = [
         {"ok": True, "data": "[Error] NullRef in Player.cs:42"},  # get_console
@@ -51,7 +47,6 @@ async def test_auto_fix_with_errors_no_sampling(mock_bridge):
     assert "Auto-fix unavailable" in result
 
 
-@pytest.mark.asyncio
 async def test_smart_build_no_sampling(mock_bridge):
     ctx = _make_ctx(sampling_error=NotImplementedError("no sampling"))
     result = await smart_build("create a red cube", ctx)
@@ -61,7 +56,6 @@ async def test_smart_build_no_sampling(mock_bridge):
 
 # ── P2: verify_visual_diff both-files guard ───────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_verify_visual_diff_returns_none_when_before_missing(tmp_path, monkeypatch):
     """before file does not exist → returns None immediately, no subprocess."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
@@ -77,7 +71,6 @@ async def test_verify_visual_diff_returns_none_when_before_missing(tmp_path, mon
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_verify_visual_diff_returns_none_when_after_missing(tmp_path, monkeypatch):
     """after file does not exist → returns None immediately, no subprocess."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
@@ -93,7 +86,6 @@ async def test_verify_visual_diff_returns_none_when_after_missing(tmp_path, monk
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_verify_visual_diff_both_present_calls_run(tmp_path, monkeypatch):
     """both files exist → _run is called (gated by enabled+_gate)."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")

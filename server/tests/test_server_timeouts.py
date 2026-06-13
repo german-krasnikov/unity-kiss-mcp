@@ -1,5 +1,4 @@
 """Tests for per-tool timeout overrides (Tier 1a)."""
-import pytest
 from unity_mcp.server import COMMAND_TIMEOUTS
 
 

@@ -8,7 +8,6 @@ Covers:
 - cache is None: no crash, result discarded
 - empty result: nothing cached
 """
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -24,7 +23,6 @@ def _make_mixin():
 
 # ── happy paths ───────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_background_prefetch_caches_string_result():
     m = _make_mixin()
     send_fn = AsyncMock(return_value="hierarchy text")
@@ -35,7 +33,6 @@ async def test_background_prefetch_caches_string_result():
     assert cached == "hierarchy text"
 
 
-@pytest.mark.asyncio
 async def test_background_prefetch_caches_dict_data_field():
     m = _make_mixin()
     send_fn = AsyncMock(return_value={"data": "component info", "ok": True})
@@ -46,7 +43,6 @@ async def test_background_prefetch_caches_dict_data_field():
     assert cached == "component info"
 
 
-@pytest.mark.asyncio
 async def test_background_prefetch_empty_result_not_cached():
     m = _make_mixin()
     send_fn = AsyncMock(return_value="")
@@ -56,8 +52,9 @@ async def test_background_prefetch_empty_result_not_cached():
     assert m._prefetch_cache.get("get_component", {"path": "/A", "type": "T"}) is None
 
 
-@pytest.mark.asyncio
+# no-assert: crash guard
 async def test_background_prefetch_cache_none_no_crash():
+    """Verifies _background_prefetch does not raise when cache is None."""
     m = _make_mixin()
     m._prefetch_cache = None
     send_fn = AsyncMock(return_value="data")
@@ -68,7 +65,6 @@ async def test_background_prefetch_cache_none_no_crash():
 
 # ── error handling ────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_background_prefetch_send_raises_increments_metric():
     from unity_mcp.metrics import METRICS
     METRICS.reset()
@@ -82,8 +78,9 @@ async def test_background_prefetch_send_raises_increments_metric():
     assert snap.get("prefetch.error", 0) == 1
 
 
-@pytest.mark.asyncio
+# no-assert: crash guard
 async def test_background_prefetch_send_raises_no_crash():
+    """Verifies _background_prefetch swallows RuntimeError without propagating."""
     m = _make_mixin()
     send_fn = AsyncMock(side_effect=RuntimeError("boom"))
 

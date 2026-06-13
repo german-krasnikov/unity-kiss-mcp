@@ -230,8 +230,6 @@ namespace UnityMCP.Editor.Tests
             Assert.IsEmpty(failures, "Commands missing schema: " + string.Join(", ", failures));
         }
 
-        // ── CS1.test.2: disabled-tool gate is testable via IsToolEnabledFn ───
-
         [Test]
         public void Process_DisabledTool_ReturnsDisabledError()
         {
@@ -278,8 +276,6 @@ namespace UnityMCP.Editor.Tests
             Assert.IsNull(result, result);
         }
 
-        // ── CS1.test.6: ProcessAsync guard with compiling blocks async cmds ───
-
         [Test]
         public void ProcessAsync_RunTests_WhileCompiling_SetsGuardResponse()
         {
@@ -319,8 +315,6 @@ namespace UnityMCP.Editor.Tests
                 CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
             }
         }
-
-        // ── CS1.test.7: ExtractString nested-key shadowing ───────────────────
 
         [Test]
         public void ExtractString_NestedDuplicate_ReturnsOuterValue()

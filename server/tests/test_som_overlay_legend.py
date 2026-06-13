@@ -4,7 +4,6 @@ import sys
 import subprocess
 import tempfile
 import textwrap
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from PIL import Image
 
@@ -67,7 +66,6 @@ def test_build_legend_for_diff_stable_order():
 
 # ── #3 annotate() wired in visual_diff when mark=True ────────────────────────
 
-@pytest.mark.asyncio
 async def test_visual_diff_mark_writes_annotated_image(tmp_path):
     """mark=True: sampling receives paths to images with visible circle marks
     (pixels differ from the original plain grey image)."""
@@ -110,7 +108,6 @@ async def test_visual_diff_mark_writes_annotated_image(tmp_path):
 
 # ── #4 som_visual feature key ─────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_visual_diff_mark_uses_som_visual_feature(tmp_path):
     """mark=True: verify_visual_diff called with feature='som_visual'."""
     from unity_mcp.visual_diff import visual_diff
@@ -138,7 +135,6 @@ async def test_visual_diff_mark_uses_som_visual_feature(tmp_path):
     )
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_no_mark_uses_visual_diff_feature(tmp_path):
     """mark=False: verify_visual_diff called with feature='visual_diff' (default)."""
     from unity_mcp.visual_diff import visual_diff

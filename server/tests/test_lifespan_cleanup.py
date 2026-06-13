@@ -15,7 +15,6 @@ def _import_lifespan():
         pytest.skip("lifespan not importable — skipping (TODO: adjust path)")
 
 
-@pytest.mark.asyncio
 async def test_lifespan_cancels_watchdog(monkeypatch):
     """Regression: lifespan finally MUST call watchdog.cancel().
 
@@ -62,7 +61,6 @@ async def test_lifespan_cancels_watchdog(monkeypatch):
     assert cancel_called, "watchdog.cancel() was not called in lifespan finally — regression!"
 
 
-@pytest.mark.asyncio
 async def test_lifespan_no_leak_when_features_disabled(monkeypatch):
     lifespan = _import_lifespan()
     for k in ("UNITY_MCP_WATCHDOG", "UNITY_MCP_HINTS", "UNITY_MCP_MIDDLEWARE",

@@ -130,7 +130,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── F20: no select-all on focus / mouse-up ────────────────────────────
 
         [Test]
-        public void F20_SelectAllOnFocus_IsFalse()
+        public void SelectAllOnFocus_IsFalse()
         {
             var field = new InlineChipField();
             Assert.IsFalse(field.TextField.selectAllOnFocus,
@@ -138,7 +138,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void F20_SelectAllOnMouseUp_IsFalse()
+        public void SelectAllOnMouseUp_IsFalse()
         {
             var field = new InlineChipField();
             Assert.IsFalse(field.TextField.selectAllOnMouseUp,

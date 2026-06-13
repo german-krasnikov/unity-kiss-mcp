@@ -11,7 +11,6 @@ from unity_mcp.server import (
 
 
 # --- get_hierarchy edge cases ---
-@pytest.mark.asyncio
 async def test_get_hierarchy_default_params(mock_bridge):
     """get_hierarchy uses depth=2, root=None by default."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Scene"})
@@ -19,7 +18,6 @@ async def test_get_hierarchy_default_params(mock_bridge):
     mock_bridge.send.assert_called_once_with("get_hierarchy", {"depth": 2}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_filter_passed(mock_bridge):
     """filter parameter IS passed to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Scene"})
@@ -28,7 +26,6 @@ async def test_get_hierarchy_filter_passed(mock_bridge):
 
 
 # --- get_component edge cases ---
-@pytest.mark.asyncio
 async def test_get_component_empty_path(mock_bridge):
     """get_component accepts empty path."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "root"})
@@ -36,7 +33,6 @@ async def test_get_component_empty_path(mock_bridge):
     mock_bridge.send.assert_called_once_with("get_component", {"path": "", "type": "Transform"}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_get_component_special_chars_in_path(mock_bridge):
     """get_component handles unicode and special chars."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "pos: 0,0,0"})
@@ -46,7 +42,6 @@ async def test_get_component_special_chars_in_path(mock_bridge):
 
 
 # --- set_property edge cases ---
-@pytest.mark.asyncio
 async def test_set_property_value_types(mock_bridge):
     """set_property passes value as string (all types)."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
@@ -55,7 +50,6 @@ async def test_set_property_value_types(mock_bridge):
     assert args["value"] == "(1,2,3)"
 
 
-@pytest.mark.asyncio
 async def test_set_property_raises_on_error(mock_bridge):
     """set_property raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Invalid property"})
@@ -64,7 +58,6 @@ async def test_set_property_raises_on_error(mock_bridge):
 
 
 # --- create_object edge cases ---
-@pytest.mark.asyncio
 async def test_create_object_minimal(mock_bridge):
     """create_object with only name (no parent/components)."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created"})
@@ -73,7 +66,6 @@ async def test_create_object_minimal(mock_bridge):
     assert args == {"name": "Empty"}
 
 
-@pytest.mark.asyncio
 async def test_create_object_with_parent(mock_bridge):
     """create_object includes parent when provided."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created"})
@@ -82,7 +74,6 @@ async def test_create_object_with_parent(mock_bridge):
     assert args["parent"] == "/Scene"
 
 
-@pytest.mark.asyncio
 async def test_create_object_with_components_string(mock_bridge):
     """create_object passes components as comma-separated string."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created"})
@@ -91,7 +82,6 @@ async def test_create_object_with_components_string(mock_bridge):
     assert args["components"] == "BoxCollider,Rigidbody"
 
 
-@pytest.mark.asyncio
 async def test_create_object_raises_on_error(mock_bridge):
     """create_object raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Parent not found"})
@@ -100,7 +90,6 @@ async def test_create_object_raises_on_error(mock_bridge):
 
 
 # --- find_objects edge cases ---
-@pytest.mark.asyncio
 async def test_find_objects_no_filters(mock_bridge):
     """find_objects with all None params sends empty args dict."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "All objects"})
@@ -109,7 +98,6 @@ async def test_find_objects_no_filters(mock_bridge):
     assert args == {}
 
 
-@pytest.mark.asyncio
 async def test_find_objects_all_filters(mock_bridge):
     """find_objects with all filters provided."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Results"})
@@ -122,7 +110,6 @@ async def test_find_objects_all_filters(mock_bridge):
     assert args["component"] == "Rigidbody"
 
 
-@pytest.mark.asyncio
 async def test_find_objects_single_filter_name(mock_bridge):
     """find_objects with only name filter."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Found"})
@@ -131,7 +118,6 @@ async def test_find_objects_single_filter_name(mock_bridge):
     assert args == {"name": "Cube"}
 
 
-@pytest.mark.asyncio
 async def test_find_objects_single_filter_tag(mock_bridge):
     """find_objects with only tag filter."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Found"})
@@ -140,7 +126,6 @@ async def test_find_objects_single_filter_tag(mock_bridge):
     assert args == {"tag": "Player"}
 
 
-@pytest.mark.asyncio
 async def test_find_objects_single_filter_layer(mock_bridge):
     """find_objects with only layer filter."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Found"})
@@ -149,7 +134,6 @@ async def test_find_objects_single_filter_layer(mock_bridge):
     assert args == {"layer": "UI"}
 
 
-@pytest.mark.asyncio
 async def test_find_objects_single_filter_component(mock_bridge):
     """find_objects with only component filter."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Found"})
@@ -159,7 +143,6 @@ async def test_find_objects_single_filter_component(mock_bridge):
 
 
 # --- manage_component edge cases ---
-@pytest.mark.asyncio
 async def test_manage_component_add(mock_bridge):
     """manage_component with action=add."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Added"})
@@ -168,7 +151,6 @@ async def test_manage_component_add(mock_bridge):
     assert args["action"] == "add"
 
 
-@pytest.mark.asyncio
 async def test_manage_component_remove(mock_bridge):
     """manage_component with action=remove."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Removed"})
@@ -177,7 +159,6 @@ async def test_manage_component_remove(mock_bridge):
     assert args["action"] == "remove"
 
 
-@pytest.mark.asyncio
 async def test_manage_component_raises_on_error(mock_bridge):
     """manage_component raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Component not found"})
@@ -186,7 +167,6 @@ async def test_manage_component_raises_on_error(mock_bridge):
 
 
 # --- get_console edge cases ---
-@pytest.mark.asyncio
 async def test_get_console_defaults(mock_bridge):
     """get_console defaults: count=10, level=None."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Logs"})
@@ -195,7 +175,6 @@ async def test_get_console_defaults(mock_bridge):
     assert args == {"count": 10}
 
 
-@pytest.mark.asyncio
 async def test_get_console_with_level(mock_bridge):
     """get_console includes level when provided."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Errors"})
@@ -205,7 +184,6 @@ async def test_get_console_with_level(mock_bridge):
     assert args["level"] == "Error"
 
 
-@pytest.mark.asyncio
 async def test_get_console_raises_on_error(mock_bridge):
     """get_console raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Console capture failed"})
@@ -213,7 +191,6 @@ async def test_get_console_raises_on_error(mock_bridge):
         await get_console()
 
 
-@pytest.mark.asyncio
 async def test_get_console_passes_first_param(mock_bridge):
     """get_console passes first param when provided."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Logs"})
@@ -223,7 +200,6 @@ async def test_get_console_passes_first_param(mock_bridge):
     assert args["count"] == 20
 
 
-@pytest.mark.asyncio
 async def test_get_console_default_first_zero(mock_bridge):
     """get_console omits first from args when default (0)."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Logs"})
@@ -233,7 +209,6 @@ async def test_get_console_default_first_zero(mock_bridge):
 
 
 # --- screenshot edge cases ---
-@pytest.mark.asyncio
 async def test_screenshot_defaults(mock_bridge):
     """screenshot defaults: 640x480, no camera."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "base64..."})
@@ -242,7 +217,6 @@ async def test_screenshot_defaults(mock_bridge):
     assert args == {"width": 640, "height": 480}
 
 
-@pytest.mark.asyncio
 async def test_screenshot_with_camera(mock_bridge):
     """screenshot includes camera when provided."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "base64..."})
@@ -251,7 +225,6 @@ async def test_screenshot_with_camera(mock_bridge):
     assert args["camera"] == "/CamObj"
 
 
-@pytest.mark.asyncio
 async def test_screenshot_custom_size(mock_bridge):
     """screenshot with custom dimensions."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "base64..."})
@@ -262,7 +235,6 @@ async def test_screenshot_custom_size(mock_bridge):
 
 
 # --- scene tools edge cases ---
-@pytest.mark.asyncio
 async def test_scene_save_without_path(mock_bridge):
     """scene save with no path sends only action."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Saved"})
@@ -271,7 +243,6 @@ async def test_scene_save_without_path(mock_bridge):
     assert args == {"action": "save"}
 
 
-@pytest.mark.asyncio
 async def test_scene_new_raises_on_error(mock_bridge):
     """scene new raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Scene creation failed"})
@@ -279,7 +250,6 @@ async def test_scene_new_raises_on_error(mock_bridge):
         await scene(action="new")
 
 
-@pytest.mark.asyncio
 async def test_scene_discard_raises_on_error(mock_bridge):
     """scene discard raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "No changes to discard"})
@@ -288,7 +258,6 @@ async def test_scene_discard_raises_on_error(mock_bridge):
 
 
 # --- animation edge cases ---
-@pytest.mark.asyncio
 async def test_animation_create_no_property_no_keys(mock_bridge):
     """animation create with no property/keys sends only required fields."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created"})
@@ -300,7 +269,6 @@ async def test_animation_create_no_property_no_keys(mock_bridge):
     assert "keys" not in args
 
 
-@pytest.mark.asyncio
 async def test_animation_create_with_property_and_keys(mock_bridge):
     """animation create with property and keys passes them."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created"})
@@ -310,7 +278,6 @@ async def test_animation_create_with_property_and_keys(mock_bridge):
     assert args["keys"] == ""
 
 
-@pytest.mark.asyncio
 async def test_animation_edit_minimal(mock_bridge):
     """animation edit with only path, clip (no property/keys)."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Edited"})
@@ -319,7 +286,6 @@ async def test_animation_edit_minimal(mock_bridge):
     assert args == {"action": "edit", "path": "/Obj", "clip": "Walk"}
 
 
-@pytest.mark.asyncio
 async def test_animation_get_with_clip_and_time(mock_bridge):
     """animation get includes clip and time when provided."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Clip data"})
@@ -330,7 +296,6 @@ async def test_animation_get_with_clip_and_time(mock_bridge):
 
 
 # --- timeline edge cases ---
-@pytest.mark.asyncio
 async def test_timeline_edit_all_optional_params(mock_bridge):
     """timeline edit with all optional params."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Edited"})
@@ -351,7 +316,6 @@ async def test_timeline_edit_all_optional_params(mock_bridge):
     assert args["blend_out"] == 0.5
 
 
-@pytest.mark.asyncio
 async def test_timeline_edit_minimal(mock_bridge):
     """timeline edit with only path + action."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Edited"})
@@ -361,7 +325,6 @@ async def test_timeline_edit_minimal(mock_bridge):
 
 
 # --- animation sub-action passthrough ---
-@pytest.mark.asyncio
 async def test_animation_add_key_passes_action(mock_bridge):
     """animation action=add_key passes through to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "edited: Clip | add_key"})
@@ -373,7 +336,6 @@ async def test_animation_add_key_passes_action(mock_bridge):
     assert "edited" in result
 
 
-@pytest.mark.asyncio
 async def test_animation_remove_curve_passes_action(mock_bridge):
     """animation action=remove_curve passes through to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "edited: Clip | remove_curve"})
@@ -383,7 +345,6 @@ async def test_animation_remove_curve_passes_action(mock_bridge):
     assert args["property"] == "localPosition"
 
 
-@pytest.mark.asyncio
 async def test_animation_set_loop_passes_action(mock_bridge):
     """animation action=set_loop passes through to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "edited: Clip | set_loop"})
@@ -394,7 +355,6 @@ async def test_animation_set_loop_passes_action(mock_bridge):
 
 
 # --- timeline sub-action passthrough ---
-@pytest.mark.asyncio
 async def test_timeline_add_track_passes_action(mock_bridge):
     """timeline action=add_track passes through to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "edited: add_track [Audio] SFX"})
@@ -406,7 +366,6 @@ async def test_timeline_add_track_passes_action(mock_bridge):
     assert "add_track" in result
 
 
-@pytest.mark.asyncio
 async def test_timeline_set_binding_passes_action(mock_bridge):
     """timeline action=set_binding passes through to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "edited: set_binding"})
@@ -416,7 +375,6 @@ async def test_timeline_set_binding_passes_action(mock_bridge):
     assert args["binding"] == "/Actor"
 
 
-@pytest.mark.asyncio
 async def test_timeline_mute_passes_action(mock_bridge):
     """timeline action=mute passes through to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "edited: mute"})
@@ -426,7 +384,6 @@ async def test_timeline_mute_passes_action(mock_bridge):
     assert args["track"] == "Music"
 
 
-@pytest.mark.asyncio
 async def test_timeline_create_with_all_params(mock_bridge):
     """timeline create with asset_path + director_path + tracks."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created"})
@@ -444,7 +401,6 @@ async def test_timeline_create_with_all_params(mock_bridge):
 
 
 # --- all tools connection error ---
-@pytest.mark.asyncio
 async def test_get_component_connection_error(mock_bridge):
     """get_component raises ConnectionError on bridge failure."""
     mock_bridge.send = AsyncMock(side_effect=ConnectionError("Unity disconnected"))
@@ -452,7 +408,6 @@ async def test_get_component_connection_error(mock_bridge):
         await get_component(path="/Obj", type="Transform")
 
 
-@pytest.mark.asyncio
 async def test_create_object_connection_error(mock_bridge):
     """create_object raises ConnectionError on bridge failure."""
     mock_bridge.send = AsyncMock(side_effect=ConnectionError("Unity disconnected"))
@@ -460,7 +415,6 @@ async def test_create_object_connection_error(mock_bridge):
         await create_object(name="Obj")
 
 
-@pytest.mark.asyncio
 async def test_screenshot_connection_error(mock_bridge):
     """screenshot raises ConnectionError on bridge failure."""
     mock_bridge.send = AsyncMock(side_effect=ConnectionError("Unity disconnected"))
@@ -469,7 +423,6 @@ async def test_screenshot_connection_error(mock_bridge):
 
 
 # --- _send_raw ConnectionError wrapping ---
-@pytest.mark.asyncio
 async def test_send_raw_wraps_connection_error_as_tool_error(mock_bridge):
     """_send_raw catches ConnectionError and raises ToolError."""
     mock_bridge.send = AsyncMock(side_effect=ConnectionError("dead"))
@@ -478,7 +431,6 @@ async def test_send_raw_wraps_connection_error_as_tool_error(mock_bridge):
 
 
 # --- C4: manager=None guard ---
-@pytest.mark.asyncio
 async def test_send_bridge_none_raises_tool_error():
     """_send raises ToolError when slot is None (lifespan not started)."""
     import unity_mcp.server as srv
@@ -493,7 +445,6 @@ async def test_send_bridge_none_raises_tool_error():
 
 # --- P2 gaps ---
 
-@pytest.mark.asyncio
 async def test_send_raw_wraps_generic_exception_as_tool_error(mock_bridge):
     """_send_raw catches generic Exception (not ConnectionError) and raises ToolError."""
     mock_bridge.send = AsyncMock(side_effect=RuntimeError("unexpected crash"))
@@ -501,21 +452,18 @@ async def test_send_raw_wraps_generic_exception_as_tool_error(mock_bridge):
         await _send("ping", {})
 
 
-@pytest.mark.asyncio
 async def test_resolve_tool_schema_empty_input():
     """resolve_tool_schema with empty string returns 'No schema found' message."""
     result = await resolve_tool_schema("")
     assert "No schema found" in result
 
 
-@pytest.mark.asyncio
 async def test_resolve_tool_schema_unknown_tool():
     """resolve_tool_schema with unknown tool name returns 'No schema found' message."""
     result = await resolve_tool_schema("nonexistent_tool_xyz")
     assert "No schema found" in result
 
 
-@pytest.mark.asyncio
 async def test_send_raw_bridge_none_raises_tool_error(mock_bridge):
     """_send_raw raises ToolError with 'No Unity connection' when slot.bridge is None."""
     import unity_mcp.server as srv

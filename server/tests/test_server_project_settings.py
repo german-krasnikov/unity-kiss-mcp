@@ -4,7 +4,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.server import project_settings
 
 
-@pytest.mark.asyncio
 async def test_get_tags(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Untagged\nPlayer\nEnemy"})
     result = await project_settings(action="get", target="tags")
@@ -12,7 +11,6 @@ async def test_get_tags(mock_bridge):
     assert "Player" in result
 
 
-@pytest.mark.asyncio
 async def test_set_tag(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Tag added"})
     result = await project_settings(action="set", target="tags", prop="Enemy")
@@ -22,7 +20,6 @@ async def test_set_tag(mock_bridge):
     assert "added" in result
 
 
-@pytest.mark.asyncio
 async def test_get_layers(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "0: Default\n8: Interactable"})
     result = await project_settings(action="get", target="layers")
@@ -30,7 +27,6 @@ async def test_get_layers(mock_bridge):
     assert "Default" in result
 
 
-@pytest.mark.asyncio
 async def test_set_layer(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Layer set"})
     result = await project_settings(action="set", target="layers", index=8, value="Interactable")
@@ -40,7 +36,6 @@ async def test_set_layer(mock_bridge):
     assert "set" in result
 
 
-@pytest.mark.asyncio
 async def test_get_physics(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "gravity: (0,-9.81,0)\nbounceThreshold: 2"})
     result = await project_settings(action="get", target="physics")
@@ -48,7 +43,6 @@ async def test_get_physics(mock_bridge):
     assert "gravity" in result
 
 
-@pytest.mark.asyncio
 async def test_set_physics_gravity(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "gravity set"})
     result = await project_settings(action="set", target="physics", prop="gravity", value="(0,-20,0)")
@@ -58,7 +52,6 @@ async def test_set_physics_gravity(mock_bridge):
     assert "gravity" in result and "set" in result, result
 
 
-@pytest.mark.asyncio
 async def test_get_time(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "fixedDeltaTime: 0.02\ntimeScale: 1"})
     result = await project_settings(action="get", target="time")
@@ -66,7 +59,6 @@ async def test_get_time(mock_bridge):
     assert "fixedDeltaTime" in result
 
 
-@pytest.mark.asyncio
 async def test_set_time(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "fixedDeltaTime set"})
     result = await project_settings(action="set", target="time", prop="fixedDeltaTime", value="0.01")
@@ -76,7 +68,6 @@ async def test_set_time(mock_bridge):
     assert "fixedDeltaTime" in result and "set" in result, result
 
 
-@pytest.mark.asyncio
 async def test_get_player(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "companyName: Acme\nproductName: MyGame"})
     result = await project_settings(action="get", target="player")
@@ -84,7 +75,6 @@ async def test_get_player(mock_bridge):
     assert "companyName" in result
 
 
-@pytest.mark.asyncio
 async def test_set_player(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "companyName set"})
     result = await project_settings(action="set", target="player", prop="companyName", value="MyStudio")
@@ -94,7 +84,6 @@ async def test_set_player(mock_bridge):
     assert "companyName" in result and "set" in result, result
 
 
-@pytest.mark.asyncio
 async def test_get_quality(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "levels: Low, Medium, High\ncurrent: 2"})
     result = await project_settings(action="get", target="quality")
@@ -102,7 +91,6 @@ async def test_get_quality(mock_bridge):
     assert "levels" in result or "Low" in result
 
 
-@pytest.mark.asyncio
 async def test_error_from_unity(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Unknown target: invalid"})
     with pytest.raises(ToolError, match="Unknown target"):

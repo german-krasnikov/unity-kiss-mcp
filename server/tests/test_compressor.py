@@ -1,5 +1,4 @@
 """Tests for response compressor — strip default values from component reads."""
-import pytest
 from unity_mcp.compressor import strip_defaults, project_fields
 
 

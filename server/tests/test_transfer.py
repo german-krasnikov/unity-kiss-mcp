@@ -4,7 +4,6 @@ import pytest
 from unittest.mock import AsyncMock, Mock, patch
 
 
-@pytest.mark.asyncio
 async def test_reconnect_unity_calls_slot_connect(mock_bridge):
     from unity_mcp.server import reconnect_unity
     import unity_mcp.server as srv
@@ -14,7 +13,6 @@ async def test_reconnect_unity_calls_slot_connect(mock_bridge):
     assert "Connected" in result
 
 
-@pytest.mark.asyncio
 async def test_reconnect_unity_no_slot_raises():
     from mcp.server.fastmcp.exceptions import ToolError
     with patch("unity_mcp.tools.connection._get_slot", return_value=None):
@@ -23,21 +21,18 @@ async def test_reconnect_unity_no_slot_raises():
             await reconnect_unity(9500)
 
 
-@pytest.mark.asyncio
 async def test_transfer_asset_removed():
     """transfer_asset no longer exists — dead code removed."""
     import unity_mcp.server as srv
     assert not hasattr(srv, "transfer_asset"), "transfer_asset must be removed"
 
 
-@pytest.mark.asyncio
 async def test_copy_asset_removed():
     """copy_asset no longer exists — dead code removed."""
     import unity_mcp.server as srv
     assert not hasattr(srv, "copy_asset"), "copy_asset must be removed"
 
 
-@pytest.mark.asyncio
 async def test_connect_unity_removed():
     """connect_unity no longer exists — replaced by reconnect_unity."""
     import unity_mcp.server as srv

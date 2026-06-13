@@ -69,7 +69,6 @@ def test_reroute_other_cmds_unchanged(mw):
 
 # ─── wrap_send integration ────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_wrap_send_reroutes_set_property_during_play():
     mw = Middleware()
     mw.is_playing = True
@@ -86,7 +85,6 @@ async def test_wrap_send_reroutes_set_property_during_play():
     assert captured["args"]["field"] == "speed"
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_tracks_editor_state():
     mw = Middleware()
     fake_send = AsyncMock(return_value="state: playing\nsome info")

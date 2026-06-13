@@ -1,5 +1,4 @@
 """Unit tests for code_intel tools — mock_bridge with canned C# response format."""
-import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -9,7 +8,6 @@ FIXTURES = Path(__file__).parent / "fixtures" / "roslyn_responses.txt"
 
 # --- find_references ---
 
-@pytest.mark.asyncio
 async def test_find_references_passes_symbol_only_no_optional_args(mock_bridge):
     from unity_mcp.tools.code_intel import find_references
 
@@ -24,7 +22,6 @@ async def test_find_references_passes_symbol_only_no_optional_args(mock_bridge):
     assert "scope" not in args
 
 
-@pytest.mark.asyncio
 async def test_find_references_passes_kind_when_set(mock_bridge):
     from unity_mcp.tools.code_intel import find_references
 
@@ -37,7 +34,6 @@ async def test_find_references_passes_kind_when_set(mock_bridge):
     assert args["symbol"] == "Health"
 
 
-@pytest.mark.asyncio
 async def test_find_references_passes_scope_when_set(mock_bridge):
     from unity_mcp.tools.code_intel import find_references
 
@@ -50,7 +46,6 @@ async def test_find_references_passes_scope_when_set(mock_bridge):
     assert "kind" not in args
 
 
-@pytest.mark.asyncio
 async def test_find_references_passthrough_response(mock_bridge):
     """Tool returns C# text verbatim — no parsing on Python side (avoid drift)."""
     from unity_mcp.tools.code_intel import find_references
@@ -68,7 +63,6 @@ async def test_find_references_passthrough_response(mock_bridge):
     assert "Player.cs:42:13" in result
 
 
-@pytest.mark.asyncio
 async def test_find_references_ambiguous_response(mock_bridge):
     from unity_mcp.tools.code_intel import find_references
 
@@ -86,7 +80,6 @@ async def test_find_references_ambiguous_response(mock_bridge):
     assert "specify kind=" in result
 
 
-@pytest.mark.asyncio
 async def test_find_references_not_found_response(mock_bridge):
     from unity_mcp.tools.code_intel import find_references
 
@@ -99,7 +92,6 @@ async def test_find_references_not_found_response(mock_bridge):
     assert "candidates:" in result
 
 
-@pytest.mark.asyncio
 async def test_find_references_roslyn_unavailable(mock_bridge):
     from unity_mcp.tools.code_intel import find_references
 
@@ -112,7 +104,6 @@ async def test_find_references_roslyn_unavailable(mock_bridge):
     assert "fallback:" in result
 
 
-@pytest.mark.asyncio
 async def test_find_references_uses_10s_timeout(mock_bridge):
     from unity_mcp.tools.code_intel import find_references
 
@@ -125,7 +116,6 @@ async def test_find_references_uses_10s_timeout(mock_bridge):
 
 # --- compile_preflight ---
 
-@pytest.mark.asyncio
 async def test_compile_preflight_clean(mock_bridge):
     from unity_mcp.tools.code_intel import compile_preflight
 
@@ -141,7 +131,6 @@ async def test_compile_preflight_clean(mock_bridge):
     assert "OK preflight" in result
 
 
-@pytest.mark.asyncio
 async def test_compile_preflight_with_errors(mock_bridge):
     from unity_mcp.tools.code_intel import compile_preflight
 
@@ -159,7 +148,6 @@ async def test_compile_preflight_with_errors(mock_bridge):
     assert "helath" in result
 
 
-@pytest.mark.asyncio
 async def test_compile_preflight_uses_15s_timeout(mock_bridge):
     from unity_mcp.tools.code_intel import compile_preflight
 
@@ -172,7 +160,6 @@ async def test_compile_preflight_uses_15s_timeout(mock_bridge):
 
 # --- semantic_at ---
 
-@pytest.mark.asyncio
 async def test_semantic_at_symbol_info(mock_bridge):
     from unity_mcp.tools.code_intel import semantic_at
 
@@ -195,7 +182,6 @@ async def test_semantic_at_symbol_info(mock_bridge):
     assert "namespace: Game.Combat" in result
 
 
-@pytest.mark.asyncio
 async def test_semantic_at_no_symbol(mock_bridge):
     from unity_mcp.tools.code_intel import semantic_at
 
@@ -207,7 +193,6 @@ async def test_semantic_at_no_symbol(mock_bridge):
     assert "NO SYMBOL" in result
 
 
-@pytest.mark.asyncio
 async def test_semantic_at_line_col_int_coercion(mock_bridge):
     """Tool coerces line/col to int even if str passed (e.g. from JSON args)."""
     from unity_mcp.tools.code_intel import semantic_at
@@ -224,7 +209,6 @@ async def test_semantic_at_line_col_int_coercion(mock_bridge):
     assert args["col"] == 14
 
 
-@pytest.mark.asyncio
 async def test_semantic_at_uses_10s_timeout(mock_bridge):
     from unity_mcp.tools.code_intel import semantic_at
 

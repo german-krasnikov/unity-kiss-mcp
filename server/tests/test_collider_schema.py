@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.server import check_colliders, get_schema
 
 
-@pytest.mark.asyncio
 async def test_check_colliders_sends_command(mock_bridge, bridge_response):
     bridge_response(data="OK: no collider issues")
     result = await check_colliders()
@@ -13,7 +12,6 @@ async def test_check_colliders_sends_command(mock_bridge, bridge_response):
     assert "OK" in result
 
 
-@pytest.mark.asyncio
 async def test_check_colliders_with_path(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "TRIGGER_NO_RB: /Player/BoxCollider"})
     result = await check_colliders(path="/Player")
@@ -22,14 +20,12 @@ async def test_check_colliders_with_path(mock_bridge):
     assert "TRIGGER_NO_RB" in result
 
 
-@pytest.mark.asyncio
 async def test_check_colliders_error(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "scene not loaded"})
     with pytest.raises(ToolError, match="scene not loaded"):
         await check_colliders()
 
 
-@pytest.mark.asyncio
 async def test_get_schema_sends_type(mock_bridge, bridge_response):
     bridge_response(data="Schema: Rigidbody\n  m_Mass: Float")
     result = await get_schema(type="Rigidbody")
@@ -37,7 +33,6 @@ async def test_get_schema_sends_type(mock_bridge, bridge_response):
     assert "Schema" in result
 
 
-@pytest.mark.asyncio
 async def test_get_schema_unknown_type(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Type not found: Ghost"})
     with pytest.raises(ToolError, match="Type not found"):

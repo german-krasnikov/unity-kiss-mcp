@@ -54,7 +54,6 @@ def _make_busy_probe(remaining=2.0):
 # 1. Domain reload: retry succeeds on 2nd attempt
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_domain_reload_retry_succeeds():
     """First attempt fails (server down), second succeeds (server restarted)."""
     call_count = 0
@@ -85,7 +84,6 @@ async def test_domain_reload_retry_succeeds():
 # 2. Domain reload: retry succeeds on 3rd attempt
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_domain_reload_retry_3rd_attempt():
     """First two fail, third succeeds."""
     bridge_mod.SESSION_TIMEOUT = 5.0
@@ -118,7 +116,6 @@ async def test_domain_reload_retry_3rd_attempt():
 # 3. Dead Unity (probe idle): fails after grace retries
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_dead_unity_fails_fast():
     """Probe says idle (not compiling) → fail after grace retries, not too long."""
     probe = make_idle_probe()
@@ -137,7 +134,6 @@ async def test_dead_unity_fails_fast():
 # 6. Session timeout aborts retries during long reload
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_session_timeout_during_reload():
     """Even during domain reload, SESSION_TIMEOUT limits total wait."""
     bridge_mod.SESSION_TIMEOUT = 0.5
@@ -160,7 +156,6 @@ async def test_session_timeout_during_reload():
 # 7. Successful reconnect clears failure state
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_successful_reconnect_resets_state():
     """After failed attempt → successful retry, first_failure_ts resets."""
     call_count = 0
@@ -199,7 +194,6 @@ def test_domain_reload_error_is_connection_error():
 # D2. _read_response raises DomainReloadError on going_away frame
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_read_response_raises_domain_reload_on_going_away():
     payload = json.dumps({"ev": "going_away", "reason": "domain_reload"}).encode()
     header = struct.pack("!I", len(payload))
@@ -215,7 +209,6 @@ async def test_read_response_raises_domain_reload_on_going_away():
 # D3. going_away forces retry → second attempt succeeds
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_domain_reload_forces_retry():
     conn_count = 0
     probe = make_idle_probe()
@@ -250,7 +243,6 @@ async def test_domain_reload_forces_retry():
 # D4. IncompleteReadError → retries then fails
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_regular_incomplete_read_still_works():
     """IncompleteReadError (not going_away) → retries then fails."""
     probe = make_idle_probe()
@@ -273,7 +265,6 @@ async def test_regular_incomplete_read_still_works():
 # 10. Auto-reconnect: bridge reconnects on send when disconnected
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_send_auto_reconnects_transparently():
     """send() reconnects automatically when writer is closed."""
     probe = make_idle_probe()
@@ -305,7 +296,6 @@ async def test_send_auto_reconnects_transparently():
 # 9. ConnectionError becomes ToolError in server
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_connection_error_becomes_tool_error():
     """bridge.send() ConnectionError must be caught by _send_raw → ToolError."""
     from mcp.server.fastmcp.exceptions import ToolError

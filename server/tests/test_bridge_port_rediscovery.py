@@ -33,7 +33,6 @@ def _make_ok_reader(msg_id="0001"):
 # 1. Discoverer returns new port — bridge._port updates
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_reconnect_rediscovers_port():
     """port_discoverer returns 9501 → bridge connects on 9501."""
     connected_to = []
@@ -57,7 +56,6 @@ async def test_reconnect_rediscovers_port():
 # 2. Discoverer raises — falls back to current port
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_reconnect_falls_back_on_discoverer_failure():
     """port_discoverer raises OSError → bridge stays on 9500."""
     connected_to = []
@@ -81,7 +79,6 @@ async def test_reconnect_falls_back_on_discoverer_failure():
 # 3. Discoverer returns same port — no probe churn
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_reconnect_same_port_no_change():
     """Discoverer returns same port → bridge._port unchanged, probe not replaced."""
     async def mock_open(host, port):
@@ -103,7 +100,6 @@ async def test_reconnect_same_port_no_change():
 # 4. No discoverer — backward-compat normal reconnect
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_reconnect_without_discoverer():
     """No port_discoverer → normal reconnect on existing port."""
     connected_to = []

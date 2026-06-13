@@ -63,9 +63,11 @@ async def _connect_with_retry(b: UnityBridge, retries: int = 15, delay: float = 
 
 @pytest.fixture(scope="session", autouse=True)
 def _require_unity():
-    """Skip all live tests if Unity is not available. Kill competing MCP server first."""
-    subprocess.run(["pkill", "-f", "unity_mcp.server"], capture_output=True)
-    time.sleep(2)  # let old process fully die + Unity drop old client
+    """Skip all live tests if Unity is not available. Kill competing MCP server if port is free."""
+    # Only pkill if port is not already answering — avoid killing a valid process
+    if not _bridge_up():
+        subprocess.run(["pkill", "-f", "unity_mcp.server"], capture_output=True)
+        time.sleep(2)  # let old process fully die + Unity drop old client
     # Wait for Unity to accept connections
     for _ in range(10):
         if _bridge_up():
@@ -202,6 +204,23 @@ def _data(result) -> str:
     if isinstance(result, dict):
         return result.get("data") or result.get("err", "")
     return str(result)
+
+
+def _ok(result) -> str:
+    """Assert result is ok and return data string."""
+    d = result.get("data", "") if isinstance(result, dict) else str(result)
+    err = result.get("err", "") if isinstance(result, dict) else ""
+    ok = result.get("ok", True) if isinstance(result, dict) else True
+    assert ok, f"cmd failed: {err or d}"
+    return d
+
+
+def _iid(text: str) -> str:
+    """Extract '#instanceId' from text, assert present."""
+    import re
+    m = re.search(r'#(-?\d+)', text)
+    assert m, f"No instance ID in: {text}"
+    return m.group(0)
 
 
 async def _reset(b: UnityBridge) -> None:

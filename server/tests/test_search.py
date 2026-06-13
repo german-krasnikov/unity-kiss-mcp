@@ -21,7 +21,6 @@ def make_response(data=None, ok=True, err=None, msg_id="0001"):
     return header, payload
 
 
-@pytest.mark.asyncio
 async def test_search_scene_sends_correct_command(mock_connection):
     mock_reader, mock_writer = mock_connection
     header, payload = make_response("Player #123 [Rigidbody]")
@@ -43,7 +42,6 @@ async def test_search_scene_sends_correct_command(mock_connection):
     assert sent_json["args"]["query"] == "t:Rigidbody"
 
 
-@pytest.mark.asyncio
 async def test_search_scene_no_matches(mock_connection):
     mock_reader, mock_writer = mock_connection
     header, payload = make_response("no matches")
@@ -58,7 +56,6 @@ async def test_search_scene_no_matches(mock_connection):
     assert result["data"] == "no matches"
 
 
-@pytest.mark.asyncio
 async def test_search_scene_error_response(mock_connection):
     mock_reader, mock_writer = mock_connection
     header, payload = make_response(ok=False, err="query is required")
@@ -73,7 +70,6 @@ async def test_search_scene_error_response(mock_connection):
     assert "query is required" in result["err"]
 
 
-@pytest.mark.asyncio
 async def test_search_scene_combined_query(mock_connection):
     mock_reader, mock_writer = mock_connection
     header, payload = make_response("SpotLight #456 [Light]\nPointLight #789 [Light]")
@@ -93,7 +89,6 @@ async def test_search_scene_combined_query(mock_connection):
     assert sent_json["args"]["query"] == "t:Light active=true"
 
 
-@pytest.mark.asyncio
 async def test_search_scene_multiple_results(mock_connection):
     mock_reader, mock_writer = mock_connection
     data = "Obj1 #100 [BoxCollider]\nObj2 #200 [BoxCollider,Rigidbody]\nObj3 #300 [BoxCollider]"
@@ -110,7 +105,6 @@ async def test_search_scene_multiple_results(mock_connection):
     assert len(lines) == 3
 
 
-@pytest.mark.asyncio
 async def test_search_scene_inactive_objects(mock_connection):
     mock_reader, mock_writer = mock_connection
     header, payload = make_response("HiddenObj #555 ! ")
@@ -125,7 +119,6 @@ async def test_search_scene_inactive_objects(mock_connection):
     assert "!" in result["data"]
 
 
-@pytest.mark.asyncio
 async def test_search_scene_tool_calls_bridge(mock_bridge):
     """Test search_scene MCP tool calls bridge with correct args"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Player #123 [Rigidbody]"})
@@ -134,7 +127,6 @@ async def test_search_scene_tool_calls_bridge(mock_bridge):
     assert "Player" in result
 
 
-@pytest.mark.asyncio
 async def test_search_scene_tool_error(mock_bridge):
     """Test search_scene MCP tool raises ToolError"""
     from mcp.server.fastmcp.exceptions import ToolError
@@ -145,7 +137,6 @@ async def test_search_scene_tool_error(mock_bridge):
 
 # ─── scene error paths ─────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_scene_open_error_raises_tool_error(mock_bridge):
     """scene open raises ToolError when Unity returns ok=False."""
     from mcp.server.fastmcp.exceptions import ToolError
@@ -154,7 +145,6 @@ async def test_scene_open_error_raises_tool_error(mock_bridge):
         await scene(action="open", path="Assets/Missing.unity")
 
 
-@pytest.mark.asyncio
 async def test_scene_save_error_raises_tool_error(mock_bridge):
     """scene save raises ToolError when Unity returns ok=False."""
     from mcp.server.fastmcp.exceptions import ToolError
@@ -163,7 +153,6 @@ async def test_scene_save_error_raises_tool_error(mock_bridge):
         await scene(action="save", path="Assets/Scene.unity")
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_error_raises_tool_error(mock_bridge):
     """get_hierarchy raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Scene not loaded"})

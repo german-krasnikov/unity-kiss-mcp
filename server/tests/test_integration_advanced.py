@@ -2,12 +2,9 @@
 import asyncio
 import json
 import struct
-import pytest
-
 from unity_mcp.bridge import UnityBridge
 
 
-@pytest.mark.asyncio
 async def test_ten_sequential_commands(mock_unity_server):
     """Send 10 different commands sequentially, all return correctly."""
     for i in range(10):
@@ -24,7 +21,6 @@ async def test_ten_sequential_commands(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_concurrent_commands(mock_unity_server):
     """Send 5 commands concurrently via asyncio.gather."""
     for i in range(5):
@@ -44,7 +40,6 @@ async def test_concurrent_commands(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_slow_server_response():
     """Server waits 0.5s before responding, bridge handles correctly."""
     async def slow_handler(reader, writer):
@@ -85,7 +80,6 @@ async def test_slow_server_response():
     await server.wait_closed()
 
 
-@pytest.mark.asyncio
 async def test_chunked_response():
     """Server sends header and payload separately (2 drain calls)."""
     async def chunked_handler(reader, writer):
@@ -131,7 +125,6 @@ async def test_chunked_response():
     await server.wait_closed()
 
 
-@pytest.mark.asyncio
 async def test_unicode_data(mock_unity_server):
     """Send and receive unicode (cyrillic, emoji) in data."""
     unicode_data = "Привет мир 🎉 🚀"
@@ -148,7 +141,6 @@ async def test_unicode_data(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_empty_data(mock_unity_server):
     """Server returns empty string in data field."""
     mock_unity_server.set_response("empty_cmd", "")
@@ -164,7 +156,6 @@ async def test_empty_data(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_binary_like_data(mock_unity_server):
     """Server returns base64 string (simulates screenshot)."""
     base64_data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
@@ -182,7 +173,6 @@ async def test_binary_like_data(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_large_args_and_response(mock_unity_server):
     """Send large args dict and receive large data response."""
     large_args = {f"param_{i}": f"value_{i}" * 50 for i in range(50)}
@@ -202,7 +192,6 @@ async def test_large_args_and_response(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_mixed_sequential_and_concurrent(mock_unity_server):
     """Mix of sequential and concurrent commands."""
     for i in range(10):
@@ -238,7 +227,6 @@ async def test_mixed_sequential_and_concurrent(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_server_error_response(mock_unity_server):
     """Server returns ok=false with error message."""
     async def error_handler(reader, writer):
@@ -275,7 +263,6 @@ async def test_server_error_response(mock_unity_server):
     await server.wait_closed()
 
 
-@pytest.mark.asyncio
 async def test_message_id_increments_correctly(mock_unity_server):
     """Message IDs increment sequentially across multiple commands."""
     bridge = UnityBridge(port=mock_unity_server.port)
@@ -289,7 +276,6 @@ async def test_message_id_increments_correctly(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_reconnect_during_commands(mock_unity_server):
     """Circuit breaker: server drop raises ConnectionError; manual reconnect works."""
     connection_count = 0

@@ -16,7 +16,6 @@ def _str_send(bridge_send):
     return _inner
 
 
-@pytest.mark.asyncio
 async def test_set_property_no_false_positive_on_real_response(bridge, sandbox):
     """set_property to real object must NOT produce a spurious [REFLECT: mismatch."""
     resp = await bridge.send(
@@ -29,7 +28,6 @@ async def test_set_property_no_false_positive_on_real_response(bridge, sandbox):
     )
 
 
-@pytest.mark.asyncio
 async def test_manage_component_no_false_positive(bridge, sandbox):
     """manage_component add+remove — rule must not false-positive on real C# response."""
     await bridge.send("manage_component", {"path": sandbox, "type": "Rigidbody", "action": "add"})
@@ -40,7 +38,6 @@ async def test_manage_component_no_false_positive(bridge, sandbox):
     )
 
 
-@pytest.mark.asyncio
 async def test_delete_object_no_false_positive(bridge):
     """delete_object on freshly created object — rule must not false-positive."""
     name = f"LiveDel_{uuid.uuid4().hex[:6]}"
@@ -52,9 +49,11 @@ async def test_delete_object_no_false_positive(bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_reflect_run_against_real_get_component(bridge, sandbox):
-    """Feed real get_component response to reflect() — must not crash or false-positive."""
+    """Feed real get_component response to reflect() — must not crash or false-positive.
+
+    no-assert: crash guard — assert fires only when mismatch is returned (non-None).
+    """
     resp = await bridge.send("get_component", {"path": sandbox, "type": "Transform"})
     real_text = resp.get("data", "") if isinstance(resp, dict) else str(resp)
 
@@ -65,16 +64,18 @@ async def test_reflect_run_against_real_get_component(bridge, sandbox):
         _str_send(bridge.send),
     )
 
-    if mismatch is not None:
+    if mismatch is not None:  # no-assert: crash guard
         assert len(mismatch.msg) > 5, "Mismatch message too short — likely garbled"
         assert "no snapshot" not in mismatch.msg.lower(), (
             f"False-positive 'no snapshot' on real response: {real_text[:200]}"
         )
 
 
-@pytest.mark.asyncio
 async def test_reflect_run_against_real_manage_component(bridge, sandbox):
-    """Feed real manage_component response to reflect() — must not crash."""
+    """Feed real manage_component response to reflect() — must not crash.
+
+    no-assert: crash guard — assert fires only when mismatch is returned (non-None).
+    """
     await bridge.send("manage_component", {"path": sandbox, "type": "Rigidbody", "action": "add"})
     resp = await bridge.send("manage_component", {"path": sandbox, "type": "Rigidbody", "action": "remove"})
     real_text = resp.get("data", "") if isinstance(resp, dict) else str(resp)
@@ -85,14 +86,15 @@ async def test_reflect_run_against_real_manage_component(bridge, sandbox):
         real_text,
         _str_send(bridge.send),
     )
-    # No assertion on mismatch value — just must not crash and not produce garbled output
-    if mismatch is not None:
+    if mismatch is not None:  # no-assert: crash guard
         assert len(mismatch.msg) > 5, f"Garbled mismatch: {mismatch.msg!r}"
 
 
-@pytest.mark.asyncio
 async def test_reflect_run_against_real_delete_object(bridge):
-    """Feed real delete_object response to reflect() — must not crash."""
+    """Feed real delete_object response to reflect() — must not crash.
+
+    no-assert: crash guard — assert fires only when mismatch is returned (non-None).
+    """
     name = f"LiveDel_{uuid.uuid4().hex[:6]}"
     await bridge.send("create_object", {"name": name})
     resp = await bridge.send("delete_object", {"path": f"/{name}"})
@@ -104,11 +106,10 @@ async def test_reflect_run_against_real_delete_object(bridge):
         real_text,
         _str_send(bridge.send),
     )
-    if mismatch is not None:
+    if mismatch is not None:  # no-assert: crash guard
         assert len(mismatch.msg) > 5, f"Garbled mismatch: {mismatch.msg!r}"
 
 
-@pytest.mark.asyncio
 async def test_get_component_transform_has_position(bridge, sandbox):
     """Real Transform component response must contain position data."""
     resp = await bridge.send("get_component", {"path": sandbox, "type": "Transform"})
@@ -118,7 +119,6 @@ async def test_get_component_transform_has_position(bridge, sandbox):
     )
 
 
-@pytest.mark.asyncio
 async def test_set_then_read_position_roundtrip(bridge, sandbox):
     """Write localPosition → read it back — value must reflect the write."""
     await bridge.send(

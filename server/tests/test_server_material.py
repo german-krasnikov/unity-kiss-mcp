@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.server import material
 
 
-@pytest.mark.asyncio
 async def test_material_create(mock_bridge):
     """create forwards path and shader to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Material: Assets/M.mat\nshader: Standard"})
@@ -18,7 +17,6 @@ async def test_material_create(mock_bridge):
     assert "Assets/M.mat" in result
 
 
-@pytest.mark.asyncio
 async def test_material_create_default_shader(mock_bridge):
     """create without shader omits shader from args."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Material: Assets/M.mat\nshader: Standard"})
@@ -29,7 +27,6 @@ async def test_material_create_default_shader(mock_bridge):
     assert call_args[1]["path"] == "Assets/M.mat"
 
 
-@pytest.mark.asyncio
 async def test_material_get_by_asset(mock_bridge):
     """get by asset path forwards path to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Material: Assets/M.mat\n_Color: (1,1,1,1)\n_Smoothness: 0.5"})
@@ -40,7 +37,6 @@ async def test_material_get_by_asset(mock_bridge):
     assert "Assets/M.mat" in result
 
 
-@pytest.mark.asyncio
 async def test_material_get_by_object(mock_bridge):
     """get by scene object path forwards object_path to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Material on '/Cube'\n_Color: (1,1,1,1)"})
@@ -51,7 +47,6 @@ async def test_material_get_by_object(mock_bridge):
     assert "/Cube" in result
 
 
-@pytest.mark.asyncio
 async def test_material_set_float(mock_bridge):
     """set float property forwards path, prop, value."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "_Smoothness=0.5 on Assets/M.mat"})
@@ -64,7 +59,6 @@ async def test_material_set_float(mock_bridge):
     assert "_Smoothness" in result
 
 
-@pytest.mark.asyncio
 async def test_material_set_color(mock_bridge):
     """set color by object_path forwards object_path and hex value."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "_BaseColor=#FF0000FF on /Cube"})
@@ -77,7 +71,6 @@ async def test_material_set_color(mock_bridge):
     assert "_BaseColor" in result
 
 
-@pytest.mark.asyncio
 async def test_material_set_texture(mock_bridge):
     """set texture property forwards texture asset path as value."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "_BaseMap=Assets/Tex.png on Assets/M.mat"})
@@ -88,7 +81,6 @@ async def test_material_set_texture(mock_bridge):
     assert "_BaseMap" in result
 
 
-@pytest.mark.asyncio
 async def test_material_copy(mock_bridge):
     """copy forwards source and targets to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Copied material from /Cube to 2 objects"})
@@ -100,7 +92,6 @@ async def test_material_copy(mock_bridge):
     assert "Copied" in result
 
 
-@pytest.mark.asyncio
 async def test_material_list_properties(mock_bridge):
     """list_properties forwards path and returns property list."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Material: Assets/M.mat\nproperties:\n  _Color: Color\n  _Smoothness: Float\n  _BaseMap: Texture"})
@@ -112,7 +103,6 @@ async def test_material_list_properties(mock_bridge):
     assert "_Smoothness" in result
 
 
-@pytest.mark.asyncio
 async def test_material_error(mock_bridge):
     """Bridge error raises ToolError."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Material not found"})

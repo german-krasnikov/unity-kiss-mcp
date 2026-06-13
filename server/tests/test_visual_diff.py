@@ -4,16 +4,13 @@ import re
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+pytest.importorskip("PIL")
+from PIL import Image  # noqa: E402
+
 
 def _write_png(path, color: tuple = (255, 0, 0)):
-    """Write minimal valid PNG with given fill color (uses Pillow if available)."""
-    try:
-        from PIL import Image
-        img = Image.new("RGB", (10, 10), color)
-        img.save(path)
-    except ImportError:
-        # Write raw bytes that differ by color value
-        path.write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(color))
+    """Write minimal valid PNG with given fill color."""
+    Image.new("RGB", (10, 10), color).save(path)
 
 
 # ── pixel diff ────────────────────────────────────────────────────────────────
@@ -29,7 +26,6 @@ def test_pixel_diff_identical_files(tmp_path):
 
 def test_pixel_diff_size_mismatch(tmp_path):
     from unity_mcp.visual_diff import _pixel_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(a)
@@ -40,7 +36,6 @@ def test_pixel_diff_size_mismatch(tmp_path):
 
 def test_pixel_diff_different_returns_score(tmp_path):
     from unity_mcp.visual_diff import _pixel_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(a)
@@ -53,10 +48,8 @@ def test_pixel_diff_different_returns_score(tmp_path):
 
 # ── visual_diff function ──────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_visual_diff_pixel_mode_no_haiku(tmp_path):
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(a)
     result = await visual_diff(str(a), str(a), mode="pixel")
@@ -66,10 +59,8 @@ async def test_visual_diff_pixel_mode_no_haiku(tmp_path):
     assert isinstance(result, str)
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_auto_identical_skips_haiku(tmp_path):
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(a)
     mock_svc = MagicMock()
@@ -79,11 +70,9 @@ async def test_visual_diff_auto_identical_skips_haiku(tmp_path):
     mock_svc.verify_visual_diff.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_auto_below_threshold_skips_haiku(tmp_path):
     """Images with <1% pixel diff should skip semantic escalation."""
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
     img = Image.new("RGB", (100, 100), (128, 128, 128))
@@ -99,10 +88,8 @@ async def test_visual_diff_auto_below_threshold_skips_haiku(tmp_path):
     assert isinstance(result, str)
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_auto_escalates_on_big_diff(tmp_path):
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(a)
@@ -114,20 +101,16 @@ async def test_visual_diff_auto_escalates_on_big_diff(tmp_path):
     assert "Red cube appeared." in result
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_targeted_requires_question(tmp_path):
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(a)
     result = await visual_diff(str(a), str(a), mode="targeted")
     assert "ERROR" in result
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_cache_hit_returns_cached(tmp_path):
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     # Use unique colors to avoid collision with other tests' cache entries
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
@@ -146,10 +129,8 @@ async def test_visual_diff_cache_hit_returns_cached(tmp_path):
     assert "[cached]" in result2
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_sampling_disabled_falls_back_to_pixel(tmp_path):
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     # Use different colors from cache test to avoid cross-test cache collision
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
@@ -191,12 +172,10 @@ def test_pixel_diff_importerror_sets_unavailable(monkeypatch):
     assert result.corrupt is False
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_falls_back_to_pixel_when_haiku_returns_none(tmp_path):
     """degrade(): haiku returns None → pixel_only rung, [DEGRADED:...] prefix."""
     from unity_mcp.visual_diff import visual_diff
     from unity_mcp.metrics import METRICS
-    from PIL import Image
     METRICS.reset()
 
     a = tmp_path / "a.png"
@@ -213,11 +192,9 @@ async def test_visual_diff_falls_back_to_pixel_when_haiku_returns_none(tmp_path)
     assert METRICS.snapshot()["counters"].get("degraded.visual_diff", 0) >= 1
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_haiku_success_no_marker(tmp_path):
     """Happy path: haiku returns text → no [DEGRADED: prefix."""
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
 
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
@@ -233,7 +210,6 @@ async def test_visual_diff_haiku_success_no_marker(tmp_path):
     assert "Color changed to red." in result
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_pil_and_haiku_both_unavailable(tmp_path):
     """PIL ImportError + sampling=None → feature_unavailable rung."""
     import builtins
@@ -263,10 +239,8 @@ async def test_visual_diff_pil_and_haiku_both_unavailable(tmp_path):
         vd_mod._pixel_diff = original_pixel_diff
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_unknown_mode_returns_error(tmp_path):
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
     a = tmp_path / "a.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(a)
     result = await visual_diff(str(a), str(a), mode="bogus_mode")
@@ -304,7 +278,6 @@ def test_diff_cache_put_existing_no_premature_evict():
     assert cache.get("k2") == "v2"
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_all_rungs_none_produces_no_fallback_marker(tmp_path, monkeypatch):
     """#1: degrade() returns (step, None) → caller must use wrap_degraded, not inline f-string.
     Force all rungs to return None: haiku→None, pixel_only→None, feature_unavailable→None.
@@ -342,11 +315,9 @@ async def test_visual_diff_all_rungs_none_produces_no_fallback_marker(tmp_path, 
         vd_mod._pixel_diff = original_pixel_diff
 
 
-@pytest.mark.asyncio
 async def test_screenshot_compare_uses_visual_diff(tmp_path, mock_bridge):
     """screenshot_compare with mode='structural' delegates to visual_diff."""
     from unity_mcp.tools.scene import screenshot_compare
-    from PIL import Image
 
     baseline_dir = tmp_path / ".claude" / "baselines"
     baseline_dir.mkdir(parents=True)
@@ -365,11 +336,9 @@ async def test_screenshot_compare_uses_visual_diff(tmp_path, mock_bridge):
     assert "SEMANTIC" in result
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_targeted_sanitizes_question(tmp_path):
     """targeted mode strips control chars and caps question at 300 chars."""
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
 
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
@@ -399,11 +368,9 @@ async def test_visual_diff_targeted_sanitizes_question(tmp_path):
     assert len(injected) <= 300, f"injected question too long: {len(injected)}"
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_targeted_truncates_long_question(tmp_path):
     """targeted mode caps question at 300 chars exactly."""
     from unity_mcp.visual_diff import visual_diff
-    from PIL import Image
 
     a = tmp_path / "a.png"
     b = tmp_path / "b.png"
@@ -437,7 +404,6 @@ def test_diff_mode_literal_matches_runtime_whitelist():
     assert modes == expected, f"Missing from DiffMode: {expected - modes}"
 
 
-@pytest.mark.asyncio
 async def test_pixel_threshold_negative_rejected(tmp_path):
     from unity_mcp.visual_diff import visual_diff
     a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -446,7 +412,6 @@ async def test_pixel_threshold_negative_rejected(tmp_path):
     assert "ERROR" in result and "pixel_threshold" in result
 
 
-@pytest.mark.asyncio
 async def test_pixel_threshold_over_100_rejected(tmp_path):
     from unity_mcp.visual_diff import visual_diff
     a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n\x1a\n")
@@ -465,7 +430,6 @@ def test_pixel_diff_corrupt_file_invalid_bytes(tmp_path):
     assert r.corrupt is True
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_corrupt_file_returns_error(tmp_path):
     """Corrupt file returns explicit ERROR (not silent degrade)."""
     from unity_mcp.visual_diff import visual_diff
@@ -476,12 +440,10 @@ async def test_visual_diff_corrupt_file_returns_error(tmp_path):
 
 # ── refusal escalation (Item 1.5) ────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_visual_diff_refusal_falls_to_pixel(tmp_path, monkeypatch):
     """Haiku refusal triggers degrade ladder fallback."""
     from unity_mcp.visual_diff import visual_diff
     from unittest.mock import AsyncMock, MagicMock
-    from PIL import Image
 
     a = tmp_path / "a.png"
     Image.new("RGB", (10, 10), (255, 0, 0)).save(a)
@@ -500,7 +462,6 @@ async def test_visual_diff_refusal_falls_to_pixel(tmp_path, monkeypatch):
 
 # ── pixel_threshold boundary (Item 1.2) ──────────────────────────────────────
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("similarity,max_diff,should_skip_haiku", [
     (99.0, 4, True),    # exact threshold boundary — skip per `>=` contract
     (98.99, 4, False),  # just below similarity — escalate

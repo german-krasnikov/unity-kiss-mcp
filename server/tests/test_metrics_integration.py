@@ -24,7 +24,6 @@ def _make_mock_proc(stdout: bytes):
     return proc
 
 
-@pytest.mark.asyncio
 async def test_sampling_increments_calls():
     from unity_mcp.sampling import SamplingService
     from unity_mcp.metrics import METRICS
@@ -35,7 +34,6 @@ async def test_sampling_increments_calls():
     assert METRICS.snapshot()["counters"]["sampling.calls"] == 1
 
 
-@pytest.mark.asyncio
 async def test_sampling_increments_success():
     from unity_mcp.sampling import SamplingService
     from unity_mcp.metrics import METRICS
@@ -46,7 +44,6 @@ async def test_sampling_increments_success():
     assert METRICS.snapshot()["counters"]["sampling.success"] == 1
 
 
-@pytest.mark.asyncio
 async def test_sampling_increments_fail_on_none():
     from unity_mcp.sampling import SamplingService
     from unity_mcp.metrics import METRICS
@@ -111,7 +108,6 @@ def test_visual_diff_cache_hit_increments():
 
 # ── 4. get_metrics tool returns text ─────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_get_metrics_tool_returns_text():
     from unity_mcp.tools.metrics_tool import get_metrics
     from unity_mcp.metrics import METRICS
@@ -121,7 +117,6 @@ async def test_get_metrics_tool_returns_text():
     assert isinstance(result, str)
 
 
-@pytest.mark.asyncio
 async def test_get_metrics_tool_returns_json():
     from unity_mcp.tools.metrics_tool import get_metrics
     import json
@@ -131,7 +126,6 @@ async def test_get_metrics_tool_returns_json():
     assert "observations" in data
 
 
-@pytest.mark.asyncio
 async def test_get_metrics_tool_reset_clears():
     from unity_mcp.tools.metrics_tool import get_metrics
     from unity_mcp.metrics import METRICS

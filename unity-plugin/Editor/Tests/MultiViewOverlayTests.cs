@@ -1,5 +1,3 @@
-// CS4.test.2 — MultiViewOverlay.Classify and ParseHighlight coverage.
-// Pure math + minimal Unity types — EditMode safe.
 using NUnit.Framework;
 using UnityEngine;
 

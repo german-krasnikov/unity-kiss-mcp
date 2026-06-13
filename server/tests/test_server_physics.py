@@ -7,7 +7,6 @@ from unity_mcp.server import manage_component, set_property, find_objects, creat
 
 # --- manage_component: add physics components ---
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("component_type", [
     "Rigidbody", "SphereCollider", "CapsuleCollider", "MeshCollider",
     "CharacterController", "HingeJoint", "SpringJoint", "FixedJoint",
@@ -23,7 +22,6 @@ async def test_manage_component_add_physics(mock_bridge, component_type):
 
 # --- set_property: Rigidbody and collider properties ---
 
-@pytest.mark.asyncio
 async def test_set_property_rigidbody_mass(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="Rigidbody", prop="m_Mass", value="50")
@@ -33,7 +31,6 @@ async def test_set_property_rigidbody_mass(mock_bridge):
     assert args["value"] == "50"
 
 
-@pytest.mark.asyncio
 async def test_set_property_rigidbody_kinematic(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="Rigidbody", prop="m_IsKinematic", value="true")
@@ -42,7 +39,6 @@ async def test_set_property_rigidbody_kinematic(mock_bridge):
     assert args["value"] == "true"
 
 
-@pytest.mark.asyncio
 async def test_set_property_rigidbody_constraints(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="Rigidbody", prop="m_Constraints", value="112")
@@ -51,7 +47,6 @@ async def test_set_property_rigidbody_constraints(mock_bridge):
     assert args["value"] == "112"
 
 
-@pytest.mark.asyncio
 async def test_set_property_collider_trigger(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="SphereCollider", prop="m_IsTrigger", value="true")
@@ -61,7 +56,6 @@ async def test_set_property_collider_trigger(mock_bridge):
     assert args["value"] == "true"
 
 
-@pytest.mark.asyncio
 async def test_set_property_collider_size(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="BoxCollider", prop="m_Size", value="(2,3,4)")
@@ -71,7 +65,6 @@ async def test_set_property_collider_size(mock_bridge):
     assert args["value"] == "(2,3,4)"
 
 
-@pytest.mark.asyncio
 async def test_set_property_collision_detection(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="Rigidbody", prop="m_CollisionDetection", value="Continuous Dynamic")
@@ -80,7 +73,6 @@ async def test_set_property_collision_detection(mock_bridge):
     assert args["value"] == "Continuous Dynamic"
 
 
-@pytest.mark.asyncio
 async def test_set_property_character_controller(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="CharacterController", prop="m_Height", value="2")
@@ -90,7 +82,6 @@ async def test_set_property_character_controller(mock_bridge):
     assert args["value"] == "2"
 
 
-@pytest.mark.asyncio
 async def test_set_property_hinge_joint_axis(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await set_property(path="/Obj", component="HingeJoint", prop="m_Axis", value="(0,1,0)")
@@ -102,7 +93,6 @@ async def test_set_property_hinge_joint_axis(mock_bridge):
 
 # --- find_objects: filter by physics component ---
 
-@pytest.mark.asyncio
 async def test_find_objects_by_rigidbody(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Results"})
     await find_objects(component="Rigidbody")
@@ -110,7 +100,6 @@ async def test_find_objects_by_rigidbody(mock_bridge):
     assert args == {"component": "Rigidbody"}
 
 
-@pytest.mark.asyncio
 async def test_find_objects_by_sphere_collider(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Results"})
     await find_objects(component="SphereCollider")
@@ -120,7 +109,6 @@ async def test_find_objects_by_sphere_collider(mock_bridge):
 
 # --- create_object with physics components ---
 
-@pytest.mark.asyncio
 async def test_create_object_with_physics_components(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created"})
     await create_object(name="PhysObj", components="Rigidbody,BoxCollider,SphereCollider")
@@ -131,7 +119,6 @@ async def test_create_object_with_physics_components(mock_bridge):
 
 # --- batch: physics workflow ---
 
-@pytest.mark.asyncio
 async def test_batch_physics_workflow(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "[0] ok: /Obj\n[1] ok\n[2] ok"})
     commands = (

@@ -4,6 +4,8 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.TestStringHelpers;
+using static UnityMCP.Editor.Chat.Tests.ChipTestHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -13,12 +15,9 @@ namespace UnityMCP.Editor.Chat.Tests
         [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
         [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();
 
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
-
-        // C1: text with no @mentions → returned unchanged
+        // text with no @mentions → returned unchanged
         [Test]
-        public void C1_NoAtMentions_Unchanged()
+        public void NoAtMentions_ReturnsTextUnchanged()
         {
             var chips = new List<ChipData> { H("/Player", "Player", 1) };
             var result = AtMentionNormalizer.Normalize("fix the health component", chips);
@@ -27,7 +26,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // C2: "@Player" with matching chip → replaced with [hierarchy:/Player #1]
         [Test]
-        public void C2_AtMentionWithMatch_ReplacedWithBracketTag()
+        public void AtMentionWithMatch_ReplacedWithBracketTag()
         {
             var chips = new List<ChipData> { H("/Player", "Player", 1) };
             var result = AtMentionNormalizer.Normalize("check @Player health", chips);
@@ -37,7 +36,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // C3: "@Player" with no matching chip → returned unchanged (no strip)
         [Test]
-        public void C3_AtMentionNoMatch_Unchanged()
+        public void AtMentionNoMatch_ReturnsTextUnchanged()
         {
             var chips = new List<ChipData> { H("/Enemy", "Enemy", 2) };
             var result = AtMentionNormalizer.Normalize("fix @Player health", chips);
@@ -46,7 +45,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // C4: text with both @mention and [kind:ref] → @mention normalized, tag unchanged
         [Test]
-        public void C4_MixedAtAndTag_AtNormalized_TagUnchanged()
+        public void MixedAtAndTag_AtNormalized_TagUnchanged()
         {
             var chips = new List<ChipData> { H("/Player", "Player", 1) };
             var input  = "see @Player and [hierarchy:/Enemy #2]";
@@ -57,7 +56,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // C5: two @mentions for same chip name → both replaced
         [Test]
-        public void C5_TwoAtMentionsSameChip_BothReplaced()
+        public void TwoAtMentionsSameChip_BothReplaced()
         {
             var chips = new List<ChipData> { H("/Player", "Player", 1) };
             var result = AtMentionNormalizer.Normalize("@Player and @Player again", chips);
@@ -67,7 +66,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // C6: @mention with multi-word name → matched correctly
         [Test]
-        public void C6_MultiWordName_Matched()
+        public void MultiWordName_Matched()
         {
             var chips = new List<ChipData> { H("/Main Camera", "Main Camera", -123) };
             var result = AtMentionNormalizer.Normalize("check @Main Camera view", chips);
@@ -76,7 +75,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // C7: case-insensitive match
         [Test]
-        public void C7_CaseInsensitive_Matched()
+        public void CaseInsensitive_Matched()
         {
             var chips = new List<ChipData> { H("/Player", "Player", 1) };
             var result = AtMentionNormalizer.Normalize("fix @player now", chips);
@@ -85,7 +84,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // C8: null sentChips → returns text unchanged
         [Test]
-        public void C8_NullSentChips_Unchanged()
+        public void NullSentChips_ReturnsTextUnchanged()
         {
             var result = AtMentionNormalizer.Normalize("fix @Player health", null);
             Assert.AreEqual("fix @Player health", result);
@@ -137,7 +136,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // P1: LLM echoes full path — @/GridPlayer → bracket
         [Test]
-        public void P1_FullPathEcho_HierarchyChip_ReplacedWithBracket()
+        public void FullPathEcho_HierarchyChip_ReplacedWithBracket()
         {
             var chips = new List<ChipData> { H("/GridPlayer", "GridPlayer", 5) };
             var result = AtMentionNormalizer.Normalize("Check @/GridPlayer now", chips);
@@ -147,7 +146,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // P2: full path with spaces consumed fully; DisplayName chip also present (longest-first)
         [Test]
-        public void P2_FullPathWithSpaces_LongestFirstOverDisplayName()
+        public void FullPathWithSpaces_LongestFirstOverDisplayName()
         {
             var chips = new List<ChipData>
             {
@@ -160,7 +159,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // P3: plain DisplayName echo still normalizes (regression guard)
         [Test]
-        public void P3_DisplayNameEcho_StillNormalized()
+        public void DisplayNameEcho_StillNormalized()
         {
             var chips = new List<ChipData> { H("/GridPlayer", "GridPlayer", 5) };
             var result = AtMentionNormalizer.Normalize("fix @GridPlayer health", chips);
@@ -170,7 +169,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // P4: script chip (asset path, no leading '/') — @Assets/Foo.cs → bracket
         [Test]
-        public void P4_ScriptPathEcho_ReplacedWithBracket()
+        public void ScriptPathEcho_ReplacedWithBracket()
         {
             var chip   = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo", 0);
             var chips  = new List<ChipData> { chip };
@@ -182,7 +181,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // P5: both @/FullPath and @DisplayName in same response — both replaced
         [Test]
-        public void P5_BothFullPathAndDisplayName_BothReplaced()
+        public void BothFullPathAndDisplayName_BothReplaced()
         {
             var chips = new List<ChipData> { H("/GridPlayer", "GridPlayer", 5) };
             var result = AtMentionNormalizer.Normalize(
@@ -192,14 +191,5 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(2, CountOccurrences(result, "[hierarchy:/GridPlayer #5]"));
         }
 
-        // ── helper ────────────────────────────────────────────────────────────
-
-        private static int CountOccurrences(string text, string pattern)
-        {
-            int count = 0, idx = 0;
-            while ((idx = text.IndexOf(pattern, idx, System.StringComparison.Ordinal)) >= 0)
-            { count++; idx += pattern.Length; }
-            return count;
-        }
     }
 }

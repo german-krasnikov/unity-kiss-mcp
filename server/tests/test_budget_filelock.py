@@ -2,8 +2,6 @@
 import threading
 from pathlib import Path
 
-import pytest
-
 from unity_mcp.budget._filelock import locked
 
 
@@ -19,6 +17,7 @@ def test_locked_acquires_and_releases(tmp_path):
     assert sentinel.exists()
 
 
+# no-assert: crash guard
 def test_locked_releases_on_exception(tmp_path):
     """Lock is released even when body raises an exception."""
     data_file = tmp_path / "budget.json"

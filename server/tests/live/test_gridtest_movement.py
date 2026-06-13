@@ -108,7 +108,7 @@ async def test_batch_movement_with_screenshots(play_session):
     await play_session.send("invoke_method", {
         "path": PLAYER, "component": COMP, "method": "ResetState", "args": ""
     })
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.5)  # let ResetState propagate before changing MoveSpeed
     await play_session.send("set_runtime_property", {
         "path": PLAYER, "component": COMP, "field": "MoveSpeed", "value": "50"
     })

@@ -49,7 +49,6 @@ def test_find_objects_none_name_returns_none(mw):
     assert mw.find_from_cache(None) is None
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_bypasses_unity_for_find_objects():
     mw = Middleware()
     mw.update_path_cache("get_hierarchy", HIERARCHY)
@@ -61,7 +60,6 @@ async def test_wrap_send_bypasses_unity_for_find_objects():
     assert "/Gameplay/Characters/Player" in result
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_falls_through_on_cache_miss():
     mw = Middleware()
     mw.update_path_cache("get_hierarchy", HIERARCHY)

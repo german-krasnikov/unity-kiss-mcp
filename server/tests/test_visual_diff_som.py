@@ -2,7 +2,9 @@
 import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from PIL import Image
+
+pytest.importorskip("PIL")
+from PIL import Image  # noqa: E402
 
 
 def _write_png(path, color=(100, 100, 100), size=(100, 100)):
@@ -17,7 +19,6 @@ MOCK_RECTS = [
 
 # ── visual_diff mark=True ─────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_visual_diff_mark_true_legend_in_prompt(tmp_path):
     """mark=True: prompt passed to Haiku contains 'Legend:' and 'element'."""
     from unity_mcp.visual_diff import visual_diff
@@ -45,7 +46,6 @@ async def test_visual_diff_mark_true_legend_in_prompt(tmp_path):
     assert "element" in prompt.lower() or "Btn" in prompt
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_mark_same_path_same_index(tmp_path):
     """Same path → same index on before AND after frames."""
     from unity_mcp.visual_diff import visual_diff
@@ -77,7 +77,6 @@ async def test_visual_diff_mark_same_path_same_index(tmp_path):
         f"Expected 'N=A' in prompt but got: {prompt}"
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_mark_false_no_legend(tmp_path):
     """mark=False (default): prompt does NOT contain 'Legend:'."""
     from unity_mcp.visual_diff import visual_diff
@@ -99,7 +98,6 @@ async def test_visual_diff_mark_false_no_legend(tmp_path):
     assert "Legend:" not in captured_prompts[0]
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_mark_empty_rects_no_legend(tmp_path):
     """mark=True but rects=[] → no Legend injected, fallback prompt."""
     from unity_mcp.visual_diff import visual_diff
@@ -124,7 +122,6 @@ async def test_visual_diff_mark_empty_rects_no_legend(tmp_path):
 
 # ── screenshot_describe mark=True ─────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_describer_mark_true_uses_som_prompt(tmp_path):
     """ScreenshotDescriber with mark=True uses SoM prompt variant."""
     from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
@@ -152,7 +149,6 @@ async def test_describer_mark_true_uses_som_prompt(tmp_path):
     assert "Legend:" in captured[0] or "mark" in captured[0].lower()
 
 
-@pytest.mark.asyncio
 async def test_describer_mark_false_no_som_prompt(tmp_path):
     """ScreenshotDescriber with mark=False uses standard prompt."""
     from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
@@ -187,11 +183,9 @@ def test_som_visual_in_budget_registry():
     assert meta.est_out >= 200
 
 
-@pytest.mark.asyncio
 async def test_diff_annotate_cleanup_after_completion(tmp_path):
     """Verify tmp dir lives until verify_visual_diff completes."""
     from unity_mcp.som.diff_annotate import diff_with_annotation
-    from PIL import Image
 
     before = tmp_path / "before.png"
     after = tmp_path / "after.png"
@@ -220,7 +214,6 @@ async def test_diff_annotate_cleanup_after_completion(tmp_path):
     assert after_exists, "annotated after.png gone before verify_visual_diff returned"
 
 
-@pytest.mark.asyncio
 async def test_visual_diff_mark_subset_after_same_index(tmp_path):
     """REGRESSION: before has /X /Y /Z, after only /X /Z (drops /Y).
 
@@ -231,7 +224,6 @@ async def test_visual_diff_mark_subset_after_same_index(tmp_path):
     With fix: both frames use the same pool, so /X=2 in both.
     """
     from unity_mcp.som.overlay import annotate
-    from PIL import Image
 
     # sha256 sort order: /Y < /X < /Z  (verified: pool=[/Y, /X, /Z])
     before_rects = [

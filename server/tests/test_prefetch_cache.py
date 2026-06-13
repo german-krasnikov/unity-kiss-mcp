@@ -1,6 +1,5 @@
 """Tests for PrefetchCache — TTL, LRU, invalidation, GATE_PRIORS."""
 import time
-import pytest
 from unity_mcp.prefetch_cache import PrefetchCache, GATE_PRIORS, _frozen_args
 
 

@@ -1,6 +1,4 @@
-// F27: Atomic batch rollback — NUnit EditMode tests.
-// Run manually in Unity Test Runner (Window > General > Test Runner > EditMode).
-// These tests CANNOT run in CI (disconnected from Unity). See project memory note.
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
@@ -12,6 +10,16 @@ namespace UnityMCP.Editor.Tests
     [TestFixture]
     public class MCPBatchAtomicTests
     {
+        private List<GameObject> _toDestroy = new List<GameObject>();
+
+        [TearDown]
+        public void TearDown()
+        {
+            foreach (var go in _toDestroy)
+                if (go != null) Object.DestroyImmediate(go);
+            _toDestroy.Clear();
+        }
+
         // ── 1. All succeed — objects present, no rollback ─────────────────────
         [Test]
         public void Atomic_AllSucceed_AllObjectsPresent()
@@ -25,12 +33,10 @@ namespace UnityMCP.Editor.Tests
 
             var a = GameObject.Find("AtomicA");
             var b = GameObject.Find("AtomicB");
+            _toDestroy.Add(a);
+            _toDestroy.Add(b);
             Assert.IsNotNull(a, "AtomicA should exist");
             Assert.IsNotNull(b, "AtomicB should exist");
-
-            // Cleanup
-            Object.DestroyImmediate(a);
-            Object.DestroyImmediate(b);
         }
 
         // ── 2. Op1 succeeds, Op2 fails — everything reverted ─────────────────
@@ -44,7 +50,9 @@ namespace UnityMCP.Editor.Tests
             Assert.IsTrue(result.Contains("ATOMIC_ROLLBACK"), "Rollback expected");
             Assert.IsTrue(result.Contains("err:1"), "Should report 1 error");
 
+            // Should be null after rollback, but track for safety
             var c = GameObject.Find("AtomicC");
+            if (c != null) _toDestroy.Add(c);
             Assert.IsNull(c, "AtomicC should be reverted (not present in scene)");
         }
 
@@ -60,20 +68,13 @@ namespace UnityMCP.Editor.Tests
 
             var d = GameObject.Find("AtomicD");
             Assert.IsNotNull(d, "AtomicD should remain (partial apply in non-atomic mode)");
-
-            // Cleanup
-            Object.DestroyImmediate(d);
+            _toDestroy.Add(d);
         }
 
         // ── 4. Nested batch: outer atomic reverts inner's work too ────────────
         [Test]
         public void Atomic_NestedBatch_OuterReverts()
         {
-            // Outer atomic batch: inner batch creates E (succeeds), then outer fails
-            // The inner batch text must be escaped for embedding; use a simple approach:
-            // outer op0: create F via inner batch (nested)
-            // outer op1: fail via invalid set_property
-            // Result: F should be gone
             string innerBatch = "create_object name=AtomicE";
             string result = BatchHelper.Execute(
                 $"batch commands=\"{innerBatch}\"\nset_property path=/NONEXISTENT component=Transform prop=m_LocalPosition value=(0,0,0)",
@@ -82,6 +83,7 @@ namespace UnityMCP.Editor.Tests
             Assert.IsTrue(result.Contains("ATOMIC_ROLLBACK"), "Outer rollback expected");
 
             var e = GameObject.Find("AtomicE");
+            if (e != null) _toDestroy.Add(e);
             Assert.IsNull(e, "AtomicE (created by nested batch) should be reverted by outer");
         }
 
@@ -104,7 +106,6 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Atomic_FirstOpFails_NothingToRevert()
         {
-            // atomic batch whose FIRST op fails → message must not say "0..-1"
             string result = BatchHelper.Execute(
                 "set_property path=/NONEXISTENT component=Transform prop=m_LocalPosition value=(0,0,0)",
                 "continue", 25000, atomic: true);
@@ -129,6 +130,8 @@ namespace UnityMCP.Editor.Tests
 
             var f = GameObject.Find("AtomicF");
             var g = GameObject.Find("AtomicG");
+            if (f != null) _toDestroy.Add(f);
+            if (g != null) _toDestroy.Add(g);
             Assert.IsNull(f, "AtomicF should be reverted");
             Assert.IsNull(g, "AtomicG should never have been created");
         }

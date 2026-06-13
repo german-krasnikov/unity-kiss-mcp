@@ -1,11 +1,9 @@
 """Tests for Cycle 5d Item 3 — Distiller Haiku fallback wiring."""
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from unity_mcp.middleware import Middleware
 
 
-@pytest.mark.asyncio
 async def test_haiku_scheduled_on_passthrough(monkeypatch):
     """When heuristic returns passthrough on big input, Haiku scheduled in background."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -27,7 +25,6 @@ async def test_haiku_scheduled_on_passthrough(monkeypatch):
     # (depends on env). Test passes either way — just verifies no crash.
 
 
-@pytest.mark.asyncio
 async def test_haiku_cache_hit_on_repeat(monkeypatch):
     """Pre-populate cache, second identical call returns cached + marker."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -49,7 +46,6 @@ async def test_haiku_cache_hit_on_repeat(monkeypatch):
     assert "[DISTILLED haiku-cached;" in result
 
 
-@pytest.mark.asyncio
 async def test_haiku_disabled_when_sampling_none(monkeypatch):
     """UNITY_MCP_VISUAL_VERIFY unset → distiller has sampling=None → no background task."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -69,7 +65,6 @@ async def test_haiku_disabled_when_sampling_none(monkeypatch):
     assert len(mw._haiku_in_flight) == 0
 
 
-@pytest.mark.asyncio
 async def test_haiku_in_flight_dedup(monkeypatch):
     """3 concurrent identical calls — only one Haiku fires (in_flight set dedups)."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -109,7 +104,6 @@ async def test_haiku_in_flight_dedup(monkeypatch):
     assert haiku_call_count[0] <= 1, f"Expected ≤1 Haiku call, got {haiku_call_count[0]}"
 
 
-@pytest.mark.asyncio
 async def test_distill_cache_max_size(monkeypatch):
     """Cache evicts oldest when over MAX_DISTILL_CACHE."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")

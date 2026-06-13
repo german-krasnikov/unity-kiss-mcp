@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.server import menu
 
 
-@pytest.mark.asyncio
 async def test_menu_execute_calls_bridge(mock_bridge):
     """menu(action='execute') sends correct args to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Executed: GameObject/3D Object/Cube"})
@@ -16,7 +15,6 @@ async def test_menu_execute_calls_bridge(mock_bridge):
     assert "Executed" in result
 
 
-@pytest.mark.asyncio
 async def test_menu_list_calls_bridge(mock_bridge):
     """menu(action='list') sends correct args to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "GameObject/Create Empty\nGameObject/3D Object"})
@@ -27,7 +25,6 @@ async def test_menu_list_calls_bridge(mock_bridge):
     assert "Create Empty" in result
 
 
-@pytest.mark.asyncio
 async def test_menu_list_no_path(mock_bridge):
     """menu(action='list') without path lists all roots."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "File\nEdit\nAssets"})
@@ -37,7 +34,6 @@ async def test_menu_list_no_path(mock_bridge):
     assert "path" not in args
 
 
-@pytest.mark.asyncio
 async def test_menu_execute_error(mock_bridge):
     """menu(action='execute') raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Menu item not found: Invalid/Path"})
@@ -45,7 +41,6 @@ async def test_menu_execute_error(mock_bridge):
         await menu(action="execute", path="Invalid/Path")
 
 
-@pytest.mark.asyncio
 async def test_menu_execute_disabled_item(mock_bridge):
     """menu(action='execute') raises ToolError for disabled item."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Menu item disabled: Assets/Delete"})
@@ -53,7 +48,6 @@ async def test_menu_execute_disabled_item(mock_bridge):
         await menu(action="execute", path="Assets/Delete")
 
 
-@pytest.mark.asyncio
 async def test_menu_invalid_action(mock_bridge):
     """menu with invalid action raises ToolError from Unity."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Invalid action 'foo'. Valid: execute, list"})
@@ -61,7 +55,6 @@ async def test_menu_invalid_action(mock_bridge):
         await menu(action="foo", path="test")
 
 
-@pytest.mark.asyncio
 async def test_menu_none_path_filtered(mock_bridge):
     """None path is omitted from bridge call args."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
@@ -71,7 +64,6 @@ async def test_menu_none_path_filtered(mock_bridge):
     assert args == {"action": "execute"}
 
 
-@pytest.mark.asyncio
 async def test_menu_not_connected(mock_bridge):
     """menu raises ToolError when manager is None."""
     import unity_mcp.server as srv

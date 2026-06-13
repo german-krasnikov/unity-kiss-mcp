@@ -1,5 +1,6 @@
 // TDD — EditMode tests for ObjectManager mutations (P0-2 audit gap).
 // Run in Unity Test Runner → EditMode.
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -11,6 +12,7 @@ namespace UnityMCP.Editor.Tests
     public class ObjectManagerTests
     {
         private GameObject _go;
+        private List<GameObject> _toDestroy = new List<GameObject>();
 
         [SetUp]
         public void SetUp()
@@ -21,17 +23,12 @@ namespace UnityMCP.Editor.Tests
         [TearDown]
         public void TearDown()
         {
-            // Destroy test object if still alive (some tests destroy it intentionally)
             if (_go != null)
                 Object.DestroyImmediate(_go);
 
-            // Clean up any objects created by tests that aren't tracked via _go
-            foreach (var name in new[] { "OM_Created", "OM_Parent", "OM_Child", "OM_SetActive" })
-            {
-                var stray = GameObject.Find(name);
-                if (stray != null)
-                    Object.DestroyImmediate(stray);
-            }
+            foreach (var go in _toDestroy)
+                if (go != null) Object.DestroyImmediate(go);
+            _toDestroy.Clear();
         }
 
         // ── 1. CreateObject ───────────────────────────────────────────────────
@@ -42,10 +39,9 @@ namespace UnityMCP.Editor.Tests
             var path = ObjectManager.CreateObject("OM_Created", null, null);
 
             var found = GameObject.Find("OM_Created");
+            _toDestroy.Add(found);
             Assert.IsNotNull(found, "GameObject should exist in scene after CreateObject");
             Assert.AreEqual("/OM_Created", path);
-
-            Object.DestroyImmediate(found);
         }
 
         [Test]
@@ -54,10 +50,9 @@ namespace UnityMCP.Editor.Tests
             var path = ObjectManager.CreateObject("OM_Created", null, null, primitive: "Cube");
 
             var found = GameObject.Find("OM_Created");
+            _toDestroy.Add(found);
             Assert.IsNotNull(found);
             Assert.IsNotNull(found.GetComponent<MeshFilter>(), "Primitive Cube must have MeshFilter");
-
-            Object.DestroyImmediate(found);
         }
 
         [Test]
@@ -68,7 +63,7 @@ namespace UnityMCP.Editor.Tests
 
             // cleanup if it partially created
             var stray = GameObject.Find("OM_Created");
-            if (stray != null) Object.DestroyImmediate(stray);
+            if (stray != null) _toDestroy.Add(stray);
         }
 
         // ── 2. DeleteObject ───────────────────────────────────────────────────

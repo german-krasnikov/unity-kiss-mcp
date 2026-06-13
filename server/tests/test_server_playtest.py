@@ -5,7 +5,6 @@ from unity_mcp.server import run_playtest
 from unity_mcp.tools.runtime import _compress_report
 
 
-@pytest.mark.asyncio
 async def test_run_playtest_sends_command(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "PASS: 3 steps"}
     script = "WAIT 1\nASSERT_CONSOLE_CLEAN"
@@ -18,7 +17,6 @@ async def test_run_playtest_sends_command(mock_bridge):
     assert result == "PASS: 3 steps"
 
 
-@pytest.mark.asyncio
 async def test_run_playtest_timeout_passthrough(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "PASS"}
     await run_playtest("WAIT 1", timeout=60.0)
@@ -27,7 +25,6 @@ async def test_run_playtest_timeout_passthrough(mock_bridge):
     assert call[1]["timeout"] == 70.0
 
 
-@pytest.mark.asyncio
 async def test_run_playtest_default_timeout(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "PASS"}
     await run_playtest("LOG hi")

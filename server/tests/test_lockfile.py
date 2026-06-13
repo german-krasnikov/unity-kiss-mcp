@@ -478,6 +478,7 @@ def test_takeover_old_process_doesnt_die(tmp_path):
         assert mock_kill_pid.call_count == 1
 
 
+# no-assert: crash guard
 def test_kill_pid_dead_process():
     """_kill_pid with dead PID (ProcessLookupError) does not raise."""
     from unity_mcp.lockfile import _kill_pid
@@ -485,6 +486,7 @@ def test_kill_pid_dead_process():
         _kill_pid(99999)  # must not raise
 
 
+# no-assert: crash guard
 def test_kill_pid_permission_error():
     """_kill_pid with PermissionError does not raise."""
     from unity_mcp.lockfile import _kill_pid

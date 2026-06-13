@@ -1,7 +1,7 @@
-// TDD — RED first. Tests for Approve & Execute flow (Feature #11).
+// Tests for Approve & Execute flow.
 // Pure logic tests (1-6): ClaudeArgBuilder + string asserts, no EditorWindow.
 // UI tests (7-10): bare VisualElement tree, no EditorWindow.
-// F3 tests (11-15): _turnHasToolCalls gate — field reflection + MaybeAppend logic.
+// Tests (11-15): _turnHasToolCalls gate — field reflection + MaybeAppend logic.
 using NUnit.Framework;
 using System.Linq;
 using System.Reflection;

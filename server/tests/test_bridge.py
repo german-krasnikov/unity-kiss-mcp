@@ -37,7 +37,6 @@ def test_bridge_invalid_env_port_falls_back_to_default(monkeypatch):
     assert bridge._port == 9500
 
 
-@pytest.mark.asyncio
 async def test_send_concurrent_unique_ids(mock_reader, mock_writer):
     """Concurrent sends produce unique message IDs."""
     import json, struct
@@ -67,7 +66,6 @@ async def test_send_concurrent_unique_ids(mock_reader, mock_writer):
 
 
 class TestUnityBridge:
-    @pytest.mark.asyncio
     async def test_send_encodes_header_as_big_endian_uint32(
         self, mock_reader, mock_writer
     ):
@@ -99,7 +97,6 @@ class TestUnityBridge:
             length = struct.unpack("!I", header)[0]
             assert length == len(payload)
 
-    @pytest.mark.asyncio
     async def test_send_encodes_payload_as_utf8_json(
         self, mock_reader, mock_writer
     ):
@@ -130,7 +127,6 @@ class TestUnityBridge:
             assert decoded["args"] == {"arg": "value"}
             assert "id" in decoded
 
-    @pytest.mark.asyncio
     async def test_send_includes_incremental_id(self, mock_reader, mock_writer):
         """Verify hex IDs increment correctly."""
         with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
@@ -164,7 +160,6 @@ class TestUnityBridge:
 
             assert ids == ["0001", "0002", "0003"]
 
-    @pytest.mark.asyncio
     async def test_read_response_decodes_json(self, mock_reader, mock_writer):
         """Verify response parsing works."""
         with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
@@ -185,7 +180,6 @@ class TestUnityBridge:
             assert result["ok"] is True
             assert result["data"] == "hierarchy"
 
-    @pytest.mark.asyncio
     async def test_message_too_large_raises_error(self, mock_reader, mock_writer):
         """Verify >10MB message raises ConnectionError (circuit breaker trips)."""
         import unity_mcp.bridge as bmod
@@ -206,7 +200,6 @@ class TestUnityBridge:
         finally:
             bmod.SESSION_TIMEOUT = orig
 
-    @pytest.mark.asyncio
     async def test_close_cleans_up_writer(self, mock_reader, mock_writer):
         """Verify writer.close() and wait_closed() are called."""
         with patch("asyncio.open_connection", return_value=(mock_reader, mock_writer)):
@@ -218,7 +211,6 @@ class TestUnityBridge:
             mock_writer.close.assert_called_once()
             mock_writer.wait_closed.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_send_fails_fast_on_connection_error(self):
         """Circuit breaker: first ConnectionError raises immediately (no retry)."""
         first_reader = AsyncMock()
@@ -233,7 +225,6 @@ class TestUnityBridge:
             with pytest.raises(ConnectionError):
                 await bridge.send("test", {})
 
-    @pytest.mark.asyncio
     async def test_send_raises_on_connection_error(self):
         """Circuit breaker: raises ConnectionError on write failure."""
         from unittest.mock import MagicMock
@@ -254,7 +245,6 @@ class TestUnityBridge:
             with pytest.raises(ConnectionError):
                 await bridge.send("test", {})
 
-    @pytest.mark.asyncio
     async def test_bridge_auto_retry_on_retry_hint(self):
         """Bridge auto-waits and retries on retry hint."""
         reader = AsyncMock()
@@ -286,7 +276,6 @@ class TestUnityBridge:
                 # Verify sleep was called with retry_ms / 1000
                 mock_sleep.assert_called_once_with(0.1)  # 100ms = 0.1s
 
-    @pytest.mark.asyncio
     async def test_bridge_no_retry_on_normal_error(self):
         """Bridge does NOT retry on normal errors (no retry field)."""
         reader = AsyncMock()
@@ -307,7 +296,6 @@ class TestUnityBridge:
             assert result["ok"] is False
             assert "Object not found" in result["err"]
 
-    @pytest.mark.asyncio
     async def test_send_raises_timeout_error_after_max_retries(self):
         """Bridge raises error after max retries on asyncio.TimeoutError."""
         call_count = 0
@@ -333,7 +321,6 @@ class TestUnityBridge:
                     with pytest.raises((TimeoutError, ConnectionError), match="Unity not responding"):
                         await bridge.send("test", {})
 
-    @pytest.mark.asyncio
     async def test_bridge_retry_respects_max_retries(self):
         """Bridge doesn't retry forever on compilation busy."""
         reader = AsyncMock()
@@ -366,7 +353,6 @@ class TestUnityBridge:
 
 # ── Tier 2a: Grace retries for non-busy ──────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_idle_retry_gets_one_grace_attempt():
     """Non-busy disconnect retries once (1 grace) before giving up."""
     call_count = 0
@@ -394,7 +380,6 @@ async def test_idle_retry_gets_one_grace_attempt():
 
 # ── Tier 2c: Heartbeat ────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_heartbeat_detects_zombie_connection():
     """Two consecutive ping timeouts → connection closed (no reconnect)."""
     reader = AsyncMock()
@@ -421,7 +406,6 @@ async def test_heartbeat_detects_zombie_connection():
     assert not bridge.connected
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_reconnects_when_disconnected():
     """Heartbeat attempts reconnect when not connected and not busy."""
     reader = AsyncMock()
@@ -448,7 +432,6 @@ async def test_heartbeat_reconnects_when_disconnected():
     assert reconnect_calls[0] >= 1
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_reconnects_when_busy():
     """Heartbeat calls _reconnect() even when probe is busy (probe controls timing only)."""
     reader = AsyncMock()
@@ -477,7 +460,6 @@ async def test_heartbeat_reconnects_when_busy():
     assert reconnect_calls[0] >= 1
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_stops_on_close():
     """stop_heartbeat cancels the background task."""
     reader = AsyncMock()
@@ -514,7 +496,6 @@ def test_heartbeat_default_interval_is_15():
     assert sig.parameters["interval"].default == 15.0
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_immediate_close_when_pid_dead():
     """Single ping failure + PID dead → close after 1 failure (not 2)."""
     reader = AsyncMock()
@@ -575,7 +556,6 @@ def test_reconnect_cooldown_allows_after_interval():
     assert bridge._reconnect_cooldown_ok()
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_respects_reconnect_cooldown():
     """Heartbeat skips reconnect if cooldown hasn't elapsed."""
     import time as _time
@@ -600,7 +580,6 @@ async def test_heartbeat_respects_reconnect_cooldown():
     assert reconnect_calls[0] == 0
 
 
-@pytest.mark.asyncio
 async def test_raw_ping_bypasses_send_retry():
     """_raw_ping sends directly without going through send() retry logic."""
     import json as _json
@@ -625,7 +604,6 @@ async def test_raw_ping_bypasses_send_retry():
             assert b'"cmd": "ping"' in call_bytes[4:4 + length]
 
 
-@pytest.mark.asyncio
 async def test_raw_ping_raises_on_disconnected():
     """_raw_ping raises ConnectionError if not connected."""
     bridge = UnityBridge(port=9500)
@@ -633,7 +611,6 @@ async def test_raw_ping_raises_on_disconnected():
         await bridge._raw_ping()
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_immediate_close_on_domain_reload_error():
     """DomainReloadError during heartbeat ping → close immediately (no 2-failure wait)."""
     from unity_mcp.bridge import DomainReloadError
@@ -660,7 +637,6 @@ async def test_heartbeat_immediate_close_on_domain_reload_error():
     assert closed_event.is_set()
 
 
-@pytest.mark.asyncio
 async def test_ensure_heartbeat_restarts_dead_task():
     """_ensure_heartbeat() auto-restarts heartbeat if task died."""
     bridge = UnityBridge(port=9500)
@@ -673,7 +649,6 @@ async def test_ensure_heartbeat_restarts_dead_task():
     bridge.stop_heartbeat()
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_survives_tick_exception():
     """Heartbeat loop continues after non-CancelledError exception in tick."""
     tick_count = [0]
@@ -754,7 +729,6 @@ def test_reconnect_callback_debounce_allows_after_cooldown():
 
 # ── F04: mark_recompile_issued wired in DomainReloadError handlers ────────────
 
-@pytest.mark.asyncio
 async def test_send_marks_recompile_on_domain_reload():
     """send() calls probe.mark_recompile_issued() when DomainReloadError occurs."""
     from unittest.mock import MagicMock
@@ -776,7 +750,6 @@ async def test_send_marks_recompile_on_domain_reload():
     idle_probe.mark_recompile_issued.assert_called()
 
 
-@pytest.mark.asyncio
 async def test_heartbeat_marks_recompile_on_domain_reload():
     """_heartbeat_tick() calls probe.mark_recompile_issued() on DomainReloadError."""
     from unity_mcp.bridge import DomainReloadError
@@ -840,7 +813,6 @@ def test_connected_property_no_msg_dontwait():
 
 # ── PY1.test.2: lock-held skip-ping branch ───────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_heartbeat_skips_ping_when_lock_held():
     """_heartbeat_tick skips _raw_ping when _lock is already held."""
     reader = AsyncMock()
@@ -868,7 +840,6 @@ async def test_heartbeat_skips_ping_when_lock_held():
 
 # ── PY1.test.3: 3 consecutive ping failures without dead PID → close ─────────
 
-@pytest.mark.asyncio
 async def test_heartbeat_closes_after_3_ping_failures():
     """3 consecutive OSError ping failures with live PID → close (no immediate close)."""
     reader = AsyncMock()
@@ -898,3 +869,65 @@ async def test_heartbeat_closes_after_3_ping_failures():
                 # Tick 3 — failures=3 >= 3 → close
                 await bridge._heartbeat_tick(0.01)
                 assert close_calls[0] == 1, "should close after 3rd consecutive failure"
+
+
+# ── Fix 24: bridge.py preserve exception type ────────────────────────────────
+
+async def test_bridge_connection_error_chains_original():
+    """Fix 24: ConnectionError raised in bridge.send must chain the original exception."""
+    from unity_mcp.bridge import UnityBridge
+    bridge = UnityBridge("127.0.0.1", 19999)  # nothing listening
+    try:
+        await bridge.send("ping", {}, timeout=1.0)
+        pytest.fail("Expected ConnectionError")
+    except (ConnectionError, TimeoutError) as ce:
+        assert ce.__cause__ is not None, "Exception must chain original via 'from e'"
+
+
+# ── F01-qw: ping timeout + concurrent message IDs ─────────────────────────────
+
+def test_raw_ping_default_timeout_is_5s():
+    """F01: _raw_ping default timeout must be 5.0s (reduced from 10.0)."""
+    import inspect
+    from unity_mcp.bridge import UnityBridge
+    sig = inspect.signature(UnityBridge._raw_ping)
+    assert sig.parameters["timeout"].default == 5.0
+
+
+def test_heartbeat_tick_calls_raw_ping_with_5s_timeout():
+    """F01: _heartbeat_tick must call _raw_ping with timeout=5 (not 20)."""
+    import inspect
+    from unity_mcp.bridge import UnityBridge
+    src = inspect.getsource(UnityBridge._heartbeat_tick)
+    assert "timeout=5" in src, "heartbeat must use timeout=5"
+    assert "timeout=20" not in src, "timeout=20 must be removed"
+
+
+async def test_concurrent_sends_use_unique_message_ids():
+    """F01-behavioral: concurrent send() calls must get unique message IDs."""
+    import asyncio
+    import json
+    from unittest.mock import AsyncMock, MagicMock
+    from unity_mcp.bridge import UnityBridge
+
+    bridge = UnityBridge("127.0.0.1", 19998)
+    sent_ids = []
+
+    writer = MagicMock()
+    writer.is_closing.return_value = False
+    writer.get_extra_info.return_value = None
+
+    def _write(buf):
+        sent_ids.append(json.loads(buf[4:])["id"])
+    writer.write.side_effect = _write
+    writer.drain = AsyncMock()
+    bridge._writer = writer
+    bridge._reader = MagicMock()
+
+    async def _read_response():
+        return {"id": sent_ids[-1], "ok": True, "data": "ok"}
+    bridge._read_response = _read_response
+
+    results = await asyncio.gather(*[bridge.send("ping", {}) for _ in range(50)])
+    assert len(set(sent_ids)) == 50, "concurrent sends must get unique IDs"
+    assert all(r.get("ok") for r in results)

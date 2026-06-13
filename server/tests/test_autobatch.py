@@ -26,7 +26,6 @@ def _batch_cmds(mock_send) -> str:
 
 # ── setup_objects ─────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_setup_objects_single(mock_send):
     from unity_mcp.tools.autobatch import setup_objects
     await setup_objects("MyObj")
@@ -35,7 +34,6 @@ async def test_setup_objects_single(mock_send):
     assert "inspect paths=/MyObj" in cmds
 
 
-@pytest.mark.asyncio
 async def test_setup_objects_with_position(mock_send):
     from unity_mcp.tools.autobatch import setup_objects
     await setup_objects("MyObj pos=(1,0,0)")
@@ -43,7 +41,6 @@ async def test_setup_objects_with_position(mock_send):
     assert "set_property path=/MyObj component=Transform prop=m_LocalPosition value=(1,0,0)" in cmds
 
 
-@pytest.mark.asyncio
 async def test_setup_objects_with_primitive(mock_send):
     from unity_mcp.tools.autobatch import setup_objects
     await setup_objects("NPC1 primitive=Capsule")
@@ -51,7 +48,6 @@ async def test_setup_objects_with_primitive(mock_send):
     assert "create_object name=NPC1 primitive=Capsule" in cmds
 
 
-@pytest.mark.asyncio
 async def test_setup_objects_with_components(mock_send):
     from unity_mcp.tools.autobatch import setup_objects
     await setup_objects("NPC1 components=Health,Rigidbody")
@@ -60,7 +56,6 @@ async def test_setup_objects_with_components(mock_send):
     assert "manage_component path=/NPC1 type=Rigidbody action=add" in cmds
 
 
-@pytest.mark.asyncio
 async def test_setup_objects_multiple(mock_send):
     from unity_mcp.tools.autobatch import setup_objects
     await setup_objects("A\nB primitive=Cube")
@@ -72,7 +67,6 @@ async def test_setup_objects_multiple(mock_send):
     assert "/B" in cmds
 
 
-@pytest.mark.asyncio
 async def test_setup_objects_empty(mock_send):
     from unity_mcp.tools.autobatch import setup_objects
     result = await setup_objects("   ")
@@ -81,7 +75,6 @@ async def test_setup_objects_empty(mock_send):
     assert "No" in result
 
 
-@pytest.mark.asyncio
 async def test_setup_objects_parent_double_slash_normalized(mock_send):
     """parent path containing // is not double-slashed in generated commands."""
     from unity_mcp.tools.autobatch import setup_objects
@@ -95,7 +88,6 @@ async def test_setup_objects_parent_double_slash_normalized(mock_send):
 
 # ── set_properties ────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_properties_single(mock_send):
     from unity_mcp.tools.autobatch import set_properties
     await set_properties("/NPC1", "Transform.m_LocalPosition=(1,0,0)")
@@ -103,7 +95,6 @@ async def test_set_properties_single(mock_send):
     assert "set_property path=/NPC1 component=Transform prop=m_LocalPosition value=(1,0,0)" in cmds
 
 
-@pytest.mark.asyncio
 async def test_set_properties_multiple(mock_send):
     from unity_mcp.tools.autobatch import set_properties
     await set_properties("/NPC1", "Transform.m_LocalPosition=(1,0,0)\nRigidbody.mass=5\nTransform.m_LocalScale=(2,2,2)")
@@ -114,7 +105,6 @@ async def test_set_properties_multiple(mock_send):
     assert "get_component path=/NPC1 type=Transform" in cmds
 
 
-@pytest.mark.asyncio
 async def test_set_properties_semicolons(mock_send):
     from unity_mcp.tools.autobatch import set_properties
     await set_properties("/NPC1", "Transform.m_LocalPosition=(1,0,0);Rigidbody.mass=5")
@@ -122,7 +112,6 @@ async def test_set_properties_semicolons(mock_send):
     assert cmds.count("set_property") == 2
 
 
-@pytest.mark.asyncio
 async def test_set_properties_invalid(mock_send):
     from unity_mcp.tools.autobatch import set_properties
     result = await set_properties("/NPC1", "no_dot_here=value")
@@ -132,7 +121,6 @@ async def test_set_properties_invalid(mock_send):
 
 # ── configure_objects ─────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_configure_objects_multi(mock_send):
     from unity_mcp.tools.autobatch import configure_objects
     await configure_objects("/NPC1 Transform.m_LocalPosition=(1,0,0)\n/NPC2 Transform.m_LocalPosition=(3,0,0)")
@@ -142,7 +130,6 @@ async def test_configure_objects_multi(mock_send):
     assert "inspect paths=" in cmds
 
 
-@pytest.mark.asyncio
 async def test_configure_objects_invalid(mock_send):
     from unity_mcp.tools.autobatch import configure_objects
     result = await configure_objects("NPC1 Transform.pos=(1,0,0)")  # no leading /
@@ -150,7 +137,6 @@ async def test_configure_objects_invalid(mock_send):
     assert "No valid" in result
 
 
-@pytest.mark.asyncio
 async def test_configure_objects_multiple_props(mock_send):
     from unity_mcp.tools.autobatch import configure_objects
     await configure_objects("/NPC1 Transform.m_LocalPosition=(1,0,0) Health.maxHp=100")
@@ -161,7 +147,6 @@ async def test_configure_objects_multiple_props(mock_send):
 
 # ── configure_objects: multi-scene path support (Bug 3) ───────────────────────
 
-@pytest.mark.asyncio
 async def test_configure_accepts_scene_qualified_path(mock_send):
     """Bug 3: SceneName:/Player path must not be rejected."""
     from unity_mcp.tools.autobatch import configure_objects
@@ -170,7 +155,6 @@ async def test_configure_accepts_scene_qualified_path(mock_send):
     assert "set_property path=SceneName:/Player" in cmds
 
 
-@pytest.mark.asyncio
 async def test_configure_still_accepts_bare_path(mock_send):
     """/Player (no scene prefix) must still work after the fix."""
     from unity_mcp.tools.autobatch import configure_objects
@@ -179,7 +163,6 @@ async def test_configure_still_accepts_bare_path(mock_send):
     assert "set_property path=/Player" in cmds
 
 
-@pytest.mark.asyncio
 async def test_configure_rejects_invalid_line(mock_send):
     """Lines without a path token are silently skipped."""
     from unity_mcp.tools.autobatch import configure_objects
@@ -188,7 +171,6 @@ async def test_configure_rejects_invalid_line(mock_send):
     assert "No valid" in result
 
 
-@pytest.mark.asyncio
 async def test_configure_mixed_paths(mock_send):
     """Both bare and scene-qualified paths can appear in one call."""
     from unity_mcp.tools.autobatch import configure_objects
@@ -200,3 +182,21 @@ async def test_configure_mixed_paths(mock_send):
     cmds = _batch_cmds(mock_send)
     assert "set_property path=/NPC1" in cmds
     assert "set_property path=Level2:/NPC2" in cmds
+
+
+# ── Fix 22: autobatch setup_objects full path with parent ─────────────────────
+
+async def test_setup_objects_uses_full_path_when_parent_given():
+    """Fix 22: set_property/manage_component must use full path when parent specified."""
+    import unity_mcp.tools.autobatch as ab
+    from unittest.mock import AsyncMock
+    send = AsyncMock(return_value="ok")
+    ab._send = send
+
+    from unity_mcp.tools.autobatch import setup_objects
+    await setup_objects("Child parent=Root pos=(1,0,0)")
+
+    cmds = send.call_args[0][1]["commands"]
+    assert "path=/Root/Child" in cmds or "path=Root/Child" in cmds
+
+    ab._send = None

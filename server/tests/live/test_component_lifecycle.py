@@ -7,20 +7,16 @@ import uuid
 
 import pytest
 
+from tests.live.conftest import _ok
+
 pytestmark = pytest.mark.live
 
 
-@pytest.mark.asyncio
 async def test_full_component_lifecycle(ensure_edit_mode, bridge):
     """Create 2 objects → add component → set ref → verify → remove → cleanup."""
     uid = uuid.uuid4().hex[:8]
     name_a = f"Live_{uid}_A"
     name_b = f"Live_{uid}_B"
-
-    def _ok(result):
-        d = result.get("data", "") if isinstance(result, dict) else str(result)
-        assert result.get("ok", True), f"Command failed: {result.get('err', d)}"
-        return d
 
     r1 = await bridge.send("create_object", {"name": name_a})
     _ok(r1)

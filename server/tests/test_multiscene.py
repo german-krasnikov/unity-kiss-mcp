@@ -2,7 +2,6 @@
 
 Includes: path cache, split, validate, distiller, compress, scale/stress, edge cases.
 """
-import pytest
 from unity_mcp.middleware_paths import PathResolverMixin, _split_scene_qualified
 from unity_mcp.distiller import ResponseDistiller
 from unity_mcp.server import compress_hierarchy

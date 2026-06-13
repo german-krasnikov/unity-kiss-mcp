@@ -1,6 +1,5 @@
 """Tests for SceneBrief — P2 feature."""
 import os
-import pytest
 from unittest.mock import AsyncMock, patch
 
 
@@ -58,7 +57,6 @@ def test_scene_brief_reset_clears_cache():
     assert brief.should_inject("get_hierarchy") is False  # no brief to inject
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_ensure_calls_send_raw(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_SCENE_BRIEF", "1")
     brief = _make_brief()
@@ -81,7 +79,6 @@ async def test_scene_brief_ensure_calls_send_raw(monkeypatch):
     assert brief.brief == "5 objects, no errors, stopped"
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_ensure_caches_result(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_SCENE_BRIEF", "1")
     brief = _make_brief()
@@ -98,7 +95,6 @@ async def test_scene_brief_ensure_caches_result(monkeypatch):
     assert not call_log  # no calls made
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_ensure_returns_none_when_disabled():
     brief = _make_brief()  # UNITY_MCP_SCENE_BRIEF not set
 
@@ -109,7 +105,6 @@ async def test_scene_brief_ensure_returns_none_when_disabled():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_ensure_send_raw_raises(monkeypatch):
     """ensure() must return None (not propagate) when send_raw raises."""
     monkeypatch.setenv("UNITY_MCP_SCENE_BRIEF", "1")
@@ -122,7 +117,6 @@ async def test_scene_brief_ensure_send_raw_raises(monkeypatch):
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_ensure_sampling_disabled(monkeypatch):
     """ensure() returns None when SamplingService is not enabled."""
     monkeypatch.setenv("UNITY_MCP_SCENE_BRIEF", "1")

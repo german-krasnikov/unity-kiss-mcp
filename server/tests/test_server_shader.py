@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.server import shader
 
 
-@pytest.mark.asyncio
 async def test_shader_get_sends_action_and_path(mock_bridge):
     """shader get forwards action and path to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Shader: Standard\nproperties:\n  _Color: Color"})
@@ -18,7 +17,6 @@ async def test_shader_get_sends_action_and_path(mock_bridge):
     assert "Standard" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_get_material_sends_target(mock_bridge):
     """shader get with target=material includes target in args."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Material on '/Cube'\nshader: Standard"})
@@ -28,7 +26,6 @@ async def test_shader_get_material_sends_target(mock_bridge):
     assert "Material" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_excludes_none_params(mock_bridge):
     """None parameters not sent to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
@@ -39,7 +36,6 @@ async def test_shader_excludes_none_params(mock_bridge):
     assert "keyword" not in call_args[1]
 
 
-@pytest.mark.asyncio
 async def test_shader_error_raises_tool_error(mock_bridge):
     """Bridge error raises ToolError."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Shader not found"})
@@ -47,7 +43,6 @@ async def test_shader_error_raises_tool_error(mock_bridge):
         await shader(action="get", path="/NonExistent")
 
 
-@pytest.mark.asyncio
 async def test_shader_create_with_preset(mock_bridge):
     """shader create with preset forwards all args."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Shader: \"Custom/Test\"\nproperties:\n  _Color: Color"})
@@ -59,7 +54,6 @@ async def test_shader_create_with_preset(mock_bridge):
     assert "Shader:" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_create_with_code(mock_bridge):
     """shader create with custom code forwards code param."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Shader: \"Custom/Test\""})
@@ -70,7 +64,6 @@ async def test_shader_create_with_code(mock_bridge):
     assert "preset" not in call_args[1]
 
 
-@pytest.mark.asyncio
 async def test_shader_set_material_property(mock_bridge):
     """shader set forwards prop and value."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "_Color=#FF0000 on /Cube"})
@@ -82,7 +75,6 @@ async def test_shader_set_material_property(mock_bridge):
     assert "_Color" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_set_keyword(mock_bridge):
     """shader set keyword forwards keyword and enabled."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "keyword _EMISSION enabled on /Cube"})
@@ -95,7 +87,6 @@ async def test_shader_set_keyword(mock_bridge):
 
 # Phase 20c tests
 
-@pytest.mark.asyncio
 async def test_shader_graph_get_sends_path(mock_bridge):
     """shader graph_get forwards path to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: Assets/Shaders/Test.shadergraph\nnodes: 3\nedges: 2"})
@@ -106,7 +97,6 @@ async def test_shader_graph_get_sends_path(mock_bridge):
     assert "ShaderGraph:" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_get_returns_nodes(mock_bridge):
     """shader graph_get result includes node list."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: Assets/Test.shadergraph\nnodes: 2\n  [abc] ColorNode\n  [def] MultiplyNode\nedges: 1"})
@@ -115,7 +105,6 @@ async def test_shader_graph_get_returns_nodes(mock_bridge):
     assert "MultiplyNode" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_create_sends_preset(mock_bridge):
     """shader graph_create forwards preset to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: Assets/Test.shadergraph\nnodes: 2"})
@@ -125,7 +114,6 @@ async def test_shader_graph_create_sends_preset(mock_bridge):
     assert call_args[1]["preset"] == "unlit_graph"
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_create_returns_data(mock_bridge):
     """shader graph_create returns created graph info."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: Assets/New.shadergraph\nnodes: 3\nedges: 2\nproperties: 1"})
@@ -136,7 +124,6 @@ async def test_shader_graph_create_returns_data(mock_bridge):
 
 # Phase 20d tests
 
-@pytest.mark.asyncio
 async def test_shader_graph_node_add_sends_type(mock_bridge):
     """shader graph_node add forwards node_type."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: test.shadergraph\nnodes: 8\n  [abc] MultiplyNode"})
@@ -148,7 +135,6 @@ async def test_shader_graph_node_add_sends_type(mock_bridge):
     assert "MultiplyNode" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_node_remove_sends_id(mock_bridge):
     """shader graph_node remove forwards node_id."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: test.shadergraph\nnodes: 6"})
@@ -159,7 +145,6 @@ async def test_shader_graph_node_remove_sends_id(mock_bridge):
     assert "node_type" not in call_args[1]
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_edge_add_sends_slots(mock_bridge):
     """shader graph_edge add forwards output/input node and slot."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: test.shadergraph\nedges: 5"})
@@ -172,7 +157,6 @@ async def test_shader_graph_edge_add_sends_slots(mock_bridge):
     assert call_args[1]["input_slot"] == 1
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_edge_remove(mock_bridge):
     """shader graph_edge remove forwards edge_action=remove."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: test.shadergraph\nedges: 3"})
@@ -185,7 +169,6 @@ async def test_shader_graph_edge_remove(mock_bridge):
 
 # New tests
 
-@pytest.mark.asyncio
 async def test_shader_create_overwrite(mock_bridge):
     """create with preset=lit called twice on same path — both calls go through."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Shader: \"Custom/MyShader\""})
@@ -204,7 +187,6 @@ async def test_shader_create_overwrite(mock_bridge):
     assert "Shader:" in result2
 
 
-@pytest.mark.asyncio
 async def test_shader_create_with_shader_name(mock_bridge):
     """create with preset=unlit and shader_name sends shader_name to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Shader: \"MyProject/Glow\""})
@@ -217,7 +199,6 @@ async def test_shader_create_with_shader_name(mock_bridge):
     assert "Glow" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_set_vector_property(mock_bridge):
     """shader set with vector value forwards prop and value correctly."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "_Vec=(1,2,3,4) on /Cube"})
@@ -229,7 +210,6 @@ async def test_shader_set_vector_property(mock_bridge):
     assert "_Vec" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_full_pipeline(mock_bridge):
     """Sequential graph_create → graph_node add x2 → graph_edge add → graph_get."""
     path = "Assets/Shaders/Pipeline.shadergraph"
@@ -266,7 +246,6 @@ async def test_shader_graph_full_pipeline(mock_bridge):
     assert mock_bridge.send.call_count == 5
 
 
-@pytest.mark.asyncio
 async def test_shader_graph_node_remove_cascade(mock_bridge):
     """graph_node remove with node_id sends node_action=remove and node_id, no node_type."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ShaderGraph: test.shadergraph\nnodes: 4"})
@@ -279,7 +258,6 @@ async def test_shader_graph_node_remove_cascade(mock_bridge):
     assert "nodes:" in result
 
 
-@pytest.mark.asyncio
 async def test_shader_set_missing_prop_and_value_raises_tool_error(mock_bridge):
     """set without prop/value and without keyword/enabled raises ToolError from bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Missing prop or keyword"})

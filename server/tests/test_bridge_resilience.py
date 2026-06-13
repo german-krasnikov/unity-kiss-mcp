@@ -18,7 +18,6 @@ def _make_bridge(port: int = 9999) -> UnityBridge:
 
 # ── Test 4: SESSION_TIMEOUT aborts retries ───────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_session_timeout_aborts_retries(monkeypatch):
     """SESSION_TIMEOUT must abort retry loop. Use slow-failure mock so refused
     fast-backoff doesn't finish before deadline check (which would make this
@@ -53,7 +52,6 @@ async def test_session_timeout_aborts_retries(monkeypatch):
 
 # ── Test 5: CONNECT_TIMEOUT fast-fail ────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_connect_timeout_fast_fail(monkeypatch):
     """Mocked open_connection that hangs forever — verify CONNECT_TIMEOUT fires."""
     import unity_mcp.bridge as bridge_mod
@@ -74,7 +72,6 @@ async def test_connect_timeout_fast_fail(monkeypatch):
 
 # ── Test 6: ECONNREFUSED fast backoff ────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_econnrefused_fails_fast(monkeypatch):
     """ConnectionRefusedError → circuit breaker trips, raises immediately (no backoff sleep)."""
     import unity_mcp.bridge as bridge_mod
@@ -104,7 +101,6 @@ async def test_econnrefused_fails_fast(monkeypatch):
 
 # ── Test 7: reconnect invokes callbacks ──────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_reconnect_invokes_callback(monkeypatch):
     """add_reconnect_callback: registered fn is called after _reconnect."""
     import unity_mcp.bridge as bridge_mod
@@ -133,7 +129,6 @@ async def test_reconnect_invokes_callback(monkeypatch):
 
 # ── Test 8 (bridge side): reconnect callback wires middleware.reset_session ───
 
-@pytest.mark.asyncio
 async def test_reconnect_callback_resets_middleware(monkeypatch):
     """Simulate wiring: reconnect fires reset_session on middleware."""
     import unity_mcp.bridge as bridge_mod

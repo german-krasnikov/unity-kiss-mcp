@@ -26,21 +26,18 @@ def screenshot_tool():
     scene_mod._args = orig_args
 
 
-@pytest.mark.asyncio
 async def test_screenshot_offset_passthrough(screenshot_tool):
     fn, captured = screenshot_tool
     await fn(camera="multi_view", path="/Cube", offset="1,2,3")
     assert captured['args'].get('offset') == "1,2,3"
 
 
-@pytest.mark.asyncio
 async def test_screenshot_fixed_size_passthrough(screenshot_tool):
     fn, captured = screenshot_tool
     await fn(camera="multi_view", path="/Cube", fixed_size=5.0)
     assert captured['args'].get('fixed_size') == 5.0
 
 
-@pytest.mark.asyncio
 async def test_screenshot_all_params_together(screenshot_tool):
     fn, captured = screenshot_tool
     await fn(camera="multi_view", path="/Cube", zoom=1.5, offset="0,1,0", fixed_size=3.0)
@@ -49,7 +46,6 @@ async def test_screenshot_all_params_together(screenshot_tool):
     assert captured['args'].get('fixed_size') == 3.0
 
 
-@pytest.mark.asyncio
 async def test_screenshot_omitted_params_not_in_args(screenshot_tool):
     fn, captured = screenshot_tool
     await fn(camera="multi_view", path="/Cube")
@@ -57,14 +53,12 @@ async def test_screenshot_omitted_params_not_in_args(screenshot_tool):
     assert 'fixed_size' not in captured['args']
 
 
-@pytest.mark.asyncio
 async def test_screenshot_angles_passthrough(screenshot_tool):
     fn, captured = screenshot_tool
     await fn(camera="multi_view", path="/X", angles="45,0,0|_|_|90,0,0")
     assert captured['args'].get('angles') == "45,0,0|_|_|90,0,0"
 
 
-@pytest.mark.asyncio
 async def test_screenshot_supersample_passthrough(screenshot_tool):
     fn, captured = screenshot_tool
     await fn(camera="multi_view", path="/X", supersample=4)

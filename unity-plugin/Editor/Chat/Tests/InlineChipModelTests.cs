@@ -170,7 +170,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A1: InsertAt stores chip with correct offset
         [Test]
-        public void A1_InsertAt_StoresChipWithCorrectOffset()
+        public void InsertAt_StoresChipWithCorrectOffset()
         {
             var m = new InlineChipModel();
             var chip = new ChipData(ChipKindKeys.Hierarchy, "/Player", "Player", 1);
@@ -182,7 +182,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A2: InsertAt multiple chips maintains sorted order by TextOffset
         [Test]
-        public void A2_InsertAt_MultipleChips_SortedByOffset()
+        public void InsertAt_MultipleChips_SortedByOffset()
         {
             var m = new InlineChipModel();
             m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/B", "B", 2));
@@ -198,7 +198,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A3: RemoveAt(1) removes exactly chip at index 1 (not by name matching)
         [Test]
-        public void A3_RemoveAt_ByIndex_NotByName()
+        public void RemoveAt_ByIndex_NotByName()
         {
             var m = new InlineChipModel();
             m.InsertAt(0,  new ChipData(ChipKindKeys.Hierarchy, "/A", "Same", 1));
@@ -212,7 +212,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A4: Two chips with identical DisplayName — RemoveAt(0) removes chip 0, chip 1 remains
         [Test]
-        public void A4_RemoveAt_DuplicateDisplayName_RemovesCorrectOne()
+        public void RemoveAt_DuplicateDisplayName_RemovesCorrectOne()
         {
             var m = new InlineChipModel();
             m.InsertAt(0, new ChipData(ChipKindKeys.Hierarchy, "/A", "Camera", 1));
@@ -226,7 +226,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // A5: AdjustOffsets — insert 3 chars at pos 5: only chips STRICTLY AFTER offset 5 shift.
         // Chip AT offset 5 stays — standard text-editor bookmark semantic (> not >=).
         [Test]
-        public void A5_AdjustOffsets_Insert_ShiftsChipsStrictlyAfterChangeAt()
+        public void AdjustOffsets_Insert_ShiftsChipsStrictlyAfterChangeAt()
         {
             var m = new InlineChipModel();
             m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1)); // before 5 → unchanged
@@ -240,7 +240,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A6: AdjustOffsets — delete 2 chars at pos 3: chip AT pos 3 stays, chip after shifts.
         [Test]
-        public void A6_AdjustOffsets_Delete_ShiftsChipsStrictlyAfterChangeAt()
+        public void AdjustOffsets_Delete_ShiftsChipsStrictlyAfterChangeAt()
         {
             var m = new InlineChipModel();
             m.InsertAt(1,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1)); // before 3 → unchanged
@@ -254,7 +254,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A7: change before first chip: chip offsets unchanged
         [Test]
-        public void A7_AdjustOffsets_ChangeBeforeAllChips_NoChange()
+        public void AdjustOffsets_ChangeBeforeAllChips_NoChange()
         {
             var m = new InlineChipModel();
             m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
@@ -264,7 +264,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A8: SerializeForReload roundtrip includes TextOffsets via GetTextOffsets
         [Test]
-        public void A8_SerializeForReload_Roundtrip_IncludesOffsets()
+        public void SerializeForReload_Roundtrip_IncludesOffsets()
         {
             var m = new InlineChipModel();
             m.InsertAt(3,  new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
@@ -282,7 +282,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // A9: RestoreFromReload with null offsets — chips restored at offset 0, no throw
         [Test]
-        public void A9_RestoreFromReload_NullOffsets_DefaultsToZero()
+        public void RestoreFromReload_NullOffsets_DefaultsToZero()
         {
             var m = new InlineChipModel();
             Assert.DoesNotThrow(() =>
@@ -300,7 +300,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // Each keystroke calls AdjustOffsetsAfterTextChange(cursorPos, 1).
         // Cursor advances: 0,1,2,3,4,5,6. Chip must STAY at 0 (not drift to 7).
         [Test]
-        public void R1_InsertAt0_Type7Chars_ChipStaysAtOffset0()
+        public void InsertAt0_Type7Chars_ChipStaysAtOffset0()
         {
             var m = new InlineChipModel();
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
@@ -316,7 +316,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // R2: chip at 0, type 7 chars, then insert second chip at offset 7.
         // Result: chipA at 0, chipB at 7.
         [Test]
-        public void R2_InsertAt0_Type7_InsertAt7_CorrectOffsets()
+        public void InsertAt0_Type7_InsertAt7_CorrectOffsets()
         {
             var m = new InlineChipModel();
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
@@ -337,7 +337,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R3: chip at 5, delete 1 char at pos 2 (before chip) → chip shifts to 4.
         [Test]
-        public void R3_AdjustOffsets_DeleteBeforeChip_ShiftsLeft()
+        public void AdjustOffsets_DeleteBeforeChip_ShiftsLeft()
         {
             var m = new InlineChipModel();
             m.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
@@ -347,7 +347,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R4: chip at 5, delete 1 char AT chip's position → chip stays at 5 (> not >=).
         [Test]
-        public void R4_AdjustOffsets_DeleteAtChipPosition_ChipStays()
+        public void AdjustOffsets_DeleteAtChipPosition_ChipStays()
         {
             var m = new InlineChipModel();
             m.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
@@ -359,7 +359,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // Simulate: insert chipA at 0, type 7 chars, insert chipB at 7.
         // Then remove chipB (index 1). chipA at 0 must survive.
         [Test]
-        public void R5_TwoDuplicateChips_RemoveSecond_FirstSurvivesAtOffset0()
+        public void TwoDuplicateChips_RemoveSecond_FirstSurvivesAtOffset0()
         {
             var m = new InlineChipModel();
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
@@ -386,7 +386,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // I1: AdjustOffsetsAfterTextChangeInclusive — chip AT changeAt shifts (inclusive semantics)
         [Test]
-        public void I1_AdjustOffsetsInclusive_ChipAtChangeAt_Shifts()
+        public void AdjustOffsetsInclusive_ChipAtChangeAt_Shifts()
         {
             var m = new InlineChipModel();
             m.InsertAt(5, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
@@ -396,7 +396,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // I2: AdjustOffsetsAfterTextChangeInclusive — chip BEFORE changeAt stays
         [Test]
-        public void I2_AdjustOffsetsInclusive_ChipBeforeChangeAt_Stays()
+        public void AdjustOffsetsInclusive_ChipBeforeChangeAt_Stays()
         {
             var m = new InlineChipModel();
             m.InsertAt(3, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
@@ -406,7 +406,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // I3: AdjustOffsetsAfterTextChangeInclusive — chip AFTER changeAt also shifts
         [Test]
-        public void I3_AdjustOffsetsInclusive_ChipAfterChangeAt_Shifts()
+        public void AdjustOffsetsInclusive_ChipAfterChangeAt_Shifts()
         {
             var m = new InlineChipModel();
             m.InsertAt(10, new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1));
@@ -416,7 +416,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // I4: contrast exclusive vs inclusive at the boundary
         [Test]
-        public void I4_Exclusive_vs_Inclusive_AtBoundary()
+        public void Exclusive_vs_Inclusive_AtBoundary()
         {
             // Exclusive: chip AT position stays; inclusive: chip AT position shifts
             var mExcl = new InlineChipModel();
@@ -432,7 +432,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R6: full scenario — chip, type "test", chip, build message, verify segment order.
         [Test]
-        public void R6_FullScenario_ChipTypeChip_CorrectSegmentOrder()
+        public void FullScenario_ChipTypeChip_CorrectSegmentOrder()
         {
             var m = new InlineChipModel();
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/A", "A", 1);

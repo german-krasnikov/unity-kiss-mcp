@@ -1,5 +1,4 @@
 """Tests for Cycle 5d Item 1 — Disambiguator wired into resolve_path_live."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from unity_mcp.middleware import Middleware, wrap_send
 
@@ -77,7 +76,6 @@ def test_disambig_blocks_when_ambiguous(monkeypatch):
     assert decision is None
 
 
-@pytest.mark.asyncio
 async def test_explicit_path_bypasses_disambig(monkeypatch):
     """Agent passes _explicit_path=True → resolve_path_live SKIPPED, exact path sent to Unity."""
     monkeypatch.setenv("UNITY_MCP_DISAMBIG", "1")
@@ -104,7 +102,6 @@ async def test_explicit_path_bypasses_disambig(monkeypatch):
     assert "[AMBIGUOUS:" not in result
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_returns_disambig_block_no_tcp(monkeypatch):
     """End-to-end: ambiguous path → AMBIGUOUS block returned, TCP never called for actual cmd.
 

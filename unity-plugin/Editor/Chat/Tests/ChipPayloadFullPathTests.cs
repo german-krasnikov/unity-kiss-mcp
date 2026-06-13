@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.ChipTestHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -13,12 +14,6 @@ namespace UnityMCP.Editor.Chat.Tests
         [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();
 
         // ── helpers ─────────────────────────────────────────────────────────
-
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
-
-        private static ChipData S(string path, string name)
-            => new ChipData(ChipKindKeys.Script, path, name, 0);
 
         private static PositionedChip PC(ChipData chip, int offset)
             => new PositionedChip(chip, offset);

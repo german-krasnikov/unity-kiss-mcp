@@ -1,33 +1,13 @@
 """Live stress tests for multi-scene support — N scenes, large object counts, edge cases."""
-import re
 import uuid
 from contextlib import asynccontextmanager
 
 import pytest
-import pytest_asyncio
 
-from tests.live.conftest import _destroy
+from tests.live.conftest import _destroy, _ok, _iid
 
 _TEMP = "Assets/TestsTemp"
 pytestmark = pytest.mark.live
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _ok(result) -> str:
-    d = result.get("data", "") if isinstance(result, dict) else str(result)
-    err = result.get("err", "") if isinstance(result, dict) else ""
-    ok = result.get("ok", True) if isinstance(result, dict) else True
-    assert ok, f"cmd failed: {err or d}"
-    return d
-
-
-def _iid(text: str) -> str:
-    m = re.search(r'#(-?\d+)', text)
-    assert m, f"No instance ID in: {text}"
-    return m.group(0)
 
 
 @asynccontextmanager
@@ -88,7 +68,6 @@ async def _create_objects(bridge, scene_name: str, prefix: str, count: int) -> l
 # Tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_3_scenes_all_hierarchy_headers(bridge):
     async with _make_scenes(bridge, 3) as scenes:
         for s in scenes:
@@ -100,7 +79,6 @@ async def test_3_scenes_all_hierarchy_headers(bridge):
         assert data.count("[") >= 3
 
 
-@pytest.mark.asyncio
 async def test_5_scenes_search_across_all(bridge):
     async with _make_scenes(bridge, 5) as scenes:
         obj_names = []
@@ -113,7 +91,6 @@ async def test_5_scenes_search_across_all(bridge):
             assert obj in data, f"Object '{obj}' not found in search"
 
 
-@pytest.mark.asyncio
 async def test_triple_ambiguity(bridge):
     """Same name in 3 scenes triggers ambiguity error."""
     async with _make_scenes(bridge, 3) as scenes:
@@ -134,7 +111,6 @@ async def test_triple_ambiguity(bridge):
         )
 
 
-@pytest.mark.asyncio
 async def test_scene_qualified_across_3_scenes(bridge):
     """get_component with 3 different scene-qualified paths works."""
     async with _make_scenes(bridge, 3) as scenes:
@@ -149,7 +125,6 @@ async def test_scene_qualified_across_3_scenes(bridge):
             assert "position" in data.lower(), f"No Transform data for {path}"
 
 
-@pytest.mark.asyncio
 async def test_deep_nested_qualified_path(bridge):
     """Root/A/B/C in additive → get_component Scene:/Root/A/B/C."""
     async with _make_scenes(bridge, 1) as scenes:
@@ -170,7 +145,6 @@ async def test_deep_nested_qualified_path(bridge):
         assert "position" in data.lower(), f"No Transform at deep path {path}"
 
 
-@pytest.mark.asyncio
 async def test_object_with_spaces(bridge):
     """'My Live Object' → search('My Live') finds it."""
     async with _make_scenes(bridge, 1) as scenes:
@@ -188,7 +162,6 @@ async def test_object_with_spaces(bridge):
         assert obj_name in data, f"'{obj_name}' not found in search:\n{data}"
 
 
-@pytest.mark.asyncio
 async def test_brackets_in_name_via_iid(bridge):
     """[SECTION/NAME] object findable by #iid."""
     async with _make_scenes(bridge, 1) as scenes:
@@ -206,7 +179,6 @@ async def test_brackets_in_name_via_iid(bridge):
         assert "position" in data.lower(), f"No Transform for bracket-named obj via {iid}"
 
 
-@pytest.mark.asyncio
 async def test_stress_30_objects_3_scenes(bridge):
     """10 objects × 3 scenes = 30 objects searchable."""
     prefix = f"Stress30_{uuid.uuid4().hex[:4]}"
@@ -219,20 +191,6 @@ async def test_stress_30_objects_3_scenes(bridge):
         assert found >= 30, f"Expected 30 objects, found {found} in:\n{data[:500]}"
 
 
-@pytest.mark.asyncio
-async def test_hierarchy_with_3_scenes_has_headers(bridge):
-    """get_hierarchy contains all 3 scene name headers."""
-    async with _make_scenes(bridge, 3) as scenes:
-        # Create 1 object per scene so scenes aren't empty
-        for s in scenes:
-            await _create_objects(bridge, s, "HH", 1)
-        r = await bridge.send("get_hierarchy", {})
-        data = _ok(r)
-        for s in scenes:
-            assert s in data, f"Scene '{s}' not in hierarchy headers"
-
-
-@pytest.mark.asyncio
 async def test_10_objects_search_limit(bridge):
     """10 objects in 1 additive, limit=3 → +7 more in result."""
     async with _make_scenes(bridge, 1) as scenes:

@@ -14,7 +14,6 @@ def skills_dir(tmp_path, monkeypatch):
     return d
 
 
-@pytest.mark.asyncio
 async def test_save_skill_creates_file(skills_dir):
     result = await save_skill("test_skill", "Does something", "var go = new GameObject();")
     assert result == "Skill saved: test_skill — Does something"
@@ -30,7 +29,6 @@ async def test_save_skill_creates_file(skills_dir):
     assert content.count('\n') == 0, "skill JSON must be compact (no indent=2)"
 
 
-@pytest.mark.asyncio
 async def test_use_skill_executes_code(skills_dir, mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "executed"}
     await save_skill("my_skill", "Creates obj", "var go = new GameObject();")
@@ -42,7 +40,6 @@ async def test_use_skill_executes_code(skills_dir, mock_bridge):
     assert "var go = new GameObject();" in call_args[1]["code"]
 
 
-@pytest.mark.asyncio
 async def test_use_skill_batch_detection(skills_dir, mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "batch done"}
     await save_skill("batch_skill", "Moves obj", "set_property path=Cube pos=1,2,3")
@@ -52,20 +49,17 @@ async def test_use_skill_batch_detection(skills_dir, mock_bridge):
     assert call_args[0] == "batch"
 
 
-@pytest.mark.asyncio
 async def test_use_skill_not_found_lists_available(skills_dir):
     result = await use_skill("nonexistent")
     # use_skill delegates to list_skills when name not found — always returns "No skills..."
     assert "No skills" in result, result
 
 
-@pytest.mark.asyncio
 async def test_list_skills_empty(skills_dir):
     result = await list_skills()
     assert result == "No skills saved yet. Use save_skill to create one."
 
 
-@pytest.mark.asyncio
 async def test_list_skills_with_saved(skills_dir):
     await save_skill("alpha", "Alpha skill", "var x = 1;")
     await save_skill("beta", "Beta skill", "create_object name=Test")
@@ -76,7 +70,6 @@ async def test_list_skills_with_saved(skills_dir):
     assert "0x" in result  # used_count
 
 
-@pytest.mark.asyncio
 async def test_use_skill_increments_count(skills_dir, mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
     await save_skill("countable", "Test count", "var x = 1;")
@@ -87,7 +80,6 @@ async def test_use_skill_increments_count(skills_dir, mock_bridge):
     assert data["used_count"] == 2
 
 
-@pytest.mark.asyncio
 async def test_use_skill_param_substitution(skills_dir, mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
     await save_skill("spawn", "Spawns obj", "var go = new GameObject(\"${name}\");")
@@ -97,21 +89,18 @@ async def test_use_skill_param_substitution(skills_dir, mock_bridge):
     assert "${name}" not in call_args[1]["code"]
 
 
-@pytest.mark.asyncio
 async def test_save_skill_stores_kind_csharp(skills_dir):
     await save_skill("cs_skill", "Does C#", "UnityEditor.AssetDatabase.Refresh();")
     data = json.loads((skills_dir / "cs_skill.json").read_text(encoding="utf-8"))
     assert data["kind"] == "csharp"
 
 
-@pytest.mark.asyncio
 async def test_save_skill_stores_kind_batch(skills_dir):
     await save_skill("batch_skill2", "Does batch", "set_property path=Cube pos=1,2,3")
     data = json.loads((skills_dir / "batch_skill2.json").read_text(encoding="utf-8"))
     assert data["kind"] == "batch"
 
 
-@pytest.mark.asyncio
 async def test_use_skill_routes_by_stored_kind_not_heuristic(skills_dir, mock_bridge):
     """C# skill with NO typical C# keywords must still route to execute_code via stored kind."""
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
@@ -128,7 +117,6 @@ async def test_use_skill_routes_by_stored_kind_not_heuristic(skills_dir, mock_br
     assert call_args[0] == "execute_code"
 
 
-@pytest.mark.asyncio
 async def test_list_skills_includes_kind(skills_dir):
     await save_skill("tagged", "Tagged skill", "var x = 1;")
     result = await list_skills()

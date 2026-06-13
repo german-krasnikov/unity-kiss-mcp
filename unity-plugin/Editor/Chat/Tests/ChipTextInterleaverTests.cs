@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.ChipTestHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -13,15 +14,12 @@ namespace UnityMCP.Editor.Chat.Tests
         [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
         [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();
 
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
-
         private static PositionedChip PC(ChipData chip, int offset)
             => new PositionedChip(chip, offset);
 
         // B1: empty text + no chips → UserMessage with one empty-text segment
         [Test]
-        public void B1_EmptyTextNoChips_OneEmptyTextSegment()
+        public void EmptyTextNoChips_OneEmptyTextSegment()
         {
             var msg = ChipTextInterleaver.Build("", new List<PositionedChip>());
             Assert.AreEqual(1, msg.Segments.Count);
@@ -31,7 +29,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B2: text only, no chips → single text segment
         [Test]
-        public void B2_TextOnlyNoChips_SingleTextSegment()
+        public void TextOnlyNoChips_SingleTextSegment()
         {
             var msg = ChipTextInterleaver.Build("hello world", new List<PositionedChip>());
             Assert.AreEqual(1, msg.Segments.Count);
@@ -41,7 +39,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B3: chip at offset 0, text "hello" → chip segment, then "hello" text segment
         [Test]
-        public void B3_ChipAtOffset0_ChipThenText()
+        public void ChipAtOffset0_ChipThenText()
         {
             var chip = H("/A", "A", 1);
             var msg = ChipTextInterleaver.Build("hello", new List<PositionedChip> { PC(chip, 0) });
@@ -54,7 +52,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B4: chip at offset 5, text "hello world" → "hello" text, chip, " world" text
         [Test]
-        public void B4_ChipAtOffset5_TextChipText()
+        public void ChipAtOffset5_TextChipText()
         {
             var chip = H("/A", "A", 1);
             var msg = ChipTextInterleaver.Build("hello world", new List<PositionedChip> { PC(chip, 5) });
@@ -68,7 +66,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B5: two chips at different offsets — segments in correct order
         [Test]
-        public void B5_TwoChipsAtDifferentOffsets_CorrectOrder()
+        public void TwoChipsAtDifferentOffsets_CorrectOrder()
         {
             var chipA = H("/A", "A", 1);
             var chipB = H("/B", "B", 2);
@@ -86,7 +84,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B6: two chips same DisplayName different offsets — both appear in output
         [Test]
-        public void B6_TwoChipsSameDisplayName_BothInSegments()
+        public void TwoChipsSameDisplayName_BothInSegments()
         {
             var chip1 = new ChipData(ChipKindKeys.Hierarchy, "/A", "Camera", 1);
             var chip2 = new ChipData(ChipKindKeys.Hierarchy, "/B", "Camera", 2);
@@ -101,7 +99,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B7: ToLlmPayload — text with @mention + chip context appended
         [Test]
-        public void B7_ToLlmPayload_TextWithMentionPlusChipContext()
+        public void ToLlmPayload_TextWithMentionPlusChipContext()
         {
             var chip = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo.cs", 0);
             var positioned = new List<PositionedChip> { PC(chip, 5) };
@@ -114,7 +112,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B8: ToLlmPayload — empty chips → just plain text, no trailing newline
         [Test]
-        public void B8_ToLlmPayload_NoChips_PlainTextOnly()
+        public void ToLlmPayload_NoChips_PlainTextOnly()
         {
             var msg = ChipTextInterleaver.Build("hello world", new List<PositionedChip>());
             var payload = ChipTextInterleaver.ToLlmPayload(msg, new ChipConfig());
@@ -124,7 +122,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // B9: ToLlmPayload — chip with depth=none → context block excluded, @mention remains
         [Test]
-        public void B9_ToLlmPayload_NoneDepthChip_ContextExcludedMentionRemains()
+        public void ToLlmPayload_NoneDepthChip_ContextExcludedMentionRemains()
         {
             var chip = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo.cs", 0);
             var positioned = new List<PositionedChip> { PC(chip, 0) };
@@ -159,7 +157,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // U1: chip at 0, text "jhkjhkj", chip at 7 → [chip, text, chip] segments
         [Test]
-        public void U1_ChipTextChip_InterleavedSegments()
+        public void ChipTextChip_InterleavedSegments()
         {
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
             var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -99);
@@ -178,7 +176,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // U2: same as U1 but verify LLM payload contains chip context
         [Test]
-        public void U2_ChipTextChip_LlmPayloadContainsChipContext()
+        public void ChipTextChip_LlmPayloadContainsChipContext()
         {
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
             var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -99);
@@ -194,7 +192,7 @@ namespace UnityMCP.Editor.Chat.Tests
         // U3: both chips at offset 7 (end of text) — text first, then both chips.
         // Regression: chips must NOT be lost even when offset equals text length.
         [Test]
-        public void U3_BothChipsAtEnd_TextThenBothChips()
+        public void BothChipsAtEnd_TextThenBothChips()
         {
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
             var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -99);
@@ -209,7 +207,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // U4: chips at end — LLM payload still includes chip context
         [Test]
-        public void U4_BothChipsAtEnd_PayloadIncludesChipContext()
+        public void BothChipsAtEnd_PayloadIncludesChipContext()
         {
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
             var positioned = new List<PositionedChip> { PC(chipA, 7) };
@@ -222,7 +220,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // U5: display text includes @mentions but no chip context blocks
         [Test]
-        public void U5_DisplayText_IncludesAtMentions()
+        public void DisplayText_IncludesAtMentions()
         {
             var chip = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -12345);
             var msg = ChipTextInterleaver.Build("hello", new List<PositionedChip> { PC(chip, 5) });
@@ -233,7 +231,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D9 (moved from UserMessageBubbleTests): no @ in any text segment — Build internals
         [Test]
-        public void D9_TextSegments_NoAtMentions()
+        public void TextSegments_NoAtMentions()
         {
             var chip = H("/Player", "Player", 1);
             var msg = ChipTextInterleaver.Build("fix this", new List<PositionedChip> { PC(chip, 4) });
@@ -245,7 +243,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M1: chip at start → display text starts with @DisplayName
         [Test]
-        public void M1_ChipAtStart_DisplayStartsWithAtMention()
+        public void ChipAtStart_DisplayStartsWithAtMention()
         {
             var chip = H("/Player", "Player", 1);
             var msg = ChipTextInterleaver.Build("do stuff", new List<PositionedChip> { PC(chip, 0) });
@@ -255,7 +253,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M2: chip at end → display text ends with @DisplayName
         [Test]
-        public void M2_ChipAtEnd_DisplayEndsWithAtMention()
+        public void ChipAtEnd_DisplayEndsWithAtMention()
         {
             var chip = H("/Player", "Player", 1);
             var msg = ChipTextInterleaver.Build("fix", new List<PositionedChip> { PC(chip, 3) });
@@ -265,7 +263,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M3: chip in middle → @DisplayName between text parts
         [Test]
-        public void M3_ChipInMiddle_AtMentionBetweenText()
+        public void ChipInMiddle_AtMentionBetweenText()
         {
             var chip = H("/Light", "Light", 2);
             var msg = ChipTextInterleaver.Build("move to pos", new List<PositionedChip> { PC(chip, 5) });
@@ -275,7 +273,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M4: two chips at different positions → both @mentions present
         [Test]
-        public void M4_TwoChips_BothAtMentionsInDisplayText()
+        public void TwoChips_BothAtMentionsInDisplayText()
         {
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
             var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Light", "Light", -200);
@@ -287,7 +285,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M5: consecutive chips (no text between) → @A @B adjacent
         [Test]
-        public void M5_ConsecutiveChips_AdjacentAtMentions()
+        public void ConsecutiveChips_AdjacentAtMentions()
         {
             var chipA = H("/A", "Alpha", 1);
             var chipB = H("/B", "Beta", 2);
@@ -299,7 +297,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M6: no chips → display text unchanged (no spurious @)
         [Test]
-        public void M6_NoChips_DisplayTextUnchanged()
+        public void NoChips_DisplayTextUnchanged()
         {
             var msg = ChipTextInterleaver.Build("hello world", new List<PositionedChip>());
             var display = ChipTextInterleaver.ToDisplayText(msg);
@@ -308,7 +306,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M7: empty text + chip → just @DisplayName
         [Test]
-        public void M7_EmptyTextWithChip_JustAtMention()
+        public void EmptyTextWithChip_JustAtMention()
         {
             var chip = H("/Cube", "Cube", 5);
             var msg = ChipTextInterleaver.Build("", new List<PositionedChip> { PC(chip, 0) });
@@ -318,7 +316,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M8: LLM payload includes @mentions in text part
         [Test]
-        public void M8_LlmPayload_IncludesAtMentions()
+        public void LlmPayload_IncludesAtMentions()
         {
             var chip = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
             var positioned = new List<PositionedChip> { PC(chip, 0) };
@@ -329,7 +327,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M9: user scenario — "test" with two Main Camera chips at 0 and 5
         [Test]
-        public void M9_UserScenario_TwoChipsAroundText()
+        public void UserScenario_TwoChipsAroundText()
         {
             var chipA = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
             var chipB = new ChipData(ChipKindKeys.Hierarchy, "/Main Camera", "Main Camera", -100);
@@ -341,7 +339,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // M10: script chip → @DisplayName uses DisplayName not Path
         [Test]
-        public void M10_ScriptChip_UsesDisplayName()
+        public void ScriptChip_UsesDisplayName()
         {
             var chip = new ChipData(ChipKindKeys.Script, "Assets/Scripts/Foo.cs", "Foo.cs", 0);
             var msg = ChipTextInterleaver.Build("fix", new List<PositionedChip> { PC(chip, 3) });
@@ -353,7 +351,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R1: @mention stripped, display text round-trips
         [Test]
-        public void R1_BuildFromRaw_StripsAtMention()
+        public void BuildFromRaw_StripsAtMention()
         {
             var chip = H("/Player", "Player", 1);
             var positioned = new List<PositionedChip> { PC(chip, 0) };
@@ -364,7 +362,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R2: chip at end of text, no trailing space
         [Test]
-        public void R2_BuildFromRaw_ChipAtEndNoTrailingSpace()
+        public void BuildFromRaw_ChipAtEndNoTrailingSpace()
         {
             var chip = H("/Player", "Player", 1);
             var positioned = new List<PositionedChip> { PC(chip, 4) };
@@ -375,7 +373,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R3: two chips in raw text
         [Test]
-        public void R3_BuildFromRaw_TwoChips()
+        public void BuildFromRaw_TwoChips()
         {
             var chipA = H("/A", "Alpha", 1);
             var chipB = H("/B", "Beta", 2);
@@ -390,7 +388,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R4: no chips — passthrough to Build
         [Test]
-        public void R4_BuildFromRaw_NoChips_Passthrough()
+        public void BuildFromRaw_NoChips_Passthrough()
         {
             var msg = ChipTextInterleaver.BuildFromRaw("hello world", new List<PositionedChip>());
             Assert.AreEqual(1, msg.Segments.Count);
@@ -399,7 +397,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // R5: chip offset beyond text length — guard path, chip still present
         [Test]
-        public void R5_BuildFromRaw_OffsetBeyondText_GuardPath()
+        public void BuildFromRaw_OffsetBeyondText_GuardPath()
         {
             var chip = H("/Player", "Player", 1);
             var positioned = new List<PositionedChip> { PC(chip, 100) };

@@ -1,6 +1,5 @@
 """TDD: CostTracker — USD spend tracking + persistence."""
 import json
-import pytest
 from pathlib import Path
 from unity_mcp.budget.cost_tracker import CostTracker, HAIKU_IN_PER_MTOK, HAIKU_OUT_PER_MTOK, IMAGE_TOKEN_OVERHEAD
 

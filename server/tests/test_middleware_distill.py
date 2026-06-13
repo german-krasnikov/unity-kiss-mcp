@@ -37,7 +37,6 @@ def test_distill_on_via_env(monkeypatch):
     assert mw._distiller_enabled
 
 
-@pytest.mark.asyncio
 async def test_maybe_distill_passthrough_when_disabled(monkeypatch):
     monkeypatch.delenv("UNITY_MCP_DISTILL", raising=False)
     mw = Middleware()
@@ -46,7 +45,6 @@ async def test_maybe_distill_passthrough_when_disabled(monkeypatch):
     assert result == text
 
 
-@pytest.mark.asyncio
 async def test_maybe_distill_no_distill_arg_bypasses(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
     mw = Middleware()
@@ -56,7 +54,6 @@ async def test_maybe_distill_no_distill_arg_bypasses(monkeypatch):
     assert result == text
 
 
-@pytest.mark.asyncio
 async def test_maybe_distill_audit_footer(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
     mw = Middleware()
@@ -69,7 +66,6 @@ async def test_maybe_distill_audit_footer(monkeypatch):
         assert "→" in result
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_no_distill_arg_bypasses_through_pipeline(monkeypatch):
     """End-to-end: agent passes _no_distill=True through wrap_send → distill skipped."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -120,7 +116,6 @@ def test_seed_preimage_no_snapshot_skips():
 
 # ── D6: Cache key collision fix ───────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_distill_cache_key_includes_all_args(monkeypatch):
     """get_component('/P','Transform') and get_component('/P','Rigidbody') must NOT share cache key."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")
@@ -142,7 +137,6 @@ async def test_distill_cache_key_includes_all_args(monkeypatch):
     assert key_transform != key_rb, "Cache keys for different types must differ"
 
 
-@pytest.mark.asyncio
 async def test_distill_cache_key_uses_all_args_not_just_path(monkeypatch):
     """Old bug: when path exists, type was excluded from key → collision."""
     monkeypatch.setenv("UNITY_MCP_DISTILL", "1")

@@ -6,21 +6,18 @@ from tests.live.conftest import strip_markers
 pytestmark = pytest.mark.live
 
 
-@pytest.mark.asyncio
-async def test_get_console_returns_dict(wrapped_bridge):
+async def test_get_console_returns_text(wrapped_bridge):
+    """get_console via middleware pipeline returns str (not dict)."""
     r = await wrapped_bridge.send("get_console", {"limit": 1})
-    # wrapped_bridge.send returns str via middleware pipeline
     assert isinstance(r, str)
 
 
-@pytest.mark.asyncio
 async def test_create_object_appears_in_hierarchy(wrapped_bridge, sandbox):
     r = await wrapped_bridge.send("get_hierarchy", {})
     # sandbox fixture name starts with "Live_"
     assert "Live_" in r
 
 
-@pytest.mark.asyncio
 async def test_destroy_object_cleans_up(wrapped_bridge):
     """Create object, DestroyImmediate, verify absent from find_objects."""
     import uuid

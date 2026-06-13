@@ -75,13 +75,17 @@ def test_no_rotation_under_limit(tmp_path):
     assert count == 100
 
 
+# no-assert: crash guard
 def test_close_idempotent(tmp_path):
+    """Verifies CrashLogger.close() can be called multiple times without raising."""
     logger = CrashLogger(log_dir=tmp_path)
     logger.close()
     logger.close()  # must not raise
 
 
+# no-assert: crash guard
 def test_write_after_close_no_crash(tmp_path):
+    """Verifies CrashLogger methods silently drop writes after close()."""
     logger = CrashLogger(log_dir=tmp_path)
     logger.close()
     # All methods must silently drop — no exception
@@ -97,7 +101,6 @@ def test_bridge_creates_crash_logger():
     assert isinstance(bridge._crash_log, CrashLogger)
 
 
-@pytest.mark.asyncio
 async def test_disconnect_logs_to_crash_log():
     bridge = UnityBridge("127.0.0.1", 9999)
     mock_log = MagicMock()
@@ -160,6 +163,7 @@ def test_log_crash_creates_dir_if_missing(tmp_path):
     assert (log_dir / "crash.jsonl").exists()
 
 
+# no-assert: crash guard
 def test_log_crash_silent_on_permission_error(tmp_path):
     """T5: log_crash silently no-ops when write fails."""
     with patch("pathlib.Path.open", side_effect=PermissionError("denied")):

@@ -27,7 +27,6 @@ def test_enabled_via_env(monkeypatch):
     assert SamplingService().enabled is True
 
 
-@pytest.mark.asyncio
 async def test_disabled_returns_none(monkeypatch):
     monkeypatch.delenv("UNITY_MCP_VISUAL_VERIFY", raising=False)
     from unity_mcp.sampling import SamplingService
@@ -38,7 +37,6 @@ async def test_disabled_returns_none(monkeypatch):
 
 # ── verify_visual ───────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_verify_visual_calls_claude_cli(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService
@@ -57,7 +55,6 @@ async def test_verify_visual_calls_claude_cli(monkeypatch):
     assert "haiku" in args
 
 
-@pytest.mark.asyncio
 async def test_verify_visual_with_screenshot(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService
@@ -86,7 +83,6 @@ async def test_verify_visual_with_screenshot(monkeypatch):
         os.unlink(tmp_path)
 
 
-@pytest.mark.asyncio
 async def test_verify_visual_bad_screenshot_ignored(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService
@@ -103,7 +99,6 @@ async def test_verify_visual_bad_screenshot_ignored(monkeypatch):
     assert "--max-turns" in args
 
 
-@pytest.mark.asyncio
 async def test_verify_visual_graceful_on_error(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService
@@ -115,7 +110,6 @@ async def test_verify_visual_graceful_on_error(monkeypatch):
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_verify_visual_timeout(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService
@@ -131,7 +125,6 @@ async def test_verify_visual_timeout(monkeypatch):
 
 # ── summarize ───────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_summarize_calls_claude(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService
@@ -148,7 +141,6 @@ async def test_summarize_calls_claude(monkeypatch):
 
 # ── Middleware integration ──────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_middleware_skips_reads():
     from unity_mcp.middleware import Middleware
     from unity_mcp.sampling import SamplingService
@@ -162,7 +154,6 @@ async def test_middleware_skips_reads():
     mock.verify_visual.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_middleware_skips_high_confidence():
     from unity_mcp.middleware import Middleware
     from unity_mcp.sampling import SamplingService
@@ -177,7 +168,6 @@ async def test_middleware_skips_high_confidence():
     mock.verify_visual.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_middleware_triggers_on_low_confidence():
     from unity_mcp.middleware import Middleware
     from unity_mcp.sampling import SamplingService
@@ -194,7 +184,6 @@ async def test_middleware_triggers_on_low_confidence():
 
 # ── Fix 1: zombie process killed on timeout ──────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_sampling_zombie_killed_on_timeout(monkeypatch):
     """When wait_for times out, proc.kill() MUST be called to prevent zombie."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
@@ -226,7 +215,6 @@ async def test_sampling_zombie_killed_on_timeout(monkeypatch):
     proc.kill.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_run_helper_returns_none_on_generic_exception(monkeypatch):
     """Generic exceptions (e.g. OSError) → return None, kill if still running."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
@@ -245,7 +233,6 @@ async def test_run_helper_returns_none_on_generic_exception(monkeypatch):
     proc.kill.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_run_passes_stdin_devnull(monkeypatch):
     """CLI must not block on stdin EOF — pass DEVNULL."""
     captured = {}
@@ -262,7 +249,6 @@ async def test_run_passes_stdin_devnull(monkeypatch):
     assert captured.get("stdin") == asyncio.subprocess.DEVNULL
 
 
-@pytest.mark.asyncio
 async def test_semaphore_serializes_concurrent_calls(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     monkeypatch.setenv("UNITY_MCP_VISUAL_CONCURRENCY", "2")
@@ -289,7 +275,6 @@ async def test_semaphore_serializes_concurrent_calls(monkeypatch):
     assert peak[0] <= 2, f"Concurrency limit violated: peak={peak[0]}"
 
 
-@pytest.mark.asyncio
 async def test_cancellederror_kills_proc_and_propagates(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
 

@@ -249,7 +249,7 @@ namespace UnityMCP.Editor
             return refList;
         }
 
-        private static bool IsAllowedAssembly(Assembly a)
+        internal static bool IsAllowedAssembly(Assembly a)
         {
             var name = a.GetName().Name;
             return name == "mscorlib" || name == "netstandard" ||

@@ -4,8 +4,10 @@ import pytest
 from unittest.mock import AsyncMock, patch, mock_open
 from unity_mcp.tools.scene import screenshot_baseline, screenshot_compare
 
+pytest.importorskip("PIL")
+from PIL import Image  # noqa: E402
 
-@pytest.mark.asyncio
+
 async def test_screenshot_baseline_creates_file(tmp_path, mock_bridge):
     src_png = tmp_path / "capture.png"
     src_png.write_bytes(b"\x89PNG\r\n\x1a\nFAKE")
@@ -19,9 +21,7 @@ async def test_screenshot_baseline_creates_file(tmp_path, mock_bridge):
     assert os.path.exists(str(baseline_dir / "test_scene.png"))
 
 
-@pytest.mark.asyncio
 async def test_screenshot_compare_identical(tmp_path, mock_bridge):
-    from PIL import Image
     src_png = tmp_path / "capture.png"
     Image.new("RGB", (10, 10), (0, 0, 0)).save(src_png)
 
@@ -38,9 +38,7 @@ async def test_screenshot_compare_identical(tmp_path, mock_bridge):
     assert "IDENTICAL" in result
 
 
-@pytest.mark.asyncio
 async def test_screenshot_compare_different(tmp_path, mock_bridge):
-    from PIL import Image
     baseline_dir = tmp_path / ".claude" / "baselines"
     baseline_dir.mkdir(parents=True)
     Image.new("RGB", (10, 10), (0, 0, 0)).save(baseline_dir / "default.png")
@@ -56,7 +54,6 @@ async def test_screenshot_compare_different(tmp_path, mock_bridge):
     assert any(k in result for k in ("PIXEL", "IDENTICAL", "SIZE_MISMATCH", "[cached]"))
 
 
-@pytest.mark.asyncio
 async def test_screenshot_compare_no_baseline(tmp_path, mock_bridge):
     current_png = tmp_path / "capture.png"
     current_png.write_bytes(b"\x89PNG\r\n\x1a\nDATA")

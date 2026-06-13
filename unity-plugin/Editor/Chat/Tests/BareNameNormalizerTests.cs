@@ -4,6 +4,8 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.TestStringHelpers;
+using static UnityMCP.Editor.Chat.Tests.ChipTestHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -12,12 +14,6 @@ namespace UnityMCP.Editor.Chat.Tests
     {
         [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
         [TearDown] public void TearDown() => ChipKindRegistry.ResetToBuiltIns();
-
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
-
-        private static ChipData S(string path, string name)
-            => new ChipData(ChipKindKeys.Script, path, name, 0);
 
         // 1. NoChips_Unchanged
         [Test]
@@ -222,14 +218,5 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains("[hierarchy:/player #1]", result);
         }
 
-        // ── helper ────────────────────────────────────────────────────────────
-
-        private static int CountOccurrences(string text, string pattern)
-        {
-            int count = 0, idx = 0;
-            while ((idx = text.IndexOf(pattern, idx, System.StringComparison.Ordinal)) >= 0)
-            { count++; idx += pattern.Length; }
-            return count;
-        }
     }
 }

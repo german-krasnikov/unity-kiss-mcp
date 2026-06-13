@@ -1,6 +1,5 @@
 """Tests for deferred/lazy schema loading (F4)."""
 import os
-import pytest
 from types import SimpleNamespace
 from typing import Optional
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -101,7 +100,6 @@ def test_unity_mcp_full_schemas_zero_still_strips(monkeypatch):
 
 # --- resolve_tool_schema meta-tool ---
 
-@pytest.mark.asyncio
 async def test_resolve_returns_full_params_single():
     from unity_mcp.server import resolve_tool_schema
     from unity_mcp.tools.schema_registry import _registry
@@ -113,7 +111,6 @@ async def test_resolve_returns_full_params_single():
     assert "path*" in result
 
 
-@pytest.mark.asyncio
 async def test_resolve_returns_full_params_multiple():
     from unity_mcp.server import resolve_tool_schema
     from unity_mcp.tools.schema_registry import _registry
@@ -124,7 +121,6 @@ async def test_resolve_returns_full_params_multiple():
     assert "== timeline ==" in result
 
 
-@pytest.mark.asyncio
 async def test_resolve_unknown_graceful():
     from unity_mcp.server import resolve_tool_schema
     result = await resolve_tool_schema("totally_unknown_xyz_abc")
@@ -132,7 +128,6 @@ async def test_resolve_unknown_graceful():
     assert isinstance(result, str)
 
 
-@pytest.mark.asyncio
 async def test_resolve_core_tool_works():
     from unity_mcp.server import resolve_tool_schema
     from unity_mcp.tools.schema_registry import _registry
@@ -141,7 +136,6 @@ async def test_resolve_core_tool_works():
     assert "== batch ==" in result
 
 
-@pytest.mark.asyncio
 async def test_resolve_output_is_plain_text_not_json():
     from unity_mcp.server import resolve_tool_schema
     from unity_mcp.tools.schema_registry import _registry
@@ -198,7 +192,6 @@ def test_plugin_tool_gets_stubbed():
 
 # --- cold-start race: resolve before ListTools populates the registry ---
 
-@pytest.mark.asyncio
 async def test_resolve_cold_start_empty_registry_returns_graceful_fallback():
     """Cold start: registry is empty (ListTools not yet called). Must return graceful
     fallback string, NOT raise or return empty string."""
@@ -242,7 +235,6 @@ def test_resolve_tool_schema_keeps_full_schema_after_strip():
 
 # --- stripping is applied in the handler ---
 
-@pytest.mark.asyncio
 async def test_filter_tools_applies_strip():
     """_filter_tools must call _strip_deferred_schemas on the result."""
     import unity_mcp.server as srv

@@ -5,7 +5,6 @@ import sys
 import pytest
 
 
-@pytest.mark.asyncio
 async def test_socket_options_set_on_connect(mock_unity_server):
     from unity_mcp.bridge import UnityBridge
     bridge = UnityBridge(port=mock_unity_server.port)
@@ -17,7 +16,6 @@ async def test_socket_options_set_on_connect(mock_unity_server):
     await bridge.close()
 
 
-@pytest.mark.asyncio
 async def test_socket_options_set_on_reconnect(mock_unity_server):
     from unity_mcp.bridge import UnityBridge
     bridge = UnityBridge(port=mock_unity_server.port)
@@ -30,7 +28,6 @@ async def test_socket_options_set_on_reconnect(mock_unity_server):
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific")
-@pytest.mark.asyncio
 async def test_socket_options_platform_specific_darwin(mock_unity_server):
     from unity_mcp.bridge import UnityBridge
     bridge = UnityBridge(port=mock_unity_server.port)
@@ -42,7 +39,6 @@ async def test_socket_options_platform_specific_darwin(mock_unity_server):
 
 # FIX 2: verify standard keepalive constants
 @pytest.mark.skipif(sys.platform != "darwin", reason="macOS-specific")
-@pytest.mark.asyncio
 async def test_keepalive_values_standard(mock_unity_server):
     """Keepalive: idle=60, interval=10 — relaxed for macOS App Nap tolerance."""
     from unity_mcp.bridge import UnityBridge, _TCP_KEEPALIVE_DARWIN, _TCP_KEEPINTVL_DARWIN
@@ -54,6 +50,8 @@ async def test_keepalive_values_standard(mock_unity_server):
     await bridge.close()
 
 
+# no-assert: crash guard
 def test_socket_options_no_extra_info_socket_safe():
+    """Verifies _apply_socket_options does not raise when passed None."""
     from unity_mcp.bridge import _apply_socket_options
     _apply_socket_options(None)  # must not raise

@@ -8,7 +8,6 @@ from unity_mcp.bridge import UnityBridge
 from helpers import make_writer, make_idle_probe, ping_response
 
 
-@pytest.mark.asyncio
 async def test_send_empty_args(mock_connection):
     """send() works with empty args dict."""
     mock_reader, mock_writer = mock_connection
@@ -32,7 +31,6 @@ async def test_send_empty_args(mock_connection):
         assert message["args"] == {}
 
 
-@pytest.mark.asyncio
 async def test_send_unicode_args(mock_connection):
     """send() handles unicode (cyrillic, emoji) in args."""
     mock_reader, mock_writer = mock_connection
@@ -56,7 +54,6 @@ async def test_send_unicode_args(mock_connection):
         assert message["args"]["name"] == "Объект 😀"
 
 
-@pytest.mark.asyncio
 async def test_read_response_invalid_json(mock_connection, monkeypatch):
     """Invalid JSON payload → ConnectionError (caught and retried like corrupt frame)."""
     import unity_mcp.bridge as bmod
@@ -77,7 +74,6 @@ async def test_read_response_invalid_json(mock_connection, monkeypatch):
             await bridge.send("test", {})
 
 
-@pytest.mark.asyncio
 async def test_read_response_zero_length(mock_connection, monkeypatch):
     """Zero-length payload → ConnectionError (caught and retried like corrupt frame)."""
     import unity_mcp.bridge as bmod
@@ -98,7 +94,6 @@ async def test_read_response_zero_length(mock_connection, monkeypatch):
             await bridge.send("test", {})
 
 
-@pytest.mark.asyncio
 async def test_read_response_exactly_10mb(mock_connection):
     """_read_response accepts exactly 10MB (boundary)."""
     mock_reader, mock_writer = mock_connection
@@ -117,7 +112,6 @@ async def test_read_response_exactly_10mb(mock_connection):
         assert result["ok"] is True
 
 
-@pytest.mark.asyncio
 async def test_read_response_exceeds_10mb(mock_connection, monkeypatch):
     """Oversized message (>10MB) raises ConnectionError."""
     import unity_mcp.bridge as bmod
@@ -137,7 +131,6 @@ async def test_read_response_exceeds_10mb(mock_connection, monkeypatch):
             await bridge.send("test", {})
 
 
-@pytest.mark.asyncio
 async def test_send_rejects_oversized_payload(mock_connection):
     """send() raises ConnectionError before writing if payload > 10MB."""
     mock_reader, mock_writer = mock_connection
@@ -151,7 +144,6 @@ async def test_send_rejects_oversized_payload(mock_connection):
             await bridge.send("test", big_args)
 
 
-@pytest.mark.asyncio
 async def test_disconnect_during_header_read(mock_connection, monkeypatch):
     """IncompleteReadError during header read → ConnectionError after grace retry."""
     import unity_mcp.bridge as bmod
@@ -171,7 +163,6 @@ async def test_disconnect_during_header_read(mock_connection, monkeypatch):
             await bridge.send("test", {})
 
 
-@pytest.mark.asyncio
 async def test_disconnect_during_payload_read(mock_connection, monkeypatch):
     """IncompleteReadError during payload read → ConnectionError after grace retry."""
     import unity_mcp.bridge as bmod
@@ -196,7 +187,6 @@ async def test_disconnect_during_payload_read(mock_connection, monkeypatch):
             await bridge.send("test", {})
 
 
-@pytest.mark.asyncio
 async def test_concurrent_sends(mock_connection):
     """Multiple concurrent send() calls are serialized by lock."""
     mock_reader, mock_writer = mock_connection
@@ -225,7 +215,6 @@ async def test_concurrent_sends(mock_connection):
             assert result["ok"] is True
 
 
-@pytest.mark.asyncio
 async def test_reconnect_preserves_counter(mock_connection):
     """_reconnect() does not reset _counter."""
     mock_reader, mock_writer = mock_connection
@@ -260,14 +249,13 @@ async def test_reconnect_preserves_counter(mock_connection):
         assert bridge._counter == 3
 
 
-@pytest.mark.asyncio
+# no-assert: crash guard
 async def test_close_when_not_connected():
     """close() when never connected does not crash."""
     bridge = UnityBridge()
     await bridge.close()  # Should not raise
 
 
-@pytest.mark.asyncio
 async def test_close_when_writer_fails(mock_connection):
     """close() handles exception in wait_closed."""
     mock_reader, mock_writer = mock_connection
@@ -284,7 +272,6 @@ async def test_close_when_writer_fails(mock_connection):
         assert bridge._reader is None
 
 
-@pytest.mark.asyncio
 async def test_send_after_close_auto_reconnects():
     """send() after close() auto-reconnects instead of crashing."""
     response = {"id": "0001", "ok": True, "data": "OK"}
@@ -313,7 +300,6 @@ async def test_send_after_close_auto_reconnects():
         assert bridge.connected
 
 
-@pytest.mark.asyncio
 async def test_send_auto_reconnects_when_never_connected():
     """send() without prior connect() auto-reconnects."""
     response = {"id": "0001", "ok": True, "data": "OK"}
@@ -338,7 +324,6 @@ async def test_send_auto_reconnects_when_never_connected():
         mock_open.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_connected_property(mock_connection):
     """connected property reflects actual state."""
     mock_reader, mock_writer = mock_connection
@@ -358,7 +343,6 @@ async def test_connected_property(mock_connection):
         assert not bridge.connected
 
 
-@pytest.mark.asyncio
 async def test_max_retries_exhausted(mock_connection):
     """send() raises ConnectionError on IncompleteReadError (circuit breaker, no retry)."""
     mock_reader, mock_writer = mock_connection
@@ -375,7 +359,6 @@ async def test_max_retries_exhausted(mock_connection):
             await bridge.send("test", {})
 
 
-@pytest.mark.asyncio
 async def test_send_timeout_raises():
     """send() raises ConnectionError when Unity doesn't respond (circuit breaker, no retry)."""
     idle_probe = make_idle_probe()
@@ -397,7 +380,6 @@ async def test_send_timeout_raises():
             await bridge.send("test", {}, timeout=0.01)
 
 
-@pytest.mark.asyncio
 async def test_concurrent_sends_with_dead_connection():
     """Concurrent sends when writer=None don't race on reconnect.
 
@@ -466,7 +448,6 @@ async def test_concurrent_sends_with_dead_connection():
             assert r["ok"] is True
 
 
-@pytest.mark.asyncio
 async def test_reconnect_inside_lock_prevents_writer_none():
     """Reconnect inside lock ensures writer is set before write()."""
     response = {"id": "0001", "ok": True, "data": "OK"}
@@ -489,7 +470,6 @@ async def test_reconnect_inside_lock_prevents_writer_none():
         assert bridge._writer is not None
 
 
-@pytest.mark.asyncio
 async def test_response_id_mismatch_raises(mock_connection):
     """Mismatched ID → ConnectionError('Response ID mismatch') immediately."""
     wrong_response = {"id": "wrong_id", "ok": True, "data": "x"}
@@ -504,7 +484,6 @@ async def test_response_id_mismatch_raises(mock_connection):
                 await bridge.send("test", {})
 
 
-@pytest.mark.asyncio
 async def test_probe_raises_does_not_crash_send():
     """Probe methods that raise must not crash send() (degrade-open)."""
     from unity_mcp.compile_state import CompileStateProbe
@@ -534,7 +513,6 @@ async def test_probe_raises_does_not_crash_send():
             await bridge.send("test", {}, timeout=0.01)
 
 
-@pytest.mark.asyncio
 async def test_concurrent_sends_routes_per_caller(mock_unity_server):
     """Each caller's response correctly identified by msg_id (not just 'all return ok')."""
     bridge = UnityBridge(host="127.0.0.1", port=mock_unity_server.port)

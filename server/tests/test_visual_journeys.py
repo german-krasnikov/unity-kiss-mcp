@@ -35,7 +35,6 @@ def journey_context(tmp_path, monkeypatch):
     return ns
 
 
-@pytest.mark.asyncio
 async def test_journey_build_screenshot_diff(journey_context):
     """Journey #1: mutation → 2 screenshots → visual_diff returns Haiku result.
 
@@ -67,7 +66,6 @@ async def test_journey_build_screenshot_diff(journey_context):
     assert ctx.mock_sampling.verify_visual_diff.call_count == 1
 
 
-@pytest.mark.asyncio
 async def test_journey_budget_exhaustion_marker(journey_context, monkeypatch):
     """Journey #3: budget exhausted → degrade kicks in → [DEGRADED:budget_*] marker."""
     from unity_mcp.visual_diff import visual_diff
@@ -113,7 +111,6 @@ async def test_journey_budget_exhaustion_marker(journey_context, monkeypatch):
     real_svc._run.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_journey_recovery_after_haiku_timeout(journey_context):
     """Pre-emptive guard against future circuit-breaker / sticky-disable additions.
     Currently degrade() is stateless — no current sticky-disable mechanism exists.

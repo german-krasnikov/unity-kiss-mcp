@@ -14,7 +14,6 @@ from unity_mcp.server import (
 
 # --- _send helper tests ---
 
-@pytest.mark.asyncio
 async def test_send_returns_data_on_success(mock_bridge, bridge_response):
     """_send returns result['data'] when ok=True."""
     bridge_response(data="hello")
@@ -22,7 +21,6 @@ async def test_send_returns_data_on_success(mock_bridge, bridge_response):
     assert result == "hello"
 
 
-@pytest.mark.asyncio
 async def test_send_raises_tool_error_on_failure(mock_bridge, bridge_response):
     """_send raises ToolError when ok=False."""
     bridge_response(ok=False, err="not found")
@@ -30,7 +28,6 @@ async def test_send_raises_tool_error_on_failure(mock_bridge, bridge_response):
         await _send("ping", {})
 
 
-@pytest.mark.asyncio
 async def test_send_passes_args_to_bridge(mock_bridge, bridge_response):
     """_send passes args dict to bridge.send."""
     bridge_response()
@@ -38,7 +35,6 @@ async def test_send_passes_args_to_bridge(mock_bridge, bridge_response):
     mock_bridge.send.assert_called_once_with("get_component", {"path": "/A", "type": "Transform"}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_send_passes_timeout_to_bridge(mock_bridge, bridge_response):
     """_send passes timeout kwarg to bridge.send when specified."""
     bridge_response(data="done")
@@ -46,7 +42,6 @@ async def test_send_passes_timeout_to_bridge(mock_bridge, bridge_response):
     mock_bridge.send.assert_called_once_with("recompile", {}, timeout=60.0)
 
 
-@pytest.mark.asyncio
 async def test_send_default_timeout(mock_bridge, bridge_response):
     """_send without timeout uses default 30s."""
     bridge_response()
@@ -54,7 +49,6 @@ async def test_send_default_timeout(mock_bridge, bridge_response):
     mock_bridge.send.assert_called_once_with("ping", {}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_send_returns_file_path_when_file_field_present(mock_bridge, bridge_response):
     """_send returns file path message when response has 'file' field."""
     bridge_response(file="/tmp/MCP/screenshot.png")
@@ -62,7 +56,6 @@ async def test_send_returns_file_path_when_file_field_present(mock_bridge, bridg
     assert result == "Data saved to: /tmp/MCP/screenshot.png"
 
 
-@pytest.mark.asyncio
 async def test_send_returns_data_when_no_file_field(mock_bridge, bridge_response):
     """_send returns data normally when no 'file' field."""
     bridge_response(data="pong")
@@ -70,7 +63,6 @@ async def test_send_returns_data_when_no_file_field(mock_bridge, bridge_response
     assert result == "pong"
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_calls_bridge(mock_bridge, bridge_response):
     """get_hierarchy tool delegates to bridge.send."""
     bridge_response(data="Scene/GameObject")
@@ -79,7 +71,6 @@ async def test_get_hierarchy_calls_bridge(mock_bridge, bridge_response):
     assert result == "Scene/GameObject"
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_default_omits_components(mock_bridge, bridge_response):
     """get_hierarchy without components=True does not send components arg."""
     bridge_response(data="tree")
@@ -88,7 +79,6 @@ async def test_get_hierarchy_default_omits_components(mock_bridge, bridge_respon
     assert "components" not in args
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_components_true_sends_arg(mock_bridge, bridge_response):
     """get_hierarchy with components=True sends components='true'."""
     bridge_response(data="tree")
@@ -97,7 +87,6 @@ async def test_get_hierarchy_components_true_sends_arg(mock_bridge, bridge_respo
     assert args["components"] == "true"
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_incremental_sends_arg(mock_bridge):
     """get_hierarchy with incremental=True sends incremental='true' to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "tree"})
@@ -106,7 +95,6 @@ async def test_get_hierarchy_incremental_sends_arg(mock_bridge):
     assert args.get("incremental") == "true"
 
 
-@pytest.mark.asyncio
 async def test_get_component_calls_bridge(mock_bridge):
     """get_component tool calls bridge.send with correct args."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "pos: 1,2,3"})
@@ -116,7 +104,6 @@ async def test_get_component_calls_bridge(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_get_component_returns_data_on_success(mock_bridge):
     """ok response returns data."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "pos: 1,2,3"})
@@ -124,7 +111,6 @@ async def test_get_component_returns_data_on_success(mock_bridge):
     assert result == "pos: 1,2,3"
 
 
-@pytest.mark.asyncio
 async def test_get_component_raises_on_failure(mock_bridge):
     """ok=false raises ToolError."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "GameObject not found"})
@@ -132,7 +118,6 @@ async def test_get_component_raises_on_failure(mock_bridge):
         await get_component(path="/Missing", type="Transform")
 
 
-@pytest.mark.asyncio
 async def test_find_objects_calls_bridge(mock_bridge):
     """find_objects tool calls bridge.send."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "/Player\n/Enemy"})
@@ -142,7 +127,6 @@ async def test_find_objects_calls_bridge(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_set_property_calls_bridge(mock_bridge):
     """set_property tool calls bridge.send."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
@@ -154,7 +138,6 @@ async def test_set_property_calls_bridge(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_create_object_calls_bridge(mock_bridge):
     """create_object tool calls bridge.send."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "/NewObject"})
@@ -164,7 +147,6 @@ async def test_create_object_calls_bridge(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_delete_object_accepts_path(mock_bridge, bridge_response):
     """delete_object(path=...) sends only path key, no id."""
     bridge_response(data="Deleted /Test")
@@ -172,7 +154,6 @@ async def test_delete_object_accepts_path(mock_bridge, bridge_response):
     mock_bridge.send.assert_called_once_with("delete_object", {"path": "/Test"}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_delete_object_accepts_id(mock_bridge, bridge_response):
     """delete_object(id=123) sends only id key, no path."""
     bridge_response(data="Deleted #123")
@@ -190,7 +171,6 @@ def test_delete_object_signature_supports_both():
     assert sig.parameters["path"].default is None
 
 
-@pytest.mark.asyncio
 async def test_delete_object_neither_arg_raises(mock_bridge):
     """delete_object() with no args raises ValueError and does NOT call bridge."""
     with pytest.raises(ValueError, match="id or path required"):
@@ -198,7 +178,6 @@ async def test_delete_object_neither_arg_raises(mock_bridge):
     mock_bridge.send.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_recompile_calls_bridge(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
     result = await recompile()
@@ -206,14 +185,12 @@ async def test_recompile_calls_bridge(mock_bridge):
     assert result == "ok"
 
 
-@pytest.mark.asyncio
 async def test_recompile_raises_on_failure(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Compilation failed"})
     with pytest.raises(ToolError, match="Compilation failed"):
         await recompile()
 
 
-@pytest.mark.asyncio
 async def test_get_components_list_calls_bridge_with_id(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Rigidbody\nMeshRenderer"})
     result = await get_components_list(id=12345)
@@ -221,7 +198,6 @@ async def test_get_components_list_calls_bridge_with_id(mock_bridge):
     assert result == "Rigidbody\nMeshRenderer"
 
 
-@pytest.mark.asyncio
 async def test_get_object_detail_calls_bridge(mock_bridge):
     """Test get_object_detail sends correct command to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "GameObject: Cube #12345\nActive: true\n---\n[MeshFilter]\nmesh = Cube"})
@@ -230,7 +206,6 @@ async def test_get_object_detail_calls_bridge(mock_bridge):
     assert "Cube" in result
 
 
-@pytest.mark.asyncio
 async def test_get_object_detail_raises_on_error(mock_bridge):
     """Test get_object_detail raises ToolError when object not found"""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
@@ -238,7 +213,6 @@ async def test_get_object_detail_raises_on_error(mock_bridge):
         await get_object_detail(id=99999)
 
 
-@pytest.mark.asyncio
 async def test_run_tests_calls_bridge(mock_bridge):
     """Test run_tests sends correct command to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Tests: 5 passed, 0 failed\nTime: 1.2s"})
@@ -247,7 +221,6 @@ async def test_run_tests_calls_bridge(mock_bridge):
     assert "passed" in result
 
 
-@pytest.mark.asyncio
 async def test_run_tests_default_mode(mock_bridge):
     """Test run_tests defaults to EditMode"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Tests: 3 passed, 0 failed"})
@@ -256,7 +229,6 @@ async def test_run_tests_default_mode(mock_bridge):
     assert "passed" in result
 
 
-@pytest.mark.asyncio
 async def test_run_tests_raises_on_error(mock_bridge):
     """Test run_tests raises ToolError"""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Test framework not available"})
@@ -264,7 +236,6 @@ async def test_run_tests_raises_on_error(mock_bridge):
         await run_tests()
 
 
-@pytest.mark.asyncio
 async def test_get_test_results_calls_bridge(mock_bridge):
     """get_test_results sends get_test_results command with empty args."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "5 tests: 5 passed (1.2s)"})
@@ -273,7 +244,6 @@ async def test_get_test_results_calls_bridge(mock_bridge):
     assert result == "5 tests: 5 passed (1.2s)"
 
 
-@pytest.mark.asyncio
 async def test_get_test_results_returns_pending(mock_bridge):
     """get_test_results returns 'pending' when tests still running."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "pending"})
@@ -281,7 +251,6 @@ async def test_get_test_results_returns_pending(mock_bridge):
     assert result == "pending"
 
 
-@pytest.mark.asyncio
 async def test_get_test_results_returns_none_when_no_run(mock_bridge):
     """get_test_results returns 'none' when no test run has occurred."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "none"})
@@ -289,7 +258,6 @@ async def test_get_test_results_returns_none_when_no_run(mock_bridge):
     assert result == "none"
 
 
-@pytest.mark.asyncio
 async def test_run_tests_playmode_polls_after_disconnect(mock_bridge):
     """run_tests PlayMode: on disconnect, polls get_test_results until results available."""
     call_count = 0
@@ -319,7 +287,6 @@ async def test_run_tests_playmode_polls_after_disconnect(mock_bridge):
     assert len(calls) >= 1
 
 
-@pytest.mark.asyncio
 async def test_run_tests_playmode_timeout_returns_error(mock_bridge):
     """run_tests PlayMode: returns error string if polling times out."""
     async def side_effect(cmd, args, timeout=30.0):
@@ -340,7 +307,6 @@ async def test_run_tests_playmode_timeout_returns_error(mock_bridge):
     assert "Error" in result or "timeout" in result.lower()
 
 
-@pytest.mark.asyncio
 async def test_run_tests_editmode_does_not_catch_disconnect(mock_bridge):
     """run_tests EditMode: ToolError propagates without polling fallback."""
     mock_bridge.send = AsyncMock(side_effect=ToolError("Unity connection lost"))
@@ -348,7 +314,6 @@ async def test_run_tests_editmode_does_not_catch_disconnect(mock_bridge):
         await run_tests(mode="EditMode")
 
 
-@pytest.mark.asyncio
 async def test_run_tests_playmode_tool_error_on_poll_swallowed(mock_bridge):
     """run_tests PlayMode: ToolError from every get_test_results poll is swallowed; result is error string."""
     mock_bridge.send = AsyncMock(side_effect=ToolError("disconnected"))
@@ -364,7 +329,6 @@ async def test_run_tests_playmode_tool_error_on_poll_swallowed(mock_bridge):
     assert result.startswith("Error:")
 
 
-@pytest.mark.asyncio
 async def test_scene_new_calls_bridge(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Untitled"})
     result = await scene(action="new")
@@ -372,7 +336,6 @@ async def test_scene_new_calls_bridge(mock_bridge):
     assert result == "Untitled"
 
 
-@pytest.mark.asyncio
 async def test_scene_open_calls_bridge(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "TestScene"})
     result = await scene(action="open", path="Assets/Scenes/TestScene.unity")
@@ -380,14 +343,12 @@ async def test_scene_open_calls_bridge(mock_bridge):
     assert result == "TestScene"
 
 
-@pytest.mark.asyncio
 async def test_scene_open_raises_on_error(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Scene not found"})
     with pytest.raises(ToolError, match="Scene not found"):
         await scene(action="open", path="Assets/Missing.unity")
 
 
-@pytest.mark.asyncio
 async def test_scene_discard_calls_bridge(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "reloaded"})
     result = await scene(action="discard")
@@ -395,14 +356,12 @@ async def test_scene_discard_calls_bridge(mock_bridge):
     assert result == "reloaded"
 
 
-@pytest.mark.asyncio
 async def test_scene_save_calls_bridge(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Assets/Scenes/Test.unity"})
     await scene(action="save", path="Assets/Scenes/Test.unity")
     mock_bridge.send.assert_called_once_with("scene", {"action": "save", "path": "Assets/Scenes/Test.unity"}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_disabled_tool_raises_tool_error(mock_bridge):
     """Disabled tool raises ToolError from Unity side"""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Tool 'screenshot' is disabled in settings"})
@@ -411,7 +370,6 @@ async def test_disabled_tool_raises_tool_error(mock_bridge):
         await screenshot()
 
 
-@pytest.mark.asyncio
 async def test_animation_get_calls_bridge(mock_bridge):
     """animation get calls bridge with path only"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Animator: Idle, Walk\n---\nIdle | 1.0s | 3 curves"})
@@ -420,7 +378,6 @@ async def test_animation_get_calls_bridge(mock_bridge):
     assert "Idle" in result
 
 
-@pytest.mark.asyncio
 async def test_animation_get_with_clip(mock_bridge):
     """animation get with clip name sends both path and clip"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Idle | 1.0s | 3 curves\nlocalPosition.x: 0.0 -> 2.0"})
@@ -429,7 +386,6 @@ async def test_animation_get_with_clip(mock_bridge):
     assert "localPosition" in result
 
 
-@pytest.mark.asyncio
 async def test_animation_get_with_time(mock_bridge):
     """animation get with time parameter sends float value"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Position: (0.5, 1.0, 0.0)"})
@@ -438,7 +394,6 @@ async def test_animation_get_with_time(mock_bridge):
     assert "Position" in result
 
 
-@pytest.mark.asyncio
 async def test_animation_get_raises_on_error(mock_bridge):
     """animation get raises ToolError when animator not found"""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Animator not found"})
@@ -446,7 +401,6 @@ async def test_animation_get_raises_on_error(mock_bridge):
         await animation(action="get", path="/Missing")
 
 
-@pytest.mark.asyncio
 async def test_animation_create_calls_bridge(mock_bridge):
     """animation create sends all args to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created: Jump.anim"})
@@ -455,7 +409,6 @@ async def test_animation_create_calls_bridge(mock_bridge):
     assert "Jump" in result
 
 
-@pytest.mark.asyncio
 async def test_animation_edit_calls_bridge(mock_bridge):
     """animation edit sends action, property, keys to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Key added"})
@@ -464,7 +417,6 @@ async def test_animation_edit_calls_bridge(mock_bridge):
     assert "added" in result
 
 
-@pytest.mark.asyncio
 async def test_animation_preview_calls_bridge(mock_bridge):
     """animation preview sends path, clip, action, time to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Previewing Walk at 0.5s"})
@@ -473,7 +425,6 @@ async def test_animation_preview_calls_bridge(mock_bridge):
     assert "Walk" in result
 
 
-@pytest.mark.asyncio
 async def test_animation_preview_no_optional(mock_bridge):
     """animation preview with only required args"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Sampling Idle at 0.0s"})
@@ -483,7 +434,6 @@ async def test_animation_preview_no_optional(mock_bridge):
 
 
 # Timeline tests
-@pytest.mark.asyncio
 async def test_timeline_get_calls_bridge(mock_bridge):
     """timeline get calls bridge with path only"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Timeline: Cutscene\nTracks: 2\nActivation | Character\nAnimation | Character"})
@@ -492,7 +442,6 @@ async def test_timeline_get_calls_bridge(mock_bridge):
     assert "Cutscene" in result
 
 
-@pytest.mark.asyncio
 async def test_timeline_get_with_track(mock_bridge):
     """timeline get with track name sends both path and track"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Animation | Character\nClips: 1\n0.0s-2.0s | Walk | bound: Character"})
@@ -501,7 +450,6 @@ async def test_timeline_get_with_track(mock_bridge):
     assert "Character" in result
 
 
-@pytest.mark.asyncio
 async def test_timeline_get_raises_on_error(mock_bridge):
     """timeline get raises ToolError when director not found"""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "PlayableDirector not found"})
@@ -509,7 +457,6 @@ async def test_timeline_get_raises_on_error(mock_bridge):
         await timeline(action="get", path="/Missing")
 
 
-@pytest.mark.asyncio
 async def test_timeline_create_calls_bridge(mock_bridge):
     """timeline create sends all args to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created: Assets/T.playable"})
@@ -518,7 +465,6 @@ async def test_timeline_create_calls_bridge(mock_bridge):
     assert "T.playable" in result
 
 
-@pytest.mark.asyncio
 async def test_timeline_create_minimal(mock_bridge):
     """timeline create with only asset_path sends minimal args"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created: Assets/T.playable"})
@@ -527,7 +473,6 @@ async def test_timeline_create_minimal(mock_bridge):
     assert "T.playable" in result
 
 
-@pytest.mark.asyncio
 async def test_timeline_edit_calls_bridge(mock_bridge):
     """timeline edit sends action and optional args to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Track added: BGM"})
@@ -536,7 +481,6 @@ async def test_timeline_edit_calls_bridge(mock_bridge):
     assert "BGM" in result
 
 
-@pytest.mark.asyncio
 async def test_timeline_preview_calls_bridge(mock_bridge):
     """timeline preview sends path, action, time to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Sampling at 5.0s"})
@@ -545,7 +489,6 @@ async def test_timeline_preview_calls_bridge(mock_bridge):
     assert "5.0" in result
 
 
-@pytest.mark.asyncio
 async def test_timeline_preview_no_time(mock_bridge):
     """timeline preview with no time omits time from args"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Sampling at 0.0s"})
@@ -554,7 +497,6 @@ async def test_timeline_preview_no_time(mock_bridge):
     assert "0.0" in result
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_tool_description_exists():
     """Verify get_hierarchy tool has a docstring mentioning max nodes."""
     assert get_hierarchy.__doc__ is not None
@@ -562,7 +504,6 @@ async def test_get_hierarchy_tool_description_exists():
     assert "narrow" in get_hierarchy.__doc__.lower() or "filter" in get_hierarchy.__doc__.lower()
 
 
-@pytest.mark.asyncio
 async def test_get_enabled_tools_calls_bridge(mock_bridge):
     """get_enabled_tools calls bridge with correct command."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "get_hierarchy,get_component,screenshot"})
@@ -572,7 +513,6 @@ async def test_get_enabled_tools_calls_bridge(mock_bridge):
     assert "screenshot" in result
 
 
-@pytest.mark.asyncio
 async def test_get_enabled_tools_raises_on_error(mock_bridge):
     """get_enabled_tools raises ToolError on failure."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Connection failed"})
@@ -580,28 +520,24 @@ async def test_get_enabled_tools_raises_on_error(mock_bridge):
         await get_enabled_tools()
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_raises_on_failure(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Scene is empty"})
     with pytest.raises(ToolError, match="Scene is empty"):
         await get_hierarchy()
 
 
-@pytest.mark.asyncio
 async def test_search_scene_raises_on_failure(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Invalid query"})
     with pytest.raises(ToolError, match="Invalid query"):
         await search_scene(query="t:BadType")
 
 
-@pytest.mark.asyncio
 async def test_set_material_raises_on_failure(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
     with pytest.raises(ToolError, match="Object not found"):
         await set_material(path="/Missing", color="#FF0000")
 
 
-@pytest.mark.asyncio
 async def test_editor_state_default(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "playing:False\ncompiling:False"})
     result = await editor("state")
@@ -609,7 +545,6 @@ async def test_editor_state_default(mock_bridge):
     assert result == "playing:False\ncompiling:False"
 
 
-@pytest.mark.asyncio
 async def test_editor_play(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
     result = await editor("play")
@@ -617,7 +552,6 @@ async def test_editor_play(mock_bridge):
     assert result == "ok"
 
 
-@pytest.mark.asyncio
 async def test_editor_select_with_path(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "selected:/Player"})
     result = await editor("select", path="/Player")
@@ -627,7 +561,6 @@ async def test_editor_select_with_path(mock_bridge):
 
 # --- Animator Controller tests ---
 
-@pytest.mark.asyncio
 async def test_animator_get_calls_bridge(mock_bridge):
     """animator get sends path to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "AnimatorController: Player | 1 layer | 3 params | 4 states"})
@@ -636,7 +569,6 @@ async def test_animator_get_calls_bridge(mock_bridge):
     assert "Player" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_get_with_state(mock_bridge):
     """animator get with state name sends state param"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "state: Idle | Idle.anim | 1.0x"})
@@ -645,7 +577,6 @@ async def test_animator_get_with_state(mock_bridge):
     assert "Idle" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_add_param(mock_bridge):
     """animator add_param sends params string"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "added: Speed(float), Jump(trigger)"})
@@ -654,7 +585,6 @@ async def test_animator_add_param(mock_bridge):
     assert "Speed" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_add_state(mock_bridge):
     """animator add_state sends states string"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "added: Idle, Walk"})
@@ -663,7 +593,6 @@ async def test_animator_add_state(mock_bridge):
     assert "Idle" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_add_transition(mock_bridge):
     """animator add_transition sends source, target, conditions, duration"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "transition: Idle → Walk"})
@@ -677,7 +606,6 @@ async def test_animator_add_transition(mock_bridge):
     assert "Walk" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_add_transition_anystate(mock_bridge):
     """animator add_transition with source=* for AnyState"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "transition: [Any] → Jump"})
@@ -691,7 +619,6 @@ async def test_animator_add_transition_anystate(mock_bridge):
     assert "Jump" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_add_transition_with_exit_time(mock_bridge):
     """animator add_transition with exit_time and has_exit_time"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "transition: Jump → Idle | exit:0.9"})
@@ -706,7 +633,6 @@ async def test_animator_add_transition_with_exit_time(mock_bridge):
     assert "exit" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_set_default(mock_bridge):
     """animator set_default sends state name"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "default: Idle"})
@@ -715,7 +641,6 @@ async def test_animator_set_default(mock_bridge):
     assert "Idle" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_remove_param(mock_bridge):
     """animator remove param sends type and name"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "removed: param Speed"})
@@ -724,7 +649,6 @@ async def test_animator_remove_param(mock_bridge):
     assert "Speed" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_remove_state(mock_bridge):
     """animator remove state"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "removed: state Walk"})
@@ -733,7 +657,6 @@ async def test_animator_remove_state(mock_bridge):
     assert "Walk" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_remove_transition(mock_bridge):
     """animator remove transition sends source and target"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "removed: transition Idle → Walk"})
@@ -746,7 +669,6 @@ async def test_animator_remove_transition(mock_bridge):
     assert "Walk" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_get_raises_on_error(mock_bridge):
     """animator get raises ToolError when animator not found"""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Animator not found"})
@@ -754,7 +676,6 @@ async def test_animator_get_raises_on_error(mock_bridge):
         await animator(action="get", path="/Missing")
 
 
-@pytest.mark.asyncio
 async def test_animator_none_params_excluded(mock_bridge):
     """animator excludes None params from args dict"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
@@ -765,7 +686,6 @@ async def test_animator_none_params_excluded(mock_bridge):
     assert "conditions" not in call_args
 
 
-@pytest.mark.asyncio
 async def test_checkpoint_sends_label(mock_bridge):
     """checkpoint sends label to Unity."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Checkpoint: save"})
@@ -773,7 +693,6 @@ async def test_checkpoint_sends_label(mock_bridge):
     mock_bridge.send.assert_called_once_with("checkpoint", {"label": "save"}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_checkpoint_default_label(mock_bridge):
     """checkpoint uses 'checkpoint' as default label."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Checkpoint: checkpoint"})
@@ -781,7 +700,6 @@ async def test_checkpoint_default_label(mock_bridge):
     mock_bridge.send.assert_called_once_with("checkpoint", {"label": "checkpoint"}, timeout=30.0)
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_compress_true(mock_bridge):
     """get_hierarchy with compress=True applies compress_hierarchy."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "  slot_0  []  #1\n  slot_1  []  #2"})
@@ -790,7 +708,6 @@ async def test_get_hierarchy_compress_true(mock_bridge):
     assert "slot_0" not in result
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_compress_false_default(mock_bridge):
     """get_hierarchy default compress=False returns raw data."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "  slot_0  []  #1\n  slot_1  []  #2"})
@@ -798,7 +715,6 @@ async def test_get_hierarchy_compress_false_default(mock_bridge):
     assert "slot_0" in result
 
 
-@pytest.mark.asyncio
 async def test_validate_references_sends_args(mock_bridge):
     """validate_references sends path and depth."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "0 ERROR, 5 OK"})
@@ -810,7 +726,6 @@ async def test_validate_references_sends_args(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_validate_references_defaults(mock_bridge):
     """validate_references default depth=3, verbose omitted (not sent)."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "0 ERROR, 0 OK"})
@@ -822,7 +737,6 @@ async def test_validate_references_defaults(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_validate_references_verbose(mock_bridge):
     """validate_references verbose=True sends verbose flag."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "[OK] ..."})
@@ -834,7 +748,6 @@ async def test_validate_references_verbose(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_set_active_true(mock_bridge):
     """set_active sends active='true' for True."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "/A active=True"})
@@ -844,7 +757,6 @@ async def test_set_active_true(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_set_active_false(mock_bridge):
     """set_active sends active='false' for False."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "/A active=False"})
@@ -854,7 +766,6 @@ async def test_set_active_false(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_create_object_with_prefab_path(mock_bridge):
     """create_object passes prefab_path when provided."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created /MyPrefab"})
@@ -866,7 +777,6 @@ async def test_create_object_with_prefab_path(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_create_object_without_prefab_unchanged(mock_bridge):
     """create_object without prefab_path works as before."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created /Cube"})
@@ -878,7 +788,6 @@ async def test_create_object_without_prefab_unchanged(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_wire_event_sends_all_args(mock_bridge):
     """wire_event sends all parameters to Unity."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Wired"})
@@ -894,7 +803,6 @@ async def test_wire_event_sends_all_args(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_wire_event_default_arg_type(mock_bridge):
     """wire_event defaults arg_type to 'void'."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Wired"})
@@ -910,7 +818,6 @@ async def test_wire_event_default_arg_type(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_wire_event_optional_arg_value(mock_bridge):
     """wire_event omits arg_value when None."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Wired"})
@@ -922,7 +829,6 @@ async def test_wire_event_optional_arg_value(mock_bridge):
     assert "arg_value" not in args
 
 
-@pytest.mark.asyncio
 async def test_wire_event_object_arg_type(mock_bridge):
     """wire_event passes object arg_type and arg_value to Unity."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Wired"})
@@ -938,7 +844,6 @@ async def test_wire_event_object_arg_type(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_get_component_returns_unity_event_expanded(mock_bridge):
     """get_component passes through UnityEvent expanded format from Unity."""
     mock_bridge.send = AsyncMock(return_value={
@@ -950,7 +855,6 @@ async def test_get_component_returns_unity_event_expanded(mock_bridge):
     assert "Button.SetActive(bool=True)" in result
 
 
-@pytest.mark.asyncio
 async def test_summary_sends_correct_args(mock_bridge):
     """get_hierarchy with summary=True sends summary='true'."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Scene (0 nodes)"})
@@ -960,7 +864,6 @@ async def test_summary_sends_correct_args(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_summary_with_root(mock_bridge):
     """get_hierarchy with summary=True and root forwards root."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Scene (5 nodes)"})
@@ -970,7 +873,6 @@ async def test_summary_with_root(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_summary_ignores_other_params(mock_bridge):
     """get_hierarchy with summary=True does not send depth/filter/components."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Scene (10 nodes)"})
@@ -981,7 +883,6 @@ async def test_summary_ignores_other_params(mock_bridge):
     assert "components" not in sent_args
 
 
-@pytest.mark.asyncio
 async def test_get_component_returns_empty_unity_event(mock_bridge):
     """get_component passes through empty UnityEvent format."""
     mock_bridge.send = AsyncMock(return_value={
@@ -992,7 +893,6 @@ async def test_get_component_returns_empty_unity_event(mock_bridge):
     assert "UnityEvent[0]" in result
 
 
-@pytest.mark.asyncio
 async def test_set_property_dry_run_passes_arg(mock_bridge):
     """set_property with dry_run=True passes dry_run='true' to bridge."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "DRY-RUN: mass would change 1 → 99"})
@@ -1002,7 +902,6 @@ async def test_set_property_dry_run_passes_arg(mock_bridge):
     assert "DRY-RUN" in result
 
 
-@pytest.mark.asyncio
 async def test_set_property_bool_python_native(mock_bridge):
     """set_property with value=True (Python bool) → bridge receives 'true' string."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
@@ -1013,7 +912,6 @@ async def test_set_property_bool_python_native(mock_bridge):
 
 # --- unwire_event tests ---
 
-@pytest.mark.asyncio
 async def test_unwire_event_clear_all(mock_bridge):
     """unwire_event with no index clears all entries."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Cleared onClick (3 removed)"})
@@ -1025,7 +923,6 @@ async def test_unwire_event_clear_all(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_unwire_event_by_index(mock_bridge):
     """unwire_event with index removes specific entry."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Removed onClick[1]"})
@@ -1037,7 +934,6 @@ async def test_unwire_event_by_index(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_unwire_event_no_index_omitted(mock_bridge):
     """unwire_event omits index when None."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Cleared"})
@@ -1048,7 +944,6 @@ async def test_unwire_event_no_index_omitted(mock_bridge):
 
 # --- screenshot new params tests ---
 
-@pytest.mark.asyncio
 async def test_screenshot_show_colliders_passthrough(mock_bridge):
     """screenshot passes show_colliders=true when enabled."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "img"})
@@ -1057,7 +952,6 @@ async def test_screenshot_show_colliders_passthrough(mock_bridge):
     assert args["show_colliders"] == "true"
 
 
-@pytest.mark.asyncio
 async def test_screenshot_show_colliders_omitted_when_false(mock_bridge):
     """screenshot omits show_colliders when False/None."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "img"})
@@ -1066,7 +960,6 @@ async def test_screenshot_show_colliders_omitted_when_false(mock_bridge):
     assert "show_colliders" not in args
 
 
-@pytest.mark.asyncio
 async def test_screenshot_single_view_angle(mock_bridge):
     """screenshot passes angle for single_view mode."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "img"})
@@ -1076,7 +969,6 @@ async def test_screenshot_single_view_angle(mock_bridge):
     assert args["angle"] == "left"
 
 
-@pytest.mark.asyncio
 async def test_screenshot_angle_omitted_when_none(mock_bridge):
     """screenshot omits angle when None."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "img"})
@@ -1085,7 +977,6 @@ async def test_screenshot_angle_omitted_when_none(mock_bridge):
     assert "angle" not in args
 
 
-@pytest.mark.asyncio
 async def test_screenshot_describe_early_return_when_no_file_path(mock_bridge):
     """screenshot with describe= returns verbatim when result has no 'Data saved to:'."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "screenshot failed: camera unavailable"})
@@ -1140,7 +1031,6 @@ def test_main_does_not_log_epipe_oserror():
 
 # ── scene enhancement tools (from test_enhancements.py) ──────────────────────
 
-@pytest.mark.asyncio
 async def test_object_diff_sends_args(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "= (identical)"})
     result = await object_diff(path_a="/Julia", path_b="SceneB:/Julia")
@@ -1150,7 +1040,6 @@ async def test_object_diff_sends_args(mock_bridge):
     assert "identical" in result
 
 
-@pytest.mark.asyncio
 async def test_hierarchy_scene_forwarded(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Player #1"})
     await get_hierarchy(scene="Gameplay")
@@ -1158,7 +1047,6 @@ async def test_hierarchy_scene_forwarded(mock_bridge):
     assert args.get("scene") == "Gameplay"
 
 
-@pytest.mark.asyncio
 async def test_hierarchy_no_scene_omitted(mock_bridge):
     """Regression: single-scene callers don't get 'scene' key added."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Player #1"})
@@ -1167,7 +1055,6 @@ async def test_hierarchy_no_scene_omitted(mock_bridge):
     assert "scene" not in args
 
 
-@pytest.mark.asyncio
 async def test_search_scene_forwarded(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Enemy #2"})
     await search_scene(query="Enemy", scene="Level2")
@@ -1175,7 +1062,6 @@ async def test_search_scene_forwarded(mock_bridge):
     assert args.get("scene") == "Level2"
 
 
-@pytest.mark.asyncio
 async def test_search_no_scene_omitted(mock_bridge):
     """Regression: default call without scene must not include scene key."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Enemy #2"})
@@ -1188,7 +1074,6 @@ async def test_search_no_scene_omitted(mock_bridge):
 # PY2.test.1: _send_raw CancelledError → ToolError
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_send_raw_cancelled_error_raises_tool_error(mock_bridge):
     """CancelledError from bridge.send → ToolError('Operation cancelled')."""
     import asyncio
@@ -1202,7 +1087,6 @@ async def test_send_raw_cancelled_error_raises_tool_error(mock_bridge):
 # PY2.test.2: ConnectionError → UNITY_UNAVAILABLE ToolError
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_send_raw_connection_error_produces_unity_unavailable_tool_error(mock_bridge):
     """ConnectionRefusedError + busy probe → ToolError with [UNITY_UNAVAILABLE]."""
     from unity_mcp.server import _send_raw
@@ -1219,7 +1103,6 @@ async def test_send_raw_connection_error_produces_unity_unavailable_tool_error(m
 # PY2.test.3: _refresh_tools_cache skips when lock already held
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_refresh_tools_cache_skips_when_lock_held():
     """Second call while lock is held must not call bridge.send."""
     import asyncio
@@ -1259,7 +1142,6 @@ def test_main_http_transport(monkeypatch):
 # PY1.arch.2: _on_port_change acquire failure must log a warning
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_on_port_change_acquire_failure_logs_warning(monkeypatch):
     """_on_port_change must log.warning when acquire_lock raises on new port."""
     import logging
@@ -1325,7 +1207,6 @@ async def test_on_port_change_acquire_failure_logs_warning(monkeypatch):
 # PY2.test.4: _on_reconnect debounce limits rapid refresh calls
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_lifespan_on_reconnect_throttles_refresh(monkeypatch):
     """Two reconnect callbacks within <5s must result in at most one refresh call."""
     import asyncio
@@ -1375,3 +1256,76 @@ async def test_lifespan_on_reconnect_throttles_refresh(monkeypatch):
     disabled_calls = [c for c in bridge.send.call_args_list if c[0][0] == "get_disabled_tools"]
     # Debounce: 2 rapid fires → at most 1 refresh sent
     assert len(disabled_calls) <= 1, f"Debounce failed: {len(disabled_calls)} calls"
+
+
+# ── lifespan lock lifecycle ───────────────────────────────────────────────────
+
+async def test_lifespan_raises_when_acquire_lock_fails(monkeypatch):
+    """When acquire_lock raises during startup, lifespan propagates the exception."""
+    from unity_mcp import server as srv
+
+    class FakeSlot:
+        bridge = None
+        connected = False
+        port = 9500
+        async def connect(self, *a, **kw): return "no Unity"
+        async def close(self): pass
+
+    monkeypatch.setattr(srv, "ConnectionSlot", lambda **_: FakeSlot())
+    monkeypatch.setattr(srv, "slot", None)
+    monkeypatch.setattr(srv, "manager", None)
+    monkeypatch.setattr(srv, "_middleware", None)
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setattr("unity_mcp.server.acquire_lock",
+                        lambda **kw: (_ for _ in ()).throw(RuntimeError("lock busy")))
+
+    class FakeApp: pass
+    with pytest.raises(RuntimeError, match="lock busy"):
+        async with srv.lifespan(FakeApp()):
+            pass
+
+
+async def test_lifespan_releases_lock_on_normal_exit(monkeypatch):
+    """lock_fd is released in finally even when lifespan exits normally."""
+    from unity_mcp import server as srv
+
+    released = []
+    fake_fd = object()
+
+    class FakeSlot:
+        bridge = None
+        connected = False
+        port = 9500
+        async def connect(self, *a, **kw): return "no Unity"
+        async def close(self): pass
+
+    monkeypatch.setattr(srv, "ConnectionSlot", lambda **_: FakeSlot())
+    monkeypatch.setattr(srv, "slot", None)
+    monkeypatch.setattr(srv, "manager", None)
+    monkeypatch.setattr(srv, "_middleware", None)
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setattr("unity_mcp.server.acquire_lock", lambda **kw: fake_fd)
+    monkeypatch.setattr("unity_mcp.server.release_lock", lambda fd: released.append(fd))
+
+    class FakeApp: pass
+    async with srv.lifespan(FakeApp()):
+        pass
+
+    assert released == [fake_fd]
+
+
+# ── globals declaration ────────────────────────────────────────────────────────
+
+def test_lifespan_global_budget_tracker_declared():
+    """_budget_tracker and _budget_router must be declared in server module globals."""
+    import unity_mcp.server as srv
+    import inspect
+    assert hasattr(srv, "_budget_tracker")
+    src = inspect.getsource(srv.lifespan)
+    assert "_budget_tracker" in src
+    assert "_budget_router" in src
+    global_line = next(l for l in src.splitlines() if l.strip().startswith("global "))
+    assert "_budget_tracker" in global_line
+    assert "_budget_router" in global_line

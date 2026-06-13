@@ -1,5 +1,4 @@
 """TDD tests for ui_intent tool."""
-import pytest
 from unittest.mock import AsyncMock, patch
 
 
@@ -116,7 +115,6 @@ def test_ui_builder_layout_group():
 # 4. E2E mock
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_ui_intent_template_bypass_no_haiku():
     from unity_mcp.tools.ui_intent_tool import ui_intent
     with patch("unity_mcp.tools.ui_intent_tool._send", new_callable=AsyncMock) as mock_send:
@@ -127,7 +125,6 @@ async def test_ui_intent_template_bypass_no_haiku():
             assert "ok" in result
 
 
-@pytest.mark.asyncio
 async def test_ui_intent_no_sampling_returns_error():
     from unity_mcp.tools.ui_intent_tool import ui_intent
     with patch("unity_mcp.tools.ui_intent_tool._send", new_callable=AsyncMock):
@@ -137,7 +134,6 @@ async def test_ui_intent_no_sampling_returns_error():
             assert "ERROR" in result
 
 
-@pytest.mark.asyncio
 async def test_ui_intent_dry_run():
     from unity_mcp.tools.ui_intent_tool import ui_intent
     dsl = "canvas Canvas\n  image HealthBar anchor=top-left"
@@ -149,7 +145,6 @@ async def test_ui_intent_dry_run():
             assert "create_ui" in result
 
 
-@pytest.mark.asyncio
 async def test_ui_intent_e2e_executes_batch():
     from unity_mcp.tools.ui_intent_tool import ui_intent
     dsl = "canvas Canvas\n  image HealthBar anchor=top-left pos=20,-20 size=200,30"
@@ -196,7 +191,6 @@ def test_ui_builder_nested_manage_component_uses_full_path():
 # 6. E2E edge cases
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_ui_intent_unknown_template_returns_error():
     """Unknown template name returns ERROR without calling bridge."""
     from unity_mcp.tools.ui_intent_tool import ui_intent
@@ -207,7 +201,6 @@ async def test_ui_intent_unknown_template_returns_error():
         assert "nonexistent_xyz" in result
 
 
-@pytest.mark.asyncio
 async def test_ui_intent_empty_dsl_from_llm_returns_error():
     """Empty/whitespace DSL from LLM produces ERROR, no bridge call."""
     from unity_mcp.tools.ui_intent_tool import ui_intent

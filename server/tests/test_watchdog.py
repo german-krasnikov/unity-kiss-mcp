@@ -1,14 +1,12 @@
 """Tests for ProactiveWatchdog."""
 import asyncio
 import time
-import pytest
 from unittest.mock import AsyncMock
 from unity_mcp.watchdog import ProactiveWatchdog
 
 
 # ── budget_gate ─────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_watchdog_skips_scan_when_budget_gate_returns_false():
     """budget_gate=False must prevent _scan from being called.
 
@@ -28,7 +26,6 @@ async def test_watchdog_skips_scan_when_budget_gate_returns_false():
     assert not scan_called, "_scan must not run when budget_gate returns False"
 
 
-@pytest.mark.asyncio
 async def test_watchdog_runs_scan_when_budget_gate_returns_true():
     """budget_gate=True (default) must allow _scan to be scheduled and run.
 
@@ -101,7 +98,6 @@ def test_consume_alert_clears_after_consume():
 
 # ── _scan() ─────────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_scan_collects_issues():
     async def send(cmd, args, **kw):
         if cmd == "validate_references":
@@ -113,7 +109,6 @@ async def test_scan_collects_issues():
     assert "ISSUES" in wd._pending_alert
 
 
-@pytest.mark.asyncio
 async def test_scan_no_issues_no_alert():
     send = AsyncMock(return_value="")
     wd = ProactiveWatchdog(send)
@@ -121,7 +116,6 @@ async def test_scan_no_issues_no_alert():
     assert wd._pending_alert is None
 
 
-@pytest.mark.asyncio
 async def test_watchdog_cancel_stops_task():
     """cancel() must cancel the running task and mark it done within 2s."""
     send = AsyncMock(return_value="")
@@ -133,7 +127,7 @@ async def test_watchdog_cancel_stops_task():
     assert wd._task.done()
 
 
-@pytest.mark.asyncio
+# no-assert: crash guard
 async def test_watchdog_cancel_no_task_is_noop():
     """cancel() with no task should not raise."""
     send = AsyncMock(return_value="")
@@ -141,7 +135,6 @@ async def test_watchdog_cancel_no_task_is_noop():
     await wd.cancel()  # must not raise
 
 
-@pytest.mark.asyncio
 async def test_watchdog_cancel_already_done_is_noop():
     """cancel() on an already-done task should be safe."""
     send = AsyncMock(return_value="")
@@ -153,7 +146,6 @@ async def test_watchdog_cancel_already_done_is_noop():
     await wd.cancel()  # must not raise
 
 
-@pytest.mark.asyncio
 async def test_scan_console_only_error():
     """Non-empty console with clean refs must produce a 'console:' alert."""
     async def send(cmd, args, **kw):
@@ -166,7 +158,6 @@ async def test_scan_console_only_error():
     assert "console:" in wd._pending_alert
 
 
-@pytest.mark.asyncio
 async def test_scan_both_issues_in_alert():
     """Both ref ERROR and non-empty console must both appear in the alert."""
     async def send(cmd, args, **kw):
@@ -182,7 +173,6 @@ async def test_scan_both_issues_in_alert():
     assert any("ERROR" in p for p in parts)
 
 
-@pytest.mark.asyncio
 async def test_dedup_within_60s_returns_no_alert():
     """Same issue within 60s should not set a new alert."""
     async def send(cmd, args, **kw):
@@ -196,3 +186,25 @@ async def test_dedup_within_60s_returns_no_alert():
     # Second scan immediately — same hash, within 60s
     await wd._scan()
     assert wd._pending_alert is None
+
+
+# ── F01-qw: watchdog gather ────────────────────────────────────────────────────
+
+async def test_watchdog_scan_dispatches_pings_concurrently():
+    """F01-behavioral: _scan must dispatch its two probes concurrently (gather), not serially."""
+    import asyncio
+    from unity_mcp.watchdog import ProactiveWatchdog
+
+    in_flight = [0]
+    max_in_flight = [0]
+
+    async def send_fn(cmd, args, timeout=5.0):
+        in_flight[0] += 1
+        max_in_flight[0] = max(max_in_flight[0], in_flight[0])
+        await asyncio.sleep(0.02)
+        in_flight[0] -= 1
+        return ""
+
+    wd = ProactiveWatchdog(send_fn)
+    await wd._scan()
+    assert max_in_flight[0] == 2, "both probes must be in-flight together (gather, not serial)"

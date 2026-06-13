@@ -5,14 +5,12 @@ Items 1, 3, 5:
   3. component_cache + check_component_exists
   5. categorize_console_errors
 """
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from unity_mcp.middleware import Middleware, wrap_send
 
 
 # ─── Item 1: resolve_path_live ────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_cache_hit(mw):
     """Cache has exact match — send_fn never called."""
     mw.known_paths = {"/Player/Arm"}
@@ -22,7 +20,6 @@ async def test_resolve_path_live_cache_hit(mw):
     send_fn.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_ref_passthrough(mw):
     """$ref paths bypass all resolution."""
     send_fn = AsyncMock()
@@ -31,7 +28,6 @@ async def test_resolve_path_live_ref_passthrough(mw):
     send_fn.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_hash_passthrough(mw):
     """#id paths bypass all resolution."""
     send_fn = AsyncMock()
@@ -40,7 +36,6 @@ async def test_resolve_path_live_hash_passthrough(mw):
     send_fn.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_no_cache_passthrough(mw):
     """No cache yet — no query made, return original."""
     send_fn = AsyncMock()
@@ -49,7 +44,6 @@ async def test_resolve_path_live_no_cache_passthrough(mw):
     send_fn.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_search_single_match(mw):
     """Cache miss + search returns 1 result → rewrite path."""
     mw.known_paths = {"/Root/SomethingElse"}
@@ -59,7 +53,6 @@ async def test_resolve_path_live_search_single_match(mw):
     send_fn.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_search_multiple(mw):
     """Multiple ambiguous candidates → disambiguator block (Cycle 5d)."""
     mw.known_paths = {"/Root/SomethingElse"}
@@ -68,7 +61,6 @@ async def test_resolve_path_live_search_multiple(mw):
     assert path.startswith("__DISAMBIG_BLOCK__"), f"Expected block, got: {path!r}"
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_search_no_match(mw):
     """Search returns empty → return original."""
     mw.known_paths = {"/Root/SomethingElse"}
@@ -77,7 +69,6 @@ async def test_resolve_path_live_search_no_match(mw):
     assert path == "/Player"
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_search_error(mw):
     """send_fn throws → silently return original."""
     mw.known_paths = {"/Root/SomethingElse"}
@@ -86,7 +77,6 @@ async def test_resolve_path_live_search_error(mw):
     assert path == "/Player"
 
 
-@pytest.mark.asyncio
 async def test_resolve_path_live_existing_cache_resolve(mw):
     """Suffix match in cache — resolved without calling send_fn."""
     mw.known_paths = {"/Root/Player"}
@@ -96,7 +86,6 @@ async def test_resolve_path_live_existing_cache_resolve(mw):
     send_fn.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_resolves_path_arg(mw):
     """wrap_send rewrites path arg when resolve_path_live returns different value."""
     mw.known_paths = {"/Root/SomethingElse"}
@@ -170,7 +159,6 @@ def test_check_component_empty_cache_for_path(mw):
     assert mw.check_component_exists("/Player", "Health") is None
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_populates_component_cache(mw):
     """wrap_send calls cache_components after each response."""
     fake_send = AsyncMock(return_value="[Health]\nvalue: 100")
@@ -179,7 +167,6 @@ async def test_wrap_send_populates_component_cache(mw):
     assert "Health" in mw._component_cache.get("/Player", set())
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_blocks_missing_component(mw):
     """wrap_send raises ToolError when component definitely absent."""
     mw._component_cache["/Player"] = {"Transform"}
@@ -218,7 +205,6 @@ def test_categorize_format_error_variant(mw):
     assert "[HINT:" in result
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_categorizes_errors(mw):
     """wrap_send appends HINT when result has NullReferenceException."""
     fake_send = AsyncMock(return_value="NullReferenceException: boom")

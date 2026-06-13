@@ -1,5 +1,4 @@
 """Tests for dynamic MCP tool filtering based on Unity MCPSettings."""
-import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -17,7 +16,6 @@ ALL_TOOLS = [_tool("get_hierarchy"), _tool("scene"), _tool("shader"), _tool("get
 
 # --- test _filter_tools fallback (gating only, no Unity cache) ---
 
-@pytest.mark.asyncio
 async def test_filter_tools_fallback_when_bridge_none():
     import unity_mcp.server as srv
     orig = srv._disabled_tools_cache
@@ -32,7 +30,6 @@ async def test_filter_tools_fallback_when_bridge_none():
         srv._disabled_tools_cache = orig
 
 
-@pytest.mark.asyncio
 async def test_filter_tools_fallback_when_disconnected():
     import unity_mcp.server as srv
     orig = srv._disabled_tools_cache
@@ -48,7 +45,6 @@ async def test_filter_tools_fallback_when_disconnected():
         srv._disabled_tools_cache = orig
 
 
-@pytest.mark.asyncio
 async def test_filter_tools_fallback_on_send_error():
     import unity_mcp.server as srv
     orig = srv._disabled_tools_cache
@@ -65,7 +61,6 @@ async def test_filter_tools_fallback_on_send_error():
         srv._disabled_tools_cache = orig
 
 
-@pytest.mark.asyncio
 async def test_filter_tools_fallback_on_unity_error():
     import unity_mcp.server as srv
     orig = srv._disabled_tools_cache
@@ -84,7 +79,6 @@ async def test_filter_tools_fallback_on_unity_error():
 
 # --- Core bug-fix: disabled-set semantics ---
 
-@pytest.mark.asyncio
 async def test_disabled_tier1_tool_hidden():
     """CORE BUG FIX: unchecking screenshot in Unity form must remove it from ListTools."""
     import unity_mcp.server as srv
@@ -103,7 +97,6 @@ async def test_disabled_tier1_tool_hidden():
         gating.reset()
 
 
-@pytest.mark.asyncio
 async def test_force_visible_survives_disabled():
     """FORCE_VISIBLE tools must never be hidden even if in disabled set."""
     import unity_mcp.server as srv
@@ -123,7 +116,6 @@ async def test_force_visible_survives_disabled():
         gating.reset()
 
 
-@pytest.mark.asyncio
 async def test_disabled_cache_none_no_hiding():
     """None cache = gating-only fallback, nothing extra hidden."""
     import unity_mcp.server as srv
@@ -145,7 +137,6 @@ async def test_disabled_cache_none_no_hiding():
 
 # --- Cache interaction tests (disabled-set semantics) ---
 
-@pytest.mark.asyncio
 async def test_filter_tools_uses_cache_when_available():
     """With disabled cache populated, _filter_tools must NOT call bridge.send."""
     from unittest.mock import Mock
@@ -170,7 +161,6 @@ async def test_filter_tools_uses_cache_when_available():
         srv._disabled_tools_cache = orig
 
 
-@pytest.mark.asyncio
 async def test_filter_tools_fallback_when_cache_empty():
     """With None cache, _apply_gating is used (no TCP)."""
     from unittest.mock import Mock
@@ -192,7 +182,6 @@ async def test_filter_tools_fallback_when_cache_empty():
         srv._disabled_tools_cache = orig
 
 
-@pytest.mark.asyncio
 async def test_disabled_tools_cache_populated_on_reconnect():
     """Reconnect populates _disabled_tools_cache via get_disabled_tools."""
     from unittest.mock import AsyncMock
@@ -214,7 +203,6 @@ async def test_disabled_tools_cache_populated_on_reconnect():
         srv._refresh_tools_lock = orig_lock
 
 
-@pytest.mark.asyncio
 async def test_disabled_tools_empty_csv_gives_empty_set():
     """Empty CSV from Unity must produce empty set, not {''}."""
     from unittest.mock import AsyncMock
@@ -246,7 +234,6 @@ def test_request_handler_is_patched():
 
 # --- TDD F4: handler strips deferred / preserves core ---
 
-@pytest.mark.asyncio
 async def test_handler_strips_non_core_schema():
     """_filter_tools returns STUB schema for non-core tools."""
     import unity_mcp.server as srv
@@ -272,7 +259,6 @@ async def test_handler_strips_non_core_schema():
         srv._disabled_tools_cache = orig_cache
 
 
-@pytest.mark.asyncio
 async def test_handler_preserves_core_full_schema():
     """Core tools keep their full inputSchema after strip."""
     import unity_mcp.server as srv
@@ -368,7 +354,6 @@ def test_read_unity_port_cyrillic_project_path_parses_correctly(tmp_path):
 # PY2.arch.3: push_catalog must omit empty categories
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_push_catalog_omits_empty_categories():
     """push_catalog must not send 'CONNECTION:' (or any empty-tools category)."""
     from unittest.mock import AsyncMock, MagicMock

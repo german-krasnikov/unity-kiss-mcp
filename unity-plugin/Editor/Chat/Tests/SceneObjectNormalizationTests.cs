@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.TestStringHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -97,14 +98,5 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.DoesNotContain("[hierarchy:/Grid]", afterScene);
         }
 
-        // ── helper ────────────────────────────────────────────────────────────
-
-        private static int CountOccurrences(string text, string pattern)
-        {
-            int count = 0, idx = 0;
-            while ((idx = text.IndexOf(pattern, idx, System.StringComparison.Ordinal)) >= 0)
-            { count++; idx += pattern.Length; }
-            return count;
-        }
     }
 }

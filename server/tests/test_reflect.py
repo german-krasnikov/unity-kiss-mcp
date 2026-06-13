@@ -3,7 +3,6 @@
 Tests use mock response strings — no real Unity bridge required.
 """
 import os
-import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock
 
@@ -27,7 +26,6 @@ async def _dummy_send(cmd, args, timeout=30.0):
 
 # ── 1. set_property happy path ────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_match():
     resp = _snap({"health": "100"})
     result = await reflect("set_property", {"prop": "health", "value": "100"}, resp, _dummy_send)
@@ -36,7 +34,6 @@ async def test_set_property_match():
 
 # ── 2. set_property mismatch ─────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_mismatch():
     resp = _snap({"health": "99"})
     result = await reflect("set_property", {"prop": "health", "value": "100"}, resp, _dummy_send)
@@ -46,7 +43,6 @@ async def test_set_property_mismatch():
 
 # ── 3. float tolerance — should NOT mismatch ─────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_float_tolerance():
     resp = _snap({"speed": "0.9999998"})
     result = await reflect("set_property", {"prop": "speed", "value": "1.0"}, resp, _dummy_send)
@@ -55,7 +51,6 @@ async def test_set_property_float_tolerance():
 
 # ── 4. vector tolerance ───────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_vector_tolerance():
     resp = _snap({"position": "(1.0000001, 2, 3)"})
     result = await reflect(
@@ -69,7 +64,6 @@ async def test_set_property_vector_tolerance():
 
 # ── 5. dry_run skipped ────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_dry_run_skipped():
     resp = _snap({"health": "0"})
     result = await reflect(
@@ -83,7 +77,6 @@ async def test_set_property_dry_run_skipped():
 
 # ── 6. response contains "Failed" → skip ─────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_failed_skipped():
     resp = "Failed: property not found\n---\nhealth: 0"
     result = await reflect("set_property", {"prop": "health", "value": "100"}, resp, _dummy_send)
@@ -92,7 +85,6 @@ async def test_set_property_failed_skipped():
 
 # ── 7. no snapshot block → None (silent — cannot verify) ─────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_no_snapshot():
     # When C# can't find the object (no --- block), we cannot verify — stay silent
     resp = "ok: property set"
@@ -102,7 +94,6 @@ async def test_set_property_no_snapshot():
 
 # ── 8. set_active match ───────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_active_match():
     resp = "ok active=true\n---\nname: /Player"
     result = await reflect("set_active", {"active": "true"}, resp, _dummy_send)
@@ -111,7 +102,6 @@ async def test_set_active_match():
 
 # ── 9. set_active mismatch ────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_active_mismatch():
     # asked to activate, but response says inactive
     resp = "ok active=false\n---\nname: /Player"
@@ -121,7 +111,6 @@ async def test_set_active_mismatch():
 
 # ── 10. create_object wrong parent ────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_create_object_wrong_parent():
     # created under /Root but expected under /Canvas
     resp = "Created Cube at /Root/Cube"
@@ -136,7 +125,6 @@ async def test_create_object_wrong_parent():
 
 # ── 11. create_object path ends with correct name ────────────────────────────
 
-@pytest.mark.asyncio
 async def test_create_object_in_subtree():
     resp = "Created Cube at /Canvas/Cube"
     result = await reflect(
@@ -150,7 +138,6 @@ async def test_create_object_in_subtree():
 
 # ── 12. no rule for unknown cmd ───────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_no_rule_for_unknown_cmd():
     before = METRICS._counters.get("reflect.skipped_no_rule", 0)
     result = await reflect("unknown_xyz_cmd", {"foo": "bar"}, "response", _dummy_send)
@@ -160,7 +147,6 @@ async def test_no_rule_for_unknown_cmd():
 
 # ── 13. rule crash → silent None + counter ────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_rule_crashed():
     from unity_mcp.reflect import register_rule
 
@@ -179,7 +165,6 @@ async def test_rule_crashed():
 
 # ── 14. batch dispatch — one failing sub-op ──────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_batch_dispatch():
     batch_resp = (
         "[1] set_property: ok\n"
@@ -215,7 +200,6 @@ async def test_batch_dispatch():
 
 # ── 15. batch caps warnings at 3 with "(N more)" suffix ──────────────────────
 
-@pytest.mark.asyncio
 async def test_batch_caps_at_3():
     # 5 set_property commands each with value=100, but snapshot shows 0
     n = 5
@@ -234,7 +218,6 @@ async def test_batch_caps_at_3():
 
 # ── 16. env var UNITY_MCP_REFLECT=0 disables middleware injection ─────────────
 
-@pytest.mark.asyncio
 async def test_env_disable(monkeypatch):
     """When UNITY_MCP_REFLECT=0, wrap_send must not append [REFLECT:...]."""
     monkeypatch.setenv("UNITY_MCP_REFLECT", "0")
@@ -251,7 +234,6 @@ async def test_env_disable(monkeypatch):
 
 # ── 17. _no_reflect kwarg skips reflection ───────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_no_reflect_kwarg(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_REFLECT", "1")
     from unity_mcp.middleware import wrap_send
@@ -266,14 +248,12 @@ async def test_no_reflect_kwarg(monkeypatch):
 
 # ── 18. set_runtime_property real C# format: field=value ─────────────────────
 
-@pytest.mark.asyncio
 async def test_set_runtime_property_real_format():
     # C# RuntimeHelper returns "health=100" — no --- block
     result = await reflect("set_runtime_property", {"field": "health", "value": "100"}, "health=100", _dummy_send)
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_set_runtime_property_mismatch_real():
     # C# returned "health=99" but we expected 100
     result = await reflect("set_runtime_property", {"field": "health", "value": "100"}, "health=99", _dummy_send)
@@ -283,7 +263,6 @@ async def test_set_runtime_property_mismatch_real():
 
 # ── 19. manage_component remove real C# format ───────────────────────────────
 
-@pytest.mark.asyncio
 async def test_manage_component_remove_real_format():
     # C# ExecManageComponent (Cycle 6d): "Removed: Rigidbody2D. Remaining: Transform,BoxCollider2D"
     resp = "Removed: Rigidbody2D. Remaining: Transform,BoxCollider2D"
@@ -291,7 +270,6 @@ async def test_manage_component_remove_real_format():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_manage_component_add_uses_type_key():
     # C# ExecManageComponent (Cycle 6d): "Added: Rigidbody2D. Components: Transform,Rigidbody2D"
     resp = "Added: Rigidbody2D. Components: Transform,Rigidbody2D"
@@ -301,14 +279,12 @@ async def test_manage_component_add_uses_type_key():
 
 # ── 20. delete_object real C# format: "Deleted #123" ────────────────────────
 
-@pytest.mark.asyncio
 async def test_delete_object_real_format():
     # C# ExecDeleteObject returns "Deleted #123"
     result = await reflect("delete_object", {"id": 123}, "Deleted #123", _dummy_send)
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_delete_object_with_path_arg():
     # path in args but C# never echoes it in response — must not fire Mismatch
     result = await reflect("delete_object", {"path": "/Enemy"}, "Deleted #456", _dummy_send)
@@ -317,7 +293,6 @@ async def test_delete_object_with_path_arg():
 
 # ── 21. set_property no snapshot → silent None ───────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_no_snapshot_silent():
     # C# returns "health = 100" when FindObject fails (no --- block) — should be None not Mismatch
     result = await reflect("set_property", {"prop": "health", "value": "100"}, "health = 100", _dummy_send)
@@ -326,7 +301,6 @@ async def test_set_property_no_snapshot_silent():
 
 # ── 22. ObjectReference format: path + #instanceId ──────────────────────────
 
-@pytest.mark.asyncio
 async def test_object_reference_format():
     # C# serializes as "/Enemy/Head #12345"
     # User passed value="/Enemy/Head"
@@ -337,7 +311,6 @@ async def test_object_reference_format():
 
 # ── 23. Color RGB vs RGBA ────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_color_rgb_vs_rgba():
     # User passed (1,0,0), Unity returns (1.00, 0.00, 0.00, 1.00)
     resp = "color = (1.00, 0.00, 0.00, 1.00)\n---\n  color: (1.00, 0.00, 0.00, 1.00)"
@@ -347,7 +320,6 @@ async def test_color_rgb_vs_rgba():
 
 # ── 24. _no_reflect stripped from bridge args ────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_no_reflect_stripped_from_bridge_args(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_REFLECT", "1")
     from unity_mcp.middleware import wrap_send
@@ -365,7 +337,6 @@ async def test_no_reflect_stripped_from_bridge_args(monkeypatch):
 
 # ── 25. verify_snapshot disabled when reflect is on ──────────────────────────
 
-@pytest.mark.asyncio
 async def test_verify_snapshot_disabled_when_reflect_on(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_REFLECT", "1")
     from unity_mcp.middleware import wrap_send
@@ -382,7 +353,6 @@ async def test_verify_snapshot_disabled_when_reflect_on(monkeypatch):
 
 # ── 26. mismatch msg with ] sanitized ────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_mismatch_msg_with_bracket(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_REFLECT", "1")
     from unity_mcp.middleware import wrap_send
@@ -406,26 +376,22 @@ async def test_mismatch_msg_with_bracket(monkeypatch):
 
 # ── 27. wire_event — no confirmation → mismatch ──────────────────────────────
 
-@pytest.mark.asyncio
 async def test_wire_event_no_confirmation_mismatch():
     result = await reflect("wire_event", {"event": "OnClick", "target": "/Btn"}, "Failed: target not found", _dummy_send)
     assert isinstance(result, Mismatch)
     assert "wire_event" in result.msg.lower()
 
 
-@pytest.mark.asyncio
 async def test_wire_event_wired_confirmation_passes():
     result = await reflect("wire_event", {"event": "OnClick", "target": "/Btn"}, "Wired: OnClick → /Btn.OnPress", _dummy_send)
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_wire_event_connected_confirmation_passes():
     result = await reflect("wire_event", {"event": "OnValueChanged", "target": "/Slider"}, "Connected: OnValueChanged to /Slider.Handle", _dummy_send)
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_wire_event_empty_response_mismatch():
     result = await reflect("wire_event", {"event": "OnClick"}, "", _dummy_send)
     assert isinstance(result, Mismatch)
@@ -433,14 +399,12 @@ async def test_wire_event_empty_response_mismatch():
 
 # ── set_property_delta ────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_set_property_delta_match():
     resp = _snap({"value_after": "100"})
     result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_set_property_delta_mismatch():
     resp = _snap({"value_after": "50"})
     result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
@@ -448,7 +412,6 @@ async def test_set_property_delta_mismatch():
     assert "health" in result.msg
 
 
-@pytest.mark.asyncio
 async def test_set_property_delta_empty_snapshot_mismatch():
     # "ok\n---\n" — snapshot section exists but is empty → no keys → snap={}
     resp = "ok\n---\n"

@@ -7,9 +7,6 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import pytest
-
-
 def _make_fake_date(target):
     """Return fake `date` class where today() returns target."""
     class FakeDate(date):
@@ -19,7 +16,6 @@ def _make_fake_date(target):
     return FakeDate
 
 
-@pytest.mark.asyncio
 async def test_concurrent_record_async_no_lost_update(tmp_path):
     """Race 1: 10 parallel record_async calls — all charges accumulate."""
     from unity_mcp.budget.cost_tracker import CostTracker
@@ -122,7 +118,6 @@ def test_day_rollover_resets_spent(tmp_path, monkeypatch):
         f"new day should have 1 call worth, has {spent_n1} (prev was {spent_n})"
 
 
-@pytest.mark.asyncio
 async def test_record_async_save_failure_no_exception(tmp_path, monkeypatch):
     """If _save returns (False, reason), record_async still updates in-memory state — no exception."""
     from unity_mcp.budget.cost_tracker import CostTracker

@@ -756,6 +756,7 @@ def test_init_corroboration_and_corroborate_clean(tmp_path, monkeypatch):
     assert result == "No compilation errors."
 
 
+# no-assert: crash guard
 def test_init_corroboration_idempotent(monkeypatch):
     """Calling init_corroboration() multiple times doesn't raise."""
     import unity_mcp.editor_log as el

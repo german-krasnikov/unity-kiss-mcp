@@ -14,7 +14,6 @@ import pytest
 
 # Exception branch: kill ONLY if returncode is None (avoid EPERM on already-dead proc)
 @pytest.mark.parametrize("error_type", [OSError, RuntimeError, ValueError])
-@pytest.mark.asyncio
 async def test_sampling_kills_subprocess_on_exception_when_alive(error_type, monkeypatch):
     """For non-timeout exceptions, proc.kill() fires only when returncode is None."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
@@ -36,7 +35,6 @@ async def test_sampling_kills_subprocess_on_exception_when_alive(error_type, mon
 
 
 # TimeoutError branch: kill UNCONDITIONALLY (timed-out proc is always zombie)
-@pytest.mark.asyncio
 async def test_sampling_kills_unconditionally_on_timeout(monkeypatch):
     """TimeoutError handler kills proc regardless of returncode (unlike Exception path)."""
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
@@ -56,7 +54,6 @@ async def test_sampling_kills_unconditionally_on_timeout(monkeypatch):
     proc.kill.assert_called_once()  # unconditional in TimeoutError branch
 
 
-@pytest.mark.asyncio
 async def test_sampling_no_kill_when_already_exited(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService
@@ -75,7 +72,6 @@ async def test_sampling_no_kill_when_already_exited(monkeypatch):
     proc.kill.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_sampling_create_failure_no_proc(monkeypatch):
     monkeypatch.setenv("UNITY_MCP_VISUAL_VERIFY", "1")
     from unity_mcp.sampling import SamplingService

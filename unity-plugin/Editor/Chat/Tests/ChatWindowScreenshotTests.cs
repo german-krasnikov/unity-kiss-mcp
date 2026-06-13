@@ -75,7 +75,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var filename = $"{System.DateTime.Now:yyyy-MM-dd_HH-mm-ss}_{prefix}.png";
             var path     = Path.Combine(dir, filename);
             File.WriteAllBytes(path, png);
-            Debug.Log($"[ChatTest] Screenshot saved: {path}");
+            TestContext.WriteLine($"Screenshot saved: {path}");
             return path;
         }
     }

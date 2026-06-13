@@ -1,10 +1,8 @@
 """Tests for SceneBrief integration in middleware wrap_send."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from unity_mcp.middleware import Middleware, wrap_send
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_injected_on_first_non_meta_call():
     """Brief prepended to first result when available."""
     mw = Middleware()
@@ -27,7 +25,6 @@ async def test_scene_brief_injected_on_first_non_meta_call():
     brief_mock.mark_injected.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_not_injected_on_second_call():
     """No injection after mark_injected() was called."""
     mw = Middleware()
@@ -45,7 +42,6 @@ async def test_scene_brief_not_injected_on_second_call():
     assert "SCENE CONTEXT" not in result
 
 
-@pytest.mark.asyncio
 async def test_scene_brief_none_no_injection():
     """No scene_brief field set — no injection."""
     mw = Middleware()

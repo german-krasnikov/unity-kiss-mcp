@@ -1,5 +1,4 @@
 """Tests for ResponseDistiller — heuristic + Haiku fallback + validation."""
-import pytest
 from unity_mcp.distiller import ResponseDistiller, DistillResult
 
 
@@ -110,14 +109,12 @@ def test_paths_overlap_no_false_positive_on_prefix():
     assert d._paths_overlap("/A", "/A")
 
 
-@pytest.mark.asyncio
 async def test_distill_haiku_returns_none_when_sampling_disabled():
     d = ResponseDistiller(sampling=None)
     result = await d.distill_haiku("get_hierarchy", "x" * 2000, ("/Player",))
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_distill_haiku_unknown_cmd_returns_none():
     from unittest.mock import AsyncMock, MagicMock
     sampling = MagicMock()
@@ -126,7 +123,6 @@ async def test_distill_haiku_unknown_cmd_returns_none():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_distill_haiku_validation_rejects_hallucination():
     from unittest.mock import AsyncMock
     sampling = AsyncMock()
@@ -136,7 +132,6 @@ async def test_distill_haiku_validation_rejects_hallucination():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_distill_haiku_accepts_valid_subset():
     from unittest.mock import AsyncMock
     sampling = AsyncMock()
@@ -150,7 +145,6 @@ async def test_distill_haiku_accepts_valid_subset():
     assert result.distilled_size < result.original_size
 
 
-@pytest.mark.asyncio
 async def test_distill_haiku_handles_exception():
     from unittest.mock import AsyncMock
     sampling = AsyncMock()
@@ -160,7 +154,6 @@ async def test_distill_haiku_handles_exception():
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_distill_haiku_cli_args_include_max_tokens():
     """distiller LlmProfile must have max_tokens set to cap output cost."""
     from unity_mcp.llm_config import get_profile

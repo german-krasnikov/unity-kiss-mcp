@@ -7,7 +7,6 @@ from unity_mcp.hinter import ToolHinter
 pytestmark = pytest.mark.live
 
 
-@pytest.mark.asyncio
 async def test_three_get_component_emits_hint(wrapped_bridge, sandbox, hinter_enabled):
     """Three consecutive get_component calls via middleware must append [HINT:...inspect..."""
     mw = Middleware()

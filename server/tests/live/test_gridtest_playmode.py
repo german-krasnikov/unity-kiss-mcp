@@ -7,15 +7,11 @@ Requires:
 
 Run: pytest tests/live/test_gridtest_playmode.py -v -m live
 """
-import asyncio
-
 import pytest
 
 from tests.live.conftest import _data, _reset, PLAYER, COMP
 
 pytestmark = pytest.mark.live
-
-SLEEP_STOP = 0.3
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +65,7 @@ async def test_invoke_reset_zeroes_state(play_session):
         "queries": f"{PLAYER}|{COMP}|PosX,{PLAYER}|{COMP}|PosZ,{PLAYER}|{COMP}|MoveCount"
     })
     text = _data(state)
-    assert "PosX: 0" in text or "PosX=0" in text or "0" in text, f"Reset PosX not 0: {text}"
+    assert "PosX: 0" in text or "PosX=0" in text, f"Reset PosX not 0: {text}"
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +130,10 @@ async def test_set_runtime_property_affects_move_duration(play_session):
         "path": PLAYER, "component": COMP, "method": "Move", "args": "north"
     })
     assert "ok" in _data(result), f"Move failed: {result}"
-    await asyncio.sleep(0.5)
+    await play_session.send("wait_until", {
+        "path": PLAYER, "component": COMP,
+        "field": "IsMoving", "value": "False", "timeout": "5"
+    })
     state = await play_session.send("query_state", {
         "queries": f"{PLAYER}|{COMP}|IsMoving"
     })

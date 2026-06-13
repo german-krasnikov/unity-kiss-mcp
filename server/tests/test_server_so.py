@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.server import scriptable_object
 
 
-@pytest.mark.asyncio
 async def test_so_create(mock_bridge):
     """create action forwards type and path."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Created: Assets/Data/Config.asset"})
@@ -18,7 +17,6 @@ async def test_so_create(mock_bridge):
     assert "Assets/Data/Config.asset" in result
 
 
-@pytest.mark.asyncio
 async def test_so_get(mock_bridge):
     """get action forwards path."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "configName: default\nmaxHealth: 100"})
@@ -31,7 +29,6 @@ async def test_so_get(mock_bridge):
     assert "maxHealth" in result
 
 
-@pytest.mark.asyncio
 async def test_so_set(mock_bridge):
     """set action forwards path, prop and value."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
@@ -44,7 +41,6 @@ async def test_so_set(mock_bridge):
     assert result == "ok"
 
 
-@pytest.mark.asyncio
 async def test_so_list_types(mock_bridge):
     """list_types with filter forwards filter param."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "GameConfig\nGameSettings"})
@@ -57,7 +53,6 @@ async def test_so_list_types(mock_bridge):
     assert "GameConfig" in result
 
 
-@pytest.mark.asyncio
 async def test_so_list_types_no_filter(mock_bridge):
     """list_types without filter omits filter key."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "SomeType\nAnotherType"})
@@ -67,7 +62,6 @@ async def test_so_list_types_no_filter(mock_bridge):
     assert call_args["action"] == "list_types"
 
 
-@pytest.mark.asyncio
 async def test_so_find(mock_bridge):
     """find action forwards type."""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Assets/Data/Config.asset\nAssets/Data/Config2.asset"})
@@ -80,7 +74,6 @@ async def test_so_find(mock_bridge):
     assert "Assets/Data/Config.asset" in result
 
 
-@pytest.mark.asyncio
 async def test_so_missing_path(mock_bridge):
     """Error response from bridge raises ToolError."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "path is required"})
@@ -88,7 +81,6 @@ async def test_so_missing_path(mock_bridge):
         await scriptable_object(action="get")
 
 
-@pytest.mark.asyncio
 async def test_so_error(mock_bridge):
     """Generic bridge error raises ToolError."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Asset not found: Assets/Missing.asset"})

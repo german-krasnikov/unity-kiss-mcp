@@ -1,8 +1,6 @@
 """Tests for errors.py — structured error classification (Tier 4c/4d)."""
 import asyncio
 
-import pytest
-
 from unity_mcp.errors import classify_failure, UnityError
 from unity_mcp.bridge import DomainReloadError
 

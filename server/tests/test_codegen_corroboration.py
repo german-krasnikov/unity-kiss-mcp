@@ -1,9 +1,7 @@
 """TDD tests: codegen.auto_fix corroboration via editor_log.corroborate + smart_build branches."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
-@pytest.mark.asyncio
 async def test_auto_fix_corroborates_get_compile_errors(monkeypatch):
     """auto_fix must pass get_compile_errors result through editor_log.corroborate."""
     import unity_mcp.editor_log as el
@@ -27,7 +25,6 @@ async def test_auto_fix_corroborates_get_compile_errors(monkeypatch):
     assert "CS0117" in result or "stale" in result
 
 
-@pytest.mark.asyncio
 async def test_auto_fix_no_errors_returns_no_errors_to_fix(monkeypatch):
     """auto_fix with clean corroborate result → 'No errors to fix.'"""
     import unity_mcp.editor_log as el
@@ -61,7 +58,6 @@ def _make_ctx(text: str) -> MagicMock:
     return ctx
 
 
-@pytest.mark.asyncio
 async def test_smart_build_fenced_csharp_extracted(monkeypatch):
     """smart_build strips ```csharp fences and passes inner code to execute_code."""
     import unity_mcp.tools.codegen as codegen
@@ -81,7 +77,6 @@ async def test_smart_build_fenced_csharp_extracted(monkeypatch):
     assert called_code == inner
 
 
-@pytest.mark.asyncio
 async def test_smart_build_unfenced_windows_line_endings(monkeypatch):
     """smart_build handles Windows \\r\\n unfenced response correctly."""
     import unity_mcp.tools.codegen as codegen
@@ -99,7 +94,6 @@ async def test_smart_build_unfenced_windows_line_endings(monkeypatch):
     assert "GameObject" in called_code
 
 
-@pytest.mark.asyncio
 async def test_smart_build_empty_response_returns_early(monkeypatch):
     """smart_build with empty LLM response returns without calling execute_code."""
     import unity_mcp.tools.codegen as codegen

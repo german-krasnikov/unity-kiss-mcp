@@ -4,6 +4,7 @@ using UnityMCP.Editor;
 
 namespace UnityMCP.Editor.Tests
 {
+    [TestFixture]
     public class MCPStatusBarPaletteTests
     {
         [Test]

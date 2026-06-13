@@ -1,6 +1,5 @@
 """TDD tests for screenshot_describe package."""
 import time
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 
@@ -65,7 +64,6 @@ def test_cache_lru_eviction_at_max():
 
 # ── describer ─────────────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_describer_cache_hit_skips_sampling():
     from unity_mcp.screenshot_describe.cache import FingerprintCache
     from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
@@ -86,7 +84,6 @@ async def test_describer_cache_hit_skips_sampling():
     mock_sampling.describe_image.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_describer_cache_miss_calls_sampling_and_stores():
     from unity_mcp.screenshot_describe.cache import FingerprintCache
     from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
@@ -105,7 +102,6 @@ async def test_describer_cache_miss_calls_sampling_and_stores():
     assert cache.get("fp_xyz", resolved_prompt) == "Fresh description."
 
 
-@pytest.mark.asyncio
 async def test_describer_sampling_returns_none_no_cache_write():
     from unity_mcp.screenshot_describe.cache import FingerprintCache
     from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
@@ -127,7 +123,6 @@ async def test_describer_sampling_returns_none_no_cache_write():
 
 # ── degrade() wiring for describer ────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_describe_no_cache_no_haiku():
     """Both haiku and cache fail → describe_disabled rung."""
     from unity_mcp.screenshot_describe.cache import FingerprintCache
@@ -146,7 +141,6 @@ async def test_describe_no_cache_no_haiku():
 
 # ── #1: describer all rungs None → no_fallback marker, no \nNone ──────────────
 
-@pytest.mark.asyncio
 async def test_describer_all_rungs_none_no_fallback_marker(monkeypatch):
     """#1: degrade() returns (step, None) → output must use wrap_degraded, not inline f-string."""
     from unity_mcp.screenshot_describe.cache import FingerprintCache
@@ -172,7 +166,6 @@ async def test_describer_all_rungs_none_no_fallback_marker(monkeypatch):
 
 # ── screenshot() tool integration ─────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_screenshot_default_describe_none_returns_path(mock_bridge):
     """CRITICAL backward compat: describe=None must not call Haiku."""
     from unity_mcp.tools.scene import screenshot
@@ -184,7 +177,6 @@ async def test_screenshot_default_describe_none_returns_path(mock_bridge):
     assert "img:" not in result
 
 
-@pytest.mark.asyncio
 async def test_screenshot_describe_auto_returns_text_with_img_suffix(mock_bridge):
     from unity_mcp.tools.scene import screenshot
 
@@ -201,7 +193,6 @@ async def test_screenshot_describe_auto_returns_text_with_img_suffix(mock_bridge
     assert "[img:" in result
 
 
-@pytest.mark.asyncio
 async def test_screenshot_raw_true_forces_path_even_with_describe(mock_bridge):
     from unity_mcp.tools.scene import screenshot
 
@@ -212,7 +203,6 @@ async def test_screenshot_raw_true_forces_path_even_with_describe(mock_bridge):
     assert "[img:" not in result
 
 
-@pytest.mark.asyncio
 async def test_screenshot_describe_sampling_unavailable_returns_path(mock_bridge):
     from unity_mcp.tools.scene import screenshot
 
@@ -244,7 +234,6 @@ def test_is_refusal_allows_hedge_with_description():
     assert _is_refusal("I can't process this image.")
 
 
-@pytest.mark.asyncio
 async def test_refusal_returns_degraded_not_cached():
     from unity_mcp.screenshot_describe.cache import FingerprintCache
     from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
@@ -263,7 +252,6 @@ async def test_refusal_returns_degraded_not_cached():
     assert cache.get("fp_refusal", resolved_prompt) is None
 
 
-@pytest.mark.asyncio
 async def test_legitimate_description_cached():
     from unity_mcp.screenshot_describe.cache import FingerprintCache
     from unity_mcp.screenshot_describe.describer import ScreenshotDescriber
@@ -283,7 +271,6 @@ async def test_legitimate_description_cached():
 
 # ── P2: mark + empty legend falls back to plain prompt ───────────────────────
 
-@pytest.mark.asyncio
 async def test_describe_mark_with_empty_legend_uses_plain_prompt():
     """mark=True but legend is '(no marks)' → resolve() used, not resolve_som()."""
     from unity_mcp.screenshot_describe.cache import FingerprintCache
@@ -308,7 +295,6 @@ async def test_describe_mark_with_empty_legend_uses_plain_prompt():
 
 # ── P2: describe() with no marks at all ──────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_describe_no_mark_uses_plain_prompt():
     """mark=False (default) → plain resolve(), SoM legend never appended."""
     from unity_mcp.screenshot_describe.cache import FingerprintCache
@@ -330,7 +316,6 @@ async def test_describe_no_mark_uses_plain_prompt():
 
 # ── P2: cache miss then hit ───────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_cache_miss_then_hit_basic_contract():
     """First call → miss (sampling invoked). Second call → hit (sampling NOT invoked)."""
     from unity_mcp.screenshot_describe.cache import FingerprintCache
@@ -355,7 +340,6 @@ async def test_cache_miss_then_hit_basic_contract():
 
 # ── P2: partial viewport overlap — mark=True, legend present ─────────────────
 
-@pytest.mark.asyncio
 async def test_describe_mark_with_legend_uses_som_prompt():
     """mark=True + real legend → resolve_som() used, legend appended to prompt."""
     from unity_mcp.screenshot_describe.cache import FingerprintCache

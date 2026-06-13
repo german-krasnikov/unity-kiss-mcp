@@ -18,6 +18,7 @@ def test_load_plugins_calls_register():
     assert len(called) > 0
 
 
+# no-assert: crash guard
 def test_load_plugins_bad_module_skipped():
     """Plugin with import error is skipped, not crash."""
     with patch("unity_mcp.plugins.import_module") as mock_import:
@@ -28,6 +29,7 @@ def test_load_plugins_bad_module_skipped():
             pytest.fail("ImportError should be swallowed by load_plugins")
 
 
+# no-assert: crash guard
 def test_plugin_without_register_skipped():
     """Module without register() is silently skipped."""
     with patch("unity_mcp.plugins.import_module") as mock_import:
@@ -147,6 +149,7 @@ def test_plugin_api_exports():
 
 # --- Zone #28 gap tests ---
 
+# no-assert: crash guard
 def test_load_entry_points_bad_ep_load_skipped():
     """Entry point whose .load() raises is skipped, not crash."""
     from unity_mcp.plugins import _load_entry_points
@@ -160,6 +163,7 @@ def test_load_entry_points_bad_ep_load_skipped():
         _load_entry_points(MagicMock(), MagicMock(), MagicMock())
 
 
+# no-assert: crash guard
 def test_load_plugin_dirs_nonexistent_dir_skipped(monkeypatch):
     """UNITY_MCP_PLUGIN_DIRS pointing to non-existent dir is silently skipped."""
     from unity_mcp.plugins import _load_plugin_dirs
@@ -199,7 +203,6 @@ def test_check_api_version_no_version_attr_returns_true():
     assert _check_api_version(mod, "plain_plugin") is True
 
 
-@pytest.mark.asyncio
 async def test_save_skill_invalid_name_slash():
     """save_skill with '/' in name raises ValueError."""
     from unity_mcp.tools.skills import save_skill
@@ -207,7 +210,6 @@ async def test_save_skill_invalid_name_slash():
         await save_skill("bad/name", "desc", "code")
 
 
-@pytest.mark.asyncio
 async def test_save_skill_invalid_name_dotdot():
     """save_skill with '..' in name raises ValueError."""
     from unity_mcp.tools.skills import save_skill
@@ -234,3 +236,38 @@ def test_plugin_register_called_twice_no_crash():
             load_plugins(mcp, send, args)
 
     assert call_count[0] >= 2  # registered twice, no exception
+
+
+# ── Fix 28: plugins PLUGIN_DIRS API version check ─────────────────────────────
+
+def test_load_plugin_dirs_calls_check_api_version(tmp_path, monkeypatch):
+    """Fix 28: _load_plugin_dirs must call _check_api_version for each loaded plugin."""
+    import sys
+    plugin_file = tmp_path / "fake_plugin.py"
+    plugin_file.write_text(
+        "REQUIRED_API_VERSION = 999\n"
+        "def register(mcp, send, args): pass\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("UNITY_MCP_PLUGIN_DIRS", str(tmp_path))
+    monkeypatch.setenv("UNITY_MCP_SKIP_PLUGINS", "")
+
+    for k in list(sys.modules.keys()):
+        if "fake_plugin" in k:
+            del sys.modules[k]
+
+    checked = []
+    import unity_mcp.plugins as plug
+
+    original_check = plug._check_api_version
+
+    def spy_check(module, name):
+        checked.append(name)
+        return original_check(module, name)
+
+    monkeypatch.setattr(plug, "_check_api_version", spy_check)
+
+    mcp = MagicMock()
+    plug._load_plugin_dirs(mcp, MagicMock(), MagicMock())
+
+    assert "fake_plugin" in checked, f"_check_api_version not called. checked={checked}"

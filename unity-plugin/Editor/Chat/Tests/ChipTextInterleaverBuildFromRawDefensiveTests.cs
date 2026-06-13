@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.ChipTestHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -15,9 +16,6 @@ namespace UnityMCP.Editor.Chat.Tests
             ChipKindRegistry.ResetToBuiltIns();
             ChipPillFactory.ColorResolver = null;
         }
-
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
 
         private static PositionedChip PC(ChipData chip, int offset)
             => new PositionedChip(chip, offset);

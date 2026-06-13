@@ -47,7 +47,6 @@ def screenshot_tool_with_manifest():
     scene_mod._args = orig_args
 
 
-@pytest.mark.asyncio
 async def test_screenshot_highlight_param_passed(screenshot_tool):
     """highlight flows through to bridge.send args."""
     fn, captured = screenshot_tool
@@ -55,7 +54,6 @@ async def test_screenshot_highlight_param_passed(screenshot_tool):
     assert captured['args'].get('highlight') == "/Player,/Enemy"
 
 
-@pytest.mark.asyncio
 async def test_screenshot_highlight_none_not_in_args(screenshot_tool):
     """highlight=None is omitted from args (backward compat)."""
     fn, captured = screenshot_tool
@@ -67,7 +65,6 @@ async def test_screenshot_highlight_none_not_in_args(screenshot_tool):
 # _send_raw: data + file coexist in response
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_png_path_extraction_with_manifest(screenshot_tool_with_manifest):
     """png_path must be just the path, not manifest prefix (MAJOR review fix)."""
     fn, captured = screenshot_tool_with_manifest
@@ -78,7 +75,6 @@ async def test_png_path_extraction_with_manifest(screenshot_tool_with_manifest):
     assert "\n" not in png_path
 
 
-@pytest.mark.asyncio
 async def test_send_raw_data_and_file_combined():
     """When response has both data and file, return 'data\\nData saved to: file'."""
     import unity_mcp.server as srv
@@ -102,7 +98,6 @@ async def test_send_raw_data_and_file_combined():
         srv.slot = orig_slot
 
 
-@pytest.mark.asyncio
 async def test_send_raw_file_only_unchanged():
     """When response has only file (no data), keep existing behavior."""
     import unity_mcp.server as srv

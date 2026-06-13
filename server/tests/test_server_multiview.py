@@ -1,8 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock, patch
 
 
-@pytest.mark.asyncio
 async def test_screenshot_multi_view_sends_args(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "file": "/tmp/MCP/multiview.png"})
     from unity_mcp.tools.scene import screenshot
@@ -14,7 +12,6 @@ async def test_screenshot_multi_view_sends_args(mock_bridge):
     assert args["width"] == 320
 
 
-@pytest.mark.asyncio
 async def test_screenshot_multi_view_passes_path(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "file": "/tmp/MCP/multiview.png"})
     from unity_mcp.tools.scene import screenshot

@@ -93,22 +93,25 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~2038 unit tests + 104 live tests + conftest.py (incl. v0.24.3 multi-scene tests)
+│   └── tests/                  # ~2048 unit tests + 70 live tests + conftest.py (v0.26.0 quality audit)
+│       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
-│       ├── test_middleware*.py          # Middleware layers
+│       ├── test_middleware*.py          # Middleware layers (god-file split in v0.26.0)
 │       ├── test_batch*.py              # Batch + conflict + timeout
 │       ├── test_multiscene.py          # Multi-scene CRUD, transfer, diff, bugs (305 tests, v0.24.3)
 │       ├── test_transfer_object.py     # transfer_object cross-scene operations (91 tests, v0.24.3)
+│       ├── test_schema_cache.py        # Schema caching + validation (17 tests, v0.26.0)
 │       ├── test_*_intent.py            # Intent tools
 │       ├── test_sampling*.py           # Visual verification
 │       ├── test_visual_*.py            # Visual diff + regression
 │       ├── test_budget_*.py            # Budget/cost tracking
 │       ├── test_scene_brief*.py        # Scene brief
 │       ├── test_screenshot_*.py        # Screenshot features
+│       ├── live/conftest.py            # Live test fixtures + _ok/_iid helpers (v0.26.0 DRY)
 │       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
 │       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
-│       └── ... + domain tests
+│       └── ... + domain tests (182 files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin/               # Unity Editor Plugin (75 C# files, ~13600 LOC)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
@@ -143,7 +146,7 @@ unity-kiss-mcp/
 │       ├── PlaytestMonitorRegistry.cs + SimulatorRegistry.cs  # Playtest type registries
 │       ├── MultiViewCapture.cs + MultiViewOverlay.cs + OverlayDrawer.cs  # 4-panel screenshots
 │       ├── ScreenshotCapture.cs            # Camera modes: default, overview, multi_view
-│       ├── CodeExecutor.cs                 # Roslyn C# execution, 3-layer security
+│       ├── CodeExecutor.cs                 # Roslyn C# execution, 3-layer security (IsAllowedAssembly: private→internal v0.26.0)
 │       ├── SpatialHelper.cs                # Raycast, overlap, nearest, bounds, grid_cast
 │       ├── AnimationHelper.cs + AnimationSerializer.cs
 │       ├── AnimatorControllerHelper.cs + AnimatorControllerSerializer.cs
@@ -182,12 +185,20 @@ unity-kiss-mcp/
 │       ├── MCPActions.cs                  # Shared actions (Restart, Kill, Reimport)
 │       ├── MCPStatusModel.cs              # Pure state logic (no deps) — maps connection state → display
 │       ├── MCPStatusBarWidget.cs          # Injects MCP pill into AppStatusBar via reflection
-│       ├── Tests/                         # Editor tests asmdef (references core)
+│       ├── Tests/                         # Editor tests asmdef (references core, v0.26.0: +[TestFixture] to 6 classes)
 │       │   ├── UnityMCP.Editor.Tests.asmdef
+│       │   ├── Helpers/                  # Test infrastructure (v0.26.0)
+│       │   │   ├── ChipTestBase.cs       # Base class: H() helpers centralized (12 shims extracted, v0.26.0)
+│       │   │   └── TestStringHelpers.cs  # CountOccurrences utility (DRY across 4+ files, v0.26.0)
 │       │   ├── MultiSceneTestBase.cs      # Base class for multi-scene tests (DRY consolidation v0.24.3+v0.25.0: saves additive scenes, captures main scene name before NewScene)
 │       │   ├── MultiSceneFinderTests.cs   # Object finding across scenes + reference scanning (v0.24.3)
 │       │   ├── PortResolverTests.cs       # 25 NUnit tests (port validation, fallback, dual-port edge cases)
-│       │   ├── MCPStatusModelTests.cs     # 14 NUnit tests (state transitions, labels, pills)
+│       │   ├── MCPStatusModelTests.cs     # 14 NUnit tests (state transitions, labels, pills) [+TestFixture v0.26.0]
+│       │   ├── CatalogParserTests.cs      # [+TestFixture v0.26.0]
+│       │   ├── JsonHelperTests.cs         # [+TestFixture v0.26.0]
+│       │   ├── MCPStatusBarPaletteTests.cs # [+TestFixture v0.26.0]
+│       │   ├── ValueParserQuaternionTests.cs # [+TestFixture v0.26.0]
+│       │   ├── PluginRegistryTests.cs     # [+TestFixture v0.26.0]
 │       │   ├── HubHeaderAnimTests.cs      # 11 NUnit tests (circuit-node animation, packet motion, state logic) (F26)
 │       │   ├── HubCardButtonTests.cs      # NUnit tests (card rendering, click behavior) (F26)
 │       │   ├── MCPHubDividerTests.cs      # NUnit tests (divider styling, layout) (F26)

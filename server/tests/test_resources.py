@@ -1,9 +1,7 @@
 """Tests for MCP resources (Part B)."""
-import pytest
 from unittest.mock import AsyncMock
 
 
-@pytest.mark.asyncio
 async def test_hierarchy_resource():
     from unity_mcp import resources
     resources._send = AsyncMock(return_value="Root\n  Player")
@@ -12,7 +10,6 @@ async def test_hierarchy_resource():
     assert "Root" in result
 
 
-@pytest.mark.asyncio
 async def test_console_errors_resource():
     from unity_mcp import resources
     resources._send = AsyncMock(return_value="[Error] NullRef")
@@ -21,7 +18,6 @@ async def test_console_errors_resource():
     assert "Error" in result
 
 
-@pytest.mark.asyncio
 async def test_editor_state_resource():
     from unity_mcp import resources
     resources._send = AsyncMock(return_value="playing: false")
@@ -30,11 +26,10 @@ async def test_editor_state_resource():
     assert "playing" in result
 
 
-def test_tool_categories_no_bridge():
+async def test_tool_categories_no_bridge():
     """Pure Python — no bridge needed."""
-    import asyncio
     from unity_mcp import resources
-    result = asyncio.get_event_loop().run_until_complete(resources.tool_categories())
+    result = await resources.tool_categories()
     assert "animation" in result
     assert "runtime" in result
 
@@ -65,7 +60,6 @@ def test_resources_registered():
 # PY2.test.5: _safe_send exception-swallowing returns '[disconnected: ...]'
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_safe_send_returns_disconnected_on_exception():
     """_send raising RuntimeError → scene_hierarchy() returns '[disconnected: ...]'."""
     from unity_mcp import resources

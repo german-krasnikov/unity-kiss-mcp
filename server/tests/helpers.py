@@ -2,6 +2,17 @@
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 
+def make_mock_bridge(connected: bool = True):
+    """Create a minimal UnityBridge mock with all required async methods."""
+    b = MagicMock()
+    b.connect = AsyncMock()
+    b.close = AsyncMock()
+    b.send = AsyncMock(return_value={"ok": True})
+    b.connected = connected
+    b.stop_heartbeat = MagicMock()
+    return b
+
+
 def make_writer():
     """Create a fresh writer mock with all required async/sync methods."""
     writer = AsyncMock()

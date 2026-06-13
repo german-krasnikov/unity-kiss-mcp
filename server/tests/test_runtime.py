@@ -8,7 +8,6 @@ from unity_mcp.server import (
 )
 
 
-@pytest.mark.asyncio
 async def test_invoke_method_sends_correct_command(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "void"}
     result = await invoke_method("/Player", "PlayerController", "Jump", "5.0")
@@ -20,7 +19,6 @@ async def test_invoke_method_sends_correct_command(mock_bridge):
     assert result == "void"
 
 
-@pytest.mark.asyncio
 async def test_invoke_method_no_args(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "void"}
     await invoke_method("/Player", "PlayerController", "Jump")
@@ -28,7 +26,6 @@ async def test_invoke_method_no_args(mock_bridge):
     assert "args" not in call_args
 
 
-@pytest.mark.asyncio
 async def test_set_runtime_property_sends_correct_command(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "speed=10"}
     result = await set_runtime_property("/Player", "PlayerController", "speed", "10")
@@ -40,7 +37,6 @@ async def test_set_runtime_property_sends_correct_command(mock_bridge):
     assert result == "speed=10"
 
 
-@pytest.mark.asyncio
 async def test_wait_until_default_timeout(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "field=true after 1.2s"}
     result = await wait_until("/Player", "PlayerController", "isAlive", "true")
@@ -52,7 +48,6 @@ async def test_wait_until_default_timeout(mock_bridge):
     assert call_args[1]["timeout"] == 10.0
 
 
-@pytest.mark.asyncio
 async def test_wait_until_with_negate(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
     await wait_until("/Enemy", "EnemyAI", "isAlive", "true", negate=True)
@@ -60,7 +55,6 @@ async def test_wait_until_with_negate(mock_bridge):
     assert sent["negate"] == "true"
 
 
-@pytest.mark.asyncio
 async def test_wait_until_custom_timeout(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "ok"}
     await wait_until("/Player", "PlayerController", "hp", "0", timeout=15.0)
@@ -71,7 +65,6 @@ async def test_wait_until_custom_timeout(mock_bridge):
     assert call_args[1]["timeout"] == 20.0
 
 
-@pytest.mark.asyncio
 async def test_query_state_sends_correct_command(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "GridPlayer.Score=5\nGridPlayer.PosX=3"}
     result = await query_state("/GridPlayer|GridPlayer|Score,/GridPlayer|GridPlayer|PosX")
@@ -83,7 +76,6 @@ async def test_query_state_sends_correct_command(mock_bridge):
     assert "GridPlayer.Score=5" in result
 
 
-@pytest.mark.asyncio
 async def test_query_state_multiple_objects(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "Health.hp=80\nAmmo.count=5"}
     result = await query_state("/Player|Health|hp,/Player|Ammo|count")
@@ -94,7 +86,6 @@ async def test_query_state_multiple_objects(mock_bridge):
 
 # --- P1-4: move_to bridge call shape ---
 
-@pytest.mark.asyncio
 async def test_move_to_sends_correct_command(mock_bridge):
     """move_to sends cmd='move_to' with timeout as str and python timeout = timeout+5."""
     mock_bridge.send.return_value = {"ok": True, "data": "arrived"}
@@ -108,7 +99,6 @@ async def test_move_to_sends_correct_command(mock_bridge):
     assert call_args[1]["timeout"] == 20.0    # timeout + 5.0
 
 
-@pytest.mark.asyncio
 async def test_move_to_custom_timeout_offset(mock_bridge):
     """Python-level timeout is always unity timeout + 5.0."""
     mock_bridge.send.return_value = {"ok": True, "data": "arrived"}
@@ -121,7 +111,6 @@ async def test_move_to_custom_timeout_offset(mock_bridge):
 
 # --- P1-4: fuzz_playtest hardcoded timeout ---
 
-@pytest.mark.asyncio
 async def test_fuzz_playtest_sends_run_playtest_cmd(mock_bridge):
     """fuzz_playtest delegates to run_playtest command on the bridge."""
     mock_bridge.send.return_value = {"ok": True, "data": "fuzz ok"}
@@ -130,7 +119,6 @@ async def test_fuzz_playtest_sends_run_playtest_cmd(mock_bridge):
     assert call_args[0][0] == "run_playtest"
 
 
-@pytest.mark.asyncio
 async def test_fuzz_playtest_hardcoded_timeout_string(mock_bridge):
     """fuzz_playtest passes args['timeout']='30' (string, not float) to bridge."""
     mock_bridge.send.return_value = {"ok": True, "data": "fuzz ok"}
@@ -143,28 +131,25 @@ async def test_fuzz_playtest_hardcoded_timeout_string(mock_bridge):
 
 # ─── ok=False → ToolError (write tools) ──────────────────────────────────────
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("active,err_msg", [
     (True,  "Object not found"),
     (False, "Scene path invalid"),
 ])
-async def test_set_active_error_raises_tool_error(mock_bridge, active, err_msg):
+async def test_set_active_error_raises_tool_error_runtime(mock_bridge, active, err_msg):
     """set_active raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": err_msg})
     with pytest.raises(ToolError, match=err_msg):
         await set_active("/Missing", active)
 
 
-@pytest.mark.asyncio
-async def test_wire_event_error_raises_tool_error(mock_bridge):
+async def test_wire_event_error_raises_tool_error_runtime(mock_bridge):
     """wire_event raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Event field not found"})
     with pytest.raises(ToolError, match="Event field not found"):
         await wire_event("/Btn", "Button", "onClick", "/Target", "SetActive")
 
 
-@pytest.mark.asyncio
-async def test_unwire_event_error_raises_tool_error(mock_bridge):
+async def test_unwire_event_error_raises_tool_error_runtime(mock_bridge):
     """unwire_event raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "No listeners to remove"})
     with pytest.raises(ToolError, match="No listeners to remove"):

@@ -1,6 +1,5 @@
 """Tests for SpeculativeLayer — predict + prefetch."""
 import asyncio
-import pytest
 from unittest.mock import AsyncMock
 from unity_mcp.speculation import SpeculativeLayer, Prediction
 
@@ -53,14 +52,12 @@ def test_predict_recompile_returns_get_compile_errors():
 
 # ── maybe_prefetch() ────────────────────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_maybe_prefetch_disabled_returns_unchanged():
     sl = SpeculativeLayer(AsyncMock(), enabled=False)
     result = await sl.maybe_prefetch("recompile", {}, "base_result")
     assert result == "base_result"
 
 
-@pytest.mark.asyncio
 async def test_maybe_prefetch_appends_data_on_success():
     send = AsyncMock(return_value="no errors")
     sl = SpeculativeLayer(send)
@@ -70,7 +67,6 @@ async def test_maybe_prefetch_appends_data_on_success():
     assert "no errors" in result
 
 
-@pytest.mark.asyncio
 async def test_maybe_prefetch_silent_on_error():
     async def failing(*a, **kw):
         raise Exception("timeout")
@@ -79,7 +75,6 @@ async def test_maybe_prefetch_silent_on_error():
     assert result == "base_result"
 
 
-@pytest.mark.asyncio
 async def test_maybe_prefetch_silent_on_oversized():
     send = AsyncMock(return_value="x" * 1000)
     sl = SpeculativeLayer(send)
@@ -89,7 +84,6 @@ async def test_maybe_prefetch_silent_on_oversized():
 
 # ── record_actual_next() / hit rate ────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_record_actual_next_increments_hits():
     send = AsyncMock(return_value="data")
     sl = SpeculativeLayer(send)
@@ -99,7 +93,6 @@ async def test_record_actual_next_increments_hits():
     assert sl._misses == 0
 
 
-@pytest.mark.asyncio
 async def test_record_actual_next_increments_misses():
     send = AsyncMock(return_value="data")
     sl = SpeculativeLayer(send)
@@ -109,7 +102,6 @@ async def test_record_actual_next_increments_misses():
     assert sl._misses == 1
 
 
-@pytest.mark.asyncio
 async def test_auto_disable_below_40_percent_hit_rate():
     """Below 40% hit rate after 50 predictions → skip prefetch."""
     send = AsyncMock(return_value="data")

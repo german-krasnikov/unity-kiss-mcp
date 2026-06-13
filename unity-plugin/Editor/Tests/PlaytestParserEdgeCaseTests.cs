@@ -1,5 +1,3 @@
-// CS4.arch.5 + CS4.test.5 + CS4.test.7 — PlaytestParser bug + missing test coverage.
-// EditMode safe — pure-logic, no Unity API.
 using NUnit.Framework;
 
 namespace UnityMCP.Editor.Tests

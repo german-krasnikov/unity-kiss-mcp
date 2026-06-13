@@ -22,7 +22,6 @@ def fake_send(monkeypatch):
     return sent
 
 
-@pytest.mark.asyncio
 async def test_get_component_fields_projects_and_sets_no_strip(fake_send):
     result = await objects.get_component("/Cube", "Transform", fields="m_Mass")
     assert fake_send["args"].get("_no_strip") is True, "explicit fields must bypass default-stripping"
@@ -30,13 +29,11 @@ async def test_get_component_fields_projects_and_sets_no_strip(fake_send):
     assert "m_LocalPosition" not in result and "m_Drag" not in result
 
 
-@pytest.mark.asyncio
 async def test_get_component_no_fields_no_strip_flag(fake_send):
     await objects.get_component("/Cube", "Transform")
     assert "_no_strip" not in fake_send["args"], "default path must not force _no_strip"
 
 
-@pytest.mark.asyncio
 async def test_inspect_fields_projects(fake_send):
     result = await objects.inspect("/A,/B", fields="m_Mass")
     assert fake_send["args"].get("_no_strip") is True
@@ -60,7 +57,6 @@ def fake_send_scene(monkeypatch):
     return sent
 
 
-@pytest.mark.asyncio
 async def test_get_component_full_sets_no_distill(monkeypatch):
     sent = {}
 
@@ -74,7 +70,6 @@ async def test_get_component_full_sets_no_distill(monkeypatch):
     assert sent["args"].get("_no_distill") is True
 
 
-@pytest.mark.asyncio
 async def test_get_component_full_false_no_flag(monkeypatch):
     sent = {}
 
@@ -88,7 +83,6 @@ async def test_get_component_full_false_no_flag(monkeypatch):
     assert "_no_distill" not in sent["args"]
 
 
-@pytest.mark.asyncio
 async def test_inspect_full_sets_no_distill(monkeypatch):
     sent = {}
 
@@ -102,7 +96,6 @@ async def test_inspect_full_sets_no_distill(monkeypatch):
     assert sent["args"].get("_no_distill") is True
 
 
-@pytest.mark.asyncio
 async def test_get_object_detail_full_sets_no_distill(monkeypatch):
     sent = {}
 
@@ -116,13 +109,11 @@ async def test_get_object_detail_full_sets_no_distill(monkeypatch):
     assert sent["args"].get("_no_distill") is True
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_full_sets_no_distill(fake_send_scene):
     await scene.get_hierarchy(full=True)
     assert fake_send_scene["args"].get("_no_distill") is True
 
 
-@pytest.mark.asyncio
 async def test_get_hierarchy_full_false_no_flag(fake_send_scene):
     await scene.get_hierarchy(full=False)
     assert "_no_distill" not in fake_send_scene["args"]

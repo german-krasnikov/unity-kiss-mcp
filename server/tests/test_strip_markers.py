@@ -1,6 +1,4 @@
 """Unit tests for strip_markers helper used in live tests."""
-import pytest
-
 # Import from live conftest — will fail until implemented
 from tests.live.conftest import strip_markers
 

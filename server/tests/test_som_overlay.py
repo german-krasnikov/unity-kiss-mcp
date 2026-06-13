@@ -1,6 +1,5 @@
 """TDD tests for Set-of-Mark (SoM) overlay module."""
 import io
-import pytest
 from PIL import Image
 
 

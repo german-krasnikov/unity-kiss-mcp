@@ -150,7 +150,7 @@ def test_p95_with_many_samples_correct():
 
 # ── 11. timed decorator async ────────────────────────────────────────────────
 
-def test_timed_decorator_async():
+async def test_timed_decorator_async():
     from unity_mcp.metrics import METRICS, timed
 
     @timed("async_op")
@@ -158,7 +158,7 @@ def test_timed_decorator_async():
         await asyncio.sleep(0.01)
         return "ok"
 
-    result = asyncio.get_event_loop().run_until_complete(my_async())
+    result = await my_async()
     assert result == "ok"
     snap = METRICS.snapshot()["observations"]["async_op"]
     assert snap["n"] == 1
@@ -184,15 +184,15 @@ def test_timed_decorator_sync():
 
 # ── 13. counted decorator async ──────────────────────────────────────────────
 
-def test_counted_decorator_async():
+async def test_counted_decorator_async():
     from unity_mcp.metrics import METRICS, counted
 
     @counted("my_count")
     async def my_fn():
         return "x"
 
-    asyncio.get_event_loop().run_until_complete(my_fn())
-    asyncio.get_event_loop().run_until_complete(my_fn())
+    await my_fn()
+    await my_fn()
     assert METRICS.snapshot()["counters"]["my_count"] == 2
 
 

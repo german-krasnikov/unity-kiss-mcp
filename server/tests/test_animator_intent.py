@@ -1,6 +1,5 @@
 """TDD tests for animator_intent tool."""
 import re
-import pytest
 from unittest.mock import AsyncMock, patch
 
 
@@ -152,7 +151,6 @@ def test_animator_builder_empty_dsl():
 # 4. E2E mock (no SamplingService → error)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_animator_intent_no_sampling_returns_error():
     from unity_mcp.tools.animator_intent_tool import animator_intent
     with patch("unity_mcp.tools.animator_intent_tool._send", new_callable=AsyncMock):
@@ -163,7 +161,6 @@ async def test_animator_intent_no_sampling_returns_error():
             assert re.search(r"ERROR|unavailable", result, re.IGNORECASE), result
 
 
-@pytest.mark.asyncio
 async def test_animator_intent_dry_run_returns_plan():
     from unity_mcp.tools.animator_intent_tool import animator_intent
     dsl = "PARAM Speed float 0\nSTATE Idle Idle.anim\nSTATE Walk Walk.anim\nDEFAULT Idle\nTRANS Idle -> Walk dur=0.15 if Speed>0.1"
@@ -175,7 +172,6 @@ async def test_animator_intent_dry_run_returns_plan():
             assert "animator" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_intent_e2e_executes_batch():
     from unity_mcp.tools.animator_intent_tool import animator_intent
     dsl = "PARAM Speed float 0\nSTATE Idle Idle.anim\nSTATE Walk Walk.anim\nDEFAULT Idle\nTRANS Idle -> Walk dur=0.15 if Speed>0.1"
@@ -190,7 +186,6 @@ async def test_animator_intent_e2e_executes_batch():
             assert "ok" in result
 
 
-@pytest.mark.asyncio
 async def test_animator_intent_invalid_dsl_no_batch():
     """LLM returns DSL with undeclared state in TRANS → result starts with 'INVALID DSL:', _send never called."""
     from unity_mcp.tools.animator_intent_tool import animator_intent
@@ -203,3 +198,24 @@ async def test_animator_intent_invalid_dsl_no_batch():
 
     assert result.startswith("INVALID DSL:"), f"Expected 'INVALID DSL:' prefix, got: {result!r}"
     mock_send.assert_not_called()
+
+
+# ── Fix 10: animator_intent sanitizes target ──────────────────────────────────
+
+def test_animator_intent_sanitizes_target():
+    """Fix 10: animator_intent must sanitize the target param to strip injection chars."""
+    from unity_mcp.tools.intent_common import sanitize_intent
+    raw_target = "/Player{injection}"
+    sanitized = sanitize_intent(raw_target)
+    assert "{" not in sanitized
+    assert "}" not in sanitized
+
+
+def test_vfx_intent_sanitizes_target():
+    """Fix 10: vfx_intent prompt must apply sanitize_intent to target param."""
+    from unity_mcp.tools.vfx_intent_tool import _PROMPT_TEMPLATE
+    from unity_mcp.tools.intent_common import sanitize_intent
+    target = "/Enemy{inject}"
+    intent = "fire explosion"
+    prompt = _PROMPT_TEMPLATE.format(target=sanitize_intent(target), kind="particle", intent=sanitize_intent(intent))
+    assert "{" not in prompt

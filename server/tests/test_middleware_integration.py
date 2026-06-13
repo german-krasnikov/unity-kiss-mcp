@@ -1,13 +1,10 @@
 """Integration tests for middleware cache pipeline: write → prefetch → cache hit."""
 import asyncio
 import os
-import pytest
-
 os.environ.setdefault("UNITY_MCP_VALIDATE", "0")
 os.environ.setdefault("UNITY_MCP_PREFETCH_CACHE", "1")
 
 
-@pytest.mark.asyncio
 async def test_write_triggers_prefetch_then_read_serves_cache():
     """set_property fires bg prefetch; subsequent get_component hits cache."""
     from unity_mcp.middleware import wrap_send, Middleware
@@ -39,7 +36,6 @@ async def test_write_triggers_prefetch_then_read_serves_cache():
     assert len(gc_calls) == 1, f"Cache should serve 2nd call, got {len(gc_calls)} bridge calls"
 
 
-@pytest.mark.asyncio
 async def test_cached_marker_no_timestamp():
     """Cache hit response uses [CACHED] without fake timestamp."""
     from unity_mcp.middleware import wrap_send, Middleware

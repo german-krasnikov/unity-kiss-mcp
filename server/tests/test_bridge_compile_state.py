@@ -67,7 +67,6 @@ def _make_failing_connection():
 # 15. send() raises ConnectionError when connection fails
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_send_raises_on_connection_failure():
     probe = _make_probe(busy=False)
     r, w = _make_failing_connection()
@@ -84,7 +83,6 @@ async def test_send_raises_on_connection_failure():
 # 20. Error message when compiling
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_bridge_error_message_compiling():
     async def open_conn(*a, **kw):
         r, w = _make_failing_connection()
@@ -121,7 +119,6 @@ def test_bridge_error_message_dead():
 # 22. No misleading "save dialog" in any error message
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_bridge_error_no_misleading_save_dialog():
     async def open_conn(*a, **kw):
         r, w = _make_failing_connection()
@@ -141,7 +138,6 @@ async def test_bridge_error_no_misleading_save_dialog():
 # 24. recompile.duration_ms observed on fail-then-succeed
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_metrics_recompile_duration_observed():
     probe = _make_probe(busy=False)
 
@@ -187,7 +183,6 @@ def test_bridge_metrics_isolated_per_test():
 # 26. _reconnect resets first_failure_ts and fires callbacks
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_reconnect_resets_failure_ts():
     mock_reader = MagicMock()
     mock_writer = MagicMock()
@@ -213,7 +208,6 @@ async def test_reconnect_resets_failure_ts():
 # A3. Compilation gate: _send_raw passes through to bridge when probe busy
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_compilation_gate_passes_through_when_busy():
     """_send_raw passes through to bridge even when probe says busy — bridge handles retries."""
     from unity_mcp.server import _send_raw

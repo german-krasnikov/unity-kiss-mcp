@@ -1,5 +1,3 @@
-// F28: CommandSchema validation — NUnit EditMode tests.
-// Covers: optional params that handlers use (fix #5) + consolidated commands (fix #17).
 using NUnit.Framework;
 using UnityMCP.Editor;
 

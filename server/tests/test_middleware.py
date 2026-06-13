@@ -7,10 +7,6 @@ from unity_mcp.middleware import (
     BLAST_RADIUS,
 )
 
-# TODO (test cycle 3): A8 review — markers using '⚠ ' prefix (RETRY, TAINT, OVERWRITE,
-# STARVATION, BLAST RADIUS, PATH WARNING) still use loose `"X" in result` substring checks.
-# Replace with `"⚠ X:" in result` once we audit actual emission format.
-
 
 # ─── Feature 1: Retry Watchdog ────────────────────────────────────────────────
 
@@ -109,7 +105,6 @@ def test_taint_allows_hash_ref(mw):
 
 # ─── Feature 4: Periodic State Injection ─────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_state_injection_every_10_calls(mw):
     fake_send = AsyncMock(return_value="HierarchyData")
     mw.call_count = 9
@@ -118,7 +113,6 @@ async def test_state_injection_every_10_calls(mw):
     assert "HierarchyData" in result
 
 
-@pytest.mark.asyncio
 async def test_auto_state_staleness_gate(mw):
     """Injects at call 10, then again at call 20 (gap > 5)."""
     fake_send = AsyncMock(return_value="H")
@@ -134,7 +128,6 @@ async def test_auto_state_staleness_gate(mw):
     fake_send.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_auto_state_skipped_when_recent(mw):
     """Auto-inject skipped when organic get_hierarchy was within last 5 calls.
 
@@ -169,7 +162,6 @@ async def test_auto_state_skipped_when_recent(mw):
     )
 
 
-@pytest.mark.asyncio
 async def test_auto_state_organic_hierarchy_suppresses_injection(mw):
     """Organic get_hierarchy within 5 calls before a % 10 boundary skips auto-inject."""
     call_log: list[str] = []
@@ -202,7 +194,6 @@ def test_reset_session_clears_hierarchy_call_counter(mw):
     assert mw._last_hierarchy_call == 0
 
 
-@pytest.mark.asyncio
 async def test_state_injection_not_before_10(mw):
     fake_send = AsyncMock(return_value="HierarchyData")
     mw.call_count = 0
@@ -211,7 +202,6 @@ async def test_state_injection_not_before_10(mw):
     fake_send.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_state_injection_increments_counter(mw):
     fake_send = AsyncMock(return_value="HierarchyData")
     mw.call_count = 0
@@ -324,7 +314,6 @@ def test_circuit_breaker_closes_on_success():
 
 # ─── wrap_send circuit integration ───────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_wrap_send_circuit_open_returns_error():
     mw = Middleware()
     mw.circuit.failures = mw.circuit.threshold  # force open
@@ -338,7 +327,6 @@ async def test_wrap_send_circuit_open_returns_error():
     fake_send.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_circuit_records_success():
     mw = Middleware()
     fake_send = AsyncMock(return_value="hierarchy data")
@@ -348,7 +336,6 @@ async def test_wrap_send_circuit_records_success():
     assert mw.circuit.get_status() == "CLOSED"
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_circuit_records_failure():
     mw = Middleware()
     fake_send = AsyncMock(side_effect=ConnectionError("TCP down"))
@@ -452,7 +439,6 @@ def test_workflow_fsm_resets_on_read(mw):
 
 # ─── F08: strip_defaults in wrap_send ────────────────────────────────────────
 
-@pytest.mark.asyncio
 async def test_wrap_send_strips_defaults_for_get_component():
     """position (0,0,0) and mass:1 stripped; localPosition (5,3,0) kept."""
     raw = "[Transform]\nposition: (0, 0, 0)\nlocalPosition: (5, 3, 0)\n[Rigidbody]\nmass: 1\n"
@@ -465,7 +451,6 @@ async def test_wrap_send_strips_defaults_for_get_component():
     assert "localPosition: (5, 3, 0)" in result
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_no_strip_for_hierarchy():
     """get_hierarchy NOT in _STRIP_CMDS — drag:0 kept."""
     raw = "SampleScene\nRigidbody drag: 0\n"
@@ -476,7 +461,6 @@ async def test_wrap_send_no_strip_for_hierarchy():
     assert "drag: 0" in result
 
 
-@pytest.mark.asyncio
 async def test_wrap_send_no_strip_escape_hatch():
     """_no_strip=True skips stripping even for get_component."""
     raw = "[Transform]\nposition: (0, 0, 0)\n"
@@ -487,7 +471,7 @@ async def test_wrap_send_no_strip_escape_hatch():
     assert "position: (0, 0, 0)" in result
 
 
-# ── Fix 4: Bounded LRU on Middleware collections ─────────────────────────────
+# ── Bounded LRU on Middleware collections ─────────────────────────────────────
 
 def test_clean_paths_bounded():
     """_clean_paths must not exceed 256 entries."""
@@ -573,3 +557,344 @@ def test_middleware_init_no_log_dir_by_default(monkeypatch):
     monkeypatch.delenv("UNITY_MCP_LOG_DIR", raising=False)
     mw2 = Middleware()
     assert mw2._mutation_log is None
+
+
+# ── CircuitBreaker HALF_OPEN probe flag ───────────────────────────────────────
+
+def test_circuit_breaker_half_open_allows_only_one_probe():
+    """In HALF_OPEN state, only the first request passes; subsequent ones are blocked."""
+    cb = CircuitBreaker(threshold=1, cooldown=0.0)
+    cb.record_failure()  # → OPEN
+    cb.state = CircuitBreaker.HALF_OPEN
+    cb._probe_in_flight = False
+    assert cb.allow_request()
+    assert not cb.allow_request()
+
+
+def test_circuit_breaker_half_open_resets_after_success():
+    """After probe succeeds (record_success), circuit transitions back to CLOSED."""
+    cb = CircuitBreaker(threshold=1, cooldown=0.0)
+    cb.record_failure()
+    cb.state = CircuitBreaker.HALF_OPEN
+    cb._probe_in_flight = False
+    cb.allow_request()
+    cb.record_success()
+    assert cb.state == CircuitBreaker.CLOSED
+    assert cb.allow_request()
+
+
+# ── reset_session completeness ────────────────────────────────────────────────
+
+def test_reset_session_clears_is_playing(mw):
+    """reset_session must reset is_playing to False."""
+    mw.is_playing = True
+    mw.reset_session()
+    assert mw.is_playing is False
+
+
+def test_reset_session_resets_circuit_breaker(mw):
+    """reset_session must reset the circuit breaker state to CLOSED."""
+    mw.circuit.state = CircuitBreaker.OPEN
+    mw.circuit.failures = 5
+    mw.reset_session()
+    assert mw.circuit.state == CircuitBreaker.CLOSED
+    assert mw.circuit.failures == 0
+
+
+def test_reset_session_clears_schema_cache(mw):
+    """reset_session must invalidate schema_cache if present."""
+    from unity_mcp.schema_cache import SchemaCache
+    from unity_mcp.schema_guard import SchemaGuard
+    if mw.schema_cache is None:
+        mw.schema_cache = SchemaCache()
+        mw.schema_guard = SchemaGuard(mw, mw.schema_cache)
+    mw.schema_cache.put("Rigidbody", frozenset(["mass"]))
+    mw.reset_session()
+    assert mw.schema_cache.get("Rigidbody") is None
+
+
+def test_reset_session_clears_component_cache(mw):
+    """reset_session must clear _component_cache."""
+    mw._component_cache["/Cube"] = {"Transform"}
+    mw.reset_session()
+    assert len(mw._component_cache) == 0
+
+
+# ── Component cache update after manage_component ────────────────────────────
+
+def test_cache_components_adds_on_manage_component_add(mw):
+    """cache_components must update the cache when manage_component add succeeds."""
+    mw._component_cache["/Cube"] = {"Transform"}
+    mw.cache_components("manage_component", {"path": "/Cube", "type": "Rigidbody", "action": "add"}, "ok: added")
+    assert "Rigidbody" in mw._component_cache.get("/Cube", set())
+
+
+def test_cache_components_removes_on_manage_component_remove(mw):
+    """cache_components must remove the component from cache on remove action."""
+    mw._component_cache["/Cube"] = {"Transform", "Rigidbody"}
+    mw.cache_components("manage_component", {"path": "/Cube", "type": "Rigidbody", "action": "remove"}, "ok: removed")
+    assert "Rigidbody" not in mw._component_cache.get("/Cube", set())
+
+
+def test_cache_components_clears_on_delete_object(mw):
+    """cache_components must remove the path from cache on delete_object."""
+    mw._component_cache["/Cube"] = {"Transform"}
+    mw.cache_components("delete_object", {"path": "/Cube"}, "ok: deleted")
+    assert "/Cube" not in mw._component_cache
+
+
+# ── F16: error deduplication ──────────────────────────────────────────────────
+
+def test_error_dedup_first_occurrence_returns_full_message(mw):
+    """F16: first occurrence of an error must return full message."""
+    result = mw.dedup_error("set_property", "Error: path not found")
+    assert result == "Error: path not found"
+
+
+def test_error_dedup_second_identical_error_returns_repeated_form(mw):
+    """F16: second identical error must return collapsed '(repeated 2x)' form."""
+    mw.dedup_error("set_property", "Error: path not found")
+    result = mw.dedup_error("set_property", "Error: path not found")
+    assert result.startswith("(repeated 2x)")
+
+
+def test_error_dedup_same_text_different_cmd_not_collapsed(mw):
+    """F16: same error text for different cmd must NOT be collapsed."""
+    mw.dedup_error("set_property", "Error: path not found")
+    result = mw.dedup_error("create_object", "Error: path not found")
+    assert not result.startswith("(repeated")
+
+
+def test_error_dedup_cleared_on_reset_session(mw):
+    """F16: _error_dedup must be cleared on reset_session."""
+    mw.dedup_error("set_property", "Error: path not found")
+    mw.reset_session()
+    result = mw.dedup_error("set_property", "Error: path not found")
+    assert result == "Error: path not found"
+
+
+async def test_error_dedup_ignores_success_payload_containing_error_substring():
+    """F16-regression: SUCCESS read whose payload merely contains 'Error' must not be deduped."""
+    mw = Middleware()
+    mw._prefetch_cache = None
+    payload = "[Log] 12:00 ErrorManager started\n[Warning] mem high\n[Log] Player spawned"
+
+    async def send_fn(cmd, args, timeout=30.0):
+        return {"ok": True, "data": payload}
+
+    wrapped = wrap_send(send_fn, mw)
+    r1 = await wrapped("get_console", {})
+    r2 = await wrapped("get_console", {})
+    assert "Player spawned" in r1 and "Player spawned" in r2
+    assert not r2.startswith("(repeated")
+
+
+def test_error_dedup_long_errors_differing_past_char80_are_distinct(mw):
+    """F16: two errors differing only past char 80 must be treated as distinct (full-key)."""
+    base = "Error: Component not found on path /Game/UI/Canvas/Panel/SubPanel/HealthBar/Fill"
+    assert len(base) >= 80
+    mw.dedup_error("get_component", base + "A")
+    result = mw.dedup_error("get_component", base + "B")
+    assert not result.startswith("(repeated")
+    assert result == base + "B"
+
+
+def test_error_dedup_dict_stays_bounded_over_long_session(mw):
+    """F16: _error_dedup must stay bounded (no unbounded growth)."""
+    for i in range(400):
+        mw.dedup_error("set_property", f"Error #{i}")
+    assert len(mw._error_dedup) <= 256
+
+
+async def test_lesson_recorder_classifies_by_ok_flag_not_error_substring():
+    """F16-regression: LessonRecorder must classify on ok-flag, not substring scan."""
+    from unity_mcp.lessons import LessonRecorder, LessonStore
+    mw = Middleware()
+    mw._prefetch_cache = None
+    mw.recorder = LessonRecorder(LessonStore(path=None))
+
+    async def send_fn(cmd, args, timeout=30.0):
+        return {"ok": True, "data": "[Error] NullRef in Foo\n[Error] again\n[Log] ok"}
+
+    wrapped = wrap_send(send_fn, mw)
+    for _ in range(4):
+        await wrapped("get_console", {"level": "Error"})
+    assert mw.recorder._recent_fails == {}
+
+
+# ── circuit breaker is_ready_fn + cache above circuit ────────────────────────
+
+def test_circuit_ready_fn_true_transitions_open_to_half_open():
+    """is_ready_fn returning True in OPEN state transitions the circuit to HALF_OPEN."""
+    ready_calls = [0]
+
+    def is_ready():
+        ready_calls[0] += 1
+        return True
+
+    cb = CircuitBreaker(threshold=1, cooldown=9999.0, is_ready_fn=is_ready)
+    cb.record_failure()
+    assert cb.state == CircuitBreaker.OPEN
+    allowed = cb.allow_request()
+    assert allowed is True
+    assert cb.state == CircuitBreaker.HALF_OPEN
+    assert ready_calls[0] == 1
+
+
+def test_circuit_ready_fn_none_uses_time_based_cooldown():
+    """Without is_ready_fn, OPEN state uses time-based cooldown."""
+    cb = CircuitBreaker(threshold=1, cooldown=9999.0)
+    cb.record_failure()
+    assert not cb.allow_request()
+    assert cb.state == CircuitBreaker.OPEN
+
+
+def test_circuit_ready_fn_false_stays_open():
+    """is_ready_fn returning False must not transition the circuit to HALF_OPEN."""
+    cb = CircuitBreaker(threshold=1, cooldown=9999.0, is_ready_fn=lambda: False)
+    cb.record_failure()
+    assert not cb.allow_request()
+    assert cb.state == CircuitBreaker.OPEN
+
+
+def test_circuit_ready_fn_exception_falls_through_to_cooldown():
+    """is_ready_fn raising must not crash allow_request; falls through to cooldown."""
+    def bad_fn():
+        raise RuntimeError("probe error")
+    cb = CircuitBreaker(threshold=1, cooldown=9999.0, is_ready_fn=bad_fn)
+    cb.record_failure()
+    assert not cb.allow_request()
+
+
+async def test_prefetch_cache_hit_served_when_circuit_open():
+    """PrefetchCache hit for a cacheable read must be served even when the circuit is OPEN."""
+    from unity_mcp.prefetch_cache import PrefetchCache
+    mw = Middleware()
+    mw.circuit = CircuitBreaker(threshold=1, cooldown=9999.0)
+    mw.circuit.record_failure()
+    assert mw.circuit.state == CircuitBreaker.OPEN
+
+    mw._prefetch_cache = PrefetchCache()
+    mw._prefetch_cache.put("get_component", {"path": "/Cube", "type": "Transform"}, "Transform data")
+
+    send_called = [False]
+    async def send_fn(cmd, args, timeout=30.0):
+        send_called[0] = True
+        return {"ok": True, "data": "from unity"}
+
+    wrapped = wrap_send(send_fn, mw)
+    result = await wrapped("get_component", {"path": "/Cube", "type": "Transform"})
+    assert not send_called[0]
+    assert "Transform data" in result or "CACHED" in result
+
+
+async def test_non_cacheable_write_blocked_when_circuit_open():
+    """Non-cacheable write commands must still be blocked when the circuit is OPEN."""
+    mw = Middleware()
+    mw.circuit = CircuitBreaker(threshold=1, cooldown=9999.0)
+    mw.circuit.record_failure()
+    assert mw.circuit.state == CircuitBreaker.OPEN
+
+    async def send_fn(cmd, args, timeout=30.0):
+        return {"ok": True, "data": "ok"}
+
+    wrapped = wrap_send(send_fn, mw)
+    result = await wrapped("set_property", {"path": "/Cube", "component": "Transform", "prop": "x", "value": "1"})
+    assert "Circuit OPEN" in result
+
+
+# ── F17: negative path cache ─────────────────────────────────────────────────
+
+async def test_negative_path_cache_skips_tcp_on_second_unknown_path_call():
+    """F17: second unknown-path call within TTL must NOT invoke send_fn (cache hit)."""
+    mw = Middleware()
+    mw.known_paths = {"/Known"}
+
+    call_count = [0]
+    async def send_fn(cmd, args, timeout=30.0):
+        call_count[0] += 1
+        return ""
+
+    await mw.resolve_path_live("/UnknownPath", send_fn)
+    assert call_count[0] == 1
+    await mw.resolve_path_live("/UnknownPath", send_fn)
+    assert call_count[0] == 1, "Second call must use negative cache, not TCP"
+
+
+async def test_negative_path_cache_queries_tcp_again_after_ttl():
+    """F17: after TTL expires, unknown path must query TCP again."""
+    from unittest.mock import patch as mock_patch
+    mw = Middleware()
+    mw.known_paths = {"/Known"}
+
+    call_count = [0]
+    async def send_fn(cmd, args, timeout=30.0):
+        call_count[0] += 1
+        return ""
+
+    with mock_patch("unity_mcp.middleware_paths.time") as mock_time:
+        mock_time.monotonic.return_value = 1000.0
+        await mw.resolve_path_live("/UnknownPath", send_fn)
+        assert call_count[0] == 1
+
+        mock_time.monotonic.return_value = 1012.0
+        await mw.resolve_path_live("/UnknownPath", send_fn)
+        assert call_count[0] == 2, "Expired cache must re-query TCP"
+
+
+async def test_negative_path_cache_cleared_on_reset_session():
+    """F17: reset_session must clear negative path cache."""
+    mw = Middleware()
+    mw.known_paths = {"/Known"}
+
+    async def send_fn(cmd, args, timeout=30.0):
+        return ""
+
+    await mw.resolve_path_live("/UnknownPath", send_fn)
+    assert len(mw._negative_path_cache) > 0
+    mw.reset_session()
+    assert len(mw._negative_path_cache) == 0
+
+
+async def test_negative_path_cache_ignores_known_paths():
+    """F17: known paths must not be added to negative cache."""
+    mw = Middleware()
+    mw.known_paths = {"/Known"}
+
+    call_count = [0]
+    async def send_fn(cmd, args, timeout=30.0):
+        call_count[0] += 1
+        return ""
+
+    await mw.resolve_path_live("/Known", send_fn)
+    assert call_count[0] == 0
+    assert "/Known" not in mw._negative_path_cache
+
+
+async def test_transient_tcp_failure_does_not_add_path_to_negative_cache():
+    """F17-regression: transient TCP failure must NOT add path to negative cache."""
+    mw = Middleware()
+    mw.known_paths = {"/Known"}
+
+    async def send_fn(cmd, args, timeout=30.0):
+        raise ConnectionError("TCP dropped")
+
+    resolved, _ = await mw.resolve_path_live("/UnknownPath", send_fn)
+    assert resolved == "/UnknownPath"
+    assert "/UnknownPath" not in mw._negative_path_cache
+
+
+async def test_write_command_drops_negative_path_cache():
+    """F17-regression: a write must drop the negative cache."""
+    import time as time_mod
+    mw = Middleware()
+    mw._prefetch_cache = None
+    mw.known_paths = set()
+    mw._negative_path_cache = {"/Ghost": time_mod.monotonic() + 999}
+
+    async def send_fn(cmd, args, timeout=30.0):
+        return {"ok": True, "data": "created"}
+
+    wrapped = wrap_send(send_fn, mw)
+    await wrapped("create_object", {"name": "Ghost"})
+    assert mw._negative_path_cache == {}

@@ -11,9 +11,6 @@ import os
 from pathlib import Path
 from dataclasses import asdict
 
-import pytest
-
-
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 CYR = "Привет"

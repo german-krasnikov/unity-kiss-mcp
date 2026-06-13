@@ -1,10 +1,8 @@
 """Tests for fingerprint and scan_scene tools."""
-import pytest
 from unittest.mock import AsyncMock
 from unity_mcp.server import fingerprint, scan_scene
 
 
-@pytest.mark.asyncio
 async def test_fingerprint_sends_command(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "fp:ABCD1234"}
     result = await fingerprint()
@@ -12,7 +10,6 @@ async def test_fingerprint_sends_command(mock_bridge):
     assert result == "fp:ABCD1234"
 
 
-@pytest.mark.asyncio
 async def test_fingerprint_default_depth(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "fp:00000000"}
     await fingerprint()
@@ -20,7 +17,6 @@ async def test_fingerprint_default_depth(mock_bridge):
     assert call_args["depth"] == 3
 
 
-@pytest.mark.asyncio
 async def test_fingerprint_custom_path_and_depth(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "fp:12345678"}
     await fingerprint(path="Player", depth=5)
@@ -29,7 +25,6 @@ async def test_fingerprint_custom_path_and_depth(mock_bridge):
     )
 
 
-@pytest.mark.asyncio
 async def test_scan_scene_sends_command(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "SCAN: 10 objects\n  colliders: 2 (20%)"}
     result = await scan_scene()
@@ -37,7 +32,6 @@ async def test_scan_scene_sends_command(mock_bridge):
     assert "SCAN" in result
 
 
-@pytest.mark.asyncio
 async def test_scan_scene_with_bands(mock_bridge):
     mock_bridge.send.return_value = {"ok": True, "data": "SCAN: 10 objects\n  lights: 1 (10%)"}
     await scan_scene(bands="lights,audio")

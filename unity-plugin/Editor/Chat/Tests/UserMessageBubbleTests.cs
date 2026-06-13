@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
+using static UnityMCP.Editor.Chat.Tests.ChipTestHelpers;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -29,9 +30,6 @@ namespace UnityMCP.Editor.Chat.Tests
             ChipPillFactory.ColorResolver = null;
         }
 
-        private static ChipData H(string path, string name, int id = 0)
-            => new ChipData(ChipKindKeys.Hierarchy, path, name, id);
-
         private static PositionedChip PC(ChipData chip, int offset)
             => new PositionedChip(chip, offset);
 
@@ -39,7 +37,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D1: text-only UserMessage → content container has label child
         [Test]
-        public void D1_TextOnly_ContentContainerHasLabel()
+        public void TextOnly_ContentContainerHasLabel()
         {
             var msg = ChipTextInterleaver.Build("hello world", new List<PositionedChip>());
             _transcript.AppendUserBubble(msg);
@@ -54,7 +52,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D2: chip-only UserMessage → no text labels, one pill
         [Test]
-        public void D2_ChipOnly_OnePillNoLabel()
+        public void ChipOnly_OnePillNoLabel()
         {
             var chip = H("/A", "A", 1);
             var msg  = ChipTextInterleaver.Build("", new List<PositionedChip> { PC(chip, 0) });
@@ -71,7 +69,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D3: text+chip+text → 3 children in order: Label, pill, Label
         [Test]
-        public void D3_TextChipText_ThreeChildrenInOrder()
+        public void TextChipText_ThreeChildrenInOrder()
         {
             var chip = H("/A", "A", 1);
             var msg  = ChipTextInterleaver.Build("before after", new List<PositionedChip> { PC(chip, 6) });
@@ -90,7 +88,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D4: chip+text+chip → no strip-at-top; interleaved
         [Test]
-        public void D4_ChipTextChip_Interleaved_NoStripAtTop()
+        public void ChipTextChip_Interleaved_NoStripAtTop()
         {
             var chipA = H("/A", "A", 1);
             var chipB = H("/B", "B", 2);
@@ -110,7 +108,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D5: empty text segments between chips are omitted (no blank Labels)
         [Test]
-        public void D5_EmptyTextSegmentOmitted_NoBlankLabels()
+        public void EmptyTextSegmentOmitted_NoBlankLabels()
         {
             // chip at offset 0 in empty text → only chip, empty text filtered out
             var chip = H("/A", "A", 1);
@@ -126,7 +124,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D6: userData on bubble includes @mention (ToDisplayText with @Name) — via Display field.
         [Test]
-        public void D6_BubbleUserData_ContainsAtMention()
+        public void BubbleUserData_ContainsAtMention()
         {
             var chip = H("/Player", "Player", 1);
             var pos  = new List<PositionedChip> { PC(chip, 5) };
@@ -139,7 +137,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D7: bubble has msg-bubble and msg-bubble--user classes
         [Test]
-        public void D7_BubbleHasCorrectClasses()
+        public void BubbleHasCorrectClasses()
         {
             var msg = ChipTextInterleaver.Build("hi", new List<PositionedChip>());
             _transcript.AppendUserBubble(msg);
@@ -150,7 +148,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D8: inline pill label matches chip display name
         [Test]
-        public void D8_InlinePillLabel_MatchesDisplayName()
+        public void InlinePillLabel_MatchesDisplayName()
         {
             var chip = H("/Player", "Player", 1);
             var msg = ChipTextInterleaver.Build("fix", new List<PositionedChip> { PC(chip, 3) });
@@ -163,7 +161,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D10: text label in F13 bubble has msg-text CSS class
         [Test]
-        public void D10_TextLabel_HasMsgTextClass()
+        public void TextLabel_HasMsgTextClass()
         {
             var msg = ChipTextInterleaver.Build("hello", new List<PositionedChip>());
             _transcript.AppendUserBubble(msg);
@@ -176,7 +174,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D11: whitespace-only segment produces no Label child
         [Test]
-        public void D11_WhitespaceOnlySegment_NoLabelAdded()
+        public void WhitespaceOnlySegment_NoLabelAdded()
         {
             // chip at offset 0 with spaces only before it → whitespace segment skipped
             var chip = H("/A", "A", 1);
@@ -199,7 +197,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // D12: chip segment renders via ChipPillFactory (pill), not as a Label
         [Test]
-        public void D12_ChipSegment_RendersPill_NotLabel()
+        public void ChipSegment_RendersPill_NotLabel()
         {
             var chip = H("/Enemy", "Enemy", 2);
             var msg  = ChipTextInterleaver.Build("", new List<PositionedChip> { PC(chip, 0) });

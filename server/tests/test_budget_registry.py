@@ -1,5 +1,4 @@
 """TDD: budget registry — feature metadata."""
-import pytest
 from unity_mcp.budget.registry import FEATURES, FeatureMeta, get_feature, DEFAULT_FEATURE
 
 

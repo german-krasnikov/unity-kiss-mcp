@@ -168,7 +168,7 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.AddChip(HierarchyChip("/Player", "Player", 99));
             SimulateSend();
             var bubble   = ChatWindowAssertions.GetUserBubble(_container, 0);
-            var display  = bubble.userData is UserBubbleData u ? u.Display : bubble.userData as string ?? "";
+            var display  = ChatWindowAssertions.GetBubbleDisplayText(bubble) ?? "";
             StringAssert.Contains("check the player", display);
             StringAssert.Contains("@Player", display);
             Assert.IsFalse(display.Contains("[hierarchy:"), "Display must not contain bracket expansion");
@@ -204,7 +204,7 @@ namespace UnityMCP.Editor.Chat.Tests
             _chipField.Text = "hello world";
             SimulateSend();
             var bubble = ChatWindowAssertions.GetUserBubble(_container, 0);
-            var display = bubble.userData is UserBubbleData u ? u.Display : bubble.userData as string;
+            var display = ChatWindowAssertions.GetBubbleDisplayText(bubble);
             Assert.AreEqual("hello world", display);
         }
     }

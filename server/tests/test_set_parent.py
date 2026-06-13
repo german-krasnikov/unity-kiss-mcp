@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.tools import objects
 
 
-@pytest.mark.asyncio
 async def test_set_parent_sends_correct_command(mock_bridge, bridge_response):
     """set_parent sends cmd=set_parent with path, parent, world_position_stays=true."""
     bridge_response(data="ok")
@@ -18,7 +17,6 @@ async def test_set_parent_sends_correct_command(mock_bridge, bridge_response):
     assert args["world_position_stays"] == "true"
 
 
-@pytest.mark.asyncio
 async def test_set_parent_null_parent(mock_bridge, bridge_response):
     """set_parent with parent=None does not send parent key."""
     bridge_response(data="ok")
@@ -28,7 +26,6 @@ async def test_set_parent_null_parent(mock_bridge, bridge_response):
     assert "parent" not in args
 
 
-@pytest.mark.asyncio
 async def test_set_parent_world_position_stays_false(mock_bridge, bridge_response):
     """world_position_stays=False sends 'false' string."""
     bridge_response(data="ok")
@@ -38,7 +35,6 @@ async def test_set_parent_world_position_stays_false(mock_bridge, bridge_respons
     assert args["world_position_stays"] == "false"
 
 
-@pytest.mark.asyncio
 async def test_delete_object_sends_force_true(mock_bridge, bridge_response):
     bridge_response(data="ok")
     from unity_mcp.tools.objects import delete_object
@@ -47,7 +43,6 @@ async def test_delete_object_sends_force_true(mock_bridge, bridge_response):
     assert args["force"] == "true"
 
 
-@pytest.mark.asyncio
 async def test_delete_object_omits_force_when_false(mock_bridge, bridge_response):
     bridge_response(data="ok")
     from unity_mcp.tools.objects import delete_object
@@ -56,7 +51,6 @@ async def test_delete_object_omits_force_when_false(mock_bridge, bridge_response
     assert "force" not in args
 
 
-@pytest.mark.asyncio
 async def test_set_parent_error_raises_tool_error(mock_bridge):
     """set_parent raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})
@@ -65,7 +59,6 @@ async def test_set_parent_error_raises_tool_error(mock_bridge):
         await set_parent(path="/Missing", parent="/Root")
 
 
-@pytest.mark.asyncio
 async def test_delete_object_error_raises_tool_error(mock_bridge):
     """delete_object raises ToolError when Unity returns ok=False."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Object not found"})

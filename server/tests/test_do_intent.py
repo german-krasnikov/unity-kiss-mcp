@@ -1,5 +1,4 @@
 """TDD tests for do_intent package: catalog, validator, planner, executor, do tool."""
-import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
@@ -139,7 +138,6 @@ def test_validator_exactly_50_lines_ok():
 # 8. Planner — builds prompt with intent and glossary
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_planner_builds_prompt_with_intent_and_glossary():
     from unity_mcp.do_intent.planner import Planner
 
@@ -159,7 +157,6 @@ async def test_planner_builds_prompt_with_intent_and_glossary():
     assert result == "create_object name=Cube"
 
 
-@pytest.mark.asyncio
 async def test_planner_returns_none_when_service_disabled():
     from unity_mcp.do_intent.planner import Planner
 
@@ -175,7 +172,6 @@ async def test_planner_returns_none_when_service_disabled():
 # 9. Executor — no failure returns summary
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_executor_no_failure_returns_summary():
     from unity_mcp.do_intent.executor import Executor
 
@@ -190,7 +186,6 @@ async def test_executor_no_failure_returns_summary():
 # 10. Executor — partial failure retries once
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_executor_partial_failure_retries_once():
     from unity_mcp.do_intent.executor import Executor
 
@@ -225,7 +220,6 @@ async def test_executor_partial_failure_retries_once():
 # 11. do dry_run returns plan without execution
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_do_dry_run_returns_plan_no_execution():
     from unity_mcp.do_intent.executor import Executor
     from unity_mcp.do_intent.planner import Planner
@@ -250,7 +244,6 @@ async def test_do_dry_run_returns_plan_no_execution():
 # 12. do e2e happy path (mock everything)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_do_e2e_happy_path():
     from unity_mcp.tools.do_tool import do
 
@@ -267,7 +260,6 @@ async def test_do_e2e_happy_path():
         assert "ok" in result.lower() or "1" in result
 
 
-@pytest.mark.asyncio
 async def test_do_dry_run_e2e():
     from unity_mcp.tools.do_tool import do
 
@@ -299,7 +291,6 @@ def test_extract_paths_from_hierarchy():
 # 12c. do() blocks forbidden plan (X5.cross.1)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_do_e2e_invalid_plan_blocked():
     from unity_mcp.tools.do_tool import do
 
@@ -320,7 +311,6 @@ async def test_do_e2e_invalid_plan_blocked():
 # 12b. do() returns error when Haiku unavailable (PY5.test.2)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_do_returns_error_when_haiku_unavailable():
     from unity_mcp.tools.do_tool import do
 
@@ -341,7 +331,6 @@ async def test_do_returns_error_when_haiku_unavailable():
 # 13a. Executor — retry accepts path created in first pass (PY5.arch.2)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_executor_retry_accepts_path_created_in_first_pass():
     """Retry plan targeting a path created in original plan must not be rejected by validator."""
     from unity_mcp.do_intent.executor import Executor
@@ -371,7 +360,6 @@ async def test_executor_retry_accepts_path_created_in_first_pass():
 # 13. Executor — no retry when >5 failures (P1-7)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_executor_no_retry_above_5_failures():
     """When >5 lines fail, executor returns raw result without retrying."""
     from unity_mcp.do_intent.executor import Executor
@@ -395,3 +383,59 @@ async def test_executor_no_retry_above_5_failures():
     assert result == raw_result
     # sampling service never called
     svc.generate.assert_not_called()
+
+
+# ── Fix 11+12: do_intent executor retry logic ─────────────────────────────────
+
+def test_is_partial_detects_err_format():
+    """Fix 12: _is_partial must detect '[N] err:' batch format."""
+    from unity_mcp.do_intent.executor import _is_partial
+    assert _is_partial("[1] err: path not found")
+
+
+def test_is_partial_detects_partial_colon():
+    """Fix 12: _is_partial also detects legacy 'PARTIAL:' prefix."""
+    from unity_mcp.do_intent.executor import _is_partial
+    assert _is_partial("PARTIAL: 1/2 ok")
+
+
+def test_is_partial_false_for_all_ok():
+    """Fix 12: _is_partial returns False when all ops succeed."""
+    from unity_mcp.do_intent.executor import _is_partial
+    assert not _is_partial("[1] ok: created")
+    assert not _is_partial("ok: 3 ops")
+
+
+def test_count_failures_matches_actual_format():
+    """Fix 12: _count_failures must parse '[N] err: ...' lines."""
+    from unity_mcp.do_intent.executor import _count_failures
+    result = "[1] ok: created\n[2] err: path not found\n[3] err: missing component"
+    failed = _count_failures(result)
+    assert len(failed) == 2
+    assert any("path not found" in f for f in failed)
+
+
+async def test_executor_applies_validate_plan_to_retry(monkeypatch):
+    """Fix 11: validate_plan is applied to the retry commands before executing them."""
+    from unittest.mock import AsyncMock, MagicMock
+    from unity_mcp.do_intent.executor import Executor
+
+    call_args = []
+
+    async def fake_send(cmd, args):
+        call_args.append(args.get("commands", ""))
+        if len(call_args) == 1:
+            return "[1] err: path not found"
+        return "[1] ok: created"
+
+    svc = MagicMock()
+    svc.generate = AsyncMock(return_value="create_object name=Cube")
+
+    ex = Executor(fake_send, sampling=svc)
+    result = await ex.execute(
+        "create_object name=Cube",
+        original_intent="add cube",
+        scene_paths=set(),
+    )
+    assert result is not None
+    assert len(call_args) == 2

@@ -1,6 +1,3 @@
-// CS4.test.6 + CS4.test.8 — PlaytestRunner.ResolveCharacterPath and BuildReport coverage.
-// EditMode safe. ResolveCharacterPath uses GameObject.Find (works in EditMode).
-// BuildReport is pure string logic + Time.realtimeSinceStartup + PlaytestMonitorRegistry (EditMode safe).
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;

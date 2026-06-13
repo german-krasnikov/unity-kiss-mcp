@@ -1,5 +1,4 @@
 """TDD tests for vfx_intent tool."""
-import pytest
 from unittest.mock import AsyncMock, patch
 
 
@@ -131,7 +130,6 @@ def test_vfx_preset_build_fire_explosion():
 # 5. E2E mock
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
 async def test_vfx_intent_preset_bypass_no_haiku():
     """fire_explosion preset should NOT call Haiku."""
     from unity_mcp.tools.vfx_intent_tool import vfx_intent
@@ -143,7 +141,6 @@ async def test_vfx_intent_preset_bypass_no_haiku():
             assert "ok" in result
 
 
-@pytest.mark.asyncio
 async def test_vfx_intent_no_sampling_returns_error():
     from unity_mcp.tools.vfx_intent_tool import vfx_intent
     with patch("unity_mcp.tools.vfx_intent_tool._send", new_callable=AsyncMock):
@@ -153,7 +150,6 @@ async def test_vfx_intent_no_sampling_returns_error():
             assert "ERROR" in result
 
 
-@pytest.mark.asyncio
 async def test_vfx_intent_dry_run():
     from unity_mcp.tools.vfx_intent_tool import vfx_intent
     dsl = "SET startColor = #FF2200\nSET startSize = 0.5"
@@ -165,7 +161,6 @@ async def test_vfx_intent_dry_run():
             assert "particle" in result
 
 
-@pytest.mark.asyncio
 async def test_vfx_intent_e2e_executes_batch():
     from unity_mcp.tools.vfx_intent_tool import vfx_intent
     dsl = "SET startColor = #FF2200\nSET startSize = 0.5"

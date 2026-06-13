@@ -5,7 +5,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from unity_mcp.server import validate_layout, get_spatial_context
 
 
-@pytest.mark.asyncio
 async def test_validate_layout_sends_correct_command(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Layout: 3 triggers, 5 solids\nOK: no trigger overlaps"})
     result = await validate_layout(root="/Arena", min_distance=2.0)
@@ -15,7 +14,6 @@ async def test_validate_layout_sends_correct_command(mock_bridge):
     assert "no trigger overlaps" in result
 
 
-@pytest.mark.asyncio
 async def test_validate_layout_default_min_distance(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await validate_layout(root="/Root")
@@ -24,7 +22,6 @@ async def test_validate_layout_default_min_distance(mock_bridge):
     assert args["min_distance"] == "3.0"
 
 
-@pytest.mark.asyncio
 async def test_validate_layout_default_root(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "OK"})
     await validate_layout()
@@ -32,14 +29,12 @@ async def test_validate_layout_default_root(mock_bridge):
     assert args["root"] == "/"
 
 
-@pytest.mark.asyncio
 async def test_validate_layout_error(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "'/Arena' not found"})
     with pytest.raises(ToolError, match="not found"):
         await validate_layout(root="/Arena")
 
 
-@pytest.mark.asyncio
 async def test_get_spatial_context_sends_correct_command(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Position: (0.0,0.0,0.0)\nApproach vectors: N/A"})
     result = await get_spatial_context(path="/Player", radius=10.0)
@@ -49,7 +44,6 @@ async def test_get_spatial_context_sends_correct_command(mock_bridge):
     assert "Position" in result
 
 
-@pytest.mark.asyncio
 async def test_get_spatial_context_default_radius(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Position: (1.0,0.0,2.0)"})
     await get_spatial_context(path="/Enemy")
@@ -58,7 +52,6 @@ async def test_get_spatial_context_default_radius(mock_bridge):
     assert args["radius"] == "5.0"
 
 
-@pytest.mark.asyncio
 async def test_get_spatial_context_error(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "'/Ghost' not found"})
     with pytest.raises(ToolError, match="not found"):

@@ -1,5 +1,4 @@
 """Tests for Inferrer + SessionContext."""
-import pytest
 from unity_mcp.inference import SessionContext, Inferrer, infer_primitive, infer_parent
 
 

@@ -4,6 +4,7 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine.UIElements;
+using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
@@ -44,6 +45,9 @@ namespace UnityMCP.Editor.Chat.Tests
                 $"Requested bubble index {index} but only {bubbles.Count} bubble(s) exist");
             return bubbles[index];
         }
+
+        internal static string GetBubbleDisplayText(VisualElement bubble)
+            => bubble.userData is UserBubbleData u ? u.Display : bubble.userData as string;
 
         // F13 layout: pills in msg-user-content; legacy: pills in user-chip-strip
         internal static void AssertBubbleHasChipStrip(VisualElement bubble, int chipCount)
