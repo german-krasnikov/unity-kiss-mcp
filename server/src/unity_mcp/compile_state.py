@@ -8,11 +8,11 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from unity_mcp.lockfile import read_pid_from_port_file, is_pid_alive
+from unity_mcp.lockfile import read_pid_from_port_file, is_pid_alive, read_project_path_from_port_file
 from unity_mcp.unity_state import read_state_for_port
 
 _DISCONNECT_WINDOW_S = 30.0
-_DEFAULT_REMAINING_S = 5.0
+_DEFAULT_REMAINING_S = 5.0  # TODO(FM-26 G16w): derive from real diagnose state, not a fabricated 5.0s default
 _MAX_REMAINING_S = 60.0
 
 
@@ -46,15 +46,52 @@ class CompileStateProbe:
         pid = read_pid_from_port_file(self._port)
         return pid is not None and not is_pid_alive(pid)
 
+    def is_startup_in_progress(self) -> bool:
+        """True when port is set, state-file is absent, and Unity PID is alive.
+
+        Covers the fresh-project-load window: OnQuit deleted the state-file,
+        Unity is still initializing and :port is not yet accepting connections.
+        """
+        if self._port is None:
+            return False
+        if read_state_for_port(self._port) is not None:
+            return False
+        pid = read_pid_from_port_file(self._port)
+        return pid is not None and is_pid_alive(pid)
+
     def has_strong_busy_signal(self) -> bool:
-        """State file (authoritative) → lock file."""
+        """State file (authoritative) → startup window → lock file.
+
+        P6: stale+busy state now consults PID instead of falling through.
+        A 120s+ legit reload produces a stale state but the process is alive;
+        the old code returned False (lock-file fallback only), causing
+        'Unity dead/not responding' on a live compiling process.
+        """
         if self._port is not None:
             state = read_state_for_port(self._port)
             if state is not None:
+                # Fresh busy state → definitely busy.
                 if not state.is_stale and state.is_busy:
                     return True
+                # Stale busy state (>120s legit reload) → consult PID + wedge detector.
+                # PID dead → not compiling. PID alive + terminal wedge → also not busy
+                # (G15: detect_wedge confirms reload failed, don't keep retrying).
+                if state.is_stale and state.is_busy:
+                    if self.is_process_dead():
+                        return False
+                    try:
+                        from unity_mcp.editor_log import detect_wedge
+                        if detect_wedge() is not None:
+                            return False  # terminal reload failure → not busy, stop retrying
+                    except Exception:
+                        pass
+                    return True
+                # State present but not busy → not busy (fresh=clean or stale=not-busy).
+                return False
             elif self.is_process_dead():
                 return False
+            elif self.is_startup_in_progress():
+                return True
         return self._lock_file_exists()
 
     def estimated_remaining_s(self) -> float:
@@ -80,12 +117,15 @@ class CompileStateProbe:
             pass
 
     @staticmethod
-    def autodetect_project_path() -> Optional[Path]:
+    def autodetect_project_path(port: Optional[int] = None) -> Optional[Path]:
+        """Resolve Unity project path: UNITY_MCP_PROJECT_PATH env override FIRST, then port-file autodetect."""
         p = os.environ.get("UNITY_MCP_PROJECT_PATH")
         if p:
             path = Path(p)
             if path.exists() and (path / "Library").exists():
                 return path
+        if port is not None:
+            return read_project_path_from_port_file(port)
         return None
 
     # ------------------------------------------------------------------

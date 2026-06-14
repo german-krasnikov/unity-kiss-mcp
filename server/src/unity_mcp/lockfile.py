@@ -200,3 +200,79 @@ def read_pid_from_port_file(port: int) -> Optional[int]:
         except (ValueError, IndexError, OSError):
             continue
     return None
+
+
+def read_reload_port() -> Optional[int]:
+    """Discover reload mini-server port from ~/.unity-mcp/ports/{pid}.reload-port.
+
+    F2: multi-line format port\\nProjectDir\\nProjectName.
+    CWD longest-match selects among multiple alive instances (mirrors read_unity_port).
+    Falls back to most-recently-modified file if no CWD match.
+    """
+    ports_dir = Path.home() / ".unity-mcp" / "ports"
+    if not ports_dir.exists():
+        return None
+
+    candidates = []  # (path_len, mtime, port, project_path)
+    for f in ports_dir.glob("*.reload-port"):
+        try:
+            pid = int(f.stem)
+            if not is_pid_alive(pid):
+                continue
+            lines = f.read_text(encoding="utf-8").strip().split("\n")
+            port = int(lines[0])
+            project_path = lines[1].strip() if len(lines) > 1 else ""
+            candidates.append((f.stat().st_mtime, port, project_path))
+        except (ValueError, OSError):
+            continue
+
+    if not candidates:
+        return None
+
+    if len(candidates) == 1:
+        return candidates[0][1]
+
+    # CWD longest-match disambiguation (mirrors server_filtering.py:read_unity_port)
+    cwd = os.getcwd()
+    cwd_matches = [
+        (len(pp), mtime, port)
+        for mtime, port, pp in candidates
+        if pp and (cwd == pp or cwd.startswith(pp + os.sep))
+    ]
+    if cwd_matches:
+        cwd_matches.sort(reverse=True)
+        return cwd_matches[0][2]
+
+    candidates.sort(reverse=True)  # newest mtime first
+    return candidates[0][1]
+
+
+def read_project_path_from_port_file(port: int) -> Optional[Path]:
+    """Read Unity project path from ~/.unity-mcp/ports/{pid}.port matching the given port.
+
+    Port file format: line0=port, line1=absolute project path, line2=project name.
+
+    P8: PID-liveness gate — skip stale .port files from dead Unity processes.
+    Without this, a dead Unity's port file could resolve the wrong project's dll
+    when a new Unity starts on the same port.
+
+    Returns Path(lines[1]) if it exists on disk AND the PID is alive, else None.
+    """
+    ports_dir = Path.home() / ".unity-mcp" / "ports"
+    if not ports_dir.exists():
+        return None
+    for f in ports_dir.glob("*.port"):
+        try:
+            pid = int(f.stem)
+            lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
+            if int(lines[0]) != port or len(lines) < 2:
+                continue
+            # P8: skip stale port files from dead processes
+            if not is_pid_alive(pid):
+                continue
+            p = Path(lines[1])
+            if p.exists():
+                return p
+        except (ValueError, IndexError, OSError):
+            continue
+    return None

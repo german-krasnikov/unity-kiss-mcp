@@ -58,9 +58,33 @@ namespace UnityMCP.Editor
             try
             {
                 System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(filePath));
-                System.IO.File.WriteAllText(filePath, $"{{\"port\":{port},\"chatPort\":{chatPort}}}");
+                // Merge-write: preserve reloadPort written by reload-package (if present).
+                string existing = null;
+                try { if (System.IO.File.Exists(filePath)) existing = System.IO.File.ReadAllText(filePath); }
+                catch { }
+                var reloadPort = ParsePortFromJson(existing, "reloadPort");
+                var json = reloadPort.HasValue
+                    ? $"{{\"port\":{port},\"chatPort\":{chatPort},\"reloadPort\":{reloadPort.Value}}}"
+                    : $"{{\"port\":{port},\"chatPort\":{chatPort}}}";
+                var tmp = filePath + ".tmp";
+                System.IO.File.WriteAllText(tmp, json);
+                if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath);
+                System.IO.File.Move(tmp, filePath);
             }
             catch { }
+        }
+
+        // Reads reloadPort from MCP_Port.json. Returns 0 if absent or file missing.
+        public static int ReadReloadPort(string filePath)
+        {
+            try
+            {
+                if (!System.IO.File.Exists(filePath)) return 0;
+                var json = System.IO.File.ReadAllText(filePath);
+                var val = ParsePortFromJson(json, "reloadPort");
+                return val ?? 0;
+            }
+            catch { return 0; }
         }
     }
 }

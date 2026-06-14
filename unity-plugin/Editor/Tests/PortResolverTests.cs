@@ -186,5 +186,24 @@ namespace UnityMCP.Editor.Tests
             Assert.IsTrue(File.Exists(path));
             Directory.Delete(dir, true);
         }
+
+        [Test]
+        public void SavePorts_OnCorruptInputFile_WritesValidJson()
+        {
+            // If MCP_Port.json is corrupt, SavePorts must still produce valid JSON.
+            // ParsePortFromJson uses regex — extracts reloadPort=9601 from corrupt string despite broken JSON.
+            var path = Path.Combine(Path.GetTempPath(), "mcp_corrupt_" + System.Guid.NewGuid().ToString("N") + ".json");
+            File.WriteAllText(path, "{\"port\":9500,\"chatPort\":9501}\"reloadPort\":9601}");
+
+            PortResolver.SavePorts(path, 9500, 9501);
+
+            var content = File.ReadAllText(path);
+            Assert.IsTrue(content.TrimStart().StartsWith("{"), "must be valid JSON object");
+            Assert.IsTrue(content.TrimEnd().EndsWith("}"), "must be valid JSON object");
+            // port and chatPort must be correct.
+            Assert.AreEqual(9500, PortResolver.ParsePortFromJson(content, "port"));
+            Assert.AreEqual(9501, PortResolver.ParsePortFromJson(content, "chatPort"));
+            File.Delete(path);
+        }
     }
 }

@@ -193,6 +193,8 @@ async def lifespan(app):
         if _middleware is not None:
             _wrapped_send = wrap_send(_send_raw, _middleware)
         await slot.connect(unity_port)
+        from . import editor_log as _editor_log
+        _editor_log.init_corroboration(port=unity_port)
         active = slot.bridge
         if active is not None:
             if active.connected:
@@ -200,15 +202,20 @@ async def lifespan(app):
                 await _push_catalog(active)
             _last_refresh_ts: float = 0.0
 
+            from .tools.sync import _reset_bump_used as _sync_reset_bump
+
             def _on_reconnect():
                 nonlocal _last_refresh_ts
                 now = time.monotonic()
+                # P9: re-resolve project path on reconnect — may be a different Unity instance.
+                _editor_log.init_corroboration(port=unity_port)
                 if now - _last_refresh_ts < 5.0:
                     return
                 _last_refresh_ts = now
                 asyncio.ensure_future(_refresh_tools_cache(slot.bridge))
                 asyncio.ensure_future(_push_catalog(slot.bridge))
             slot.add_reconnect_callback(_on_reconnect)
+            slot.add_reconnect_callback(_sync_reset_bump)
             if _middleware is not None:
                 slot.add_reconnect_callback(_middleware.reset_session)
                 wire_circuit_breaker(_middleware, active)

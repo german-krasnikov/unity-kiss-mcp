@@ -109,6 +109,8 @@ namespace UnityMCP.Editor
         public static bool IsClientConnected => _mainSlot.Connected || _chatSlot.Connected;
         public static int ServerPort => Port;
         public static int ServerChatPort => ChatPort;
+        // Reads reloadPort from MCP_Port.json. Returns 0 if reload-package is not installed.
+        public static int ServerReloadPort => PortResolver.ReadReloadPort(PortFilePath);
 
         private static double _lastWatchdogCheck;
 
@@ -123,12 +125,13 @@ namespace UnityMCP.Editor
             CompilationPipeline.compilationStarted += _ => { _isCompiling = true; _compileStartTime = DateTime.UtcNow; WriteStateFile("compiling"); };
             CompilationPipeline.compilationFinished += _ =>
             {
+                // R-4 fix: never write "ready" from compilationFinished.
+                // If compile failed → no reload will happen, write compile_failed.
+                // If compile succeeded → reload is coming; "ready" written after reload in StartAsync.
                 _isCompiling = false;
-                EditorApplication.delayCall += () =>
-                {
-                    if (!EditorApplication.isCompiling && !_shuttingDown)
-                        WriteStateFile(IsRunning ? "ready" : "restarting");
-                };
+                if (EditorUtility.scriptCompilationFailed)
+                    WriteStateFile("compile_failed");
+                // else: state stays "compiling" until reload completes (StartAsync writes "ready")
             };
             EditorSceneManager.sceneOpened += (_, _) => { RefManager.Invalidate(); HierarchySerializer.ResetIncrementalCache(); };
             EditorSceneManager.newSceneCreated += (_, _, _) => { RefManager.Invalidate(); HierarchySerializer.ResetIncrementalCache(); };
@@ -172,9 +175,14 @@ namespace UnityMCP.Editor
                     try
                     {
                         _listener = new TcpListener(IPAddress.Loopback, Port);
+#if UNITY_EDITOR_WIN
+                        // Windows: SO_REUSEADDR = port-hijack; use ExclusiveAddressUse instead (CoplayDev #1173)
+                        _listener.Server.ExclusiveAddressUse = true;
+#else
                         _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 #if UNITY_EDITOR_OSX || UNITY_EDITOR_LINUX
                         try { _listener.Server.SetSocketOption(SocketOptionLevel.Socket, (SocketOptionName)0x0200, true); } catch { }
+#endif
 #endif
                         _listener.Start();
                         break;
@@ -243,6 +251,7 @@ namespace UnityMCP.Editor
                     if (_cts == cts) _cts = null;
                     try { _listener?.Stop(); } catch { }
                     _listener = null;
+                    if (!_shuttingDown) WriteStateFile("bind_failed");
                 }
             }
             finally { _starting = false; }
@@ -352,7 +361,10 @@ namespace UnityMCP.Editor
                         }
                         if (cmdName == "get_version")
                         {
-                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, "1.0", null), clientToken);
+                            // RC-5: include domain stamp so reconnect can detect stale DLL.
+                            var stamp = SyncHelper.CurrentDomainStamp;
+                            var ver = string.IsNullOrEmpty(stamp) ? "1.0" : $"1.0|stamp:{stamp}";
+                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, ver, null), clientToken);
                             continue;
                         }
                         if (cmdName == "status")
@@ -574,10 +586,14 @@ namespace UnityMCP.Editor
                 var tmp = path + ".tmp";
                 var ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
                 var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+                var epoch = SyncHelper.CurrentEpoch;
                 // Invariant culture so decimal separator is always '.'
-                File.WriteAllText(tmp, $"{state}\n{ts.ToString(System.Globalization.CultureInfo.InvariantCulture)}\n{pid}");
-                // rename(2) on POSIX atomically overwrites
-                if (File.Exists(path)) File.Delete(path); // .NET Framework compat
+                File.WriteAllText(tmp,
+                    $"{state}\n{ts.ToString(System.Globalization.CultureInfo.InvariantCulture)}\n{pid}\n{epoch}");
+                // Unity editor scripting is still Mono/netstandard2.1 — no
+                // File.Move(string,string,bool) overload (CS1739). Delete+Move:
+                // tiny non-atomic window, readers retry so it's acceptable.
+                try { File.Delete(path); } catch { }
                 File.Move(tmp, path);
             }
             catch { }

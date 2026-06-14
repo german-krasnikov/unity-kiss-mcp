@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEditor.Compilation;
 using UnityEngine;
 
 [assembly: InternalsVisibleTo("UnityMCP.TestProject")]
@@ -244,7 +245,9 @@ namespace UnityMCP.Editor
 
             // Meta (non-mutating)
             CommandRegistry.Register("ping", _ => "pong");
-            CommandRegistry.Register("get_version", _ => VersionTracker.Version.ToString());
+            // C7: "get_version" fast-path is in MCPServer.cs:293 (emits MVID stamp).
+            // The VersionTracker delegation here was dead code — MCPServer intercepts get_version
+            // before it reaches CommandRouter. Removed so get_version unambiguously means MVID stamp.
             CommandRegistry.Register("get_enabled_tools", _ => ExecGetEnabledTools());
             CommandRegistry.Register("get_disabled_tools", _ => ExecGetDisabledTools());
             CommandRegistry.Register("set_tool_catalog", args =>
@@ -263,10 +266,28 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("get_console", ExecGetConsole);
             CommandRegistry.Register("get_compile_errors", _ => CompileErrorCapture.GetErrors());
             CommandRegistry.Register("compile_status", _ => CompileNotifier.GetStatus());
+            CommandRegistry.Register("diagnose", args => DiagnoseCommand.Execute(args));  // C8: read-only multi-signal snapshot
+            // sync/sync_status: unified reload API (v0.21)
+            CommandRegistry.Register("sync",        args => SyncHelper.TriggerSync(
+                JsonHelper.ExtractString(args, "resolve") == "true"));
+            CommandRegistry.Register("sync_status", _ => SyncHelper.GetSyncStatus());
             // screenshot is intercepted in Process/ProcessAsync for file response formatting;
             // registered here only for IsRegistered/IsMutating queries
             CommandRegistry.Register("screenshot", _ => throw new InvalidOperationException("screenshot intercepted before ExecuteCommand"));
             CommandRegistry.Register("recompile", _ => { UnityEditor.AssetDatabase.Refresh(); return "ok"; });
+            // G11: force_refresh — CLASS-A recovery sequence for file: UPM packages.
+            // 1. ImportPackageSources: targeted ImportAsset bypasses dead directory-monitor.
+            // 2. Refresh: whole-DB rescan as fallback for multi-file/asmdef edits.
+            // 3. RequestScriptCompilation(None): compile ingested source (CleanBuildCache has 6.x no-op bug).
+            // 4. StartTickPump: nudge backgrounded editor to start compiling.
+            CommandRegistry.Register("force_refresh", _ =>
+            {
+                SyncHelper.Ops.ImportPackageSources();
+                SyncHelper.Ops.Refresh();
+                SyncHelper.Ops.RequestScriptCompilation(RequestScriptCompilationOptions.None);
+                SyncHelper.Ops.StartTickPump();
+                return "force_refresh triggered";
+            });
             CommandRegistry.Register("search_scene", args => SearchHelper.Search(
                 JsonHelper.ExtractString(args, "query"),
                 JsonHelper.ExtractString(args, "root"),
@@ -423,12 +444,14 @@ namespace UnityMCP.Editor
         // Commands that bypass MCPSettings.IsToolEnabled check
         internal static bool IsAlwaysAllowed(string cmd) =>
             cmd == "ping" || cmd == "get_version" || cmd == "get_enabled_tools" ||
-            cmd == "get_disabled_tools" || cmd == "set_tool_catalog";
+            cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "diagnose";  // C4: diagnose always reachable
 
         internal static bool IsAllowedDuringCompile(string cmd) =>
             cmd == "ping" || cmd == "get_version" || cmd == "get_console" ||
             cmd == "screenshot" || cmd == "get_enabled_tools" || cmd == "compile_status" ||
-            cmd == "get_disabled_tools" || cmd == "set_tool_catalog";
+            cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "sync_status" ||
+            cmd == "get_compile_errors" || cmd == "diagnose" ||  // C4: escape-hatch + diagnose reachable while wedged
+            cmd == "force_refresh";  // G11: real force-recompile must work when wedged
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {

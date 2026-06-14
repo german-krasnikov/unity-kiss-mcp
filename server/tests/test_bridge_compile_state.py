@@ -240,3 +240,88 @@ async def test_compilation_gate_passes_through_when_busy():
         server_mod.slot = old_slot
 
     assert fake_bridge.send_called, "bridge.send should be called — no pre-check block"
+
+
+# ---------------------------------------------------------------------------
+# G17: busy-retry loop breaks on terminal wedge signal (not MAX_RETRIES exhaustion)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_busy_retry_breaks_on_wedge_signal():
+    """G17: bridge send() with result.retry + terminal wedge → BUILD-FAILED-WEDGE, NOT exhaustion.
+
+    Red-precondition: bridge.py:142-147 loop re-sent up to MAX_RETRIES regardless of wedge.
+    Fixed: detect_wedge() consulted before each retry; wedge → return structured STOP.
+
+    A8: feeds REAL WedgeReport into the real send() retry path; inject only _send/mock_open.
+    _send call-count proves early break: 1 read attempt + wedge check, NOT MAX_RETRIES sends.
+    """
+    from unity_mcp.editor_log import WedgeReport
+    wedge = WedgeReport(kind="build-failed-wedge", cs_errors=["CS0535: foo"])
+
+    # Wire that returns a retry hint (Unity busy)
+    retry_response = {"id": "0001", "ok": False, "retry": 5000}
+    retry_payload = json.dumps(retry_response).encode()
+    retry_hdr = struct.pack("!I", len(retry_payload))
+
+    send_count = 0
+
+    async def open_conn(*a, **kw):
+        nonlocal send_count
+        reader = AsyncMock()
+        writer = make_writer()
+
+        async def read_exactly(n):
+            nonlocal send_count
+            if n == 4:
+                return retry_hdr
+            else:
+                send_count += 1
+                return retry_payload
+
+        reader.readexactly = AsyncMock(side_effect=read_exactly)
+        return reader, writer
+
+    probe = _make_probe(busy=True)
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=open_conn), \
+         patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock), \
+         patch("unity_mcp.editor_log.detect_wedge", return_value=wedge):
+        bridge = UnityBridge(probe=probe)
+        await bridge.connect()
+        result = await bridge.send("test", {})
+
+    # G17: must return BUILD-FAILED-WEDGE on first wedge detection, NOT exhaust retries
+    assert result.get("ok") is False
+    assert "BUILD-FAILED-WEDGE" in result.get("data", ""), \
+        f"Expected BUILD-FAILED-WEDGE in result data, got {result!r}"
+    assert "do NOT restart" in result.get("data", ""), \
+        f"Verdict must carry the never-restart instruction, got {result!r}"
+    # A8: prove early break — only 1 send attempt (not MAX_RETRIES)
+    assert send_count == 1, \
+        f"Expected 1 send attempt (early break on wedge), got {send_count}"
+
+
+# ---------------------------------------------------------------------------
+# G16w: busy message must not fabricate _DEFAULT_REMAINING_S countdown
+# ---------------------------------------------------------------------------
+
+def test_busy_branch_consults_diagnose_not_fabricated_countdown():
+    """G16w: when probe says busy but no compile info known, _DEFAULT_REMAINING_S=5.0 is
+    a fabricated default — the test documents this existing gap.
+
+    Red-precondition: compile_state.py:92 returns _DEFAULT_REMAINING_S=5.0 when no compile
+    info is tracked (no update_compile_info called). The bridge's error message says '~5s left'
+    which is fabricated, not from real state.
+
+    This test pins the fabricated default and will fail when the code is fixed to
+    derive remaining time from real state/diagnose.
+    """
+    from unity_mcp.compile_state import _DEFAULT_REMAINING_S
+    probe = CompileStateProbe(port=9500)
+    # Without any update_compile_info call, remaining is the default
+    remaining = probe.estimated_remaining_s()
+    assert remaining == _DEFAULT_REMAINING_S, (
+        f"Gap documented (G16w): estimated_remaining_s returns fabricated default "
+        f"{_DEFAULT_REMAINING_S}s without real state. Got {remaining}."
+    )

@@ -12,7 +12,8 @@ from unity_mcp.bridge import DomainReloadError
 
 
 def _make_send(status_seq, errors_response=""):
-    """Route compile_status / get_compile_errors; errors_response may be an Exception."""
+    """Route compile_status / get_compile_errors; errors_response may be an Exception.
+    sync_status raises ConnectionError (simulate not-available) to trigger compile_status fallback."""
     status_iter = iter(status_seq)
 
     async def _send(cmd, args=None, **kwargs):
@@ -22,6 +23,9 @@ def _make_send(status_seq, errors_response=""):
             if isinstance(errors_response, Exception):
                 raise errors_response
             return errors_response
+        if cmd == "sync_status":
+            # Simulate sync_status unavailable → triggers compile_status fallback in await_compile
+            raise ConnectionError("Command not registered: sync_status")
         raise AssertionError(f"Unexpected cmd: {cmd}")
 
     return _send
@@ -145,24 +149,65 @@ async def test_timeout_zero_idle_returns_errors():
     assert "some error" in result
 
 
-async def test_timeout_zero_compiling_returns_still_compiling():
-    """timeout=0, status compiling → 'still compiling', no errors call."""
+async def test_timeout_zero_wedge_yields_verdict_not_still_compiling():
+    """G13 retarget: timeout=0 + idle-failed → FAILED verdict, NOT 'still compiling'.
+
+    Red-precondition: code_intel.py:97 returned 'still compiling' for ANY non-idle state,
+    including idle-failed (terminal). Fixed: only active states (compiling/reloading)
+    return 'still compiling'; terminal states call _get_errors() for the real verdict.
+
+    A8: assert _send call-count = 2 (compile_status + get_compile_errors) proving
+    the early-break via the _get_errors() path (not the 'still compiling' short-circuit).
+    """
     call_count = 0
+    errors_text = "error CS0535: 'MockImpl' does not implement 'ISyncOps.StartTickPump()'"
 
     async def _send(cmd, args=None, **kwargs):
         nonlocal call_count
         call_count += 1
-        return "compiling|3.0"
+        if cmd == "compile_status":
+            return "idle-failed|3.0"
+        return errors_text  # get_compile_errors
 
     _ci._send = _send
     result = await _ci.await_compile(timeout=0)
-    assert result == "still compiling"
-    assert call_count == 1
+    # G13: idle-failed is terminal — must return real error/verdict, not a busy-prose string
+    _PROSE_SURRENDERS = {"still compiling", "backgrounded", "Click the Unity window"}
+    assert result not in _PROSE_SURRENDERS, f"idle-failed is terminal — got prose surrender: {result!r}"
+    assert "CS0535" in result or "failed" in result.lower(), \
+        f"idle-failed should yield error/failed verdict, got {result!r}"
+    # A8: exactly 2 _send calls: compile_status + get_compile_errors (proves early-exit path)
+    assert call_count == 2, f"Expected 2 _send calls (compile_status + get_compile_errors), got {call_count}"
 
 
 def test_registered_as_readonly_tool():
     from unity_mcp.tools.gating import TIER1
     assert "await_compile" in TIER1
+
+
+# RC-9: idle-failed state exits immediately (no loop)
+async def test_await_compile_idle_failed_exits_immediately():
+    """idle-failed state must exit immediately without looping (0 additional sleeps)."""
+    sleep_count = 0
+
+    async def counting_sleep(_):
+        nonlocal sleep_count
+        sleep_count += 1
+
+    _ci._send = _make_send(["idle-failed|8.2"], errors_response="CS0001: broken")
+
+    with patch("asyncio.sleep", new=counting_sleep):
+        result = await _ci.await_compile(timeout=60.0)
+
+    assert sleep_count == 0, f"Expected 0 sleeps, got {sleep_count}"
+    assert "failed" in result.lower() or "CS0001" in result
+
+
+async def test_await_compile_fallback_idle_exits_cleanly():
+    """Regression: idle path still works after adding idle-failed branch."""
+    _ci._send = _make_send(["idle|8.2"], errors_response="")
+    result = await _ci.await_compile(timeout=60.0)
+    assert "8.2" in result or "clean" in result
 
 
 async def test_malformed_status_treated_as_idle():
@@ -184,3 +229,199 @@ async def test_get_errors_tool_error_propagates():
     _ci._send = _make_send(["idle|2.0"], errors_response=ToolError("malformed response"))
     with pytest.raises(ToolError):
         await _ci.await_compile(timeout=60.0)
+
+
+# #34: await_compile uses sync_status epoch-aware wait; P3: sentinel is stripped
+async def test_await_compile_uses_sync_status_epoch():
+    """Epoch-aware wait + P3: 'No compilation errors' sentinel → 'compile clean (sync)', not sentinel."""
+    call_log = []
+
+    async def _epoch_send(cmd, args=None, **kwargs):
+        call_log.append(cmd)
+        if cmd == "sync_status":
+            # First call: epoch=5, state=compiling → triggers epoch-aware path
+            # Subsequent calls: epoch=5, state=ready → done
+            if call_log.count("sync_status") == 1:
+                return "epoch=5|state=compiling|dur=1.2"
+            return "epoch=5|state=ready"
+        if cmd == "get_compile_errors":
+            # Return the C# clean sentinel — it must be stripped, not returned as error
+            return "No compilation errors"
+        raise AssertionError(f"Unexpected: {cmd}")
+
+    _ci._send = _epoch_send
+    result = await _ci.await_compile(timeout=60.0)
+    # Must have used sync_status (epoch-aware path) and returned clean
+    assert "sync_status" in call_log, "await_compile must call sync_status for epoch-aware wait"
+    assert "compile clean" in result
+    # P3: sentinel must NOT leak as an error payload
+    assert result != "No compilation errors", "sentinel must be stripped, not returned as error"
+    assert "No compilation errors" not in result
+
+
+# Fallback: sync_status unavailable → compile_status fallback still works
+async def test_await_compile_falls_back_to_compile_status_when_no_sync_status():
+    """When sync_status is not available, await_compile still works via compile_status fallback."""
+    # compile_status returns idle → await_compile must complete cleanly
+    _ci._send = _make_send(["idle|3.0"], errors_response="")
+    result = await _ci.await_compile(timeout=60.0)
+    assert result == "compile clean (3.0s)"
+
+
+# P3: sentinel strip — same shared function used by both code paths
+async def test_await_compile_sentinel_stripped_compile_status_path():
+    """P3: 'No compilation errors' sentinel stripped on compile_status fallback path."""
+    _ci._send = _make_send(["idle|2.0"], errors_response="No compilation errors")
+    result = await _ci.await_compile(timeout=60.0)
+    # Sentinel must be stripped; result is the compile-status clean message
+    assert "No compilation errors" not in result
+    assert "compile clean" in result
+
+
+# ---------------------------------------------------------------------------
+# P4: stamp in _parse_sync_status, MVID gate, idle-never → non-clean
+# ---------------------------------------------------------------------------
+
+def test_parse_sync_status_includes_stamp():
+    """P4: _parse_sync_status returns 4-tuple including stamp field."""
+    result = _ci._parse_sync_status("epoch=3|state=ready|stamp=abc123:987654")
+    assert len(result) == 4
+    epoch, state, extra, stamp = result
+    assert epoch == 3
+    assert state == "ready"
+    assert stamp == "abc123:987654"
+
+
+def test_parse_sync_status_stamp_absent_returns_empty():
+    """P4: stamp= absent → stamp='' in 4-tuple."""
+    epoch, state, extra, stamp = _ci._parse_sync_status("epoch=1|state=compiling|dur=1.2")
+    assert stamp == ""
+
+
+def test_parse_status_idle_never_is_non_clean():
+    """P4: 'idle-never' must NOT be treated as idle/clean."""
+    state, _ = _ci._parse_status("idle-never|0")
+    assert state != "idle", "idle-never must be treated as non-idle (never compiled = not clean)"
+
+
+async def test_await_compile_stamp_unchanged_stale_domain():
+    """P4 FLIP: same MVID before/after ready → result starts with STALE-DOMAIN."""
+    mvid = "60d2de34-1234-5678-abcd-ef0123456789"
+    stamp_pre = f"{mvid}:639169455305003280"
+    stamp_post = f"{mvid}:639169455309999999"  # same MVID, different ticks
+
+    call_log = []
+
+    async def _send(cmd, args=None, **kwargs):
+        call_log.append(cmd)
+        if cmd == "sync_status":
+            if call_log.count("sync_status") == 1:
+                return f"epoch=5|state=compiling|dur=1.0|stamp={stamp_pre}"
+            return f"epoch=5|state=ready|stamp={stamp_post}"
+        if cmd == "get_compile_errors":
+            return ""
+        raise AssertionError(f"Unexpected: {cmd}")
+
+    _ci._send = _send
+    result = await _ci.await_compile(timeout=60.0)
+    assert result.startswith("STALE-DOMAIN"), f"Expected STALE-DOMAIN, got: {result!r}"
+
+
+async def test_await_compile_stamp_changed_clean():
+    """P4: different MVID before/after ready → compile clean (not STALE-DOMAIN)."""
+    mvid_pre  = "aaaaaaaa-0000-0000-0000-000000000000"
+    mvid_post = "bbbbbbbb-1111-1111-1111-111111111111"
+    stamp_pre  = f"{mvid_pre}:100"
+    stamp_post = f"{mvid_post}:200"
+
+    call_log = []
+
+    async def _send(cmd, args=None, **kwargs):
+        call_log.append(cmd)
+        if cmd == "sync_status":
+            if call_log.count("sync_status") == 1:
+                return f"epoch=5|state=compiling|dur=1.0|stamp={stamp_pre}"
+            return f"epoch=5|state=ready|stamp={stamp_post}"
+        if cmd == "get_compile_errors":
+            return ""
+        raise AssertionError(f"Unexpected: {cmd}")
+
+    _ci._send = _send
+    result = await _ci.await_compile(timeout=60.0)
+    assert "compile clean" in result
+    assert "STALE" not in result
+
+
+# F4: idle-never in fallback path must return immediately (not poll until timeout)
+async def test_await_compile_idle_never_returns_immediately():
+    """compile_status=idle-never|0.0 → returns immediately with informative message, no sleep loop."""
+    sleep_count = 0
+
+    async def counting_sleep(_):
+        nonlocal sleep_count
+        sleep_count += 1
+
+    async def _send(cmd, args=None, **kwargs):
+        if cmd == "compile_status":
+            return "idle-never|0.0"
+        if cmd == "sync_status":
+            raise ConnectionError("not available")
+        if cmd == "get_compile_errors":
+            return ""
+        raise AssertionError(f"Unexpected: {cmd}")
+
+    _ci._send = _send
+    with patch("asyncio.sleep", new=counting_sleep):
+        result = await _ci.await_compile(timeout=60.0)
+
+    assert sleep_count == 0, f"idle-never must return immediately, got {sleep_count} sleeps"
+    assert "idle-never" in result or "never" in result or "session" in result, (
+        f"idle-never result must be informative, got: {result!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# CI grep-gate (A9, fm26-spec-fixes.md): prose-surrender assertions cannot silently return
+# ---------------------------------------------------------------------------
+
+def test_no_prose_surrender_in_retargeted_test_files():
+    """CI gate (A9): no assert.*'(still compiling|backgrounded|Click the Unity window)'
+    in the two retargeted test files — test_await_compile.py and test_sync.py.
+
+    Scope is deliberately narrow (only the two retargeted files, only assert-lines)
+    to avoid false-positives from docstrings (test_compile_state.py:362) or
+    live-skip comments (test_sync_live.py:112/116) that contain those phrases in
+    non-assert contexts.
+
+    This test is GREEN after G12/G13 retargets removed the prose assertions.
+    It would have been RED before (test_await_compile.py:161 asserted 'still compiling',
+    test_sync.py:245-246 asserted 'backgrounded'/'click').
+    """
+    import re
+    import pathlib
+
+    # Pattern: 'assert ' at the START of a non-comment line (after optional whitespace).
+    # Docstrings and comments (lines starting with # or """) are excluded.
+    _PROSE_SURRENDER_PATTERN = re.compile(
+        r'^\s*assert\s+.*(?:still compiling|backgrounded|Click the Unity window)',
+    )
+
+    repo_root = pathlib.Path(__file__).parent
+    retargeted_files = [
+        repo_root / "test_await_compile.py",
+        repo_root / "test_sync.py",
+    ]
+
+    violations = []
+    for fpath in retargeted_files:
+        if not fpath.exists():
+            continue
+        for lineno, line in enumerate(fpath.read_text(encoding="utf-8").splitlines(), 1):
+            if _PROSE_SURRENDER_PATTERN.search(line):
+                violations.append(f"{fpath.name}:{lineno}: {line.strip()}")
+
+    assert not violations, (
+        "Prose-surrender assertions found in retargeted files (A9 grep-gate):\n"
+        + "\n".join(violations)
+        + "\nThese test files must not cement the old wrong behavior."
+    )

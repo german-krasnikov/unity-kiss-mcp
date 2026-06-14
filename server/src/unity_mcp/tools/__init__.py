@@ -2,13 +2,13 @@ from . import scene, objects, asset, animation, connection, runtime, autobatch
 from . import batch, codegen, skills, spatial, ui
 from . import do_tool, ask_tool
 from . import animator_intent_tool, vfx_intent_tool, ui_intent_tool
-from . import budget_tool, code_intel
+from . import budget_tool, code_intel, sync, diagnose
 from .metrics_tool import register as register_metrics
 
 
 def register_all(mcp, send, args, *, get_slot, get_middleware=None):
     for mod in [scene, objects, asset, animation, runtime, code_intel,
-                batch, codegen, skills, spatial, ui]:
+                batch, codegen, skills, spatial, ui, sync, diagnose]:
         mod.register(mcp, send, args)
     connection.register(mcp, send, args, get_slot=get_slot,
                         get_middleware=get_middleware)

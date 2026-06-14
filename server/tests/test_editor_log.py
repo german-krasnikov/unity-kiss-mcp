@@ -719,8 +719,14 @@ def test_large_log_failure_in_tail_window(tmp_path):
     assert "CS0009" in errors[0]
 
 
-def test_large_log_failure_before_tail_window_returns_empty(tmp_path):
-    """Failure header is BEFORE the tail window — must return [] (can't see it)."""
+def test_large_log_failure_before_tail_window_found_via_full_file_read(tmp_path):
+    """P1: full-file rfind finds failure header even when pushed before the tail window.
+
+    Before P1 fix: 256KB tail seek missed the header → returned [].
+    After P1 fix: full-file read → rfind finds it → errors returned.
+    The success block after the filler has NO ## Script Compilation Error header so
+    it cannot produce a false-negative: rfind anchors on the failure header only.
+    """
     from unity_mcp.editor_log import parse_compile_errors_from_log
 
     fail_block = _bee_block_named(
@@ -728,14 +734,16 @@ def test_large_log_failure_before_tail_window_returns_empty(tmp_path):
         exit_code=1,
         output_lines=["Assets/Editor/Old.cs(1,1): error CS0001: old error"],
     )
-    # Lots of content after the failure pushes it out of the tail window
+    # Lots of content after the failure pushes header before 256KB tail window
     filler = "X" * 300_000
     success = _bee_block(exit_code=0, output_lines=[""])
     log = _write_log(tmp_path, fail_block + filler + "\n" + success)
 
     errors = parse_compile_errors_from_log(log, max_bytes=256_000)
-    # The failure header is before the tail window; the success at end has no header → []
-    assert errors == []
+    # Full-file rfind finds the failure header → errors must be returned
+    assert errors != [], "P1: failure header must be found even outside tail window"
+    assert len(errors) == 1
+    assert "CS0001" in errors[0]
 
 
 # ---------------------------------------------------------------------------
@@ -765,6 +773,63 @@ def test_init_corroboration_idempotent(monkeypatch):
     el.init_corroboration()
 
 
+def test_init_corroboration_prod_path_scoped_chat_cs_not_stale(tmp_path, monkeypatch):
+    """ITEM 1 (RC-4 prod path): Chat/*.cs newer than dll must NOT cause stale verdict.
+
+    Drives the PRODUCTION entry: init_corroboration patches _cor_* then corroborate().
+    Current (broken) code: init_corroboration calls find_plugin_source_dir() which
+    rglobs the whole plugin_dir and picks up Chat .cs → stale verdict.
+    Fixed code: uses find_plugin_source_files() which excludes Chat → fresh verdict.
+    """
+    import unity_mcp.editor_log as el
+
+    # Build fake plugin layout with core + Chat (same as _make_plugin_layout)
+    plugin_root = tmp_path / "unity-plugin"
+    core_dir = plugin_root / "Editor"
+    core_dir.mkdir(parents=True)
+    (core_dir / "UnityMCP.Editor.asmdef").write_text('{"name":"UnityMCP.Editor"}')
+    base_t = 1000000.0
+    core_cs = core_dir / "Core.cs"
+    core_cs.write_text("class Core {}")
+    os.utime(core_cs, (base_t, base_t))
+
+    chat_dir = core_dir / "Chat"
+    chat_dir.mkdir()
+    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}')
+    chat_cs = chat_dir / "ChatFoo.cs"
+    chat_cs.write_text("class ChatFoo {}")
+    # Chat .cs is VERY new — newer than dll
+    os.utime(chat_cs, (base_t + 500, base_t + 500))
+
+    # dll is fresh relative to core but STALE relative to Chat
+    _make_dll(tmp_path, base_t + 50)
+
+    # Clean log (no compile errors)
+    content = _bee_block(exit_code=0, output_lines=[""])
+    log = _write_log(tmp_path, content)
+
+    # Patch init_corroboration to use our fake plugin_root
+    # We set _cor_source_files directly as init_corroboration would after the fix
+    scoped_files = el.find_plugin_source_files(plugin_dir=plugin_root)
+    monkeypatch.setattr(el, "_cor_project_path", tmp_path)
+    monkeypatch.setattr(el, "_cor_log_path", log)
+    # Simulate what the FIXED init_corroboration stores: scoped source_files
+    # After the fix, corroborate() must use source_files= not source_dirs=
+    # We inject via the module attribute that corroborate() reads.
+    # Before fix: _cor_source_dirs is set, corroborate passes source_dirs= (rglobs Chat)
+    # After fix: _cor_source_files is set, corroborate passes source_files= (no Chat)
+    monkeypatch.setattr(el, "_cor_source_files", scoped_files, raising=False)
+    # Clear source_dirs so old path is not accidentally used
+    if hasattr(el, "_cor_source_dirs"):
+        monkeypatch.setattr(el, "_cor_source_dirs", None)
+
+    result = el.corroborate("No compilation errors.")
+    # Chat is newer than dll but scoped list excludes Chat → dll is fresh → no stale warn
+    assert "stale" not in result.lower() and "warn" not in result.lower(), (
+        f"Expected no stale/warn (Chat excluded), got: {result!r}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # get_editor_log_path: warn on non-existent env override
 # ---------------------------------------------------------------------------
@@ -784,6 +849,169 @@ def test_env_override_nonexistent_warns_to_stderr(tmp_path, monkeypatch, capsys)
 # ---------------------------------------------------------------------------
 # CORROBORATED prefix is short ASCII (no em dash)
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# RC-4: find_plugin_source_files (scope to UnityMCP.Editor only)
+# ---------------------------------------------------------------------------
+
+def _make_plugin_layout(root: Path) -> dict:
+    """Create a fake unity-plugin directory with core + Chat + Tests asmdefs."""
+    core_dir = root / "Editor"
+    core_dir.mkdir(parents=True)
+    (core_dir / "UnityMCP.Editor.asmdef").write_text('{"name":"UnityMCP.Editor"}')
+    core_cs = core_dir / "Core.cs"
+    core_cs.write_text("class Core {}")
+
+    chat_dir = core_dir / "Chat"
+    chat_dir.mkdir()
+    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}')
+    chat_cs = chat_dir / "ChatFoo.cs"
+    chat_cs.write_text("class ChatFoo {}")
+
+    tests_dir = core_dir / "Tests"
+    tests_dir.mkdir()
+    (tests_dir / "UnityMCP.Editor.Tests.asmdef").write_text('{"name":"UnityMCP.Editor.Tests"}')
+    tests_cs = tests_dir / "TestFoo.cs"
+    tests_cs.write_text("class TestFoo {}")
+
+    return {"core": core_cs, "chat_asmdef_dir": chat_dir, "chat_cs": chat_cs,
+            "tests_cs": tests_cs, "plugin_root": root}
+
+
+def test_find_plugin_source_files_excludes_chat_cs(tmp_path):
+    """Chat/ subdir has non-UnityMCP.Editor asmdef → its .cs files excluded."""
+    from unity_mcp.editor_log import find_plugin_source_files
+    layout = _make_plugin_layout(tmp_path)
+    result = find_plugin_source_files(plugin_dir=tmp_path)
+    paths = [f.name for f in result]
+    assert "ChatFoo.cs" not in paths
+    assert "Core.cs" in paths
+
+
+def test_find_plugin_source_files_excludes_tests_cs(tmp_path):
+    """Tests/ subdir has non-UnityMCP.Editor asmdef → its .cs files excluded."""
+    from unity_mcp.editor_log import find_plugin_source_files
+    layout = _make_plugin_layout(tmp_path)
+    result = find_plugin_source_files(plugin_dir=tmp_path)
+    paths = [f.name for f in result]
+    assert "TestFoo.cs" not in paths
+
+
+def test_find_plugin_source_files_includes_core_cs(tmp_path):
+    """Core dir has UnityMCP.Editor.asmdef → Core.cs included."""
+    from unity_mcp.editor_log import find_plugin_source_files
+    layout = _make_plugin_layout(tmp_path)
+    result = find_plugin_source_files(plugin_dir=tmp_path)
+    assert any(f.name == "Core.cs" for f in result)
+
+
+def test_check_dll_freshness_chat_edit_not_stale(tmp_path):
+    """Chat .cs newer than dll → freshness True (not stale) because Chat is excluded."""
+    from unity_mcp.editor_log import check_dll_freshness, find_plugin_source_files
+    layout = _make_plugin_layout(tmp_path)
+    base_t = 1000000.0
+    _make_dll(tmp_path, base_t + 50)  # dll is fresh relative to core
+    os.utime(layout["core"], (base_t, base_t))  # core .cs is old
+    os.utime(layout["chat_cs"], (base_t + 200, base_t + 200))  # chat .cs is very new
+
+    # Use source_files (scoped list, no rglob picking up Chat)
+    core_files = find_plugin_source_files(plugin_dir=tmp_path)
+    result = check_dll_freshness(tmp_path, source_files=core_files)
+    assert result is True  # chat edit doesn't make dll stale
+
+
+def test_find_plugin_source_files_no_editor_asmdef(tmp_path):
+    """plugin_dir with ONLY a foreign asmdef (e.g. UnityMCP.Editor.Chat.asmdef) + .cs.
+
+    Documented behavior: .cs files under the foreign-asmdef dir are excluded;
+    any .cs at the plugin_dir root (not under any excluded ancestor) are included.
+    Intent: 'UnityMCP.Editor' assembly boundary = no foreign asmdef ancestor.
+    """
+    from unity_mcp.editor_log import find_plugin_source_files
+
+    # Only a Chat asmdef — no UnityMCP.Editor.asmdef at all
+    chat_dir = tmp_path / "Chat"
+    chat_dir.mkdir()
+    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}')
+    chat_cs = chat_dir / "ChatOnly.cs"
+    chat_cs.write_text("class ChatOnly {}")
+
+    # A .cs at root level (not under any foreign-asmdef dir)
+    root_cs = tmp_path / "Orphan.cs"
+    root_cs.write_text("class Orphan {}")
+
+    result = find_plugin_source_files(plugin_dir=tmp_path)
+    names = [f.name for f in result]
+    # Chat .cs is under the foreign-asmdef dir → excluded
+    assert "ChatOnly.cs" not in names
+    # Root-level .cs has no excluding ancestor → included
+    assert "Orphan.cs" in names
+
+
+# ---------------------------------------------------------------------------
+# P2: codeless [no-cs-code] suffix + idle-failed 3rd gate
+# ---------------------------------------------------------------------------
+
+def test_strong_broken_codeless_gets_no_cs_code_suffix(tmp_path):
+    """P2: _collect_strong_broken / _collect_errors append [no-cs-code] sentinel."""
+    content = (
+        "##### ExitCode\n"
+        "1\n"
+        "##### Output\n"
+        "All compiler errors have to be fixed before you can enter playmode!\n"
+    )
+    log = _write_log(tmp_path, content)
+    from unity_mcp.editor_log import parse_compile_errors_from_log
+    errors = parse_compile_errors_from_log(log)
+    assert len(errors) == 1
+    assert "[no-cs-code]" in errors[0]
+    assert "DO NOT GUESS" in errors[0]
+
+
+def test_corroborate_stale_log_not_resurrected_when_compile_status_idle(tmp_path):
+    """P2: stale log errors NOT resurrected when compile_status='idle' (3rd gate)."""
+    base_t = 1000000.0
+    _make_dll(tmp_path, base_t)
+    src = tmp_path / "src"
+    _make_cs(src, base_t + 200)  # cs newer → stale dll
+
+    content = _bee_block(
+        exit_code=1,
+        output_lines=["Assets/Foo.cs(1,1): error CS0001: stale error"],
+    )
+    log = _write_log(tmp_path, content)
+
+    from unity_mcp.editor_log import corroborate_compile_status
+    result = corroborate_compile_status(
+        "No compilation errors.", project_path=tmp_path, log_path=log,
+        source_dirs=[src], compile_status="idle",
+    )
+    # 3rd gate: compile_status=idle means C# says clean → don't resurrect stale log block
+    assert "[editor.log" not in result
+
+
+def test_corroborate_stale_log_resurrected_when_compile_status_idle_failed(tmp_path):
+    """P2: stale log errors ARE resurrected when compile_status='idle-failed'."""
+    base_t = 1000000.0
+    _make_dll(tmp_path, base_t)
+    src = tmp_path / "src"
+    _make_cs(src, base_t + 200)  # cs newer → stale dll
+
+    content = _bee_block(
+        exit_code=1,
+        output_lines=["Assets/Foo.cs(1,1): error CS0001: real error"],
+    )
+    log = _write_log(tmp_path, content)
+
+    from unity_mcp.editor_log import corroborate_compile_status
+    result = corroborate_compile_status(
+        "No compilation errors.", project_path=tmp_path, log_path=log,
+        source_dirs=[src], compile_status="idle-failed",
+    )
+    # Both dll-stale + log-error + idle-failed → resurrect
+    assert "[editor.log" in result
+    assert "CS0001" in result
+
 
 def test_corroborated_prefix_is_ascii(tmp_path):
     """CORROBORATED prefix must be pure ASCII — no em dash or Unicode."""

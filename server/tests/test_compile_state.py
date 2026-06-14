@@ -310,3 +310,127 @@ def test_has_strong_busy_signal_state_none_process_alive_falls_to_lock(tmp_path)
         assert probe.has_strong_busy_signal() is True
 
 
+# ---------------------------------------------------------------------------
+# RC-3: autodetect_project_path with port parameter
+# ---------------------------------------------------------------------------
+
+def test_autodetect_project_path_from_port_file(tmp_path, monkeypatch):
+    """env absent, port file present → path from port file."""
+    monkeypatch.delenv("UNITY_MCP_PROJECT_PATH", raising=False)
+    project_dir = tmp_path / "MyProject"
+    project_dir.mkdir()
+    with patch("unity_mcp.compile_state.read_project_path_from_port_file", return_value=project_dir):
+        result = CompileStateProbe.autodetect_project_path(port=9500)
+    assert result == project_dir
+
+
+def test_autodetect_project_path_env_override(tmp_path, monkeypatch):
+    """env present → env wins over port file."""
+    project_dir = tmp_path / "EnvProject"
+    project_dir.mkdir()
+    (project_dir / "Library").mkdir()
+    monkeypatch.setenv("UNITY_MCP_PROJECT_PATH", str(project_dir))
+    # Even with port file returning different path, env wins
+    other = tmp_path / "OtherProject"
+    other.mkdir()
+    with patch("unity_mcp.compile_state.read_project_path_from_port_file", return_value=other):
+        result = CompileStateProbe.autodetect_project_path(port=9500)
+    assert result == project_dir
+
+
+# ---------------------------------------------------------------------------
+# FIX-4: state=None + pid-alive + no lock → is_startup_in_progress AND
+#         has_strong_busy_signal both True (purely from startup detection)
+# ---------------------------------------------------------------------------
+
+def test_startup_in_progress_no_state_pid_alive_no_lock(tmp_path):
+    """state-file None + PID alive + no BeeDriver Lock → is_startup_in_progress True."""
+    (tmp_path / "Library").mkdir()  # no BeeDriver/Lock subfolder
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=None), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=99999), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True):
+        probe = CompileStateProbe(unity_project_path=tmp_path, port=9500)
+        assert probe.is_startup_in_progress() is True
+        assert probe.has_strong_busy_signal() is True
+
+
+# ---------------------------------------------------------------------------
+# P6: stale+busy state must consult PID (was falling through to lock-file only)
+# ---------------------------------------------------------------------------
+
+def test_stale_busy_state_pid_alive_returns_true():
+    """P6: state.is_stale=True AND is_busy=True AND PID alive → True (still compiling)."""
+    state = _make_state(is_stale=True, is_busy=True)
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=12345), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True):
+        probe = CompileStateProbe(port=9500)
+        assert probe.has_strong_busy_signal() is True
+
+
+def test_stale_busy_state_pid_dead_returns_false():
+    """P6: state.is_stale=True AND is_busy=True AND PID dead → False (Unity gone)."""
+    state = _make_state(is_stale=True, is_busy=True)
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=99999), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=False):
+        probe = CompileStateProbe(port=9500)
+        assert probe.has_strong_busy_signal() is False
+
+
+def test_stale_not_busy_state_returns_false():
+    """P6: state.is_stale=True AND is_busy=False → False (stale state not compiling)."""
+    state = _make_state(is_stale=True, is_busy=False)
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state):
+        probe = CompileStateProbe(port=9500)
+        assert probe.has_strong_busy_signal() is False
+
+
+# ---------------------------------------------------------------------------
+# G15: stale+busy+PID-alive + detect_wedge returns failure → not busy (terminal)
+# ---------------------------------------------------------------------------
+
+def test_stale_busy_live_pid_with_log_error_is_failed_not_busy():
+    """G15: stale+busy state + PID alive + detect_wedge returns a wedge → False (terminal).
+
+    Red-precondition: compile_state.py:78-79 returned not self.is_process_dead() = True
+    for ANY stale+busy+alive combination. G15 adds detect_wedge() check: a terminal
+    reload failure (build-failed-wedge) means the domain CANNOT self-heal via retry —
+    has_strong_busy_signal must return False so the bridge stops treating it as busy.
+
+    A8: feeds REAL WedgeReport into the real has_strong_busy_signal; inject only
+    detect_wedge return value, not the SUT method itself.
+    """
+    from unity_mcp.editor_log import WedgeReport
+    state = _make_state(is_stale=True, is_busy=True)
+    wedge = WedgeReport(kind="build-failed-wedge", cs_errors=["CS0535: foo"])
+
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=12345), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True), \
+         patch("unity_mcp.editor_log.detect_wedge", return_value=wedge):
+        probe = CompileStateProbe(port=9500)
+        result = probe.has_strong_busy_signal()
+
+    assert result is False, (
+        "stale+busy+PID-alive + terminal wedge → NOT busy (domain cannot self-heal)"
+    )
+
+
+def test_stale_busy_live_pid_no_wedge_is_still_busy():
+    """G15 companion: stale+busy+PID-alive + NO wedge → True (still legitimately compiling).
+
+    Proves the wedge check is additive: without a wedge report, P6 behavior is preserved.
+    """
+    state = _make_state(is_stale=True, is_busy=True)
+
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=12345), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True), \
+         patch("unity_mcp.editor_log.detect_wedge", return_value=None):
+        probe = CompileStateProbe(port=9500)
+        result = probe.has_strong_busy_signal()
+
+    assert result is True, "stale+busy+PID-alive + no wedge → still busy (P6 preserved)"
+
+

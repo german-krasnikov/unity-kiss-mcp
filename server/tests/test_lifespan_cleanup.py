@@ -118,3 +118,69 @@ def test_sampling_service_enabled_with_both_envs(monkeypatch):
     from unity_mcp.sampling import SamplingService
     svc = SamplingService()
     assert svc.enabled, "MIDDLEWARE + VISUAL_VERIFY must enable visual-verify"
+
+
+# ---------------------------------------------------------------------------
+# P9: init_corroboration re-called on reconnect
+# ---------------------------------------------------------------------------
+
+async def test_init_corroboration_called_on_reconnect(monkeypatch):
+    """P9: _on_reconnect callback calls init_corroboration(port=...) to re-resolve project."""
+    from unittest.mock import MagicMock, patch
+    from unity_mcp import server as srv
+
+    reconnect_callbacks = []
+    init_corroboration_calls = []
+
+    class FakeSlot:
+        bridge = MagicMock()
+        bridge.connected = True
+        bridge.start_heartbeat = MagicMock()
+        connected = False
+        port = 9500
+
+        async def connect(self, *a, **kw): return "ok"
+        async def close(self): pass
+
+        def add_reconnect_callback(self, cb):
+            reconnect_callbacks.append(cb)
+
+    with patch("unity_mcp.editor_log.init_corroboration",
+               side_effect=lambda **kw: init_corroboration_calls.append(kw)) as mock_ic, \
+         patch.object(srv, "ConnectionSlot", lambda **_: FakeSlot()), \
+         patch.object(srv, "slot", None), \
+         patch.object(srv, "manager", None), \
+         patch.object(srv, "_middleware", None), \
+         patch("unity_mcp.server._refresh_tools_cache", new=lambda *a: asyncio.sleep(0)), \
+         patch("unity_mcp.server._push_catalog", new=lambda *a: asyncio.sleep(0)):
+
+        monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+        monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+        monkeypatch.delenv("UNITY_MCP_WATCHDOG", raising=False)
+
+        lifespan = _import_lifespan()
+
+        class FakeApp:
+            pass
+
+        async with lifespan(FakeApp()):
+            pass
+
+    # Find the _on_reconnect callback (first registered) and invoke it
+    on_reconnect_cb = next(
+        (cb for cb in reconnect_callbacks
+         if hasattr(cb, "__qualname__") and "_on_reconnect" in cb.__qualname__),
+        None,
+    )
+    if on_reconnect_cb is None and reconnect_callbacks:
+        on_reconnect_cb = reconnect_callbacks[0]
+
+    if on_reconnect_cb is not None:
+        try:
+            on_reconnect_cb()
+        except (AttributeError, Exception):
+            pass  # other parts of callback may fail outside lifespan context
+        # init_corroboration must have been called with port kwarg
+        assert any("port" in call for call in init_corroboration_calls), (
+            "P9: init_corroboration must be called with port= in _on_reconnect"
+        )

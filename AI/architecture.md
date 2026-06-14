@@ -349,6 +349,22 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - `compile_preflight(file_path, new_content)` — validates C# without disk write
 - `semantic_at(file_path, line, col)` — type/symbol info at position
 
+## Dual-Channel Reload Recovery (v0.27.4)
+
+**Reload Package:** Independent UPM package `com.unity-mcp.reload` (separate asmdef, references:[]) runs background mini-server on port 9600+ (SO_REUSEADDR bind-retry). Persists discovered port to `Library/MCP_Port.json`. AssetImportWorker gate prevents interference with import pipeline. **Rationale:** When main plugin compilation breaks, domain reload is blocked; the reload package compiles independently and provides recovery channel.
+
+**Recovery Ladder (Python: `reload_ladder.py` T0-T5):**
+- **T0 (baseline):** Synchronous diagnose check, 1 poll
+- **T1 (force_refresh):** Call C# force_refresh + poll main MVID (30 polls × 15s = 7.5min timeout)
+- **T2 (AssetDatabase.Refresh):** Out-of-band full refresh via reload port + poll (3s sleep before poll)
+- **T3 (RequestScriptCompilation):** Out-of-band compile request via reload port + poll
+- **T4 (reimport fallback):** Last attempt, 20s polls (no max)
+- **T5 (play mode fallback):** Enter/exit Play mode to force compile via main thread, 2s wait
+
+**Sole Healing Proof:** MVID-delta (`main_mvid` before/after each tier). Frozen MVID + compile error = BROKEN_DOMAIN sentinel (domain stuck, manual reimport needed).
+
+**Integration:** `sync.py _attempt_recovery()` calls `run_ladder(start_tier=2)` on REIMPORT-NEEDED verdict.
+
 ## Implementation Notes (для Developer)
 
 ### Data Flow

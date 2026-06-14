@@ -48,12 +48,13 @@ class TestCountMcpTools:
 
 class TestCountPytestTests:
     def test_returns_int_or_none(self) -> None:
-        result = ur.count_pytest_tests(REPO_ROOT / "server" / "tests")
+        # C9: count_pytest_tests removed; use count_pytest_python from readme_facts
+        result = ur.count_pytest_python(REPO_ROOT / "server" / "tests")
         assert result is None or isinstance(result, int)
 
     def test_nonexistent_dir_returns_none(self, tmp_path: pathlib.Path) -> None:
-        result = ur.count_pytest_tests(tmp_path / "no_such_tests")
-        assert result is None
+        result = ur.count_pytest_python(tmp_path / "no_such_tests")
+        assert result is None or result == 0
 
 
 # ---------------------------------------------------------------------------

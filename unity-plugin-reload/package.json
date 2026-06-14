@@ -1,0 +1,8 @@
+{
+  "name": "com.unity-mcp.reload",
+  "version": "0.1.4",
+  "displayName": "Unity MCP Reload",
+  "description": "Reload recovery package for Unity MCP — survives main plugin compilation failures",
+  "unity": "6000.0",
+  "dependencies": {}
+}

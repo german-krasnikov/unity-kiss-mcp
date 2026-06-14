@@ -63,9 +63,26 @@ namespace UnityMCP.Editor.Chat
         private void TryResumePendingTurn()
         {
             // P0-1: consume the restore flag exactly once per call, regardless of which
-            // return path we take below (idle/stale/null all returned early before).
+            // return path we take (D6 gate / stale / null / idle all return before dispatch).
             var transcriptRestored = _transcriptRestored;
             _transcriptRestored = false;
+
+            // D6 gate: if compile is not clean, reschedule via delayCall (bounded 30 retries).
+            // Spec: 31st call with IsCompileClean=false → give up (discard pending state).
+            if (!SyncHelper.IsCompileClean)
+            {
+                if (_resumeRetryCount >= MaxResumeRetries)
+                {
+                    // Give up: discard pending state to avoid zombie resume.
+                    ReloadGuard.ClearPendingState();
+                    _resumeRetryCount = 0;
+                    return;
+                }
+                _resumeRetryCount++;
+                EditorApplication.delayCall += TryResumePendingTurn;
+                return;
+            }
+            _resumeRetryCount = 0;  // reset on success path
 
             var pending = ReloadGuard.LoadPendingState();
             if (pending == null) return;
@@ -171,11 +188,8 @@ namespace UnityMCP.Editor.Chat
             foreach (var ev in _evBuf) HandleEvent(ev);
             foreach (var rec in _toolBuf) HandleToolRecord(rec);
             _transcript.FlushStreaming();
-            if (_needsRefresh)
-            {
-                _needsRefresh = false;
-                AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-            }
+            // _needsRefresh is now debounced to TurnDone (HandleEvent case TurnDone).
+            // Do NOT act on it here — mid-stream partial compiles cause phantom CS errors.
             if (EditorPrefs.GetBool("MCPChat.AutoScroll", true))
                 _scroll.scrollOffset = new Vector2(0, float.MaxValue);
         }
@@ -191,6 +205,13 @@ namespace UnityMCP.Editor.Chat
                 case ChatEventKind.TurnDone:
                     ReloadGuard.OnTurnFinished(); // #1 unlock after turn complete
                     if (_activity.Done()) OnActivityChanged();
+                    // Debounced refresh: fire once at TurnDone (not mid-stream per tool result).
+                    // D2.3: single Refresh after unlock avoids phantom CS errors from partial edits.
+                    if (_needsRefresh)
+                    {
+                        _needsRefresh = false;
+                        SyncHelper.TriggerSync(resolve: false);
+                    }
                     // F20: refresh resolver before freeze so objects created during this turn
                     // are visible to BareNameNormalizer's scene-wide pass (closes cache-staleness gap).
                     _resolver?.Refresh();

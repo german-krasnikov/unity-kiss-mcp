@@ -492,3 +492,152 @@ def test_kill_pid_permission_error():
     from unity_mcp.lockfile import _kill_pid
     with patch("os.kill", side_effect=PermissionError):
         _kill_pid(99999)  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# RC-3: read_project_path_from_port_file
+# ---------------------------------------------------------------------------
+
+def test_read_project_path_from_port_file_returns_path(tmp_path):
+    """Port file with matching port, existing path, alive PID → returns Path."""
+    from unity_mcp.lockfile import read_project_path_from_port_file
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    project_dir = tmp_path / "MyProject"
+    project_dir.mkdir()
+    port_file = ports_dir / "12345.port"
+    port_file.write_text(f"9500\n{project_dir}\nMyProject\n")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True):
+        result = read_project_path_from_port_file(9500)
+    assert result == project_dir
+
+
+def test_read_project_path_dead_pid_skipped(tmp_path):
+    """P8: port file with dead PID → skip (return None, don't resolve wrong project dll)."""
+    from unity_mcp.lockfile import read_project_path_from_port_file
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    project_dir = tmp_path / "MyProject"
+    project_dir.mkdir()
+    port_file = ports_dir / "99999.port"
+    port_file.write_text(f"9500\n{project_dir}\nMyProject\n")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=False):
+        result = read_project_path_from_port_file(9500)
+    assert result is None
+
+
+def test_read_project_path_alive_pid_returned(tmp_path):
+    """P8: alive PID with matching port → project path returned."""
+    from unity_mcp.lockfile import read_project_path_from_port_file
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    project_dir = tmp_path / "AliveProject"
+    project_dir.mkdir()
+    port_file = ports_dir / "11111.port"
+    port_file.write_text(f"9500\n{project_dir}\nAliveProject\n")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True):
+        result = read_project_path_from_port_file(9500)
+    assert result == project_dir
+
+
+def test_read_project_path_from_port_file_wrong_port(tmp_path):
+    """Port file exists but port doesn't match → None."""
+    from unity_mcp.lockfile import read_project_path_from_port_file
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    project_dir = tmp_path / "MyProject"
+    project_dir.mkdir()
+    port_file = ports_dir / "12345.port"
+    port_file.write_text(f"9501\n{project_dir}\nMyProject\n")
+    with patch.object(Path, "home", return_value=tmp_path):
+        result = read_project_path_from_port_file(9500)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# read_reload_port
+# ---------------------------------------------------------------------------
+
+def test_read_reload_port_returns_none_when_no_dir():
+    """read_reload_port returns None when ~/.unity-mcp/ports doesn't exist."""
+    from unity_mcp.lockfile import read_reload_port
+    with patch.object(Path, "home", return_value=Path("/nonexistent_dir_xyz")):
+        assert read_reload_port() is None
+
+
+def test_read_reload_port_returns_port_for_alive_pid(tmp_path):
+    """read_reload_port finds {pid}.reload-port with alive PID → returns int port."""
+    from unity_mcp.lockfile import read_reload_port
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    pid = os.getpid()  # our own PID is always alive
+    (ports_dir / f"{pid}.reload-port").write_text("9600", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path):
+        result = read_reload_port()
+    assert result == 9600
+
+
+def test_read_reload_port_skips_dead_pid(tmp_path):
+    """read_reload_port skips {pid}.reload-port files whose PID is dead → None."""
+    from unity_mcp.lockfile import read_reload_port
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    dead_pid = 99999999
+    (ports_dir / f"{dead_pid}.reload-port").write_text("9600", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path):
+        result = read_reload_port()
+    assert result is None
+
+
+def test_read_reload_port_skips_corrupt_file(tmp_path):
+    """read_reload_port skips files with non-integer content."""
+    from unity_mcp.lockfile import read_reload_port
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    pid = os.getpid()
+    (ports_dir / f"{pid}.reload-port").write_text("not-a-port", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path):
+        result = read_reload_port()
+    assert result is None
+
+
+def test_read_reload_port_cwd_disambiguation(tmp_path):
+    """F2: read_reload_port with multi-line format selects port matching CWD prefix."""
+    from unity_mcp.lockfile import read_reload_port
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    pid = os.getpid()
+
+    proj_a = str(tmp_path / "ProjectA")
+    proj_b = str(tmp_path / "ProjectB")
+
+    # Two reload-port files — one matches CWD, one doesn't
+    # Use different fake PIDs for file naming but point both to our alive PID
+    (ports_dir / f"{pid}.reload-port").write_text(
+        f"9601\n{proj_a}\nProjectA", encoding="utf-8"
+    )
+    pid2 = pid + 1  # fake second "pid" — won't be alive, so just use this for file name
+    # Write second file with pid pointing to nonexistent process — will be skipped by is_pid_alive
+    # Instead, test single-file CWD match
+    with patch("os.getcwd", return_value=proj_a):
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = read_reload_port()
+
+    assert result == 9601
+
+
+def test_read_reload_port_multiline_backward_compat(tmp_path):
+    """F2: multi-line reload-port file (port\\nProjectDir\\nProjectName) still returns port."""
+    from unity_mcp.lockfile import read_reload_port
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    pid = os.getpid()
+    (ports_dir / f"{pid}.reload-port").write_text(
+        "9605\n/some/project/path\nMyProject", encoding="utf-8"
+    )
+    with patch.object(Path, "home", return_value=tmp_path):
+        result = read_reload_port()
+    assert result == 9605

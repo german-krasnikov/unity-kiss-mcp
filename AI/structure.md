@@ -9,6 +9,7 @@ unity-kiss-mcp/
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
 │   │   ├── server_filtering.py # Port discovery + TCP probe (v0.23.0), catalog push, tool filtering
 │   │   ├── lockfile.py         # Cross-platform exclusive locking + zombie detection (v0.23.0)
+│   │   ├── diagnose.py         # Shared diagnose parser + verdict logic (_parse_diagnose, _verdict, _DiagnoseFields)
 │   │   ├── compile_state.py    # CompileStateProbe (heuristic Unity compile detection)
 │   │   ├── middleware.py       # 23-layer middleware pipeline (env-gated UNITY_MCP_MIDDLEWARE=1)
 │   │   ├── middleware_paths.py # PathResolverMixin extracted from middleware.py
@@ -65,8 +66,9 @@ unity-kiss-mcp/
 │   │   │   ├── overlay.py      # Pillow-based SoM overlay renderer (numbered circles, boxes)
 │   │   │   ├── extract.py      # Parse and filter rects from Unity screenshot payload
 │   │   │   └── diff_annotate.py # Annotate before/after images with SoM, call sampling
-│   │   ├── tools/              # Tool modules (23 files + __init__)
+│   │   ├── tools/              # Tool modules (24 files + __init__)
 │   │   │   ├── __init__.py     # Tool module registry
+│   │   │   ├── reload_ladder.py # Reload recovery T0-T5 ladder (MVID-delta healing proof)
 │   │   │   ├── objects.py      # create/delete/find/inspect/set_parent/set_material
 │   │   │   ├── scene.py        # scene, editor, screenshot, search, spatial, scan, schema
 │   │   │   ├── runtime.py      # invoke_method, wait_until, move_to, run_playtest, fuzz_playtest
@@ -93,10 +95,11 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~2048 unit tests + 70 live tests + conftest.py (v0.26.0 quality audit)
+│   └── tests/                  # ~2068 unit tests + 70 live tests + conftest.py (v0.26.0 quality audit)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
+│       ├── test_reload_ladder.py       # Reload recovery T0-T5 stages + verdict scenarios (20+ tests, v0.27.4)
 │       ├── test_middleware*.py          # Middleware layers (god-file split in v0.26.0)
 │       ├── test_batch*.py              # Batch + conflict + timeout
 │       ├── test_multiscene.py          # Multi-scene CRUD, transfer, diff, bugs (305 tests, v0.24.3)
@@ -112,7 +115,28 @@ unity-kiss-mcp/
 │       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
 │       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
 │       └── ... + domain tests (182 files total, 1018 @pytest.mark.asyncio removed v0.26.0)
-├── unity-plugin/               # Unity Editor Plugin (75 C# files, ~13600 LOC)
+├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
+│   ├── Editor/
+│   │   ├── ReloadBinder.cs                   # SO_REUSEADDR bind-retry for port 9600+
+│   │   ├── ReloadCommands.cs                 # Public API for recovery tools
+│   │   ├── ReloadCompileNotifier.cs          # Domain load completion detector
+│   │   ├── ReloadDiagnoseCommand.cs          # TCP diagnose endpoint (portable _parse_diagnose)
+│   │   ├── ReloadDomainStamp.cs              # Session-scoped domain timestamp
+│   │   ├── ReloadMiniServer.cs               # Mini TCP server (async accept + handler)
+│   │   ├── ReloadPlugin.cs                   # Entry point (AssetImportWorker gate)
+│   │   ├── ReloadPortResolver.cs             # Atomic Delete+Move port persistence
+│   │   └── Tests/                            # 7 NUnit test files (asmdef: UnityMCP.Reload.Tests)
+│   │       ├── ReloadCommandsTests.cs
+│   │       ├── ReloadCompileNotifierTests.cs
+│   │       ├── ReloadDiagnoseTests.cs
+│   │       ├── ReloadDomainStampTests.cs
+│   │       ├── ReloadMiniServerTests.cs
+│   │       ├── ReloadPluginTests.cs
+│   │       └── ReloadPortResolverTests.cs
+│   ├── UnityMCP.Reload.asmdef                # Core assembly (no references)
+│   ├── package.json                          # v0.1.4, "com.unity-mcp.reload"
+│   └── package.json.meta
+├── unity-plugin/               # Unity Editor Plugin (75+ C# files, ~13600 LOC)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, etc.) + 25 tests

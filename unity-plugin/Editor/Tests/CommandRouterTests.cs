@@ -351,5 +351,58 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void ExtractKeys_NullJson_ReturnsEmpty()
             => Assert.IsEmpty(CommandSchema.ExtractKeys(null));
+
+        // ── Step 2: sync + sync_status commands (#11, #12) ───────────────────
+
+        // #11: sync and sync_status are registered
+        [TestCase("sync",        ExpectedResult = true)]
+        [TestCase("sync_status", ExpectedResult = true)]
+        public bool Sync_Commands_Registered(string cmd)
+            => CommandRegistry.IsRegistered(cmd);
+
+        // #12: sync_status is allowed during compile
+        [TestCase("sync_status", ExpectedResult = true)]
+        public bool SyncStatus_Allowed_During_Compile(string cmd)
+            => CommandRouter.IsAllowedDuringCompile(cmd);
+
+        // C4: get_compile_errors and diagnose allowed during compile (escape-hatch must be reachable when wedged)
+        [TestCase("get_compile_errors", ExpectedResult = true)]
+        [TestCase("diagnose",           ExpectedResult = true)]
+        public bool IsAllowedDuringCompile_AllowsGetCompileErrorsAndDiagnose(string cmd)
+            => CommandRouter.IsAllowedDuringCompile(cmd);
+
+        // C4: diagnose is always allowed (not gated by MCPSettings)
+        [Test]
+        public void IsAlwaysAllowed_Diagnose_ReturnsTrue()
+            => Assert.IsTrue(CommandRouter.IsAlwaysAllowed("diagnose"));
+
+        // C7: get_version is NOT registered in CommandRegistry (MCPServer fast-path owns it)
+        // This ensures no caller can accidentally route to the VersionTracker counter.
+        [Test]
+        public void GetVersion_NotRegistered_In_CommandRegistry()
+            => Assert.IsFalse(CommandRegistry.IsRegistered("get_version"),
+                "get_version must NOT be in CommandRegistry — MCPServer fast-path is sole handler");
+
+        // G11: force_refresh is registered as a distinct verb from recompile
+        [Test]
+        public void ForceRefresh_IsRegistered_And_DistinctFrom_Recompile()
+        {
+            Assert.IsTrue(CommandRegistry.IsRegistered("force_refresh"),
+                "force_refresh must be registered");
+            Assert.IsTrue(CommandRegistry.IsRegistered("recompile"),
+                "recompile must still be registered");
+        }
+
+        // G11: force_refresh is in the IsAllowedDuringCompile allowlist (works when wedged)
+        [Test]
+        public void ForceRefresh_IsAllowedDuringCompile()
+            => Assert.IsTrue(CommandRouter.IsAllowedDuringCompile("force_refresh"),
+                "G11: force_refresh must be allowed during compile so it works when wedged");
+
+        // G11: recompile is NOT in the IsAllowedDuringCompile allowlist (old no-op path stays separate)
+        [Test]
+        public void Recompile_IsNotAllowedDuringCompile()
+            => Assert.IsFalse(CommandRouter.IsAllowedDuringCompile("recompile"),
+                "G11: recompile (AssetDatabase.Refresh no-op) must NOT be in the allowlist");
     }
 }

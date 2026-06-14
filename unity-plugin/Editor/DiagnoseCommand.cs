@@ -1,0 +1,257 @@
+// DiagnoseCommand — C8. Read-only atomic snapshot of all fact-signals.
+// MUST NOT call TriggerSync or any mutating API (re-wedges the state machine).
+// Registered in IsAllowedDuringCompile + IsAlwaysAllowed (C4).
+using System;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEditor.Compilation;
+
+namespace UnityMCP.Editor
+{
+    internal static class DiagnoseCommand
+    {
+        // G29: enumerate dlls dynamically via CompilationPipeline so newly-added
+        // asmdefs (e.g. Chat.Tests) are always included without manual list updates.
+        // Returns dll file names (e.g. "UnityMCP.Editor.dll") for freshness check.
+        internal static string[] GetKnownDlls()
+        {
+            try
+            {
+                var assemblies = CompilationPipeline.GetAssemblies(AssembliesType.Editor);
+                var result = new string[assemblies.Length];
+                for (int i = 0; i < assemblies.Length; i++)
+                    result[i] = System.IO.Path.GetFileName(assemblies[i].outputPath);
+                return result;
+            }
+            catch (Exception)
+            {
+                // Fallback to known-critical dlls if CompilationPipeline unavailable
+                return new[] { "UnityMCP.Editor.dll", "UnityMCP.Editor.Tests.dll" };
+            }
+        }
+
+        // NOTE: snapshot is NOT atomic across these reads (two reads of isCompiling possible).
+        // Accepted limitation — Unity main thread guarantees no lock needed, but the boundary
+        // between reads is open. Document; over-engineering with a snapshot struct would be
+        // premature.
+        public static string Execute(string args)
+        {
+            var sb = new StringBuilder();
+
+            // mvid= — MVID half of ComputeStamp (IL identity)
+            var stamp = SyncHelper.ComputeStamp();
+            var mvid = string.IsNullOrEmpty(stamp) ? "UNDETERMINED"
+                : stamp.Split(':')[0];
+            sb.AppendLine($"mvid={mvid}");
+
+            // stamp= — SyncHelper.CurrentDomainStamp
+            var domainStamp = SyncHelper.CurrentDomainStamp;
+            sb.AppendLine($"stamp={(!string.IsNullOrEmpty(domainStamp) ? domainStamp : "UNDETERMINED")}");
+
+            // compile= — CompileNotifier.GetStatus() (e.g. "idle|3.2", "idle-failed|8.1")
+            sb.AppendLine($"compile={CompileNotifier.GetStatus()}");
+
+            // sync= — first 2 fields of GetSyncStatus (state + epoch). No TriggerSync call.
+            var syncStatus = SyncHelper.GetSyncStatus();
+            sb.AppendLine($"sync={ExtractSyncSummary(syncStatus)}");
+
+            // iscompiling/cn_active/started/stamp_frozen — wedge fingerprint (C2 fields)
+            // Read these directly for a standalone snapshot (GetSyncStatus only emits them
+            // in the compiling state; here we always emit for completeness).
+            bool isCompiling = EditorApplication.isCompiling;
+            bool cnActive    = CompileNotifier.IsCompiling;
+            bool started     = SessionState.GetBool("MCP_SyncCompileStarted", false);
+            var  stampAtTrig = SessionState.GetString("MCP_StampAtTrigger", "");
+            bool stampFrozen = !string.IsNullOrEmpty(domainStamp) && domainStamp == stampAtTrig;
+            sb.AppendLine(
+                $"iscompiling={isCompiling.ToString().ToLower()}" +
+                $"  cn_active={cnActive.ToString().ToLower()}" +
+                $"  started={started.ToString().ToLower()}" +
+                $"  stamp_frozen={stampFrozen.ToString().ToLower()}");
+
+            // dlls= — per-asmdef dll mtime + freshness
+            sb.AppendLine($"dlls={BuildDllFreshness()}");
+
+            // errors= — CompileErrorCapture.GetErrors() (survives reload via SessionState after C5)
+            sb.AppendLine($"errors={CompileErrorCapture.GetErrors()}");
+
+            // log= — Editor.log parse for CS codes
+            sb.AppendLine($"log={ParseEditorLog()}");
+
+            // main_mvid= — MVID of UnityMCP.Editor assembly (this assembly). Thread-safe.
+            // Symmetrical with ReloadDiagnoseCommand / ReloadDomainStamp.MainAsmdefMvid().
+            sb.AppendLine($"main_mvid={typeof(DiagnoseCommand).Assembly.ManifestModule.ModuleVersionId}");
+
+            // C10: reload_failed= — detects "Reloading assemblies failed." or "Editor compiler errors found.
+            // Will not reload assemblies." in the editor log. Python editor_log_parser.py already defines
+            // BuildFailure.reload_failed; this C# signal lets Python consume it via wire format.
+            sb.AppendLine($"reload_failed={DetectReloadFailed().ToString().ToLower()}");
+
+            return sb.ToString().TrimEnd();
+        }
+
+        // Extract "state  epoch=N" summary from full GetSyncStatus string
+        static string ExtractSyncSummary(string syncStatus)
+        {
+            // format: epoch=N|state=X|... or epoch=N|state=compiling|dur=...|stamp=...|...
+            // Return "state  epoch=N" for wire-format
+            var parts = syncStatus.Split('|');
+            string epochPart = "", statePart = "";
+            foreach (var p in parts)
+            {
+                if (p.StartsWith("epoch=")) epochPart = p;
+                if (p.StartsWith("state=")) statePart = p.Substring(6); // just the state value
+            }
+            return $"{statePart}  {epochPart}";
+        }
+
+        static string BuildDllFreshness()
+        {
+            var projectPath = UnityEngine.Application.dataPath;
+            // Library/ScriptAssemblies is sibling of Assets (dataPath ends in /Assets)
+            var projectRoot = Path.GetDirectoryName(projectPath) ?? "";
+            var libPath = Path.Combine(projectRoot, "Library", "ScriptAssemblies");
+            var sbDlls = new StringBuilder();
+
+            foreach (var dllName in GetKnownDlls())
+            {
+                var asmName = Path.GetFileNameWithoutExtension(dllName);
+                var dllPath = Path.Combine(libPath, dllName);
+                var srcDir  = FindAsmdefDir(projectPath, asmName);
+                var token   = GetDllFreshnessToken(dllPath, srcDir);
+                var mtime   = File.Exists(dllPath)
+                    ? new FileInfo(dllPath).LastWriteTimeUtc.Ticks : 0L;
+
+                if (sbDlls.Length > 0) sbDlls.Append(',');
+                sbDlls.Append($"{asmName}:{mtime}:{token}");
+            }
+
+            return sbDlls.Length > 0 ? sbDlls.ToString() : "none";
+        }
+
+        // Exposed internal for NUnit testing with injected temp paths.
+        // Returns "fresh" | "stale" | "unknown(missing)" | "unknown(no-src)"
+        internal static string GetDllFreshnessToken(string dllPath, string srcDir)
+        {
+            if (!File.Exists(dllPath)) return "unknown(missing)";
+            if (string.IsNullOrEmpty(srcDir) || !Directory.Exists(srcDir)) return "unknown(no-src)";
+
+            var dllMtime = new FileInfo(dllPath).LastWriteTimeUtc;
+            var maxCsMtime = DateTime.MinValue;
+            foreach (var cs in Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories))
+            {
+                var t = new FileInfo(cs).LastWriteTimeUtc;
+                if (t > maxCsMtime) maxCsMtime = t;
+            }
+
+            if (maxCsMtime == DateTime.MinValue) return "fresh"; // no .cs files → dll is up-to-date by definition
+            return dllMtime < maxCsMtime ? "stale" : "fresh";
+        }
+
+        // Find the directory containing <asmName>.asmdef by scanning under dataPath.
+        static string FindAsmdefDir(string dataPath, string asmName)
+        {
+            var asmdefName = asmName + ".asmdef";
+            try
+            {
+                foreach (var f in Directory.GetFiles(dataPath, "*.asmdef", SearchOption.AllDirectories))
+                {
+                    if (Path.GetFileName(f).Equals(asmdefName, StringComparison.OrdinalIgnoreCase))
+                        return Path.GetDirectoryName(f) ?? "";
+                }
+            }
+            catch (Exception) { /* permission or IO error — degrade gracefully */ }
+            return "";
+        }
+
+        // C10: Detect reload-failed markers in Editor.log.
+        // Matches the same substrings as Python editor_log_parser.py _RELOAD_FAILED / _RELOAD_ABORTED.
+        // Returns true when "Reloading assemblies failed." OR "Editor compiler errors found.
+        // Will not reload assemblies." is present in the log.
+        // Testable overload — accepts injected logPath for NUnit coverage.
+        internal static bool DetectReloadFailed(string logPath)
+        {
+            const string reloadFailed  = "Reloading assemblies failed.";
+            const string reloadAborted = "Editor compiler errors found. Will not reload assemblies.";
+            try
+            {
+                if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath))
+                    return false;
+                string text;
+                using (var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var reader = new StreamReader(fs))
+                    text = reader.ReadToEnd();
+                return text.IndexOf(reloadFailed,  StringComparison.Ordinal) >= 0
+                    || text.IndexOf(reloadAborted, StringComparison.Ordinal) >= 0;
+            }
+            catch (Exception) { return false; }
+        }
+
+        internal static bool DetectReloadFailed() => DetectReloadFailed(GetEditorLogPath());
+
+        static string ParseEditorLog()
+        {
+            try
+            {
+                var logPath = GetEditorLogPath();
+                if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath))
+                    return "absent";
+
+                // Read full file (not tail — P1 fix teaches full-file is correct)
+                string text;
+                using (var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var reader = new StreamReader(fs))
+                    text = reader.ReadToEnd();
+
+                // Find last failure header (rfind equivalent via LastIndexOf)
+                const string failHeader = "## Script Compilation Error for:";
+                var idx = text.LastIndexOf(failHeader, StringComparison.Ordinal);
+                if (idx < 0) return "clean";
+
+                // Extract CS#### codes from the failure block
+                var block = text.Substring(idx, Math.Min(8192, text.Length - idx));
+                var matches = Regex.Matches(block, @"error (CS\d+)");
+                if (matches.Count == 0) return "clean";
+
+                var seen = new System.Collections.Generic.HashSet<string>();
+                var codes = new StringBuilder();
+                foreach (Match m in matches)
+                {
+                    var code = m.Groups[1].Value;
+                    if (seen.Add(code))
+                    {
+                        if (codes.Length > 0) codes.Append(' ');
+                        codes.Append(code);
+                    }
+                }
+                return codes.ToString();
+            }
+            catch (Exception e)
+            {
+                return $"error:{e.GetType().Name}";
+            }
+        }
+
+        static string GetEditorLogPath()
+        {
+            // macOS: ~/Library/Logs/Unity/Editor.log
+            // Windows: %LOCALAPPDATA%\Unity\Editor\Editor.log
+            // Linux: ~/.config/unity3d/Editor.log
+            if (UnityEngine.Application.platform == UnityEngine.RuntimePlatform.OSXEditor)
+            {
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+                return Path.Combine(home, "Library", "Logs", "Unity", "Editor.log");
+            }
+            if (UnityEngine.Application.platform == UnityEngine.RuntimePlatform.WindowsEditor)
+            {
+                var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                return Path.Combine(local, "Unity", "Editor", "Editor.log");
+            }
+            // Linux
+            var linuxHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return Path.Combine(linuxHome, ".config", "unity3d", "Editor.log");
+        }
+    }
+}

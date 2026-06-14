@@ -57,6 +57,15 @@ namespace UnityMCP.Editor
             chatPortField.AddToClassList("hub-port-label");
             section.Add(chatPortField);
 
+            var reloadPort = MCPServer.ServerReloadPort;
+            if (reloadPort != 0)
+            {
+                var reloadPortField = new IntegerField("Reload Port") { value = reloadPort };
+                reloadPortField.AddToClassList("hub-port-label");
+                reloadPortField.SetEnabled(false);
+                section.Add(reloadPortField);
+            }
+
             var restartWarning = new Label("Restart required to apply") { visible = false };
             restartWarning.AddToClassList("hub-port-restart-warning");
             section.Add(restartWarning);

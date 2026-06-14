@@ -931,3 +931,58 @@ async def test_concurrent_sends_use_unique_message_ids():
     results = await asyncio.gather(*[bridge.send("ping", {}) for _ in range(50)])
     assert len(set(sent_ids)) == 50, "concurrent sends must get unique IDs"
     assert all(r.get("ok") for r in results)
+
+
+# ---------------------------------------------------------------------------
+# P7: ProtocolDesyncError + hard deadline
+# ---------------------------------------------------------------------------
+
+async def test_heartbeat_ping_mismatch_raises_protocol_desync():
+    """P7: ID mismatch in _raw_ping raises ProtocolDesyncError (not generic ConnectionError)."""
+    from unity_mcp.bridge_heartbeat import ProtocolDesyncError
+
+    idle_probe = make_idle_probe()
+    with patch("unity_mcp.bridge.asyncio.open_connection",
+               return_value=(AsyncMock(), make_writer())):
+        bridge = UnityBridge()
+        bridge._probe = idle_probe
+        await bridge.connect()
+
+        async def mismatched_read():
+            return {"id": "wrong-id", "ok": True, "data": "pong"}
+
+        with patch.object(bridge, "_read_response", side_effect=mismatched_read):
+            with pytest.raises(ProtocolDesyncError):
+                await bridge._raw_ping(timeout=5.0)
+
+
+async def test_heartbeat_hard_deadline_latches_grace_expired():
+    """P7: HARD_DEADLINE_S reached while disconnected → _startup_grace_expired=True."""
+    import time as _time
+    import unity_mcp.bridge_heartbeat as _bh
+    from unittest.mock import AsyncMock as _AsyncMock
+
+    idle_probe = make_idle_probe()
+    idle_probe.has_strong_busy_signal = Mock(return_value=True)  # always busy
+
+    with patch("unity_mcp.bridge.asyncio.open_connection",
+               return_value=(_AsyncMock(), make_writer())):
+        bridge = UnityBridge()
+        bridge._probe = idle_probe
+        bridge._on_unavailable = None
+        await bridge.connect()
+        await bridge.close()  # start disconnected
+
+        # Patch HARD_DEADLINE_S to near-zero so test completes quickly
+        original = _bh.HARD_DEADLINE_S
+        _bh.HARD_DEADLINE_S = 0.001
+        try:
+            # Simulate enough elapsed time by moving reconnect_started_at far back
+            bridge._reconnect_started_at = _time.monotonic() - 1.0
+            with patch("asyncio.sleep", new=_AsyncMock(return_value=None)):
+                # One tick should latch the deadline
+                await bridge._heartbeat_tick(interval=0.01)
+        finally:
+            _bh.HARD_DEADLINE_S = original
+
+    assert bridge._startup_grace_expired is True

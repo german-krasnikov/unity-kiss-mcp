@@ -57,9 +57,9 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
         "asset", "prefab", "scriptable_object", "project_settings",
     ],
     "ADVANCED_CODE": [
-        "execute_code", "recompile", "find_references", "semantic_at",
+        "execute_code", "recompile", "sync_unity", "find_references", "semantic_at",
         "compile_preflight", "await_compile", "get_schema", "auto_fix", "smart_build",
-        "checkpoint", "validate_references", "menu",
+        "checkpoint", "validate_references", "menu", "diagnose",
     ],
     "SESSION_SKILLS": [
         "save_skill", "use_skill", "list_skills",
@@ -107,7 +107,7 @@ TIER1: set[str] = {
     "do", "ask",
     "animator_intent", "vfx_intent", "ui_intent",
     "get_metrics",
-    "find_references", "compile_preflight", "semantic_at", "await_compile",
+    "find_references", "compile_preflight", "semantic_at", "await_compile", "sync_unity",
     "set_parent",
     # runtime tools — always available in Play Mode
     "invoke_method", "set_runtime_property", "wait_until", "move_to",

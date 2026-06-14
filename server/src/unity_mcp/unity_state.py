@@ -1,12 +1,13 @@
 """Unity Editor state file reader.
 
 Unity writes ~/.unity-mcp/state/port-{port}.state with:
-  line 0: state name (ready/compiling/reloading)
+  line 0: state name (ready/compiling/reloading/compile_failed)
   line 1: unix timestamp when state changed
-  line 2: Unity process PID (written by C# but ignored by Python)
+  line 2: Unity process PID
+  line 3: epoch (NEW — sync_unity epoch; absent in pre-0.21 state files)
 """
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -17,6 +18,7 @@ _STALE_SECONDS = 120.0
 class UnityState:
     state: str
     timestamp: float
+    epoch: int = 0  # backward-compatible: 0 when line 3 absent
 
     @property
     def is_busy(self) -> bool:
@@ -34,6 +36,7 @@ def read_state_for_port(port: int) -> Optional[UnityState]:
         lines = path.read_text(encoding="utf-8", errors="replace").strip().split("\n")
         if len(lines) < 2:
             return None
-        return UnityState(state=lines[0], timestamp=float(lines[1]))
+        epoch = int(lines[3]) if len(lines) >= 4 else 0  # backward-compatible
+        return UnityState(state=lines[0], timestamp=float(lines[1]), epoch=epoch)
     except (OSError, ValueError, IndexError):
         return None

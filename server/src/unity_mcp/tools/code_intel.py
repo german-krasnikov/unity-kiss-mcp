@@ -21,6 +21,8 @@ from typing import Any
 
 _send = None
 
+_STILL_BUSY_STATES = frozenset({"compiling", "reloading"})
+
 
 async def find_references(symbol: str, kind: str = "", scope: str = "") -> str:
     """Find all C# references to a symbol (Roslyn). Replaces grep+reads for renames.
@@ -49,36 +51,68 @@ async def semantic_at(file_path: str, line: int, col: int) -> str:
 
 
 def _parse_status(status: str) -> tuple[str, float]:
-    """Parse 'state|number' → (state, number). Unknown format → ('idle', 0.0)."""
+    """Parse 'state|number' → (state, number). Unknown format → ('idle', 0.0).
+
+    P4: 'idle-never' mapped to non-idle ('idle-never', 0.0) — never compiled ≠ clean.
+    """
     try:
         state, val = status.split("|", 1)
-        return state.strip(), float(val)
+        state = state.strip()
+        # idle-never: Unity never compiled this session — NOT equivalent to idle/clean
+        return state, float(val)
     except (ValueError, AttributeError):
         return "idle", 0.0
+
+
+def _parse_sync_status(status: str) -> tuple[int, str, str, str]:
+    """Parse 'epoch=N|state=S[|dur=X][|stamp=G:T][|err=...]' → (epoch, state, extra, stamp).
+
+    P4: adds stamp field to the return tuple so callers can compare MVIDs.
+    """
+    try:
+        parts = {p.split("=", 1)[0]: p.split("=", 1)[1] for p in status.split("|") if "=" in p}
+        epoch = int(parts.get("epoch", "0"))
+        state = parts.get("state", "idle")
+        extra = parts.get("err", parts.get("dur", ""))
+        stamp = parts.get("stamp", "")
+        return epoch, state, extra, stamp
+    except (ValueError, AttributeError):
+        return 0, "idle", "", ""
 
 
 async def await_compile(timeout: float = 60.0) -> str:
     """Block until Unity finishes compiling + reloading, then return compile errors.
     Use after writing .cs files instead of sleep. Returns errors or 'compile clean (Xs)'.
-    Handles domain reload disconnects transparently. timeout=0 → immediate check, no loop."""
+    Handles domain reload disconnects transparently. timeout=0 → immediate check, no loop.
+    Epoch-aware via sync_status when available (+10 from MAJOR-1); falls back to compile_status."""
     async def _get_errors() -> str:
-        try:
-            csharp = await _send("get_compile_errors", {})
-        except ConnectionError:
-            return ""
+        # Sentinel-strip lives in get_corroborated_errors (P3 DRY).
         from .. import editor_log
-        return editor_log.corroborate(csharp)
+        return await editor_log.get_corroborated_errors(_send)
 
     # timeout=0: single check, no loop
+    # G13: only active compile states are "still compiling"; terminal states (idle-failed,
+    # idle-never, idle-stale) fall through to _get_errors() which returns the real verdict.
     if timeout == 0:
         try:
             status = await _send("compile_status", {})
             state, _ = _parse_status(status)
-            if state != "idle":
+            if state in _STILL_BUSY_STATES:
                 return "still compiling"
         except ConnectionError:
             pass
         return await _get_errors()
+
+    # Epoch-aware path: try sync_status first; fall back to compile_status if unavailable.
+    epoch = None
+    stamp_pre = ""
+    try:
+        raw = await _send("sync_status", {})
+        ep, st, _, stamp_pre = _parse_sync_status(raw)
+        if ep > 0 and st in ("compiling", "reloading"):
+            epoch = ep  # there's a pending sync cycle — wait for this epoch
+    except (ConnectionError, Exception):
+        pass  # sync_status not available → use compile_status fallback
 
     deadline = time.monotonic() + timeout
 
@@ -89,14 +123,53 @@ async def await_compile(timeout: float = 60.0) -> str:
             msg = f"timeout after {elapsed_total:.1f}s — compile still in progress"
             return f"{msg}\n{errors}" if errors else msg
 
+        if epoch is not None:
+            # Epoch-aware: poll sync_status until this epoch is ready/failed/idle
+            try:
+                raw = await _send("sync_status", {})
+                ep, st, err, stamp_post = _parse_sync_status(raw)
+            except ConnectionError:
+                await asyncio.sleep(1)
+                continue
+
+            if ep == epoch:
+                if st == "ready" or st == "idle":
+                    # P4: MVID gate — unchanged MVID after intended compile → stale domain
+                    if stamp_pre and stamp_post:
+                        mvid_pre  = stamp_pre.partition(":")[0]
+                        mvid_post = stamp_post.partition(":")[0]
+                        if mvid_pre == mvid_post:
+                            return (
+                                "STALE-DOMAIN: stamp unchanged after reload"
+                                " — old code may be live"
+                            )
+                    errors = await _get_errors()
+                    return errors if errors else "compile clean (sync)"
+                if st == "failed":
+                    errors = await _get_errors()
+                    return errors if errors else f"compile failed: {err}"
+            # still compiling/reloading or epoch mismatch — poll
+            await asyncio.sleep(1)
+            continue
+
+        # Fallback: compile_status poll (original behavior)
         try:
             status = await _send("compile_status", {})
         except ConnectionError:
-            # Domain reload (DomainReloadError is-a ConnectionError): Unity is restarting — wait and retry
+            # Domain reload: Unity is restarting — wait and retry
             await asyncio.sleep(1)
             continue
 
         state, duration = _parse_status(status)
+
+        if state == "idle-failed":
+            errors = await _get_errors()
+            return errors if errors else f"compile failed ({duration:.1f}s)"
+
+        if state == "idle-never":
+            # Cold session — Unity never compiled this session; return immediately
+            errors = await _get_errors()
+            return errors if errors else "compile clean (never ran this session — idle-never)"
 
         if state == "idle":
             errors = await _get_errors()

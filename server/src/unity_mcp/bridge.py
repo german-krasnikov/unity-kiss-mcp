@@ -31,6 +31,7 @@ CONNECT_TIMEOUT = float(os.environ.get("UNITY_MCP_CONNECT_TIMEOUT", "5.0"))
 SESSION_TIMEOUT = float(os.environ.get("UNITY_MCP_SESSION_TIMEOUT", "120.0"))
 MAX_RETRIES = int(os.environ.get("UNITY_MCP_MAX_RETRIES", "3"))
 MIN_RECONNECT_INTERVAL = float(os.environ.get("UNITY_MCP_MIN_RECONNECT_INTERVAL", "2.0"))
+STARTUP_GRACE_S = float(os.environ.get("UNITY_MCP_STARTUP_GRACE", "90.0"))
 
 
 class UnityBridge(HeartbeatMixin):
@@ -52,6 +53,8 @@ class UnityBridge(HeartbeatMixin):
             CompileStateProbe.autodetect_project_path(), port=self._port
         )
         self._first_failure_ts: Optional[float] = None
+        self._reconnect_started_at: Optional[float] = None
+        self._startup_grace_expired: bool = False
         self._on_reconnect_callbacks: list = []
         self._crash_log = CrashLogger()
         self._heartbeat_task: Optional[asyncio.Task] = None
@@ -83,6 +86,8 @@ class UnityBridge(HeartbeatMixin):
             self._heartbeat_task = asyncio.ensure_future(self._heartbeat_loop(self._heartbeat_interval))
 
     async def send(self, cmd: str, args: dict, timeout: float = 30.0) -> dict:
+        if self._startup_grace_expired:
+            raise ConnectionError(self._describe_failure(cmd, ConnectionRefusedError()))
         self._ensure_heartbeat()
         self._counter += 1
         msg_id = f"{self._counter:04x}"
@@ -137,6 +142,18 @@ class UnityBridge(HeartbeatMixin):
 
             # Unity retry hint (compilation busy)
             if not result.get("ok") and result.get("retry"):
+                # G17: check for terminal reload failure before re-sending.
+                # A wedged domain will never clear via retry — stop early.
+                try:
+                    from unity_mcp.editor_log import detect_wedge
+                    wedge = detect_wedge()
+                    if wedge is not None:
+                        return {"ok": False, "data": (
+                            f"BUILD-FAILED-WEDGE: reload failed ({wedge.kind}) — "
+                            "reimport the file: package (sync), do NOT restart"
+                        )}
+                except Exception:
+                    pass
                 if attempt < MAX_RETRIES:
                     await asyncio.sleep(result["retry"] / 1000)
                     attempt += 1
@@ -217,6 +234,8 @@ class UnityBridge(HeartbeatMixin):
             raise
         self._writer = writer
         self._first_failure_ts = None
+        self._reconnect_started_at = None
+        self._startup_grace_expired = False
         self._last_reconnect_at = time.monotonic()
         for cb in self._on_reconnect_callbacks:
             try:
