@@ -100,6 +100,7 @@ COMMAND_TIMEOUTS: dict[str, float] = {
     "fuzz_playtest": 120.0,
     "compile_preflight": 60.0,
     "batch": 60.0,
+    "ask_user": 300.0,
 }
 
 slot: Optional[ConnectionSlot] = None

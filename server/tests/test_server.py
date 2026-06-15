@@ -215,25 +215,33 @@ async def test_get_object_detail_raises_on_error(mock_bridge):
 
 async def test_run_tests_calls_bridge(mock_bridge):
     """Test run_tests sends correct command to bridge"""
-    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Tests: 5 passed, 0 failed\nTime: 1.2s"})
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "tests: 5 passed, 0 failed\nTime: 1.2s"})
     result = await run_tests(mode="EditMode")
-    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=120.0)
+    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=30.0)
     assert "passed" in result
 
 
 async def test_run_tests_default_mode(mock_bridge):
     """Test run_tests defaults to EditMode"""
-    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Tests: 3 passed, 0 failed"})
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "tests: 3 passed, 0 failed"})
     result = await run_tests()
-    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=120.0)
+    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=30.0)
     assert "passed" in result
 
 
-async def test_run_tests_raises_on_error(mock_bridge):
-    """Test run_tests raises ToolError"""
+async def test_run_tests_error_falls_through_to_poll(mock_bridge):
+    """run_tests error on initial send → falls through to poll → poll returns none → error string."""
+    import unity_mcp.tools.scene as _scene
+    orig_interval, orig_attempts = _scene._POLL_INTERVAL, _scene._POLL_ATTEMPTS
+    _scene._POLL_INTERVAL = 0
+    _scene._POLL_ATTEMPTS = 1
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Test framework not available"})
-    with pytest.raises(ToolError, match="Test framework not available"):
-        await run_tests()
+    try:
+        result = await run_tests()
+    finally:
+        _scene._POLL_INTERVAL = orig_interval
+        _scene._POLL_ATTEMPTS = orig_attempts
+    assert "Error" in result
 
 
 async def test_get_test_results_calls_bridge(mock_bridge):
@@ -307,11 +315,19 @@ async def test_run_tests_playmode_timeout_returns_error(mock_bridge):
     assert "Error" in result or "timeout" in result.lower()
 
 
-async def test_run_tests_editmode_does_not_catch_disconnect(mock_bridge):
-    """run_tests EditMode: ToolError propagates without polling fallback."""
+async def test_run_tests_editmode_catches_disconnect_and_polls(mock_bridge):
+    """run_tests EditMode: ToolError is caught → falls through to poll."""
+    import unity_mcp.tools.scene as _scene
+    orig_interval, orig_attempts = _scene._POLL_INTERVAL, _scene._POLL_ATTEMPTS
+    _scene._POLL_INTERVAL = 0
+    _scene._POLL_ATTEMPTS = 2
     mock_bridge.send = AsyncMock(side_effect=ToolError("Unity connection lost"))
-    with pytest.raises(ToolError):
-        await run_tests(mode="EditMode")
+    try:
+        result = await run_tests(mode="EditMode")
+    finally:
+        _scene._POLL_INTERVAL = orig_interval
+        _scene._POLL_ATTEMPTS = orig_attempts
+    assert "Error" in result
 
 
 async def test_run_tests_playmode_tool_error_on_poll_swallowed(mock_bridge):
@@ -319,14 +335,15 @@ async def test_run_tests_playmode_tool_error_on_poll_swallowed(mock_bridge):
     mock_bridge.send = AsyncMock(side_effect=ToolError("disconnected"))
 
     import unity_mcp.tools.scene as _scene
+    orig_interval, orig_attempts = _scene._POLL_INTERVAL, _scene._POLL_ATTEMPTS
     _scene._POLL_INTERVAL = 0
     _scene._POLL_ATTEMPTS = 3
     try:
         result = await run_tests(mode="PlayMode")
     finally:
-        _scene._POLL_INTERVAL = 2.0
-        _scene._POLL_ATTEMPTS = 30
-    assert result.startswith("Error:")
+        _scene._POLL_INTERVAL = orig_interval
+        _scene._POLL_ATTEMPTS = orig_attempts
+    assert "Error" in result
 
 
 async def test_scene_new_calls_bridge(mock_bridge):

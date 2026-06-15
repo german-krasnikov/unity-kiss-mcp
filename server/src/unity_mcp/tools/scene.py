@@ -131,31 +131,29 @@ async def recompile() -> str:
     return await _send("recompile", {}, timeout=60.0)
 
 
-_POLL_INTERVAL = 2.0
-_POLL_ATTEMPTS = 30
+_POLL_INTERVAL = 3.0
+_POLL_ATTEMPTS = 60
 
 
 async def run_tests(mode: str = "EditMode", filter: str | None = None) -> str:
     """Run Unity tests. mode: EditMode or PlayMode. filter: pipe-separated test names."""
-    from mcp.server.fastmcp.exceptions import ToolError as _TE
+    import asyncio
     args = {"mode": mode}
     if filter:
         args["filter"] = filter
     try:
-        return await _send("run_tests", args, timeout=120.0)
-    except _TE:
-        if mode != "PlayMode":
-            raise
-        import asyncio
-        for _ in range(_POLL_ATTEMPTS):
-            await asyncio.sleep(_POLL_INTERVAL)
-            try:
-                result = await _send("get_test_results", {})
-                if result and result != "pending":
-                    return result
-            except _TE:
-                pass
-        return "Error: PlayMode test results not received (timeout)"
+        return await _send("run_tests", args, timeout=30.0)
+    except Exception:
+        pass  # TCP died (domain reload) — fall through to poll
+    for _ in range(_POLL_ATTEMPTS):
+        await asyncio.sleep(_POLL_INTERVAL)
+        try:
+            result = await _send("get_test_results", {})
+            if result and result not in ("pending", "none"):
+                return result
+        except Exception:
+            pass  # transient reconnect failure — keep polling
+    return f"Error: {mode} test results not received after {_POLL_ATTEMPTS * _POLL_INTERVAL:.0f}s"
 
 
 async def get_test_results() -> str:

@@ -9,7 +9,7 @@ namespace UnityMCP.Editor
     // C5: Errors persisted to SessionState so they survive domain reload.
     // In-memory list is wiped on reload; SessionState key survives.
     [InitializeOnLoad]
-    internal static class CompileErrorCapture
+    public static class CompileErrorCapture
     {
         static readonly List<string> _errors = new();
         const int MaxErrors = 50;
@@ -100,7 +100,7 @@ namespace UnityMCP.Editor
 
 #if UNITY_INCLUDE_TESTS
         /// <summary>Test seam: inject a compile error without real compilation.</summary>
-        internal static void InjectForTest(string msg)
+        public static void InjectForTest(string msg)
         {
             _errors.Add(msg);
             // Also persist to SessionState so reload-survival can be tested
@@ -108,7 +108,7 @@ namespace UnityMCP.Editor
         }
 
         /// <summary>Test seam: simulate domain reload (clears in-memory, SessionState survives).</summary>
-        internal static void SimulateDomainReload() => _errors.Clear();
+        public static void SimulateDomainReload() => _errors.Clear();
 #endif
     }
 }

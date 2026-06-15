@@ -6,7 +6,7 @@ namespace UnityMCP.Editor
     {
         /// <summary>UTF-8 without BOM. Use for all File.WriteAllText calls — the static
         /// <c>Encoding.UTF8</c> emits a BOM that breaks Node JSON.parse and Unity importer.</summary>
-        internal static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false, true);
+        public static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false, true);
 
         private static int FindKeyIndex(string json, string needle)
         {
@@ -81,7 +81,7 @@ namespace UnityMCP.Editor
             return json.Substring(i, endIdx - i).Trim();
         }
 
-        internal static string ExtractObject(string json, string key)
+        public static string ExtractObject(string json, string key)
         {
             if (string.IsNullOrEmpty(json)) return "{}";
             var needle = $"\"{key}\"";
@@ -102,7 +102,7 @@ namespace UnityMCP.Editor
             return "{}";
         }
 
-        internal static string ExtractArray(string json, string key)
+        public static string ExtractArray(string json, string key)
         {
             if (string.IsNullOrEmpty(json)) return "[]";
             var needle = $"\"{key}\"";

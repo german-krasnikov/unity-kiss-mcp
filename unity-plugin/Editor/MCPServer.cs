@@ -17,13 +17,119 @@ namespace UnityMCP.Editor
     [InitializeOnLoad]
     public static class MCPServer
     {
-        // ── Per-port client state ─────────────────────────────────────────────
+        // ── Per-port client state (ring of up to 4 simultaneous clients) ────────
         private sealed class ClientSlot
         {
-            internal volatile bool Connected;
-            internal volatile TcpClient Client;
-            internal volatile CancellationTokenSource Cts;
-            internal long Generation;  // OK — Interlocked
+            internal const int MaxClients = 4;
+
+            private sealed class ClientEntry
+            {
+                internal volatile TcpClient Client;
+                internal volatile CancellationTokenSource Cts;
+                internal long Generation;  // Interlocked
+            }
+
+            private readonly ClientEntry[] _entries;
+            private readonly object _lock = new object();
+
+            internal ClientSlot()
+            {
+                _entries = new ClientEntry[MaxClients];
+                for (int i = 0; i < MaxClients; i++)
+                    _entries[i] = new ClientEntry();
+            }
+
+            // Returns (index, generation, clientCts) for the new entry
+            internal (int index, long generation, CancellationTokenSource clientCts) Add(
+                TcpClient client, CancellationToken parentToken)
+            {
+                lock (_lock)
+                {
+                    // Find empty slot first
+                    for (int i = 0; i < MaxClients; i++)
+                    {
+                        if (_entries[i].Client == null)
+                        {
+                            var cts = CancellationTokenSource.CreateLinkedTokenSource(parentToken);
+                            var gen = Interlocked.Increment(ref _entries[i].Generation);
+                            _entries[i].Client = client;
+                            _entries[i].Cts = cts;
+                            return (i, gen, cts);
+                        }
+                    }
+                    // All full — evict entry 0 (oldest), shift down, add at end
+                    try { _entries[0].Cts?.Cancel(); } catch { }
+                    try { _entries[0].Client?.Close(); } catch { }
+                    for (int i = 0; i < MaxClients - 1; i++)
+                    {
+                        _entries[i].Client = _entries[i + 1].Client;
+                        _entries[i].Cts = _entries[i + 1].Cts;
+                        _entries[i].Generation = _entries[i + 1].Generation;
+                    }
+                    var last = MaxClients - 1;
+                    var newCts = CancellationTokenSource.CreateLinkedTokenSource(parentToken);
+                    var newGen = Interlocked.Increment(ref _entries[last].Generation);
+                    _entries[last].Client = client;
+                    _entries[last].Cts = newCts;
+                    return (last, newGen, newCts);
+                }
+            }
+
+            // Called from handler's finally block — only clears if generation matches
+            internal void Clear(int index, long generation)
+            {
+                lock (_lock)
+                {
+                    if (index >= 0 && index < MaxClients &&
+                        Interlocked.Read(ref _entries[index].Generation) == generation)
+                    {
+                        _entries[index].Client = null;
+                        _entries[index].Cts = null;
+                    }
+                }
+            }
+
+            // Safe iteration over all connected clients (e.g. going_away broadcast)
+            internal void ForEach(Action<TcpClient> action)
+            {
+                lock (_lock)
+                {
+                    for (int i = 0; i < MaxClients; i++)
+                    {
+                        var c = _entries[i].Client;
+                        if (c != null)
+                            try { action(c); } catch { }
+                    }
+                }
+            }
+
+            // Cancel + close all entries (teardown)
+            internal void DisconnectAll()
+            {
+                lock (_lock)
+                {
+                    for (int i = 0; i < MaxClients; i++)
+                    {
+                        try { _entries[i].Cts?.Cancel(); } catch { }
+                        try { _entries[i].Client?.Close(); } catch { }
+                        _entries[i].Client = null;
+                        _entries[i].Cts = null;
+                    }
+                }
+            }
+
+            internal bool AnyConnected
+            {
+                get
+                {
+                    lock (_lock)
+                    {
+                        for (int i = 0; i < MaxClients; i++)
+                            if (_entries[i].Client != null) return true;
+                        return false;
+                    }
+                }
+            }
         }
 
         private static TcpListener _listener;
@@ -74,6 +180,7 @@ namespace UnityMCP.Editor
                 { "wait_until", 30 },
                 { "move_to", 30 },
                 { "test_step", 30 },
+                { "ask_user", 300 },
             };
 
         internal static int GetCommandTimeout(string cmd)
@@ -106,7 +213,7 @@ namespace UnityMCP.Editor
                 catch { return false; }
             }
         }
-        public static bool IsClientConnected => _mainSlot.Connected || _chatSlot.Connected;
+        public static bool IsClientConnected => _mainSlot.AnyConnected || _chatSlot.AnyConnected;
         public static int ServerPort => Port;
         public static int ServerChatPort => ChatPort;
         // Reads reloadPort from MCP_Port.json. Returns 0 if reload-package is not installed.
@@ -274,20 +381,10 @@ namespace UnityMCP.Editor
                     continue;
                 }
 
-                // Cancel old handler for THIS slot only — leaves the other slot untouched
-                if (slot.Connected && slot.Client != null)
-                {
-                    Debug.Log($"[MCP] {label}: new client — disconnecting previous");
-                    try { slot.Cts?.Cancel(); } catch { }
-                    try { slot.Client.Close(); } catch { }
-                }
-
                 try { client.NoDelay = true; } catch { }
                 ApplyKeepAlive(client.Client);
-                slot.Client = client;
-                var gen = Interlocked.Increment(ref slot.Generation);
-                slot.Cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                _ = HandleClientAsync(client, slot, gen, label, slot.Cts.Token);
+                var (idx, gen, clientCts) = slot.Add(client, token);
+                _ = HandleClientAsync(client, slot, idx, gen, label, clientCts.Token);
             }
         }
 
@@ -320,11 +417,10 @@ namespace UnityMCP.Editor
 #endif
         }
 
-        private static async Task HandleClientAsync(TcpClient client, ClientSlot slot, long generation,
+        private static async Task HandleClientAsync(TcpClient client, ClientSlot slot, int index, long generation,
             string label, CancellationToken clientToken)
         {
             Debug.Log($"[MCP] {label} client connected");
-            slot.Connected = true;
             RefManager.Invalidate();
             try
             {
@@ -429,12 +525,7 @@ namespace UnityMCP.Editor
             }
             finally
             {
-                // Only clear slot state if we are still the active handler for this slot.
-                if (Interlocked.Read(ref slot.Generation) == generation)
-                {
-                    slot.Connected = false;
-                    slot.Client = null;
-                }
+                slot.Clear(index, generation);
                 Debug.Log($"[MCP] {label} client disconnected (gen={generation})");
             }
         }
@@ -514,21 +605,11 @@ namespace UnityMCP.Editor
             catch { }
         }
 
-        private static void TeardownSlot(ClientSlot slot)
-        {
-            try { slot.Cts?.Cancel(); } catch { }
-            try { slot.Client?.Close(); } catch { }
-            slot.Client = null;
-            slot.Connected = false;
-            try { slot.Cts?.Dispose(); } catch { }
-            slot.Cts = null;
-        }
-
         private static void TeardownCore()
         {
             try { _cts?.Cancel(); } catch { }      // fires linked tokens safely FIRST
-            TeardownSlot(_mainSlot);
-            TeardownSlot(_chatSlot);
+            _mainSlot.DisconnectAll();
+            _chatSlot.DisconnectAll();
             try { _cts?.Dispose(); } catch { }
             _cts = null;
             try { _listener?.Server?.Shutdown(SocketShutdown.Both); } catch { }
@@ -563,11 +644,9 @@ namespace UnityMCP.Editor
         {
             _shuttingDown = true;
             WriteStateFile("reloading");
-            // Send going_away FIRST — stream still alive, handler still running
-            if (_mainSlot.Client != null && _mainSlot.Connected)
-                try { SendGoingAwaySync(_mainSlot.Client.GetStream()); } catch { }
-            if (_chatSlot.Client != null && _chatSlot.Connected)
-                try { SendGoingAwaySync(_chatSlot.Client.GetStream()); } catch { }
+            // Send going_away FIRST — streams still alive, handlers still running
+            _mainSlot.ForEach(c => SendGoingAwaySync(c.GetStream()));
+            _chatSlot.ForEach(c => SendGoingAwaySync(c.GetStream()));
             TeardownCore();
             // Do NOT delete port file — port stays the same after reload, Python needs it
         }

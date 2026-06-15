@@ -24,6 +24,21 @@ namespace UnityMCP.Editor
         internal static bool HasConnectionSubscribers => OnBuildConnection != null;
         internal static void ResetConnectionEvent() => OnBuildConnection = null;
 
+        internal static void InvokeConnectionViaReflection(VisualElement root)
+        {
+            try
+            {
+                var t = System.Type.GetType(
+                    "UnityMCP.Editor.Chat.ChatSettingsSection, UnityMCP.Editor.Chat.View");
+                if (t == null) return;
+                var m = t.GetMethod("BuildContent",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic,
+                    null, new[] { typeof(VisualElement) }, null);
+                m?.Invoke(null, new object[] { root });
+            }
+            catch { }
+        }
+
         public static bool IsChatBinaryAvailable()
         {
             try

@@ -12,6 +12,9 @@ namespace UnityMCP.Editor
 {
     public static partial class CommandRouter
     {
+        // Fired when ask_user command arrives; MCPChatWindow subscribes to show AskUserCard.
+        public static event System.Action<string, string> OnAskUser;  // (requestId, questionsJson)
+
         // Testable compilation state (defaults to real EditorApplication state)
         internal static Func<bool> IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
         internal static Func<bool> IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
@@ -224,6 +227,25 @@ namespace UnityMCP.Editor
                     return;
                 }
 
+                if (cmd == "ask_user")
+                {
+                    var guard = CheckGuards(id, cmd);
+                    if (guard != null) { tcs.TrySetResult(guard); return; }
+                    var argsJson = JsonHelper.ExtractObject(json, "args");
+                    var questionsJson = JsonHelper.ExtractString(argsJson, "questions") ?? "[]";
+                    var requestId = System.Guid.NewGuid().ToString("N");
+                    PendingAskRegistry.Register(requestId);
+                    if (OnAskUser == null)
+                        Debug.LogWarning("[MCP] ask_user: no listener — is chat window open?");
+                    OnAskUser?.Invoke(requestId, questionsJson);
+                    var askTcs = PendingAskRegistry.GetTcs(requestId);
+                    askTcs.Task.ContinueWith(t =>
+                        tcs.TrySetResult(t.IsFaulted || t.IsCanceled
+                            ? BuildResponse(id, "{\"cancelled\":true}")
+                            : BuildResponse(id, t.Result)));
+                    return;
+                }
+
                 tcs.TrySetResult(Process(json));
             }
             catch (Exception e)
@@ -334,6 +356,8 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "clear") != "false"));
             // run_tests is intercepted by ProcessAsync before ExecuteCommand; this entry exists for IsMutating/IsRegistered only
             CommandRegistry.Register("run_tests", _ => throw new InvalidOperationException("run_tests requires async dispatch via ProcessAsync"));
+            // ask_user is intercepted by ProcessAsync; entry exists for IsRegistered/IsAllowedDuringCompile only
+            CommandRegistry.Register("ask_user", _ => throw new InvalidOperationException("ask_user requires async dispatch via ProcessAsync"));
             CommandRegistry.Register("get_test_results", _ => TestRunner.GetResults());
 
             // Runtime (Play Mode only)

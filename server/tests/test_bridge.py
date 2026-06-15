@@ -963,7 +963,7 @@ async def test_heartbeat_hard_deadline_latches_grace_expired():
     from unittest.mock import AsyncMock as _AsyncMock
 
     idle_probe = make_idle_probe()
-    idle_probe.has_strong_busy_signal = Mock(return_value=True)  # always busy
+    idle_probe.has_strong_busy_signal = Mock(return_value=False)  # idle — grace reset doesn't fire
 
     with patch("unity_mcp.bridge.asyncio.open_connection",
                return_value=(_AsyncMock(), make_writer())):

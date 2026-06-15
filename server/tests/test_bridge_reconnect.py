@@ -321,3 +321,75 @@ async def test_connection_error_becomes_tool_error():
             await _send_raw("test", {})
     finally:
         server_mod.slot = old_slot
+
+
+# ---------------------------------------------------------------------------
+# G1. Grace timer resets while Unity is busy (domain reload)
+#
+# Bug scenario: Unity busy for 200s → becomes not-busy → grace should NOT
+# immediately expire because _reconnect_started_at was never reset during busy.
+# Fix: reset _reconnect_started_at each tick while busy so elapsed is measured
+# from the moment Unity became idle, not from initial disconnect.
+# ---------------------------------------------------------------------------
+
+async def test_grace_not_expired_after_becoming_idle_post_busy():
+    """After long busy period, grace countdown starts fresh when Unity goes idle."""
+    bridge = UnityBridge("127.0.0.1", 9999)
+    bridge._writer = None
+    bridge._startup_grace_expired = False
+
+    now = 1000.0  # fixed base time
+    # Sequence: t=1000 (set _reconnect_started_at), t=1000 (busy tick 1),
+    # t=1200 (busy tick 2 — 200s elapsed total, > STARTUP_GRACE_S=90s),
+    # t=1200 (reset should move _reconnect_started_at to ~1200),
+    # t=1250 (idle tick — elapsed from reset = ~50s, < 90s → should NOT latch)
+    time_seq = iter([
+        1000.0,  # tick 1: set _reconnect_started_at
+        1000.0,  # tick 1: probe_busy=True → reset _reconnect_started_at to 1000
+        1000.0,  # tick 1: elapsed calc → 0s (under grace)
+        1200.0,  # tick 2: probe_busy=True → reset _reconnect_started_at to 1200
+        1200.0,  # tick 2: elapsed calc → 0s (just reset)
+        1250.0,  # tick 3: probe_busy=False → elapsed = 1250-1200 = 50s < 90s → no latch
+        1250.0,  # tick 3: elapsed calc
+    ])
+
+    with patch("unity_mcp.bridge_heartbeat.time.monotonic", side_effect=lambda: next(time_seq)):
+        with patch("unity_mcp.bridge_heartbeat.asyncio.sleep", new_callable=AsyncMock):
+            with patch.object(bridge, "_reconnect_cooldown_ok", return_value=False):
+                # tick 1: busy
+                bridge._probe_busy = Mock(return_value=True)
+                await bridge._heartbeat_tick(15.0)
+                # tick 2: busy (200s later in wall time, but timer should reset)
+                await bridge._heartbeat_tick(15.0)
+                # tick 3: NOT busy, only 50s since last reset → should NOT latch
+                bridge._probe_busy = Mock(return_value=False)
+                await bridge._heartbeat_tick(15.0)
+
+    assert bridge._startup_grace_expired is False, \
+        "Grace should NOT expire — only 50s elapsed since Unity became idle"
+
+
+# ---------------------------------------------------------------------------
+# G2. Grace expires normally when Unity is NOT busy
+# ---------------------------------------------------------------------------
+
+async def test_grace_expires_when_not_busy():
+    """Grace timer expires after STARTUP_GRACE_S when probe says NOT busy."""
+    bridge = UnityBridge("127.0.0.1", 9999)
+    bridge._writer = None
+    bridge._startup_grace_expired = False
+
+    now = 1000.0
+    # tick 1: set _reconnect_started_at=1000, not busy
+    # tick 2: elapsed = 100s > STARTUP_GRACE_S=90s, not busy → latch
+    time_seq = iter([1000.0, 1000.0, 1100.0, 1100.0])
+
+    with patch("unity_mcp.bridge_heartbeat.time.monotonic", side_effect=lambda: next(time_seq, 1100.0)):
+        with patch("unity_mcp.bridge_heartbeat.asyncio.sleep", new_callable=AsyncMock):
+            with patch.object(bridge, "_probe_busy", return_value=False):
+                with patch.object(bridge, "_reconnect_cooldown_ok", return_value=False):
+                    await bridge._heartbeat_tick(15.0)  # sets _reconnect_started_at=1000
+                    await bridge._heartbeat_tick(15.0)  # elapsed=100s > 90s → latch
+
+    assert bridge._startup_grace_expired is True, \
+        "Grace SHOULD expire after 90s when Unity is not busy"

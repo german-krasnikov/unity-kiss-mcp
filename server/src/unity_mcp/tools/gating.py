@@ -15,7 +15,7 @@ _CORE_TOOLS: frozenset[str] = frozenset({
     "scene", "search_scene", "set_parent",
     # Always-on meta / connection-hygiene
     "get_console", "get_compile_errors", "get_enabled_tools", "discover_tools",
-    "editor", "do", "ask",
+    "editor", "do", "ask", "ask_user", "permission_prompt",
     # FORCE_VISIBLE connection tools — always must be reachable
     "reconnect_unity", "list_connections",
     # F4: deferred schema resolution
@@ -104,7 +104,7 @@ TIER1: set[str] = {
     "get_console", "get_compile_errors", "screenshot", "scene", "editor",
     "search_scene", "run_tests", "discover_tools", "get_enabled_tools",
     "setup_objects", "set_properties", "configure_objects",
-    "do", "ask",
+    "do", "ask", "ask_user", "permission_prompt",
     "animator_intent", "vfx_intent", "ui_intent",
     "get_metrics",
     "find_references", "compile_preflight", "semantic_at", "await_compile", "sync_unity",

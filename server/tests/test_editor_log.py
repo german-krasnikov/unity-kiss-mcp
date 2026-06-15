@@ -787,17 +787,17 @@ def test_init_corroboration_prod_path_scoped_chat_cs_not_stale(tmp_path, monkeyp
     plugin_root = tmp_path / "unity-plugin"
     core_dir = plugin_root / "Editor"
     core_dir.mkdir(parents=True)
-    (core_dir / "UnityMCP.Editor.asmdef").write_text('{"name":"UnityMCP.Editor"}')
+    (core_dir / "UnityMCP.Editor.asmdef").write_text('{"name":"UnityMCP.Editor"}', encoding="utf-8")
     base_t = 1000000.0
     core_cs = core_dir / "Core.cs"
-    core_cs.write_text("class Core {}")
+    core_cs.write_text("class Core {}", encoding="utf-8")
     os.utime(core_cs, (base_t, base_t))
 
     chat_dir = core_dir / "Chat"
     chat_dir.mkdir()
-    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}')
+    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}', encoding="utf-8")
     chat_cs = chat_dir / "ChatFoo.cs"
-    chat_cs.write_text("class ChatFoo {}")
+    chat_cs.write_text("class ChatFoo {}", encoding="utf-8")
     # Chat .cs is VERY new — newer than dll
     os.utime(chat_cs, (base_t + 500, base_t + 500))
 
@@ -858,21 +858,21 @@ def _make_plugin_layout(root: Path) -> dict:
     """Create a fake unity-plugin directory with core + Chat + Tests asmdefs."""
     core_dir = root / "Editor"
     core_dir.mkdir(parents=True)
-    (core_dir / "UnityMCP.Editor.asmdef").write_text('{"name":"UnityMCP.Editor"}')
+    (core_dir / "UnityMCP.Editor.asmdef").write_text('{"name":"UnityMCP.Editor"}', encoding="utf-8")
     core_cs = core_dir / "Core.cs"
-    core_cs.write_text("class Core {}")
+    core_cs.write_text("class Core {}", encoding="utf-8")
 
     chat_dir = core_dir / "Chat"
     chat_dir.mkdir()
-    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}')
+    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}', encoding="utf-8")
     chat_cs = chat_dir / "ChatFoo.cs"
-    chat_cs.write_text("class ChatFoo {}")
+    chat_cs.write_text("class ChatFoo {}", encoding="utf-8")
 
     tests_dir = core_dir / "Tests"
     tests_dir.mkdir()
-    (tests_dir / "UnityMCP.Editor.Tests.asmdef").write_text('{"name":"UnityMCP.Editor.Tests"}')
+    (tests_dir / "UnityMCP.Editor.Tests.asmdef").write_text('{"name":"UnityMCP.Editor.Tests"}', encoding="utf-8")
     tests_cs = tests_dir / "TestFoo.cs"
-    tests_cs.write_text("class TestFoo {}")
+    tests_cs.write_text("class TestFoo {}", encoding="utf-8")
 
     return {"core": core_cs, "chat_asmdef_dir": chat_dir, "chat_cs": chat_cs,
             "tests_cs": tests_cs, "plugin_root": root}
@@ -932,13 +932,13 @@ def test_find_plugin_source_files_no_editor_asmdef(tmp_path):
     # Only a Chat asmdef — no UnityMCP.Editor.asmdef at all
     chat_dir = tmp_path / "Chat"
     chat_dir.mkdir()
-    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}')
+    (chat_dir / "UnityMCP.Editor.Chat.asmdef").write_text('{"name":"UnityMCP.Editor.Chat"}', encoding="utf-8")
     chat_cs = chat_dir / "ChatOnly.cs"
-    chat_cs.write_text("class ChatOnly {}")
+    chat_cs.write_text("class ChatOnly {}", encoding="utf-8")
 
     # A .cs at root level (not under any foreign-asmdef dir)
     root_cs = tmp_path / "Orphan.cs"
-    root_cs.write_text("class Orphan {}")
+    root_cs.write_text("class Orphan {}", encoding="utf-8")
 
     result = find_plugin_source_files(plugin_dir=tmp_path)
     names = [f.name for f in result]

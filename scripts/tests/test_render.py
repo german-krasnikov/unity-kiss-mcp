@@ -390,6 +390,44 @@ class TestContributing:
 
 
 # ---------------------------------------------------------------------------
+# Step D: architecture.svg STAT:TOOLS gate — render-controlled, not hardcoded
+# ---------------------------------------------------------------------------
+
+class TestArchitectureSvgGate:
+    """Prove architecture.svg tool count is render-controlled and gate bites."""
+
+    def test_architecture_svg_has_stat_tools_marker(self) -> None:
+        """STAT:TOOLS marker must exist so render() can rewrite it."""
+        arch = (_ASSETS / "architecture.svg").read_text()
+        assert "<!-- STAT:TOOLS -->" in arch, "architecture.svg missing STAT:TOOLS marker"
+        assert "<!-- /STAT -->" in arch
+
+    def test_stale_architecture_svg_fails_check(self, tmp_path: pathlib.Path) -> None:
+        """A stale tool count in architecture.svg causes --check to exit non-zero."""
+        arch = (_ASSETS / "architecture.svg").read_text()
+        meta = json.loads(_META.read_text())
+        stale = re.sub(
+            r"<!-- STAT:TOOLS -->[^<]*<!-- /STAT -->",
+            "<!-- STAT:TOOLS -->42<!-- /STAT -->",
+            arch,
+        )
+        rendered = rr.substitute_svg_markers(stale, meta)
+        assert rendered != stale, "substitute_svg_markers must change stale value"
+        p = tmp_path / "architecture.svg"
+        p.write_text(stale, encoding="utf-8")
+        with pytest.raises(SystemExit) as exc:
+            rr._apply_or_check([(p, rendered)], check=True)
+        assert exc.value.code == 1
+
+    def test_render_corrects_stale_architecture_svg(self) -> None:
+        """After --render, architecture.svg STAT:TOOLS equals _meta.json tools."""
+        meta = json.loads(_META.read_text())
+        expected = f"<!-- STAT:TOOLS -->{meta['tools']}<!-- /STAT -->"
+        arch = (_ASSETS / "architecture.svg").read_text()
+        assert expected in arch, f"architecture.svg stale: expected {expected}"
+
+
+# ---------------------------------------------------------------------------
 # Gate-hardening: STAT:BREAKDOWN marker + aria-label substitution
 # ---------------------------------------------------------------------------
 

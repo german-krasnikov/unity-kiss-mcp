@@ -58,6 +58,8 @@ class HeartbeatMixin:
                 self._reconnect_started_at = time.monotonic()
 
             busy = self._probe_busy()
+            if busy:
+                self._reconnect_started_at = time.monotonic()
             wait = 5.0 if busy else 2.0
             await asyncio.sleep(wait)
 

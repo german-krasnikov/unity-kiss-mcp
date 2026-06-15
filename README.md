@@ -46,7 +46,7 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 94 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 98 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the Claude or Codex CLI directly. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="94 MCP Tools · 4154 Tests (2121 Python · 1963 Unity · 70 Live) · 80-95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 4565 Tests (2333 Python · 2152 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -230,48 +230,54 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
-<summary><b>v0.25.13</b> — 2026-06-12 — UTF-8 encoding fixes round-3 (grey-zones closed)</summary>
+<summary><b>v0.29.38</b> — 2026-06-15 — **Codex Interactive User Input (Plugin v0.29.38)** — Codex CLI can now show …</summary>
 
-**UTF-8 Encoding Round-3 (Server + Plugin v0.25.13)** — **(C1: Python test I/O gates)** All bare `open(..., "r")` in test suite now explicit `encoding …
-
-</details>
-
-<details>
-<summary><b>v0.25.12</b> — 2026-06-12 — UTF-8 encoding fixes + safety tests + grey-zone audit round-2</summary>
-
-**UTF-8 Everywhere (Server + Plugin v0.25.12)** — **(Round 1)** Python file I/O and C# Windows codepage safety hardening.
+**Codex Interactive User Input (Plugin v0.29.38)** — Codex CLI can now show interactive `AskUserCard` via JSON-RPC `tool/requestUserInput` and …
 
 </details>
 
 <details>
-<summary><b>v0.25.0</b> — 2026-06-12 — Multi-scene CRUD + test filter + compile check workflow</summary>
+<summary><b>v0.29.37</b> — 2026-06-15 — **Claude Interactive User Input (Plugin v0.29.37, Server)** — Claude CLI …</summary>
 
-**Multi-Scene CRUD + Diff (Plugin v0.25.0)** — Cross-scene `transfer_object` (move/copy between scenes), `object_diff` (unified diff of two objects sh …
-
-</details>
-
-<details>
-<summary><b>v0.24.1</b> — 2026-06-12 — Port re-discovery on reconnect + lockfile takeover + 9 new tests</summary>
-
-**Port Re-Discovery on Reconnect (Server v0.24.1)** — UnityBridge now auto-rediscovers Unity's port when reconnecting after a restart.
+**Claude Interactive User Input (Plugin v0.29.37, Server)** — Claude CLI `AskUserQuestion` now routes through MCP `permission_prompt_tool` → Unity …
 
 </details>
 
 <details>
-<summary><b>v0.24.0</b> — 2026-06-12 — Multi-scene hierarchy support + temp test assets refactor</summary>
+<summary><b>v0.29.11</b> — 2026-06-15 — **Interactive Permission Protocol Fix (Plugin v0.29.11, Sprint 1C)** — Fixes …</summary>
 
-**Multi-Scene Hierarchy Support (Plugin v0.24.0)** — `get_hierarchy` now handles multiple loaded scenes with scene-aware context headers.
+**Interactive Permission Protocol Fix (Plugin v0.29.11, Sprint 1C)** — Fixes non-functional permission prompts from Sprint 1B.
+
+</details>
+
+<details>
+<summary><b>v0.29.2</b> — 2026-06-15 — **Chat Assembly Split (Plugin v0.29.2)** — `UnityMCP.Editor.Chat` split into …</summary>
+
+**Chat Assembly Split (Plugin v0.29.2)** — `UnityMCP.Editor.Chat` split into two independent assemblies: `UnityMCP.Editor.Chat.CLI` (protocol, …
+
+</details>
+
+<details>
+<summary><b>v0.27.4</b> — 2026-06-14 — **Reload Recovery Package (Plugin + Server v0.27.4)** — Independent UPM package …</summary>
+
+**Reload Recovery Package (Plugin + Server v0.27.4)** — Independent UPM package `com.unity-mcp.reload` (asmdef references:[]) provides …
 
 </details>
 
 <details>
 <summary>Older releases</summary>
 
-- **v0.23.13** — 2026-06-11 — Unified settings + media viewers + LLM config + review hardening
-- **v0.23.0** — 2026-06-11 — Reconnect recovery + installer + unified settings + media viewers + DRY sampling
-- **v0.22.1** — 2026-06-11 — Crash logging for unhandled MCP server exceptions
-- **v0.22.0** — 2026-06-11 — Multi-project port auto-assignment + dual-port isolation + PortResolver extraction
-- **v0.21.0** — 2026-06-11 — Cross-platform Windows/Linux support + zero manual patching
+- **v0.26.0** — 2026-06-13 — **Test Quality Audit (Server + Plugin v0.26.0)** — Systematic cleanup of test …
+- **v0.25.13** — 2026-06-12 — **UTF-8 Encoding Round-3 (Server + Plugin v0.25.13)** — **(C1: Python test I/O …
+- **v0.25.12** — 2026-06-12 — **UTF-8 Everywhere (Server + Plugin v0.25.12)** — **(Round 1)** Python file I/O …
+- **v0.25.0** — 2026-06-12 — **Multi-Scene CRUD + Diff (Plugin v0.25.0)** — Cross-scene `transfer_object` …
+- **v0.24.1** — 2026-06-12 — **Port Re-Discovery on Reconnect (Server v0.24.1)** — UnityBridge now …
+- **v0.24.0** — 2026-06-12 — **Multi-Scene Hierarchy Support (Plugin v0.24.0)** — `get_hierarchy` now …
+- **v0.23.13** — 2026-06-11 — **SettingsNavController Hardening (Plugin v0.23.13)** — Timer-based animated …
+- **v0.23.0** — 2026-06-11 — **Reconnect Recovery: Zombie Detection + SO_REUSEPORT + TCP Probe (Server + …
+- **v0.22.1** — 2026-06-11 — **Crash Logging for Unhandled Server Exceptions** — Python MCP server now …
+- **v0.22.0** — 2026-06-11 — **Multi-Project Port Configuration (Plugin + Server v0.22.0)** — Unity projects …
+- **v0.21.0** — 2026-06-11 — **Cross-Platform Windows/Linux Support (Plugin v0.21.0 + Server)** — Plugin now …
 - **v0.20.7** — 2026-06-10 — Reload-resume re-sends the full-path chip payload, not short-name mentions (task#10)
 - **v0.20.6** — 2026-06-10 — Full-path chip payload + always-raw "Show LLM payload" inspector for every turn type
 - **v0.20.0** — 2026-06-10 — Chip-unification Phase 1 — delete SceneNameLinker path, unified @-mention rendering

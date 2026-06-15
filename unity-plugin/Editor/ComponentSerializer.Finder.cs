@@ -77,7 +77,7 @@ namespace UnityMCP.Editor
 
         internal static GameObject FindObjectById(int instanceId)
         {
-            var obj = EditorUtility.EntityIdToObject(instanceId);
+            var obj = EditorUtility.InstanceIDToObject(instanceId);
             return obj as GameObject;
         }
 
@@ -198,7 +198,7 @@ namespace UnityMCP.Editor
             return null;
         }
 
-        internal static string GetPath(GameObject go)
+        public static string GetPath(GameObject go)
         {
             var path = go.name;
             var t = go.transform.parent;

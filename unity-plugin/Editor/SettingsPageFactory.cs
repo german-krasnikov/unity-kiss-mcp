@@ -41,9 +41,11 @@ namespace UnityMCP.Editor
             page.AddToClassList("nav-page");
             page.Add(BackHeader("Chat Settings", onBack));
             page.Add(ChatHeaderAnim.Build(page));
-            if (ChatSettingsHook.HasConnectionSubscribers)
+            if (ChatSettingsHook.IsChatEnabled())
             {
                 ChatSettingsHook.InvokeConnection(page);
+                if (page.childCount <= 2)
+                    ChatSettingsHook.InvokeConnectionViaReflection(page);
             }
             else
             {

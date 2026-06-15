@@ -66,7 +66,7 @@ unity-kiss-mcp/
 │   │   │   ├── overlay.py      # Pillow-based SoM overlay renderer (numbered circles, boxes)
 │   │   │   ├── extract.py      # Parse and filter rects from Unity screenshot payload
 │   │   │   └── diff_annotate.py # Annotate before/after images with SoM, call sampling
-│   │   ├── tools/              # Tool modules (24 files + __init__)
+│   │   ├── tools/              # Tool modules (26 files + __init__)
 │   │   │   ├── __init__.py     # Tool module registry
 │   │   │   ├── reload_ladder.py # Reload recovery T0-T5 ladder (MVID-delta healing proof)
 │   │   │   ├── objects.py      # create/delete/find/inspect/set_parent/set_material
@@ -81,9 +81,11 @@ unity-kiss-mcp/
 │   │   │   ├── asset.py        # asset, material, prefab, scriptable_object, project_settings
 │   │   │   ├── connection.py   # list_connections, reconnect_unity
 │   │   │   ├── autobatch.py    # setup_objects, set_properties, configure_objects
-│   │   │   ├── gating.py       # TIER1 + category-based capability filtering
+│   │   │   ├── gating.py       # TIER1 + category-based capability filtering (permission_prompt in CORE_TOOLS, v0.29.37)
 │   │   │   ├── do_tool.py      # NL intent → Haiku plan → batch execute
 │   │   │   ├── ask_tool.py     # NL read-only → route → Haiku summarize
+│   │   │   ├── ask_user_tool.py # ask_user MCP tool (ask_user AskUserCard routing, v0.29.11)
+│   │   │   ├── permission_prompt_tool.py # permission_prompt MCP tool (Claude --permission-prompt-tool routing, v0.29.37)
 │   │   │   ├── animator_intent_tool.py  # Domain NL: animator
 │   │   │   ├── vfx_intent_tool.py       # Domain NL: VFX/particles
 │   │   │   ├── ui_intent_tool.py        # Domain NL: UI
@@ -136,7 +138,7 @@ unity-kiss-mcp/
 │   ├── UnityMCP.Reload.asmdef                # Core assembly (no references)
 │   ├── package.json                          # v0.1.4, "com.unity-mcp.reload"
 │   └── package.json.meta
-├── unity-plugin/               # Unity Editor Plugin (75+ C# files, ~13600 LOC)
+├── unity-plugin/               # Unity Editor Plugin (130+ C# files, ~14000 LOC, v0.29.2: Chat split into CLI+View)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, etc.) + 25 tests
@@ -230,118 +232,141 @@ unity-kiss-mcp/
 │       │   ├── PermissionsHeaderAnimTests.cs # 7 NUnit tests (shield pulse, state logic)
 │       │   ├── ChatHeaderAnimTests.cs     # 7 NUnit tests (wifi arc, state logic)
 │       │   ├── ChatSettingsHookEventTests.cs # NUnit tests (event firing, hook execution) (F26)
-│       ├── Chat/                          # Optional in-Unity Agent Chat (isolated, UNITY_MCP_CHAT define)
-│       │   ├── ChatEvent.cs               # Normalized event struct
-│       │   ├── ChatStreamParser.cs        # Parse stream-json from claude CLI stdout
-│       │   ├── ClaudeArgBuilder.cs        # Build --mcp-config file + CLI args (+ --disallowedTools)
-│       │   ├── UserTurnBuilder.cs         # Encode user messages → stdin JSON
-│       │   ├── ToolVerbMap.cs             # Tool name → humanized action text
-│       │   ├── IChatBackend.cs            # Backend interface (future plugin seams)
-│       │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS /bin/zsh -lc)
-│       │   ├── ChatProcess.cs             # Process lifecycle manager
-│       │   ├── CliBackendBase.cs          # Abstract host: shared lifecycle, 4 variation axes
-│       │   ├── ClaudeBackend.cs           # Claude: CliBackendBase subclass (persistent stdin)
-│       │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions, token streaming (F28)
-│       │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC → ChatEvent (item/agentMessage/delta, mcpToolCall) (F28)
-│       │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex) (F28: 2 backends, removed spawn-per-turn)
-│       │   ├── BackendConfig.cs           # [Serializable] Claude/Codex configs + persistence (F9)
-│       │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (F9, project-local Library/)
-│       │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (F9)
-│       │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
-│       │   ├── TranscriptSerializer.cs    # Serialize/deserialize chat history to plain-text (F21 reload survival)
-│       │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
-│       │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates + domain refresh trigger (F27) (partial class)
-│       │   ├── MCPChatWindow.Send.cs      # Send path: OnSend, rawText/llmText split, chip snapshot (partial class)
-│       │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (partial class)
-│       │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons (F29: external files/folders, v0.23.0 Block 5: ProcessDraggedObject)
-│       │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
-│       │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
-│       │   ├── MCPChatWindow.Resize.cs    # Window resize logic
-│       │   ├── TokenFormat.cs             # Pure Abbr(n) helper — "1.2k" / "840" token display
-│       │   ├── EnterKeySend.cs            # Enter-to-send + Alt+Enter newline logic (pure testable)
-│       │   ├── ChatSettingsSection.cs     # Delegate class for ChatConnectionSection (F23 refactored)
-│       │   ├── ChatConnectionSection.cs   # [InitializeOnLoad] subscriber to ChatSettingsHook.OnBuildConnection (F23)
-│       │   ├── ChatActivityState.cs       # Activity state tracking for grouping
-│       │   ├── ChatLabel.cs               # Label customization + UI behavior
-│       │   ├── ChatRefAction.cs           # Click-navigate + context-menu for interactive refs
-│       │   ├── ChatRefResolver.cs         # Scan hierarchy, resolve scene/script refs (F4 #ID)
-│       │   ├── CopyableText.cs            # Selectable text wrapper
-│       │   ├── CopyTextBuilder.cs         # Multi-line copy block assembly
-│       │   ├── InputHeightCalc.cs         # Input field auto-height calculation (F30: 4-line default, tiny-window clamp fix)
-│       │   ├── JsonArrayScan.cs           # Scan JSON arrays for streaming results
-│       │   ├── ArgTokenizer.cs            # Shell-style quote-aware split (F9, review-hardening)
-│       │   ├── ArgQuoting.cs              # Quote escaping helpers
-│       │   ├── InlineChipData.cs          # ChipData + InlineChipTracker (F5)
-│       │   ├── InlineChipOverlay.cs       # Pill row UI (F5)
-│       │   ├── InlineChipKeyHandler.cs    # TextField event routing (F5)
-│       │   ├── ChipKindDetector.cs        # Pure Detect() → ChipKind (F10)
-│       │   ├── ResponseTagInliner.cs      # [kind:ref] parser + renderer (F10)
-│       │   ├── RestoreButton.cs           # Undo per-turn + cascade restore (F2)
-│       │   ├── TurnUndoTracker.cs         # Group lifecycle + RestoreFromIndex (F2)
-│       │   ├── SelectionSummary.cs        # Auto-Selection context (F4 hierarchy #ID)
-│       │   ├── CompileAutoFix.cs          # Auto-retry on compile
-│       │   ├── EditorStateSnapshot.cs     # Context block injection
-│       │   ├── ToolPing.cs                # Flash object on tool-call
-│       │   ├── HierarchyContextMenu.cs    # Right-click Hierarchy GameObject → Add to Chat Context (F16a)
-│       │   ├── ComponentContextMenu.cs    # Right-click Component → Add to Chat Context (F16b, v0.23.0 Block 5: dual-chip @GO|@Script)
-│       │   ├── ChipContextResolver.cs     # Resolve chips + emit typed (F10)
-│       │   ├── MCPChatWindow.Approve.cs   # Event handler (F3 gate)
-│       │   ├── ApproveHelper.cs           # Session management
-│       │   ├── ApproveButtonFactory.cs    # Button builder
-│       │   ├── ChatBinaryResolver.cs      # Cross-platform binary PATH resolution (where.exe, bash -lic, zsh -lc per OS)
-│       │   ├── ChatMcpConfigWriter.cs     # Python command resolution + warning on serverDir change (v0.23.0)
-│       │   ├── SlashTemplate.cs           # Template model
-│       │   ├── SlashRegistry.cs           # Template registry
-│       │   ├── SlashPopup.cs              # UIToolkit popup
-│       │   ├── MCPChatWindow.Slash.cs     # Slash setup
-│       │   ├── ReloadGuard.cs             # Domain-reload lock
-│       │   ├── PendingTurnState.cs        # Persist in-flight state (v3: BackendKind) (F28: backward-compat mapping for old int=2)
-│       │   ├── SentTextCache.cs           # Domain-reload dedup
-│       │   ├── StderrRingBuffer.cs        # Stderr capture
-│       │   ├── ToolCallAccumulator.cs     # Accumulate tool calls
-│       │   ├── ToolCallRecord.cs          # Tool call record struct
-│       │   ├── ToolChipGrouper.cs         # Group tool calls by ID
-│       │   ├── ToolDetailBuilder.cs       # Tool card humanization
-│       │   ├── ToolGroupState.cs          # Tool grouping state
-│       │   ├── ToolGroupSummary.cs        # Summary of grouped tool calls
-│       │   ├── UserTurnBuilder.cs         # Encode user messages
-│       │   ├── UserToolResultParser.cs    # Parse tool results
-│       │   ├── MCPChatWindow.uss          # UIToolkit styling (header removal + bottom footer)
-│       │   ├── Markdown/                  # Content rendering: registry seam + renderers
-│       │   │   ├── MdBlock.cs             # Block model (enum + metadata)
-│       │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)
-│       │   │   ├── MarkdownParser.Blocks.cs # Block parsing helpers
-│       │   │   ├── MarkdownInline.cs      # Inline spans → Unity rich-text (noparse <>, protect code)
-│       │   │   ├── IChatBlockRenderer.cs  # Extension interface (can-render + render)
-│       │   │   ├── ChatBlockRendererRegistry.cs # Ordered first-match-wins
-│       │   │   ├── ChatBlockRendererFactory.cs # Default wiring (Mermaid first, Markdown catch-all); injects ChatRefResolver + AddRefToContext
-│       │   │   ├── MarkdownBlockRenderer.cs # 8-kind dispatcher
-│       │   │   ├── MarkdownBlockRenderer.Table.cs # Table grid layout (partial)
-│       │   │   ├── MarkdownBlockRenderer.List.cs # Bullet/ordered list (partial)
-│       │   │   ├── ImageBlockRenderer.cs  # PNG/JPG → Texture2D + click-to-open (v0.23.0: IsImageFile guard)
-│       │   │   ├── Viewers/                # Media viewer windows (v0.23.0 Block 4)
-│       │   │   │   ├── ImageViewerWindow.cs # Modal image viewer: zoom/pan/fit controls
-│       │   │   │   ├── MermaidViewerWindow.cs # Modal mermaid viewer: zoom/pan + exportable SVG
-│       │   │   │   └── ZoomPanManipulator.cs # DRY shared zoom/pan/fit logic (reusable for future viewers)
-│       │   │   ├── Mermaid/               # Native Mermaid flowchart (no lib, pure parse+layout)
-│       │   │   │   ├── MermaidGraph.cs    # POCO: nodes, edges, direction
-│       │   │   │   ├── MermaidParser.cs   # lines → graph or null
-│       │   │   │   ├── MermaidLayout.cs   # Kahn topo + longest-path + dynamic node sizing
-│       │   │   │   ├── MermaidLayout.Layers.cs # Layer building + cycle guard
-│       │   │   │   ├── MermaidBlockRenderer.cs # CanRender Mermaid, fallback to code-box (v0.23.0: opens MermaidViewerWindow)
-│       │   │   │   ├── MermaidView.cs     # Absolute nodes + edge overlay + geom-change callback
-│       │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
-│       │   ├── UnityMCP.Editor.Chat.asmdef # Assembly: one-way ref to core, define-gated
-│       │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators
-│       │   └── Tests/                     # 25+ NUnit suites = ~565+ test cases (render + backend + chips + pure)
-│       │       │   # Render (66): MdBlockTests(5), MarkdownParserTests(16), MarkdownInlineTests(13), MermaidParserTests(17), MermaidLayoutTests(15)
-│       │       │   # Backend/parse (150): ChatStreamParserTests(24), CliBackendBaseTests(29), CodexAppServerParserTests(15), CodexArgBuilderTests(35), ClaudeArgBuilderTests(8), ToolVerbMapTests(5), BackendRegistryTests(8), DomainRefreshTests(4), DragDropExternalTests(8)
-│       │       │   # Interactivity/input (43): EnterKeySendTests(7), InputHeightCalcTests(14), ChatActivityStateTests(13), CopyTextBuilderTests(9)
-│       │       │   # Chips (320+): ChipSequenceTests, ChipSequenceExtraTests, ChipSendSequenceTests, ChipSendSequenceExtraTests, ChipTestHelpers (shared)
-│       │       │   # Pure/state (6+489): TokenFormatTests(6), PendingTurnStateTests(187), PendingTurnStateV4Tests(197), PendingTurnStateStalenessTests(105)
-│       │       │   # Total: ~1550+ EditMode (5 pre-existing baseline reds, 0 new regressions)
+│       ├── Chat/                          # Optional in-Unity Agent Chat (v0.29.2: split into CLI + View, UNITY_MCP_CHAT define)
+│       │   ├── CLI/                        # Chat.CLI assembly (protocol, parsing, backends, independent compile)
+│       │   │   ├── ChatEvent.cs               # Normalized event struct
+│       │   │   ├── ChatStreamParser.cs    # Parse stream-json from claude CLI stdout
+│       │   │   ├── ClaudeArgBuilder.cs    # Build --mcp-config file + CLI args (--permission-prompt-tool wired, v0.29.37)
+│       │   │   ├── UserTurnBuilder.cs     # Encode user messages → stdin JSON
+│       │   │   ├── ToolVerbMap.cs             # Tool name → humanized action text
+│       │   │   ├── IChatBackend.cs            # Backend interface (future plugin seams)
+│       │   │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS /bin/zsh -lc)
+│       │   │   ├── ChatProcess.cs             # Process lifecycle manager
+│       │   │   ├── CliBackendBase.cs          # Abstract host: shared lifecycle, 4 variation axes
+│       │   │   ├── ClaudeBackend.cs           # Claude: CliBackendBase subclass (persistent stdin)
+│       │   │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions (experimentalApi, v0.29.38)
+│       │   │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC + tool/requestUserInput handler (v0.29.38)
+│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex)
+│       │   │   ├── BackendConfig.cs           # [Serializable] Claude/Codex configs + persistence
+│       │   │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (project-local Library/)
+│       │   │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms
+│       │   │   ├── ControlResponseBuilder.cs  # Serialize approval + user input responses (v0.29.2+, CodexUserInputResponse v0.29.38)
+│       │   │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
+│       │   │   ├── TranscriptSerializer.cs    # Serialize/deserialize chat history to plain-text (F21 reload survival)
+│       │   │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators (Chat.CLI)
+│       │   │   └── Tests/                     # CLI assembly tests (protocol, parsing, backends)
+│       │   │       ├── ChatStreamParserTests.cs # Parse stream-json events + control_request routing
+│       │   │       ├── ClaudeArgBuilderTests.cs # CLI arg building + permission-prompt-tool (v0.29.37)
+│       │   │       ├── CodexAppServerParserTests.cs # Codex JSON-RPC + requestUserInput (v0.29.38)
+│       │   │       ├── ControlResponseBuilderTests.cs # Response serialization including CodexUserInputResponse (v0.29.38)
+│       │   │       └── ... # 24+ total CLI tests
+│       │   ├── View/                       # Chat.View assembly (UI windows, rendering, cards)
+│       │   │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
+│       │   │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates + domain refresh trigger (F27) (partial class)
+│       │   │   ├── MCPChatWindow.Send.cs      # Send path: OnSend, rawText/llmText split, chip snapshot (partial class)
+│       │   │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (_askPending flag v0.29.37)
+│       │   │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons (F29: external files/folders, v0.23.0 Block 5: ProcessDraggedObject)
+│       │   │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
+│       │   │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
+│       │   │   ├── MCPChatWindow.Resize.cs    # Window resize logic
+│       │   │   ├── MCPChatWindow.Approve.cs   # Event handler for interactive permissions (v0.29.2+)
+│       │   │   ├── TokenFormat.cs             # Pure Abbr(n) helper — "1.2k" / "840" token display
+│       │   │   ├── EnterKeySend.cs            # Enter-to-send + Alt+Enter newline logic (pure testable)
+│       │   │   ├── ChatSettingsSection.cs     # Delegate class for ChatConnectionSection (F23 refactored)
+│       │   │   ├── ChatConnectionSection.cs   # [InitializeOnLoad] subscriber to ChatSettingsHook.OnBuildConnection (F23)
+│       │   │   ├── ChatActivityState.cs       # Activity state tracking for grouping
+│       │   │   ├── ChatLabel.cs               # Label customization + UI behavior
+│       │   │   ├── ChatRefAction.cs           # Click-navigate + context-menu for interactive refs
+│       │   │   ├── ChatRefResolver.cs         # Scan hierarchy, resolve scene/script refs (F4 #ID)
+│       │   │   ├── CopyableText.cs            # Selectable text wrapper
+│       │   │   ├── CopyTextBuilder.cs         # Multi-line copy block assembly
+│       │   │   ├── InputHeightCalc.cs         # Input field auto-height calculation (F30: 4-line default, tiny-window clamp fix)
+│       │   │   ├── JsonArrayScan.cs           # Scan JSON arrays for streaming results
+│       │   │   ├── ArgTokenizer.cs            # Shell-style quote-aware split (F9, review-hardening)
+│       │   │   ├── ArgQuoting.cs              # Quote escaping helpers
+│       │   │   ├── InlineChipData.cs          # ChipData + InlineChipTracker (F5)
+│       │   │   ├── InlineChipOverlay.cs       # Pill row UI (F5)
+│       │   │   ├── InlineChipKeyHandler.cs    # TextField event routing (F5)
+│       │   │   ├── ChipKindDetector.cs        # Pure Detect() → ChipKind (F10)
+│       │   │   ├── ResponseTagInliner.cs      # [kind:ref] parser + renderer (F10)
+│       │   │   ├── RestoreButton.cs           # Undo per-turn + cascade restore (F2)
+│       │   │   ├── TurnUndoTracker.cs         # Group lifecycle + RestoreFromIndex (F2)
+│       │   │   ├── SelectionSummary.cs        # Auto-Selection context (F4 hierarchy #ID)
+│       │   │   ├── CompileAutoFix.cs          # Auto-retry on compile
+│       │   │   ├── EditorStateSnapshot.cs     # Context block injection
+│       │   │   ├── ToolPing.cs                # Flash object on tool-call
+│       │   │   ├── HierarchyContextMenu.cs    # Right-click Hierarchy GameObject → Add to Chat Context (F16a)
+│       │   │   ├── ComponentContextMenu.cs    # Right-click Component → Add to Chat Context (F16b, v0.23.0 Block 5: dual-chip @GO|@Script)
+│       │   │   ├── ChipContextResolver.cs     # Resolve chips + emit typed (F10)
+│       │   │   ├── AskUserCard.cs             # Interactive user input dialog (radio/checkbox/freetext, v0.29.11+, v0.29.38: codex: support)
+│       │   │   ├── AskUserQuestionRow.cs      # Extracted pill-button row UI (217 LOC, v0.29.37)
+│       │   │   ├── ToolApprovalCard.cs        # Risk-classified tool approval UI (Allow/Deny/Session/Always, v0.29.2)
+│       │   │   ├── RiskClassifier.cs          # Tool risk categorization (v0.29.2)
+│       │   │   ├── SessionAllowlist.cs        # Session-scoped tool allowlist manager (v0.29.2)
+│       │   │   ├── ApproveHelper.cs           # Session management for approvals
+│       │   │   ├── ApproveButtonFactory.cs    # Button builder (Allow/Deny/Session/Always)
+│       │   │   ├── ChatMcpConfigWriter.cs     # Python command resolution + warning on serverDir change (v0.23.0)
+│       │   │   ├── SlashTemplate.cs           # Template model
+│       │   │   ├── SlashRegistry.cs           # Template registry
+│       │   │   ├── SlashPopup.cs              # UIToolkit popup
+│       │   │   ├── MCPChatWindow.Slash.cs     # Slash setup
+│       │   │   ├── ReloadGuard.cs             # Domain-reload lock
+│       │   │   ├── PendingTurnState.cs        # Persist in-flight state (v3: BackendKind) (F28: backward-compat mapping for old int=2)
+│       │   │   ├── SentTextCache.cs           # Domain-reload dedup
+│       │   │   ├── StderrRingBuffer.cs        # Stderr capture
+│       │   │   ├── ToolCallAccumulator.cs     # Accumulate tool calls
+│       │   │   ├── ToolCallRecord.cs          # Tool call record struct
+│       │   │   ├── ToolChipGrouper.cs         # Group tool calls by ID
+│       │   │   ├── ToolDetailBuilder.cs       # Tool card humanization
+│       │   │   ├── ToolGroupState.cs          # Tool grouping state
+│       │   │   ├── ToolGroupSummary.cs        # Summary of grouped tool calls
+│       │   │   ├── UserToolResultParser.cs    # Parse tool results
+│       │   │   ├── MCPChatWindow.uss          # UIToolkit styling (header removal + bottom footer)
+│       │   │   ├── Markdown/                  # Content rendering: registry seam + renderers
+│       │   │   │   ├── MdBlock.cs             # Block model (enum + metadata)
+│       │   │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)
+│       │   │   │   ├── MarkdownParser.Blocks.cs # Block parsing helpers
+│       │   │   │   ├── MarkdownInline.cs      # Inline spans → Unity rich-text (noparse <>, protect code)
+│       │   │   │   ├── IChatBlockRenderer.cs  # Extension interface (can-render + render)
+│       │   │   │   ├── ChatBlockRendererRegistry.cs # Ordered first-match-wins
+│       │   │   │   ├── ChatBlockRendererFactory.cs # Default wiring (Mermaid first, Markdown catch-all); injects ChatRefResolver + AddRefToContext
+│       │   │   │   ├── MarkdownBlockRenderer.cs # 8-kind dispatcher
+│       │   │   │   ├── MarkdownBlockRenderer.Table.cs # Table grid layout (partial)
+│       │   │   │   ├── MarkdownBlockRenderer.List.cs # Bullet/ordered list (partial)
+│       │   │   │   ├── ImageBlockRenderer.cs  # PNG/JPG → Texture2D + click-to-open (v0.23.0: IsImageFile guard)
+│       │   │   │   ├── Viewers/                # Media viewer windows (v0.23.0 Block 4)
+│       │   │   │   │   ├── ImageViewerWindow.cs # Modal image viewer: zoom/pan/fit controls
+│       │   │   │   │   ├── MermaidViewerWindow.cs # Modal mermaid viewer: zoom/pan + exportable SVG
+│       │   │   │   │   └── ZoomPanManipulator.cs # DRY shared zoom/pan/fit logic (reusable for future viewers)
+│       │   │   │   ├── Mermaid/               # Native Mermaid flowchart (no lib, pure parse+layout)
+│       │   │   │   │   ├── MermaidGraph.cs    # POCO: nodes, edges, direction
+│       │   │   │   │   ├── MermaidParser.cs   # lines → graph or null
+│       │   │   │   │   ├── MermaidLayout.cs   # Kahn topo + longest-path + dynamic node sizing
+│       │   │   │   │   ├── MermaidLayout.Layers.cs # Layer building + cycle guard
+│       │   │   │   │   ├── MermaidBlockRenderer.cs # CanRender Mermaid, fallback to code-box (v0.23.0: opens MermaidViewerWindow)
+│       │   │   │   │   ├── MermaidView.cs     # Absolute nodes + edge overlay + geom-change callback
+│       │   │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
+│       │   │   ├── Tests/                     # CLI + View assembly tests (parsing, backends, cards, interactivity)
+│       │   │   │   ├── CLI/                   # CLI assembly tests
+│       │   │   │   │   ├── ChatStreamParserTests.cs # Parse stream-json events + control_request routing
+│       │   │   │   │   ├── ClaudeArgBuilderTests.cs # CLI arg building + permission-prompt-tool (v0.29.37)
+│       │   │   │   │   ├── CodexAppServerParserTests.cs # Codex JSON-RPC + requestUserInput (v0.29.38)
+│       │   │   │   │   ├── ControlResponseBuilderTests.cs # Response serialization including CodexUserInputResponse (v0.29.38)
+│       │   │   │   │   └── ... # 24+ total CLI tests
+│       │   │   │   ├── View/                  # View assembly tests (UI, cards, interactivity)
+│       │   │   │   │   ├── AskUserCardTests.cs     # User input dialog + Codex protocol (v0.29.38 addition)
+│       │   │   │   │   ├── ApproveFlowTests.cs     # Interactive approvals flow
+│       │   │   │   │   ├── ChipSequenceTests.cs
+│       │   │   │   │   ├── ChipSendSequenceTests.cs
+│       │   │   │   │   └── ... # 45+ total View tests
+│       │   │   │   └── Markdown/                # Render tests
+│       │   │   │       ├── MarkdownParserTests.cs
+│       │   │   │       ├── MermaidParserTests.cs
+│       │   │   │       └── ... # 25+ render tests
+│       │   ├── UnityMCP.Editor.Chat.CLI.asmdef # CLI assembly: protocol, parsing, backends (independent compile, v0.29.2)
+│       │   ├── UnityMCP.Editor.Chat.View.asmdef # View assembly: UI windows, rendering, cards (depends on CLI)
 │       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
-│       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat")
+│       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat.*")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs
 │       ├── JsonHelper.cs + StringDistance.cs + UndoGroupHelper.cs
 │       ├── FileOutputHelper.cs             # ScreenshotsDir = <ProjectRoot>/ScreenShots/ (v0.23.0)

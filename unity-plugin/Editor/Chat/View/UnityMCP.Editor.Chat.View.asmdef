@@ -1,0 +1,14 @@
+{
+    "name": "UnityMCP.Editor.Chat.View",
+    "rootNamespace": "UnityMCP.Editor.Chat",
+    "references": ["UnityMCP.Editor", "UnityMCP.Editor.Chat.CLI"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_MCP_CHAT"],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

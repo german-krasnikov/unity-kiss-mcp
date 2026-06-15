@@ -1,6 +1,6 @@
 from . import scene, objects, asset, animation, connection, runtime, autobatch
 from . import batch, codegen, skills, spatial, ui
-from . import do_tool, ask_tool
+from . import do_tool, ask_tool, ask_user_tool, permission_prompt_tool
 from . import animator_intent_tool, vfx_intent_tool, ui_intent_tool
 from . import budget_tool, code_intel, sync, diagnose
 from .metrics_tool import register as register_metrics
@@ -15,6 +15,8 @@ def register_all(mcp, send, args, *, get_slot, get_middleware=None):
     autobatch.register(mcp, send, args)
     do_tool.register(mcp, send, args)
     ask_tool.register(mcp, send, args)
+    ask_user_tool.register(mcp, send, args)
+    permission_prompt_tool.register(mcp, send, args)
     for mod in [animator_intent_tool, vfx_intent_tool, ui_intent_tool]:
         mod.register(mcp, send, args)
     register_metrics(mcp, send, args)

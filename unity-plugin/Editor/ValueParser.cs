@@ -141,7 +141,7 @@ namespace UnityMCP.Editor
             {
                 if (!int.TryParse(value.Substring(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var instanceId))
                     throw new ArgumentException($"Invalid instance ID: {value}");
-                var resolved = EditorUtility.EntityIdToObject(instanceId);
+                var resolved = EditorUtility.InstanceIDToObject(instanceId);
                 if (resolved == null)
                     throw new ArgumentException($"No object found for instance ID: {value}");
                 property.objectReferenceValue = resolved;
