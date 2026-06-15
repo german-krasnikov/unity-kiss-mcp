@@ -104,3 +104,42 @@ def test_set_profile_overrides():
     set_profile("summarize", LlmProfile("sonnet", max_turns=3, timeout=20.0))
     assert get_profile("summarize").model == "sonnet"
     assert get_profile("summarize").max_turns == 3
+
+
+# --- Backend field tests ---
+
+def test_default_profile_backend_is_claude():
+    from unity_mcp.llm_config import get_profile
+    assert get_profile("visual_verify").backend == "claude"
+
+
+def test_parse_tcp_config_with_backend():
+    from unity_mcp.llm_config import parse_tcp_config
+    result = parse_tcp_config("visual_verify:gemini-2.5-flash,2,15.0,0,gemini")
+    assert result["visual_verify"]["backend"] == "gemini"
+    assert result["visual_verify"]["model"] == "gemini-2.5-flash"
+
+
+def test_parse_tcp_config_missing_backend_defaults_claude():
+    """Backward compat: old 4-field format → backend='claude'."""
+    from unity_mcp.llm_config import parse_tcp_config
+    result = parse_tcp_config("visual_verify:haiku,2,15.0,0")
+    assert result["visual_verify"]["backend"] == "claude"
+
+
+def test_parse_tcp_config_empty_backend_defaults_claude():
+    from unity_mcp.llm_config import parse_tcp_config
+    result = parse_tcp_config("visual_verify:haiku,2,15.0,0,")
+    assert result["visual_verify"]["backend"] == "claude"
+
+
+def test_apply_config_sets_backend():
+    from unity_mcp.llm_config import apply_config, get_profile
+    apply_config({"visual_verify": {"model": "codex-mini-latest", "max_turns": 2, "timeout": 15.0, "backend": "codex"}})
+    assert get_profile("visual_verify").backend == "codex"
+
+
+def test_apply_config_missing_backend_defaults_claude():
+    from unity_mcp.llm_config import apply_config, get_profile
+    apply_config({"visual_verify": {"model": "haiku", "max_turns": 2, "timeout": 15.0}})
+    assert get_profile("visual_verify").backend == "claude"

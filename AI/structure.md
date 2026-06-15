@@ -194,8 +194,9 @@ unity-kiss-mcp/
 │       ├── CatalogParser.cs               # Plain-text catalog parser (v0.18.0+): "CORE:tool1,tool2\n..." format
 │       ├── SettingsNavController.cs       # iOS-style navigational stack + slide animations (v0.23.0 Block 1)
 │       ├── SettingsPageFactory.cs         # DRY builder for 4 settings pages (Tools/Permissions/Chat/Sampling) (v0.23.0 Block 1)
-│       ├── LlmConfig.cs                   # [Serializable] universal LLM config (Claude + Codex profiles) (v0.23.0 Block 3)
+│       ├── LlmConfig.cs                   # [Serializable] universal LLM config (Claude + Codex + Gemini) (v0.23.0 Block 3, backend field v0.30.1)
 │       ├── LlmConfigStore.cs              # Load/Save LLM configs to Library/ (v0.23.0 Block 3)
+│       ├── SamplingPresets.cs             # Backend + Model preset templates: Claude Fast / Gemini Flash / Codex (v0.30.1)
 │       ├── MCPSettingsHub.cs              # Central hub window coordinating all settings UI (F26, v0.23.0)
 │       ├── MCPHubUI.cs                    # Hub-level layout + sub-window orchestration (F26, v0.23.0)
 │       ├── HubHeaderAnim.cs               # Circuit-node network animation: 5 nodes + lines + packet (F26)
@@ -246,10 +247,14 @@ unity-kiss-mcp/
 │       │   │   ├── ClaudeBackend.cs           # Claude: CliBackendBase subclass (persistent stdin)
 │       │   │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions (experimentalApi, v0.29.38)
 │       │   │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC + tool/requestUserInput handler (v0.29.38)
-│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex)
-│       │   │   ├── BackendConfig.cs           # [Serializable] Claude/Codex configs + persistence
+│       │   │   ├── GeminiBackend.cs           # Gemini: CliBackendBase subclass (gcloud CLI, v0.30.1)
+│       │   │   ├── GeminiArgBuilder.cs        # Build gcloud args + .gemini/settings.json (smart port merge, v0.30.1)
+│       │   │   ├── GeminiParser.cs            # Parse stream-json: skip role:user + non-mcp_ tools, suppress ask_user (v0.30.1)
+│       │   │   ├── GeminiProvider.cs          # IBackendProvider Gemini implementation (auto-discovered via TypeCache, v0.30.1)
+│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex, Gemini)
+│       │   │   ├── BackendConfig.cs           # [Serializable] Claude/Codex/Gemini configs + persistence
 │       │   │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (project-local Library/)
-│       │   │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms
+│       │   │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (v0.30.1: redesigned with presets)
 │       │   │   ├── ControlResponseBuilder.cs  # Serialize approval + user input responses (v0.29.2+, CodexUserInputResponse v0.29.38)
 │       │   │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
 │       │   │   ├── TranscriptSerializer.cs    # Serialize/deserialize chat history to plain-text (F21 reload survival)
@@ -259,7 +264,10 @@ unity-kiss-mcp/
 │       │   │       ├── ClaudeArgBuilderTests.cs # CLI arg building + permission-prompt-tool (v0.29.37)
 │       │   │       ├── CodexAppServerParserTests.cs # Codex JSON-RPC + requestUserInput (v0.29.38)
 │       │   │       ├── ControlResponseBuilderTests.cs # Response serialization including CodexUserInputResponse (v0.29.38)
-│       │   │       └── ... # 24+ total CLI tests
+│       │   │       ├── GeminiArgBuilderTests.cs # Gemini gcloud args + settings.json port update + field mapping (v0.30.1, 217 tests)
+│       │   │       ├── GeminiParserTests.cs   # Gemini stream-json parsing: prompt echo filter, tool prefix, ask_user suppression (v0.30.1, 190 tests)
+│       │   │       ├── GeminiTestFixtures.cs  # Shared Gemini test payloads (v0.30.1, 33 LOC)
+│       │   │       └── ... # 32+ total CLI tests
 │       │   ├── View/                       # Chat.View assembly (UI windows, rendering, cards)
 │       │   │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
 │       │   │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates + domain refresh trigger (F27) (partial class)

@@ -187,18 +187,17 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── F28: backward compat — old int=2 (CodexAppServer) maps to Codex ──
 
         [Test]
-        public void Deserialize_LegacyCodexAppServer_MapsToCodex()
+        public void Deserialize_BackendKind2_MapsToGemini()
         {
-            // Build a v3 header with BackendKind=2 (old CodexAppServer int value)
-            // Format: SessionId|TextB64|AgentMode|AgentNameB64|ActivityPhaseB64|ChipCount|UndoId|SavedAt|BackendKind
+            // int=2 was CodexAppServer (removed F28), now Gemini.
             var textB64  = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("do stuff"));
             var nameB64  = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("agent"));
             var phaseB64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Sending"));
             var header   = $"sess-old|{textB64}|1|{nameB64}|{phaseB64}|0|0|1000|2";
             var rt = PendingTurnState.Deserialize(header);
             Assert.IsNotNull(rt);
-            Assert.AreEqual(BackendKind.Codex, rt.Value.BackendKind,
-                "Legacy CodexAppServer (int=2) must map to BackendKind.Codex");
+            Assert.AreEqual(BackendKind.Gemini, rt.Value.BackendKind,
+                "int=2 now maps to BackendKind.Gemini");
         }
     }
 }

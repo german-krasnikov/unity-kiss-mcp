@@ -28,6 +28,8 @@ class ConnectionSlot:
     def add_reconnect_callback(self, cb) -> None:
         """Register a callback to be wired on every new bridge (survives reconnect)."""
         self._reconnect_callbacks.append(cb)
+        if self._bridge is not None:
+            self._bridge.add_reconnect_callback(cb)
 
     async def connect(self, port: int, host: str = "127.0.0.1") -> str:
         if self._bridge is not None:

@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from .connection_slot import ConnectionSlot
-from .lockfile import acquire_lock, release_lock
+from .lockfile import acquire_lock, release_lock, cleanup_stale_locks
 from .plugins import load_plugins
 from .tools import register_all
 from mcp.server.fastmcp import Context
@@ -168,6 +168,9 @@ async def lifespan(app):
         unity_port = _read_unity_port()
     except (ValueError, OSError):
         unity_port = 9500
+    cleanup_stale_locks(port=unity_port)
+    from .server_filtering import cleanup_stale_port_files as _cleanup_ports
+    _cleanup_ports()
     lock_fd = acquire_lock(port=unity_port)  # raises on failure — do not swallow
 
     def _on_port_change(old_port: int, new_port: int):
@@ -210,7 +213,7 @@ async def lifespan(app):
                 now = time.monotonic()
                 # P9: re-resolve project path on reconnect — may be a different Unity instance.
                 _editor_log.init_corroboration(port=unity_port)
-                if now - _last_refresh_ts < 5.0:
+                if now - _last_refresh_ts < 30.0:
                     return
                 _last_refresh_ts = now
                 asyncio.ensure_future(_refresh_tools_cache(slot.bridge))

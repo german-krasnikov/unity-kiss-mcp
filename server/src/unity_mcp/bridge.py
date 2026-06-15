@@ -30,7 +30,7 @@ __all__ = [
 CONNECT_TIMEOUT = float(os.environ.get("UNITY_MCP_CONNECT_TIMEOUT", "5.0"))
 SESSION_TIMEOUT = float(os.environ.get("UNITY_MCP_SESSION_TIMEOUT", "120.0"))
 MAX_RETRIES = int(os.environ.get("UNITY_MCP_MAX_RETRIES", "3"))
-MIN_RECONNECT_INTERVAL = float(os.environ.get("UNITY_MCP_MIN_RECONNECT_INTERVAL", "2.0"))
+MIN_RECONNECT_INTERVAL = float(os.environ.get("UNITY_MCP_MIN_RECONNECT_INTERVAL", "5.0"))
 STARTUP_GRACE_S = float(os.environ.get("UNITY_MCP_STARTUP_GRACE", "90.0"))
 
 
@@ -106,7 +106,7 @@ class UnityBridge(HeartbeatMixin):
             try:
                 async with self._lock:
                     if not self.connected:
-                        await self._reconnect()
+                        await self._reconnect(fire_callbacks=False)
                     self._writer.write(header + payload)
                     await self._writer.drain()
                     result = await asyncio.wait_for(
@@ -197,7 +197,7 @@ class UnityBridge(HeartbeatMixin):
             raise DomainReloadError(f"Unity domain reload: {data.get('reason', 'unknown')}")
         return data
 
-    async def _reconnect(self):
+    async def _reconnect(self, fire_callbacks: bool = True):
         await self.close()
         if self._port_discoverer is not None:
             try:
@@ -237,11 +237,12 @@ class UnityBridge(HeartbeatMixin):
         self._reconnect_started_at = None
         self._startup_grace_expired = False
         self._last_reconnect_at = time.monotonic()
-        for cb in self._on_reconnect_callbacks:
-            try:
-                cb()
-            except Exception:
-                pass
+        if fire_callbacks:
+            for cb in self._on_reconnect_callbacks:
+                try:
+                    cb()
+                except Exception:
+                    pass
 
     @property
     def connected(self) -> bool:

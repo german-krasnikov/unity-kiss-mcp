@@ -44,16 +44,16 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(result[0].Enabled);
         }
 
-        // ── Last entry is always Codex (session-based) (enabled) ────────────
+        // ── Last entry is always Gemini (enabled) ─────────────────────────
 
         [Test]
-        public void Discover_CodexIsLast()
+        public void Discover_GeminiIsLast()
         {
             var result = BackendRegistry.Discover(new string[0]);
-            Assert.AreEqual(2, result.Count); // Claude + Codex only
+            Assert.AreEqual(3, result.Count); // Claude + Codex + Gemini
             var last = result[result.Count - 1];
-            Assert.AreEqual("Codex",             last.DisplayName);
-            Assert.AreEqual(BackendKind.Codex,   last.Kind);
+            Assert.AreEqual("Gemini",             last.DisplayName);
+            Assert.AreEqual(BackendKind.Gemini,   last.Kind);
             Assert.IsTrue(last.Enabled);
         }
 
@@ -67,7 +67,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            Assert.AreEqual(3, result.Count); // Claude + code-reviewer + Codex
+            Assert.AreEqual(4, result.Count); // Claude + code-reviewer + Codex + Gemini
             Assert.AreEqual("code-reviewer", result[1].DisplayName);
             Assert.AreEqual("code-reviewer", result[1].AgentName);
             Assert.IsTrue(result[1].Enabled);
@@ -81,7 +81,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { userDir });
 
-            Assert.AreEqual(3, result.Count); // Claude + doc-keeper + Codex
+            Assert.AreEqual(4, result.Count); // Claude + doc-keeper + Codex + Gemini
             Assert.AreEqual("doc-keeper", result[1].AgentName);
         }
 
@@ -109,10 +109,10 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var result = BackendRegistry.Discover(new[] { "/nonexistent/path1", "/nonexistent/path2" });
 
-            Assert.AreEqual(2, result.Count);
+            Assert.AreEqual(3, result.Count);
             Assert.AreEqual("Claude", result[0].DisplayName);
             Assert.AreEqual("Codex",  result[1].DisplayName);
-            Assert.IsTrue(result[1].Enabled);
+            Assert.AreEqual("Gemini", result[2].DisplayName);
         }
 
         // ── Agent named "Claude" is skipped (collision guard) ─────────────────
@@ -125,8 +125,8 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            // Claude + Codex, no extra "Claude" entry
-            Assert.AreEqual(2, result.Count);
+            // Claude + Codex + Gemini, no extra "Claude" entry
+            Assert.AreEqual(3, result.Count);
         }
 
         // ── Agent named "Codex" is skipped (collision guard) ─────────────────

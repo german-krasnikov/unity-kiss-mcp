@@ -6,6 +6,7 @@ namespace UnityMCP.Editor
     internal sealed class SamplingConfig
     {
         public string Model     = "";
+        public string Backend   = "";   // "" == "claude" (backward compat)
         public int    MaxTurns  = 2;
         public float  Timeout   = 20f;
         public int    MaxTokens = 0;

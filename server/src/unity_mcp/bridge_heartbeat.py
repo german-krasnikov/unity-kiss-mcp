@@ -1,9 +1,13 @@
 import asyncio
 import json
+import os
 import struct
 import time
 
 from unity_mcp.bridge_socket import DomainReloadError
+
+# Captured at import time — all bridges in this process share the same parent.
+_ORIGINAL_PPID: int = os.getppid()
 
 
 class ProtocolDesyncError(ConnectionError):
@@ -52,6 +56,14 @@ class HeartbeatMixin:
 
     async def _heartbeat_tick(self, interval: float) -> None:
         """Single heartbeat iteration. Separated for safety-net wrapping."""
+        # Parent death = immediate hard exit. No clean shutdown — parent is already dead,
+        # nobody reads our stdout. OS releases flock and closes TCP sockets on exit.
+        if os.getppid() != _ORIGINAL_PPID:
+            import logging
+            logging.getLogger("unity_mcp.bridge").warning(
+                "Parent died (ppid %d → %d), exiting", _ORIGINAL_PPID, os.getppid()
+            )
+            os._exit(0)
         if not self.connected:
             # Track cumulative disconnected time for startup-grace deadline.
             if self._reconnect_started_at is None:

@@ -534,10 +534,10 @@ def test_describe_failure_reports_crash_when_pid_dead():
 # ── Tier 2c: Reconnect cooldown + raw ping ──────────────────────────────────
 
 
-def test_reconnect_cooldown_default_2s():
-    """MIN_RECONNECT_INTERVAL defaults to 2.0s."""
+def test_reconnect_cooldown_default_5s():
+    """MIN_RECONNECT_INTERVAL defaults to 5.0s (increased from 2.0 to reduce reconnect spam)."""
     from unity_mcp.bridge import MIN_RECONNECT_INTERVAL
-    assert MIN_RECONNECT_INTERVAL == 2.0
+    assert MIN_RECONNECT_INTERVAL == 5.0
 
 
 def test_reconnect_cooldown_blocks_rapid_reconnect():

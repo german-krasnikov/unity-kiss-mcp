@@ -175,3 +175,35 @@ async def test_connection_slot_registers_callbacks_on_new_bridge():
         await s.connect(9501)
         assert b2.add_reconnect_callback.call_count == 2
         b2.add_reconnect_callback.assert_any_call(cb)
+
+
+# ---------------------------------------------------------------------------
+# Reconnect spam fix: add_reconnect_callback wires to existing bridge (Fix 2)
+# ---------------------------------------------------------------------------
+
+async def test_add_reconnect_callback_wires_to_existing_bridge():
+    """add_reconnect_callback() must wire cb to current bridge if one exists.
+
+    This ensures the initial bridge (B1) gets callbacks — not just future ones.
+    Previously, callbacks were only wired inside connect() so B1 never got them.
+    """
+    from unity_mcp.connection_slot import ConnectionSlot
+    from unittest.mock import MagicMock, patch
+
+    b = make_mock_bridge()
+    b.add_reconnect_callback = MagicMock()
+
+    cb = MagicMock()
+
+    with patch("unity_mcp.connection_slot.UnityBridge", return_value=b):
+        s = ConnectionSlot()
+        await s.connect(9500)
+        # b.add_reconnect_callback was called once inside connect() for _sync_port.
+        call_count_before = b.add_reconnect_callback.call_count
+
+        # Now add a callback AFTER connect — should also wire to existing bridge
+        s.add_reconnect_callback(cb)
+
+    assert b.add_reconnect_callback.call_count == call_count_before + 1, \
+        "add_reconnect_callback must wire cb to current bridge immediately"
+    b.add_reconnect_callback.assert_called_with(cb)

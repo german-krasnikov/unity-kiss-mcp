@@ -36,23 +36,34 @@ def _strip_deferred_schemas(tools: list) -> list:
     return tools
 
 
+_push_catalog_lock: "asyncio.Lock | None" = None
+
+
 async def push_catalog(bridge_) -> None:
     """Push the Python-authoritative tool catalog to Unity on connect/reconnect.
 
     Silent on failure — Unity can still operate with stale/no catalog.
+    Skip-if-locked: prevents parallel invocations from piling up.
     """
-    try:
-        if bridge_ is None or not bridge_.connected:
-            return
-        categories = get_catalog()["categories"]
-        catalog_str = "\n".join(
-            f"{cat}:{','.join(tools)}"
-            for cat, tools in categories.items()
-            if tools
-        )
-        await bridge_.send("set_tool_catalog", {"catalog": catalog_str}, timeout=5.0)
-    except Exception:
-        pass
+    import asyncio
+    global _push_catalog_lock
+    if _push_catalog_lock is None:
+        _push_catalog_lock = asyncio.Lock()
+    if _push_catalog_lock.locked():
+        return
+    if bridge_ is None or not bridge_.connected:
+        return
+    async with _push_catalog_lock:
+        try:
+            categories = get_catalog()["categories"]
+            catalog_str = "\n".join(
+                f"{cat}:{','.join(tools)}"
+                for cat, tools in categories.items()
+                if tools
+            )
+            await bridge_.send("set_tool_catalog", {"catalog": catalog_str}, timeout=5.0)
+        except Exception:
+            pass
 
 
 def filter_tools(tools: list, disabled: set | None) -> list:
@@ -63,6 +74,30 @@ def filter_tools(tools: list, disabled: set | None) -> list:
     if disabled:
         result = [t for t in result if t.name not in disabled or t.name in FORCE_VISIBLE]
     return _strip_deferred_schemas(result)
+
+
+def cleanup_stale_port_files() -> int:
+    """Delete *.reload-port files whose PID is no longer alive. Returns count cleaned."""
+    ports_dir = Path.home() / ".unity-mcp" / "ports"
+    if not ports_dir.exists():
+        return 0
+    cleaned = 0
+    for f in ports_dir.glob("*.reload-port"):
+        try:
+            pid = int(f.stem)
+        except ValueError:
+            continue
+        try:
+            os.kill(pid, 0)
+        except (OSError, ProcessLookupError):
+            try:
+                f.unlink()
+                cleaned += 1
+            except OSError:
+                pass
+        except PermissionError:
+            pass  # alive but owned by another user
+    return cleaned
 
 
 def _tcp_probe(port: int, timeout: float = 0.2) -> bool:

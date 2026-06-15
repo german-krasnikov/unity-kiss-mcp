@@ -25,6 +25,15 @@ namespace UnityMCP.Editor.Chat
         public string ExtraArgs         = "";
     }
 
+    [Serializable]
+    internal sealed class GeminiBackendConfig
+    {
+        public string Model        = "gemini-2.5-flash"; // default model
+        public string ApprovalMode = "";                 // "" | "yolo"
+        public bool   Sandbox      = false;
+        public string ExtraArgs    = "";
+    }
+
     /// <summary>Per-kind user overrides. Null fields = use provider default.</summary>
     internal readonly struct ChipDisplayOverride
     {

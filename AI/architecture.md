@@ -37,6 +37,10 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 
 1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support)
    - **89 core MCP tools registered**. Gating: TIER1=38 core (hardcoded). External plugins can add more tools dynamically.
+   - **In-Unity Chat Backends** (v0.29.2+): Three CLI providers with auto-discovery via TypeCache:
+     * **ClaudeBackend** — Claude CLI with --permission-prompt-tool, MCP elicitation, stream-json protocol
+     * **CodexBackend** — Codex CLI (no permission prompts), experimentalApi: true, tool/requestUserInput support
+     * **GeminiBackend** (v0.30.1) — Gemini gcloud-cli with .gemini/settings.json smart-merge, stream-json 6-event protocol (init/message/tool_use/tool_result/error/result), filters prompt echo + internal tools (no --permission-prompt-tool support)
    - Transport: stdio (default) or streamable-http (`UNITY_MCP_TRANSPORT=http`)
    - FastMCP("UnityMCP", lifespan=lifespan)
    - Lifespan: auto-discover Unity port from `~/.unity-mcp/ports/*.port`, acquire exclusive PID lockfile, create ConnectionSlot, connect bridge, fetch disabled tools cache (`get_disabled_tools`), push Python-authoritative catalog (`_push_catalog`), start heartbeat, register reconnect callbacks, load_plugins()
@@ -62,7 +66,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      * Kills stale servers: SIGTERM→SIGKILL (Unix), TerminateProcess (Windows)
      * **v0.23.0: Zombie detection** via `_is_zombie()` prevents stale defunct processes from blocking reconnection
    - **SIGPIPE handling**: guarded with `hasattr(signal, "SIGPIPE")` since Windows lacks SIGPIPE. Suppressed on Unix to prevent server crash on client disconnect.
-   - Reconnect: cooldown MIN_RECONNECT_INTERVAL=2.0s, ping verification, fires callbacks
+   - **Reconnect (v0.30.3)**: cooldown MIN_RECONNECT_INTERVAL=5s (was 2s), heartbeat debounce=30s (was 5s). send() reconnect no longer fires callbacks (only heartbeat does) — breaks reconnect feedback loop. push_catalog skips if already locked.
    - Max message: 10MB, timeouts: 30s default, 60s compile_preflight/batch, 120s run_tests/run_playtest/fuzz_playtest
 
 3. **Unity Plugin** (C#: 130+ files, ~14000 LOC)

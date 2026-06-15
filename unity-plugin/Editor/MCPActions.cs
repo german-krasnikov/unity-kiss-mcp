@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -13,41 +15,49 @@ namespace UnityMCP.Editor
             MCPServer.StartAsync();
         }
 
-        internal static void Kill()
+        internal static void Kill() => KillAll();
+
+        internal static void KillAll()
         {
-            // Read PID from lockfile written by the Python server.
-            // Lockfile format: ~/.unity-mcp/server-<port>.lock — PID at bytes 0-31 (UTF-8 decimal).
-            // Source-of-truth: server/src/unity_mcp/lockfile.py
-            var lockFile = Path.Combine(
+            var dir = System.IO.Path.Combine(
                 System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                ".unity-mcp", $"server-{MCPServer.ServerPort}.lock");
-
-            if (!File.Exists(lockFile))
+                ".unity-mcp");
+            if (!Directory.Exists(dir))
             {
-                Debug.LogWarning("[MCP] Kill: lockfile not found — MCP server is not running");
+                UnityEngine.Debug.LogWarning("[MCP] Kill: no ~/.unity-mcp dir");
                 return;
             }
 
-            var text = File.ReadAllText(lockFile).Trim().Split(new char[]{'\n','\r',' ','\0'}, 2)[0];
-            if (!int.TryParse(text, out var pid))
-            {
-                Debug.LogWarning($"[MCP] Kill: cannot parse PID from lockfile ({text})");
-                return;
-            }
+            var port = MCPServer.ServerPort;
+            // Glob: server-{port}-*.lock (per-PID format, written by Python lockfile.py)
+            var files = new List<string>(Directory.GetFiles(dir, $"server-{port}-*.lock"));
+            // Also check legacy single-file format: server-{port}.lock
+            var legacy = System.IO.Path.Combine(dir, $"server-{port}.lock");
+            if (File.Exists(legacy)) files.Add(legacy);
 
-            try
+            int killed = 0, stale = 0;
+            foreach (var f in files)
             {
-                System.Diagnostics.Process.GetProcessById(pid).Kill();
-                Debug.Log($"[MCP] Kill: terminated PID {pid}");
+                var text = File.ReadAllText(f).Trim().Split(new char[] { '\n', '\r', ' ', '\0' })[0];
+                if (!int.TryParse(text, out var pid)) { TryDelete(f); stale++; continue; }
+                try
+                {
+                    Process.GetProcessById(pid).Kill();
+                    killed++;
+                }
+                catch (System.ArgumentException) { TryDelete(f); stale++; }  // already dead
+                catch (System.InvalidOperationException) { TryDelete(f); stale++; }  // exited between lookup & kill
+                catch (System.Exception ex)
+                {
+                    UnityEngine.Debug.LogWarning($"[MCP] Kill PID {pid}: {ex.Message}");
+                }
             }
-            catch (System.ArgumentException)
-            {
-                Debug.LogWarning($"[MCP] Kill: process {pid} not running (already stopped)");
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogWarning($"[MCP] Kill: failed to kill PID {pid} — {ex.Message}");
-            }
+            UnityEngine.Debug.Log($"[MCP] Kill All: {killed} killed, {stale} stale cleaned");
+        }
+
+        private static void TryDelete(string path)
+        {
+            try { File.Delete(path); } catch { }
         }
 
         internal static void Reimport()
@@ -57,12 +67,12 @@ namespace UnityMCP.Editor
             {
                 var path = AssetDatabase.GUIDToAssetPath(guids[0]);
                 AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
-                Debug.Log("[MCP] Plugin reimported — recompiling...");
+                UnityEngine.Debug.Log("[MCP] Plugin reimported — recompiling...");
             }
             else
             {
                 AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-                Debug.Log("[MCP] AssetDatabase.Refresh forced");
+                UnityEngine.Debug.Log("[MCP] AssetDatabase.Refresh forced");
             }
         }
     }

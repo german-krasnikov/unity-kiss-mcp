@@ -102,6 +102,59 @@
     padding: 2px 4px;
 }
 
+/* ── Sampling cards ── */
+.sampling-card {
+    margin: 3px 4px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    transition-property: border-color;
+    transition-duration: 0.2s;
+}
+
+.sampling-card:hover {
+    border-color: #3a9a3a;
+}
+
+.sampling-card-body {
+    padding: 4px 2px;
+}
+
+.sampling-inline-row {
+    flex-direction: row;
+    margin-bottom: 3px;
+}
+
+.sampling-inline-row > * {
+    flex: 1;
+    margin-right: 4px;
+}
+
+.sampling-inline-row > *:last-child {
+    margin-right: 0;
+}
+
+.sampling-backend-dd,
+.sampling-model-dd {
+    min-width: 100px;
+    font-size: 11px;
+}
+
+.sampling-int-field,
+.sampling-float-field {
+    min-width: 70px;
+    font-size: 11px;
+}
+
+/* 200ms orange flash when backend changes */
+.model-changed-flash {
+    border-color: #e07020;
+    border-width: 1px;
+    transition-property: border-color;
+    transition-duration: 0.2s;
+}
+
 /* ── Plugins section ── */
 .plugin-section {
     margin-top: 12px;

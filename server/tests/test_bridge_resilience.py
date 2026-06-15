@@ -31,7 +31,7 @@ async def test_session_timeout_aborts_retries(monkeypatch):
     # which triggers id-mismatch retry path. Loop top checks deadline → aborts.
     bridge = bridge_mod.UnityBridge("127.0.0.1", 1)
 
-    async def slow_reconnect():
+    async def slow_reconnect(fire_callbacks=True):
         await asyncio.sleep(0.5)
         raise ConnectionResetError("simulated drop")
     bridge._reconnect = slow_reconnect

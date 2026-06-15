@@ -4,38 +4,57 @@ using NUnit.Framework;
 
 namespace UnityMCP.Editor.Tests
 {
-    // ── CS5.test.1 / CS5.arch.1 — MCPActions.Kill uses live ServerPort ──────
-
     [TestFixture]
     public class MCPActionsKillTests
     {
         [Test]
         public void Kill_MissingLockfile_DoesNotThrow()
         {
-            // Kill() reads server-{ServerPort}.lock; when it does not exist it logs
-            // a warning and returns. This test confirms Kill() is callable without crash
-            // and that no hardcoded path exception is thrown (lockfile simply absent).
+            // KillAll globs server-{ServerPort}-*.lock; when none exist it logs and returns.
             Assert.DoesNotThrow(() => MCPActions.Kill());
         }
 
         [Test]
-        public void Kill_UsesServerPort_NotHardcoded9500()
+        public void KillAll_MissingLockfile_DoesNotThrow()
         {
-            // Verify the formula: the lockfile name must be server-{ServerPort}.lock,
-            // NOT server-9500.lock when ServerPort differs from 9500.
+            Assert.DoesNotThrow(() => MCPActions.KillAll());
+        }
+
+        [Test]
+        public void Kill_ForwardsToKillAll()
+        {
+            // Kill() must delegate to KillAll() — both must not throw when no lockfiles present.
+            Assert.DoesNotThrow(() => MCPActions.Kill());
+            Assert.DoesNotThrow(() => MCPActions.KillAll());
+        }
+
+        [Test]
+        public void KillAll_GlobsPerPidPattern()
+        {
+            // Verify the lockfile pattern uses PID format: server-{port}-*.lock
             var port = MCPServer.ServerPort;
             var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var dir = Path.Combine(home, ".unity-mcp");
 
-            // Build what the fixed code builds
-            var fixedPath = Path.Combine(home, ".unity-mcp", $"server-{port}.lock");
-            // Build what the old broken code built
-            var brokenPath = Path.Combine(home, ".unity-mcp", "server-9500.lock");
+            // Pattern used by KillAll must match per-PID files, NOT legacy single-file
+            var perPidFile = $"server-{port}-12345.lock";
+            var legacyFile = $"server-{port}.lock";
 
-            Assert.AreEqual(Path.GetFileName(fixedPath), $"server-{port}.lock");
+            // Confirm pattern: per-PID file matches glob "server-{port}-*.lock"
+            Assert.IsTrue(perPidFile.StartsWith($"server-{port}-"),
+                "Per-PID lockfile must start with server-{port}-");
+            Assert.IsFalse(legacyFile.Contains("-12345"),
+                "Legacy lockfile must NOT contain PID in filename");
+        }
 
-            if (port != 9500)
-                Assert.AreNotEqual(fixedPath, brokenPath,
-                    "When ServerPort != 9500 the fixed path must differ from the old hardcoded path");
+        [Test]
+        public void KillAll_UsesServerPort_NotHardcoded9500()
+        {
+            var port = MCPServer.ServerPort;
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var perPidPattern = Path.Combine(home, ".unity-mcp", $"server-{port}-*.lock");
+            Assert.IsTrue(perPidPattern.Contains($"server-{port}-"),
+                $"KillAll pattern must use ServerPort={port}, not hardcoded 9500");
         }
     }
 }

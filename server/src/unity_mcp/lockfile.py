@@ -112,6 +112,28 @@ def release_lock(fd: int) -> None:
     os.close(fd)
 
 
+def cleanup_stale_locks(port: int, lock_dir: Path = None) -> int:
+    """Delete lockfiles for dead PIDs. Returns count cleaned."""
+    if lock_dir is None:
+        lock_dir = Path.home() / ".unity-mcp"
+    lock_dir = Path(lock_dir)
+    if not lock_dir.exists():
+        return 0
+    cleaned = 0
+    for f in lock_dir.glob(f"server-{port}-*.lock"):
+        try:
+            pid = int(f.stem.rsplit("-", 1)[1])
+        except (ValueError, IndexError):
+            continue
+        if not is_pid_alive(pid):
+            try:
+                f.unlink()
+                cleaned += 1
+            except OSError:
+                pass
+    return cleaned
+
+
 def read_pid_from_port_file(port: int) -> Optional[int]:
     """Read Unity PID from ~/.unity-mcp/ports/{pid}.port matching the given port."""
     ports_dir = Path.home() / ".unity-mcp" / "ports"

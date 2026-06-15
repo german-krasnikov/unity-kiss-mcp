@@ -12,6 +12,7 @@ class LlmProfile:
     max_turns: int = 1
     timeout: float = 15.0
     max_tokens: Optional[int] = None
+    backend: str = "claude"  # "" or absent → "claude" (backward compat)
 
     def to_cli_args(self) -> list[str]:
         args = ["--model", self.model, "--max-turns", str(self.max_turns)]
@@ -53,6 +54,7 @@ def apply_config(config_dict: dict) -> None:
                 max_turns=params.get("max_turns", 1),
                 timeout=params.get("timeout", 15.0),
                 max_tokens=params.get("max_tokens"),
+                backend=params.get("backend", "claude") or "claude",
             )
 
 
@@ -62,7 +64,10 @@ def reset() -> None:
 
 
 def parse_tcp_config(payload: str) -> dict:
-    """Parse TCP plain-text: feature:model,turns,timeout,max_tokens"""
+    """Parse TCP plain-text: feature:model,turns,timeout,max_tokens[,backend]
+
+    Backend is optional 5th field — absent means 'claude' (backward compat).
+    """
     result = {}
     for line in payload.strip().splitlines():
         if ":" not in line:
@@ -72,12 +77,14 @@ def parse_tcp_config(payload: str) -> dict:
         if len(parts) < 3:
             continue
         max_tokens_raw = parts[3].strip() if len(parts) > 3 else "0"
+        backend_raw = parts[4].strip() if len(parts) > 4 else ""
         try:
             result[key.strip()] = {
-                "model": parts[0].strip(),
-                "max_turns": int(parts[1]),
-                "timeout": float(parts[2]),
+                "model":      parts[0].strip(),
+                "max_turns":  int(parts[1]),
+                "timeout":    float(parts[2]),
                 "max_tokens": int(max_tokens_raw) if max_tokens_raw and max_tokens_raw != "0" else None,
+                "backend":    backend_raw or "claude",
             }
         except (ValueError, IndexError):
             continue

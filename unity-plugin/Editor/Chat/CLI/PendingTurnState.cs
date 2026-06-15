@@ -110,11 +110,10 @@ namespace UnityMCP.Editor.Chat
 
                 var undoGroupId = header.Length > 6 ? int.Parse(header[6])  : -1;
                 var savedAtUtc  = header.Length > 7 ? long.Parse(header[7]) : 0L;
+                // int=2 was CodexAppServer (removed F28), now Gemini. Legacy state files resume as Gemini.
                 var backendKind = header.Length > 8
                     ? (BackendKind)int.Parse(header[8])
                     : BackendKind.Claude;
-                // F28: map legacy CodexAppServer (int=2) to Codex (int=1)
-                if ((int)backendKind == 2) backendKind = BackendKind.Codex;
                 // v6: full-path payload; pre-v6 blobs have no 10th field → "".
                 var llmPayload = header.Length > 9 ? FromB64(header[9]) : "";
 

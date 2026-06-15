@@ -97,6 +97,58 @@ namespace UnityMCP.Editor.Chat
             parent.Add(extraField);
         }
 
+        internal static void BuildGeminiForm(
+            VisualElement parent,
+            GeminiBackendConfig config,
+            Action onSave)
+        {
+            var autoGeminiPath = ChatBinaryResolver.Resolve("gemini");
+            var hint = new Label($"Auto: {autoGeminiPath ?? "not found"}");
+            hint.style.fontSize = 10;
+            hint.style.color    = new StyleColor(autoGeminiPath != null
+                ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
+            parent.Add(hint);
+
+            if (autoGeminiPath == null)
+            {
+                var installHint = new Label("Install: npm install -g @google/gemini-cli");
+                installHint.style.fontSize   = 9;
+                installHint.style.color      = new StyleColor(new Color(0.9f, 0.7f, 0.3f));
+                installHint.style.whiteSpace = WhiteSpace.Normal;
+                parent.Add(installHint);
+            }
+
+            var geminiPathField = new TextField("Binary Path")
+                { value = EditorPrefs.GetString(ChatBinaryResolver.GeminiPrefKey, "") };
+            geminiPathField.RegisterValueChangedCallback(e =>
+            {
+                if (string.IsNullOrEmpty(e.newValue))
+                    EditorPrefs.DeleteKey(ChatBinaryResolver.GeminiPrefKey);
+                else
+                    EditorPrefs.SetString(ChatBinaryResolver.GeminiPrefKey, e.newValue);
+            });
+            parent.Add(geminiPathField);
+
+            var modelField = new TextField("Model") { value = config.Model };
+            modelField.RegisterValueChangedCallback(e => { config.Model = e.newValue; onSave(); });
+            parent.Add(modelField);
+
+            var approvalField = new DropdownField(
+                "Approval Mode",
+                new List<string> { "default", "yolo" },
+                config.ApprovalMode == "yolo" ? 1 : 0);
+            approvalField.RegisterValueChangedCallback(e => { config.ApprovalMode = e.newValue == "default" ? "" : e.newValue; onSave(); });
+            parent.Add(approvalField);
+
+            var sandboxToggle = new Toggle("Sandbox") { value = config.Sandbox };
+            sandboxToggle.RegisterValueChangedCallback(e => { config.Sandbox = e.newValue; onSave(); });
+            parent.Add(sandboxToggle);
+
+            var extraField = new TextField("Extra Args") { value = config.ExtraArgs };
+            extraField.RegisterValueChangedCallback(e => { config.ExtraArgs = e.newValue; onSave(); });
+            parent.Add(extraField);
+        }
+
         internal static void BuildCodexForm(
             VisualElement parent,
             CodexBackendConfig config,

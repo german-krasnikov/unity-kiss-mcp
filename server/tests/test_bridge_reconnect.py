@@ -393,3 +393,83 @@ async def test_grace_expires_when_not_busy():
 
     assert bridge._startup_grace_expired is True, \
         "Grace SHOULD expire after 90s when Unity is not busy"
+
+
+# ---------------------------------------------------------------------------
+# Reconnect spam fix: send() internal _reconnect must NOT fire callbacks
+# ---------------------------------------------------------------------------
+
+async def test_send_reconnect_does_not_fire_callbacks():
+    """send()'s internal reconnect passes fire_callbacks=False — no callback spam."""
+    probe = make_idle_probe()
+    callback = Mock()
+    calls_to_reconnect = []
+
+    async def mock_open(host, port):
+        ping_hdr, ping_pay = ping_response()
+        hdr, pay = _make_ok_response("0001")
+        reader = AsyncMock()
+        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, hdr, pay])
+        return reader, make_writer()
+
+    bridge = UnityBridge("127.0.0.1", 9999, probe=probe)
+    bridge.add_reconnect_callback(callback)
+
+    # Wrap _reconnect to capture fire_callbacks argument
+    original_reconnect = bridge._reconnect
+    async def spy_reconnect(fire_callbacks=True):
+        calls_to_reconnect.append(fire_callbacks)
+        return await original_reconnect(fire_callbacks=fire_callbacks)
+    bridge._reconnect = spy_reconnect
+
+    # Mark disconnected so send() triggers internal reconnect
+    bridge._writer = MagicMock()
+    bridge._writer.is_closing.return_value = True
+
+    with patch.object(bridge_mod.asyncio, "open_connection", side_effect=mock_open):
+        result = await bridge.send("test", {})
+
+    assert result["ok"] is True
+    assert calls_to_reconnect == [False], \
+        f"send() must call _reconnect(fire_callbacks=False), got {calls_to_reconnect}"
+    callback.assert_not_called(), "Callback must NOT fire on send()-triggered reconnect"
+
+
+async def test_heartbeat_reconnect_fires_callbacks():
+    """Heartbeat _reconnect uses default fire_callbacks=True — callbacks DO fire."""
+    probe = make_idle_probe()
+    callback = Mock()
+    calls_to_reconnect = []
+
+    async def mock_open(host, port):
+        ping_hdr, ping_pay = ping_response()
+        reader = AsyncMock()
+        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+        return reader, make_writer()
+
+    bridge = UnityBridge("127.0.0.1", 9999, probe=probe)
+    bridge.add_reconnect_callback(callback)
+
+    original_reconnect = bridge._reconnect
+    async def spy_reconnect(fire_callbacks=True):
+        calls_to_reconnect.append(fire_callbacks)
+        return await original_reconnect(fire_callbacks=fire_callbacks)
+    bridge._reconnect = spy_reconnect
+
+    bridge._writer = None  # disconnected
+
+    with patch.object(bridge_mod.asyncio, "open_connection", side_effect=mock_open):
+        with patch.object(bridge, "_reconnect_cooldown_ok", return_value=True):
+            with patch("unity_mcp.bridge_heartbeat.asyncio.sleep", new_callable=AsyncMock):
+                with patch("unity_mcp.bridge_heartbeat.time.monotonic", return_value=1000.0):
+                    with patch.object(bridge, "_probe_busy", return_value=False):
+                        await bridge._heartbeat_tick(15.0)
+
+    assert True in calls_to_reconnect, \
+        "Heartbeat must call _reconnect(fire_callbacks=True)"
+    callback.assert_called_once()
+
+
+def test_min_reconnect_interval_default_is_5s():
+    """MIN_RECONNECT_INTERVAL default must be 5.0 (was 2.0) — defense in depth."""
+    assert bridge_mod.MIN_RECONNECT_INTERVAL == 5.0

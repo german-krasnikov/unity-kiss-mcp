@@ -41,7 +41,14 @@ namespace UnityMCP.Editor.Chat
 
         /// <summary>Map BackendKind enum to ProviderId string.</summary>
         internal static string KindToId(BackendKind kind)
-            => kind == BackendKind.Codex ? "codex" : "claude";
+        {
+            switch (kind)
+            {
+                case BackendKind.Codex:  return "codex";
+                case BackendKind.Gemini: return "gemini";
+                default:                 return "claude";
+            }
+        }
 
         private static List<IBackendProvider> Discover()
         {

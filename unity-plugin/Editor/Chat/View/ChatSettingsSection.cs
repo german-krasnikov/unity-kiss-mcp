@@ -62,6 +62,10 @@ namespace UnityMCP.Editor.Chat
             BackendSettingsForm.BuildCodexForm(codexFoldout, store.Codex, () => store.Save());
             parent.Add(codexFoldout);
 
+            var geminiFoldout = new Foldout { text = "Gemini Settings", value = false };
+            BackendSettingsForm.BuildGeminiForm(geminiFoldout, store.Gemini, () => store.Save());
+            parent.Add(geminiFoldout);
+
             // Context Chips — per-kind depth + color overrides
             var chipFoldout = new Foldout { text = "Context Chips", value = false };
             BackendSettingsForm.BuildChipDisplayForm(chipFoldout, store.Chips, () =>

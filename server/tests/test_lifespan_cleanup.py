@@ -184,3 +184,40 @@ async def test_init_corroboration_called_on_reconnect(monkeypatch):
         assert any("port" in call for call in init_corroboration_calls), (
             "P9: init_corroboration must be called with port= in _on_reconnect"
         )
+
+
+# ---------------------------------------------------------------------------
+# Zombie cleanup: cleanup_stale_locks called during lifespan startup
+# ---------------------------------------------------------------------------
+
+async def test_lifespan_calls_cleanup_stale_locks_on_startup(monkeypatch):
+    """lifespan() must call cleanup_stale_locks() before acquire_lock()."""
+    from unittest.mock import MagicMock, patch
+    from unity_mcp import server as srv
+
+    cleanup_calls = []
+
+    class FakeSlot:
+        bridge = None
+        connected = False
+        port = 9500
+        async def connect(self, *a, **kw): return "no Unity (fake)"
+        async def close(self): pass
+
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+    monkeypatch.delenv("UNITY_MCP_WATCHDOG", raising=False)
+
+    with patch("unity_mcp.server.cleanup_stale_locks",
+               side_effect=lambda port, **kw: cleanup_calls.append(port) or 0) as mock_cleanup, \
+         patch.object(srv, "ConnectionSlot", lambda **_: FakeSlot()), \
+         patch.object(srv, "slot", None), \
+         patch.object(srv, "manager", None), \
+         patch.object(srv, "_middleware", None):
+
+        lifespan = _import_lifespan()
+        class FakeApp: pass
+        async with lifespan(FakeApp()):
+            pass
+
+    assert cleanup_calls, "cleanup_stale_locks() was never called during lifespan startup"

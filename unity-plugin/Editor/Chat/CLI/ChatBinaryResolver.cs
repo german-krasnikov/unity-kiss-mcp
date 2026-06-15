@@ -12,8 +12,9 @@ namespace UnityMCP.Editor.Chat
 {
     internal static class ChatBinaryResolver
     {
-        internal const string PrefKey      = "UnityMCP_Chat_ClaudePath";
-        internal const string CodexPrefKey = "UnityMCP_Chat_Path_codex";
+        internal const string PrefKey       = "UnityMCP_Chat_ClaudePath";
+        internal const string CodexPrefKey  = "UnityMCP_Chat_Path_codex";
+        internal const string GeminiPrefKey = "UnityMCP_Chat_Path_gemini";
 
         // Per-binary negative cache: key = binary name, value = resolved path (null = not found).
         // Populated on first probe per binary; cleared by ResetCacheForTests.

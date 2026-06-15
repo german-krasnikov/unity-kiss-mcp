@@ -9,9 +9,10 @@ namespace UnityMCP.Editor.Chat
     [Serializable]
     internal sealed class BackendConfigStore
     {
-        public ClaudeBackendConfig Claude = new ClaudeBackendConfig();
-        public CodexBackendConfig  Codex  = new CodexBackendConfig();
-        public ChipConfig          Chips  = new ChipConfig();
+        public ClaudeBackendConfig  Claude = new ClaudeBackendConfig();
+        public CodexBackendConfig   Codex  = new CodexBackendConfig();
+        public GeminiBackendConfig  Gemini = new GeminiBackendConfig();
+        public ChipConfig           Chips  = new ChipConfig();
 
         private static string DefaultPath =>
             Path.Combine(Application.dataPath, "..", "Library", "MCP_ChatBackendConfig.json");
@@ -25,9 +26,10 @@ namespace UnityMCP.Editor.Chat
             {
                 var json  = File.ReadAllText(path);
                 var store = JsonUtility.FromJson<BackendConfigStore>(json);
-                store.Claude = store.Claude ?? new ClaudeBackendConfig();
-                store.Codex  = store.Codex  ?? new CodexBackendConfig();
-                store.Chips  = store.Chips  ?? new ChipConfig();
+                store.Claude  = store.Claude  ?? new ClaudeBackendConfig();
+                store.Codex   = store.Codex   ?? new CodexBackendConfig();
+                store.Gemini  = store.Gemini  ?? new GeminiBackendConfig();
+                store.Chips   = store.Chips   ?? new ChipConfig();
                 return store;
             }
             catch

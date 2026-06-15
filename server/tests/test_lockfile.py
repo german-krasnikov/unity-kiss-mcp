@@ -315,3 +315,84 @@ def test_read_reload_port_multiline_backward_compat(tmp_path):
     )
     with patch.object(Path, "home", return_value=tmp_path):
         assert read_reload_port() == 9605
+
+
+# ---------------------------------------------------------------------------
+# cleanup_stale_locks — zombie detection (Bug #3)
+# ---------------------------------------------------------------------------
+
+def test_zombie_detection_deletes_dead_pid_lockfile(tmp_path):
+    """Dead PID lockfile is deleted by cleanup_stale_locks."""
+    from unity_mcp.lockfile import cleanup_stale_locks
+    dead_pid = 99999999
+    (tmp_path / f"server-9900-{dead_pid}.lock").write_text(str(dead_pid), encoding="utf-8")
+    cleaned = cleanup_stale_locks(9900, lock_dir=tmp_path)
+    assert cleaned == 1
+    assert not (tmp_path / f"server-9900-{dead_pid}.lock").exists()
+
+
+def test_alive_lockfile_preserved(tmp_path):
+    """Alive PID lockfile is NOT deleted by cleanup_stale_locks."""
+    from unity_mcp.lockfile import cleanup_stale_locks
+    alive_pid = os.getpid()
+    lock_file = tmp_path / f"server-9900-{alive_pid}.lock"
+    lock_file.write_text(str(alive_pid), encoding="utf-8")
+    cleaned = cleanup_stale_locks(9900, lock_dir=tmp_path)
+    assert cleaned == 0
+    assert lock_file.exists()
+
+
+def test_multiple_zombies_scenario(tmp_path):
+    """3 dead + 2 alive lockfiles: cleanup removes 3, keeps 2."""
+    from unity_mcp.lockfile import cleanup_stale_locks
+    dead_pids = [99999991, 99999992, 99999993]
+    alive_pids = [os.getpid(), os.getppid()]  # both are definitely alive
+    for pid in dead_pids:
+        (tmp_path / f"server-9500-{pid}.lock").write_text(str(pid), encoding="utf-8")
+    for pid in alive_pids:
+        (tmp_path / f"server-9500-{pid}.lock").write_text(str(pid), encoding="utf-8")
+    cleaned = cleanup_stale_locks(9500, lock_dir=tmp_path)
+    assert cleaned == 3
+    for pid in dead_pids:
+        assert not (tmp_path / f"server-9500-{pid}.lock").exists()
+    for pid in alive_pids:
+        assert (tmp_path / f"server-9500-{pid}.lock").exists()
+
+
+def test_cleanup_stale_locks_ignores_other_ports(tmp_path):
+    """cleanup_stale_locks(9500) must NOT touch server-9900-*.lock files."""
+    from unity_mcp.lockfile import cleanup_stale_locks
+    dead_pid = 99999999
+    (tmp_path / f"server-9900-{dead_pid}.lock").write_text(str(dead_pid), encoding="utf-8")
+    cleaned = cleanup_stale_locks(9500, lock_dir=tmp_path)
+    assert cleaned == 0
+    assert (tmp_path / f"server-9900-{dead_pid}.lock").exists()
+
+
+def test_cleanup_stale_locks_empty_dir(tmp_path):
+    """cleanup_stale_locks on empty dir returns 0."""
+    from unity_mcp.lockfile import cleanup_stale_locks
+    assert cleanup_stale_locks(9500, lock_dir=tmp_path) == 0
+
+
+def test_cleanup_stale_locks_nonexistent_dir():
+    """cleanup_stale_locks on missing dir returns 0 without error."""
+    from unity_mcp.lockfile import cleanup_stale_locks
+    assert cleanup_stale_locks(9500, lock_dir=Path("/nonexistent_xyz_abc")) == 0
+
+
+def test_kill_all_finds_all_lockfiles(tmp_path):
+    """KillAll pattern: cleanup_stale_locks finds all server-{port}-{pid}.lock files."""
+    from unity_mcp.lockfile import cleanup_stale_locks
+    port = 9900
+    dead_pids = [99999991, 99999992, 99999993]
+    for pid in dead_pids:
+        (tmp_path / f"server-{port}-{pid}.lock").write_text(str(pid), encoding="utf-8")
+    # Also create a file for another port — must be ignored
+    (tmp_path / f"server-9500-99999999.lock").write_text("99999999", encoding="utf-8")
+    cleaned = cleanup_stale_locks(port, lock_dir=tmp_path)
+    assert cleaned == 3, f"Expected 3 cleaned, got {cleaned}"
+    for pid in dead_pids:
+        assert not (tmp_path / f"server-{port}-{pid}.lock").exists()
+    # Other port file untouched
+    assert (tmp_path / "server-9500-99999999.lock").exists()

@@ -1,4 +1,6 @@
 """Tests for dynamic MCP tool filtering based on Unity MCPSettings."""
+import os
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -401,3 +403,87 @@ def test_no_gating_env_bypasses_filter(monkeypatch):
     tools = [SimpleNamespace(name="shader"), SimpleNamespace(name="animation")]
     result = _apply_gating(tools)
     assert result is tools
+
+
+# ---------------------------------------------------------------------------
+# Reconnect spam fix: push_catalog skip-if-locked guard
+# ---------------------------------------------------------------------------
+
+async def test_push_catalog_skips_when_locked():
+    """push_catalog() must not call send() if the lock is already held."""
+    import asyncio
+    from unity_mcp import server_filtering
+    from unittest.mock import AsyncMock
+
+    # Reset module-level lock so test is isolated
+    server_filtering._push_catalog_lock = asyncio.Lock()
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True})
+
+    async with server_filtering._push_catalog_lock:
+        # Lock is held; push_catalog must skip
+        await server_filtering.push_catalog(bridge)
+
+    bridge.send.assert_not_called()
+
+
+async def test_push_catalog_sends_when_unlocked():
+    """push_catalog() proceeds normally when lock is free."""
+    import asyncio
+    from unity_mcp import server_filtering
+    from unittest.mock import AsyncMock
+
+    server_filtering._push_catalog_lock = None  # fresh state
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True})
+
+    await server_filtering.push_catalog(bridge)
+
+    bridge.send.assert_called_once()
+    call_args = bridge.send.call_args
+    assert call_args[0][0] == "set_tool_catalog"
+
+
+# ---------------------------------------------------------------------------
+# cleanup_stale_port_files — stale reload-port files (Bug #3 bonus)
+# ---------------------------------------------------------------------------
+
+def test_stale_reload_port_cleanup_removes_dead_pid(tmp_path):
+    """Dead-PID *.reload-port files are deleted by cleanup_stale_port_files()."""
+    from unity_mcp.server_filtering import cleanup_stale_port_files
+    from pathlib import Path
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    dead_pid = 99999999
+    (ports_dir / f"{dead_pid}.reload-port").write_text("9600", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path):
+        cleaned = cleanup_stale_port_files()
+    assert cleaned == 1
+    assert not (ports_dir / f"{dead_pid}.reload-port").exists()
+
+
+def test_stale_reload_port_cleanup_preserves_alive_pid(tmp_path):
+    """Alive-PID *.reload-port files are NOT deleted."""
+    from unity_mcp.server_filtering import cleanup_stale_port_files
+    from pathlib import Path
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    alive_pid = os.getpid()
+    f = ports_dir / f"{alive_pid}.reload-port"
+    f.write_text("9600", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path):
+        cleaned = cleanup_stale_port_files()
+    assert cleaned == 0
+    assert f.exists()
+
+
+def test_stale_reload_port_cleanup_no_dir():
+    """Missing ports dir returns 0 without error."""
+    from unity_mcp.server_filtering import cleanup_stale_port_files
+    from pathlib import Path
+    with patch.object(Path, "home", return_value=Path("/nonexistent_xyz_abc")):
+        assert cleanup_stale_port_files() == 0

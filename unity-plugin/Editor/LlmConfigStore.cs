@@ -44,8 +44,9 @@ namespace UnityMCP.Editor
 
         private static void AppendLine(StringBuilder sb, string key, SamplingConfig c)
         {
-            var model = string.IsNullOrEmpty(c.Model) ? "haiku" : c.Model;
-            sb.AppendLine($"{key}:{model},{c.MaxTurns},{c.Timeout},{c.MaxTokens}");
+            var model   = string.IsNullOrEmpty(c.Model)   ? "haiku"  : c.Model;
+            var backend = string.IsNullOrEmpty(c.Backend) ? "claude" : c.Backend;
+            sb.AppendLine($"{key}:{model},{c.MaxTurns},{c.Timeout},{c.MaxTokens},{backend}");
         }
     }
 }
