@@ -138,6 +138,8 @@ namespace UnityMCP.Editor
                         case 'n':  sb.Append('\n'); i++; break;
                         case 'r':  sb.Append('\r'); i++; break;
                         case 't':  sb.Append('\t'); i++; break;
+                        case 'b':  sb.Append('\b'); i++; break;
+                        case 'f':  sb.Append('\f'); i++; break;
                         case 'u':
                             if (i + 5 < s.Length)
                             {
@@ -157,12 +159,25 @@ namespace UnityMCP.Editor
         internal static string EscapeJson(string str)
         {
             if (string.IsNullOrEmpty(str)) return "";
-            return str
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\n", "\\n")
-                .Replace("\r", "\\r")
-                .Replace("\t", "\\t");
+            var sb = new StringBuilder(str.Length + 8);
+            foreach (char c in str)
+            {
+                switch (c)
+                {
+                    case '\\': sb.Append("\\\\"); break;
+                    case '"':  sb.Append("\\\""); break;
+                    case '\n': sb.Append("\\n");  break;
+                    case '\r': sb.Append("\\r");  break;
+                    case '\t': sb.Append("\\t");  break;
+                    case '\b': sb.Append("\\b");  break;
+                    case '\f': sb.Append("\\f");  break;
+                    default:
+                        if (c < ' ') sb.AppendFormat("\\u{0:x4}", (int)c);
+                        else sb.Append(c);
+                        break;
+                }
+            }
+            return sb.ToString();
         }
 
         /// <summary>Extract the first balanced JSON object from an array string like [{"a":1},{"b":2}].</summary>

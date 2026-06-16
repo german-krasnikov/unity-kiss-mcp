@@ -12,7 +12,6 @@ from unity_mcp.bridge_socket import (
     _apply_socket_options,
     _TCP_KEEPALIVE_DARWIN,
     _TCP_KEEPINTVL_DARWIN,
-    _TCP_KEEPCNT_DARWIN,
 )
 from unity_mcp.bridge_heartbeat import HeartbeatMixin
 from unity_mcp.compile_state import CompileStateProbe
@@ -22,7 +21,7 @@ from unity_mcp.metrics import METRICS
 # Re-export so existing `from .bridge import DomainReloadError` keeps working
 __all__ = [
     "UnityBridge", "DomainReloadError",
-    "MIN_RECONNECT_INTERVAL",
+    "MIN_RECONNECT_INTERVAL", "DOMAIN_RELOAD_EXPIRY_S",
     "_apply_socket_options",
     "_TCP_KEEPALIVE_DARWIN", "_TCP_KEEPINTVL_DARWIN",
 ]
@@ -32,6 +31,7 @@ SESSION_TIMEOUT = float(os.environ.get("UNITY_MCP_SESSION_TIMEOUT", "120.0"))
 MAX_RETRIES = int(os.environ.get("UNITY_MCP_MAX_RETRIES", "3"))
 MIN_RECONNECT_INTERVAL = float(os.environ.get("UNITY_MCP_MIN_RECONNECT_INTERVAL", "5.0"))
 STARTUP_GRACE_S = float(os.environ.get("UNITY_MCP_STARTUP_GRACE", "90.0"))
+DOMAIN_RELOAD_EXPIRY_S: float = 30.0
 
 
 class UnityBridge(HeartbeatMixin):
@@ -63,6 +63,9 @@ class UnityBridge(HeartbeatMixin):
         self._last_reconnect_at: float = 0.0
         self._min_reconnect_interval: float = MIN_RECONNECT_INTERVAL
         self._port_discoverer: Optional[Callable[[], int]] = port_discoverer
+        self._domain_reload_in_progress: bool = False
+        self._domain_reload_since: Optional[float] = None
+        self._ppid_mismatch_count: int = 0
 
     def add_reconnect_callback(self, fn) -> None:
         self._on_reconnect_callbacks.append(fn)
@@ -87,7 +90,12 @@ class UnityBridge(HeartbeatMixin):
 
     async def send(self, cmd: str, args: dict, timeout: float = 30.0) -> dict:
         if self._startup_grace_expired:
-            raise ConnectionError(self._describe_failure(cmd, ConnectionRefusedError()))
+            try:
+                async with self._lock:
+                    await self._reconnect(fire_callbacks=False)
+                # _reconnect cleared _startup_grace_expired on success
+            except Exception:
+                raise ConnectionError(self._describe_failure(cmd, ConnectionRefusedError()))
         self._ensure_heartbeat()
         self._counter += 1
         msg_id = f"{self._counter:04x}"
@@ -120,7 +128,13 @@ class UnityBridge(HeartbeatMixin):
                     self._first_failure_ts = time.monotonic()
                 if isinstance(e, DomainReloadError):
                     self._probe.mark_recompile_issued()
-                busy = isinstance(e, DomainReloadError) or self._probe_busy()
+                    self._domain_reload_in_progress = True
+                    self._domain_reload_since = time.monotonic()
+                if self._domain_reload_in_progress and self._domain_reload_since is not None:
+                    if time.monotonic() - self._domain_reload_since > DOMAIN_RELOAD_EXPIRY_S:
+                        self._domain_reload_in_progress = False
+                        self._domain_reload_since = None
+                busy = self._domain_reload_in_progress or self._probe_busy()
                 self._crash_log.log_disconnect(cmd=cmd, retry=attempt,
                                                error_type=type(e).__name__,
                                                unity_busy=busy, port=self._port)
@@ -160,6 +174,8 @@ class UnityBridge(HeartbeatMixin):
                     continue
                 return result
 
+            self._domain_reload_in_progress = False
+            self._domain_reload_since = None
             if self._first_failure_ts is not None:
                 outage = time.monotonic() - self._first_failure_ts
                 METRICS.observe("recompile.duration_ms", outage * 1000)
@@ -201,7 +217,9 @@ class UnityBridge(HeartbeatMixin):
         await self.close()
         if self._port_discoverer is not None:
             try:
-                new_port = self._port_discoverer()
+                import inspect
+                kw = {"skip_probe": True} if "skip_probe" in inspect.signature(self._port_discoverer).parameters else {}
+                new_port = self._port_discoverer(**kw)
                 if new_port != self._port:
                     self._port = new_port
                     self._probe = CompileStateProbe(
@@ -216,7 +234,7 @@ class UnityBridge(HeartbeatMixin):
         try:
             self._counter += 1
             ping_id = f"rc{self._counter:04x}"
-            ping = json.dumps({"id": ping_id, "cmd": "ping", "args": {}}).encode("utf-8")
+            ping = json.dumps({"id": ping_id, "cmd": "ping", "args": {}}, ensure_ascii=False).encode("utf-8")
             writer.write(struct.pack("!I", len(ping)) + ping)
             await writer.drain()
             # Temporarily wire reader so _read_response works
@@ -236,6 +254,8 @@ class UnityBridge(HeartbeatMixin):
         self._first_failure_ts = None
         self._reconnect_started_at = None
         self._startup_grace_expired = False
+        self._domain_reload_in_progress = False
+        self._domain_reload_since = None
         self._last_reconnect_at = time.monotonic()
         if fire_callbacks:
             for cb in self._on_reconnect_callbacks:

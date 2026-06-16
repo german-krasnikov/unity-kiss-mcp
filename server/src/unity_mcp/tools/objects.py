@@ -149,7 +149,7 @@ async def set_parent(path: str, parent: str | None = None, world_position_stays:
 
 
 async def object_diff(path_a: str, path_b: str) -> str:
-    """Diff two GameObjects (components, properties, children). Cross-scene: 'SceneA:/Julia'."""
+    """Diff two GameObjects (components, properties, children). Cross-scene: 'SceneA:/Alice'."""
     return await _send("object_diff", {"pathA": path_a, "pathB": path_b})
 
 

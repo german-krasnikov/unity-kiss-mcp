@@ -3,19 +3,9 @@
 Reduces multi-step setup to a single tool call.
 """
 from ._annotations import RW as _RW
+from ..utils import parse_kv
 
 _send = None
-_args = None
-
-
-def _parse_kv(parts: list[str]) -> dict:
-    """Parse 'key=value' token list into dict."""
-    kv = {}
-    for p in parts:
-        if "=" in p:
-            k, v = p.split("=", 1)
-            kv[k] = v
-    return kv
 
 
 async def setup_objects(specs: str) -> str:
@@ -30,7 +20,7 @@ async def setup_objects(specs: str) -> str:
             continue
         parts = spec.split()
         name = parts[0]
-        kv = _parse_kv(parts[1:])
+        kv = parse_kv(" ".join(parts[1:]))
 
         cmd = f"create_object name={name}"
         parent = kv.get("parent", "")
@@ -126,9 +116,8 @@ async def configure_objects(config: str) -> str:
 
 
 def register(mcp, send, args):
-    global _send, _args
+    global _send
     _send = send
-    _args = args
     mcp.tool(annotations=_RW)(setup_objects)
     mcp.tool(annotations=_RW)(set_properties)
     mcp.tool(annotations=_RW)(configure_objects)

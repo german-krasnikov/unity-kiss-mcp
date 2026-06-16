@@ -59,3 +59,17 @@ def assign_indices(
     out = [(idx_of[r.get("path", "")], r) for r in rects if r.get("path", "") in idx_of]
     out.sort(key=lambda t: t[0])
     return out
+
+
+def build_path_pool(
+    rects: list[dict],
+    rects_after: list[dict] | None = None,
+    cap: int = 30,
+) -> list[str]:
+    """Canonical SHA-256-sorted union of paths from before+after frames, capped."""
+    after = rects_after if rects_after is not None else rects
+    paths = (
+        {r.get("path") for r in rects if r.get("path")} |
+        {r.get("path") for r in after if r.get("path")}
+    )
+    return sorted(paths, key=lambda p: hashlib.sha256(p.encode()).hexdigest())[:cap]

@@ -289,3 +289,32 @@ def test_cwd_nested_projects_prefers_longest_match(monkeypatch, tmp_path):
     # CWD is inside the sub-project (both match, longest wins)
     monkeypatch.setattr("os.getcwd", lambda: project_sub + "/Assets")
     assert _read_unity_port() == 9501
+
+
+# ---------------------------------------------------------------------------
+# RC-4: skip_probe bypasses TCP check
+# ---------------------------------------------------------------------------
+
+def test_skip_probe_true_returns_port_without_tcp_check(monkeypatch, tmp_path):
+    """skip_probe=True: port returned even when TCP probe would fail."""
+    monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    _make_port_file(ports_dir, pid=1111, port=9510)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("os.kill", lambda pid, sig: None)
+    probe_calls = []
+
+    def fail_probe(port, timeout=0.2):
+        probe_calls.append(port)
+        return False  # would reject the candidate
+
+    monkeypatch.setattr("unity_mcp.server_filtering._tcp_probe", fail_probe)
+    # Without skip_probe → candidate rejected → default 9500
+    assert _read_unity_port(skip_probe=False) == 9500
+    assert probe_calls  # probe was called
+
+    probe_calls.clear()
+    # With skip_probe=True → candidate accepted despite probe failure
+    assert _read_unity_port(skip_probe=True) == 9510
+    assert not probe_calls  # probe was NOT called

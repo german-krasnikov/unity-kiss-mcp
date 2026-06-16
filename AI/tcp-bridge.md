@@ -61,8 +61,24 @@ Key features:
 - Reconnect: cooldown `MIN_RECONNECT_INTERVAL=2.0s` gates frequency; `_reconnect_cooldown_ok()` check prevents thundering herd. Heartbeat uses probe for TIMING only, not as gate for reconnect.
 - `DomainReloadError`: raised when Unity sends `going_away` event frame → immediate close (no wait), triggers `mark_recompile_issued()` state probe update, fast reconnect
 - `_ensure_heartbeat()`: called on every `send()`, auto-restarts heartbeat task if it died (safety net)
-- `send()` retry logic: idle errors get 1 grace attempt; busy (domain reload / probe) gets full retries with exponential backoff (capped at 8s). Session deadline `SESSION_TIMEOUT=120s` prevents infinite retries.
+- `send()` retry logic: idle errors get 1 grace attempt; busy (domain reload / probe) gets full retries with exponential backoff (capped at 8s). Session deadline `SESSION_TIMEOUT=120s` prevents infinite retries. **v0.31.1 Fix**: When `DomainReloadError` is caught, `domain_reload_in_progress` flag is pinned to True for all subsequent retries within that send() call, preventing `_probe_busy()` re-evaluation from returning False too early (Editor.log may clear "compiling" status before TCP 9700 is restored). Non-DomainReloadError exceptions still allow probe re-evaluation per attempt.
 - Lock per connection for thread safety
+
+**P0 (Cycle 17+) Fix — Domain Reload Sticky Flag**
+- `_domain_reload_in_progress` now auto-expires after `DOMAIN_RELOAD_EXPIRY_S=30s`
+- Cleared on successful reconnect (when TCP fully restores)
+- Prevents permanent "busy" state if domain reload never completes (e.g., compile error during reload)
+- Regression: flag was set but never cleared, causing -32000 errors on all subsequent commands
+
+**P2 (Cycle 17+) Fix — Startup Grace Latch Recovery**
+- `_startup_grace_expired` death latch: `send()` now attempts one reconnect before raising ConnectionError
+- Allows recovery from permanent-death state (grace period elapsed without successful connection)
+- If reconnect succeeds, clears flag and proceeds; if fails, raises original error
+
+**P4 (Cycle 17+) Safety Comment — Lock Serialization**
+- Both `_raw_ping()` and `send()` hold `self._lock` for their full write→read cycle
+- asyncio.Lock serializes them — heartbeat ping can never interleave with a tool-call response
+- ID collision is impossible by design
 
 ### ConnectionSlot (connection_slot.py)
 
@@ -100,6 +116,18 @@ Append-only JSONL crash log for unhandled exceptions:
 - Auto-creates parent dir, silent on I/O failures
 - Integrated into `main()`: outer try/except catches `BaseException` → calls `log_crash()` → re-raises (preserves clean shutdown for `KeyboardInterrupt`, `SystemExit`, EPIPE)
 - **CrashLogger class**: JSONL append-only logger with rotation (500 entries max, 15MB size limit) — logs disconnect, reconnect events (older feature). Separate from module-level `log_crash()` used for unhandled server exceptions.
+
+### Parent PID Monitoring (bridge_heartbeat.py)
+
+**P3 (Cycle 17+) Fix — Double-Check Parent Death**
+- PPID mismatch now requires 2 consecutive checks (not immediate kill)
+- Prevents race-condition kills during rapid fork() activity (e.g., subprocess spawn)
+- Counter resets to 0 if PPID matches on next check
+
+**P5 (Cycle 18+) Fix — Graceful Heartbeat Stop on Parent Death**
+- When parent dies (2 consecutive PPID mismatches), calls `self.stop_heartbeat()` instead of `raise SystemExit(0)`
+- **Why:** `SystemExit` is `BaseException` — escapes `except Exception` safety net in `_heartbeat_loop`, kills anyio task group, closes stdio → -32000 errors on in-flight MCP calls
+- Process now dies naturally from `BrokenPipeError` on next stdio write, leaving in-flight MCP operations intact
 
 ### C# Server (MCPServer.cs) — v0.23.0 SO_REUSEPORT Recovery
 
@@ -146,10 +174,25 @@ Append-only JSONL crash log for unhandled exceptions:
 **Per-command timeouts:**
 | Command | Timeout |
 |---------|---------|
-| `run_tests`, `run_playtest` | 130s |
+| `run_tests`, `run_playtest` | 130s (initial send; v0.32.0: short 8s fire-and-forget) |
 | `batch` | 65s |
 | `wait_until`, `move_to`, `test_step` | 30s |
 | Default | 25s |
+
+**run_tests Fire-and-Forget (v0.32.0)**
+- `run_tests()` returns immediately (8s send timeout) with message `"tests-started|{mode}|poll get_test_results every 5s for up to 2min"`
+- Does NOT poll internally — caller must poll `get_test_results()` externally
+- On `DomainReloadError`: returns immediately (no wait)
+- **Why:** avoids TCP blocking when domain reload clears socket before port 9700 restored
+
+**P1 (Cycle 17+) Fix — Compile Guard Allowlist for Test Results**
+- `get_test_results` added to `IsAllowedDuringCompile` allowlist in CommandRouter.cs
+- Reads SessionState only (no main thread dispatch) — safe during compile + domain reload
+- Fixes blocking of test result polling during domain reload, causing -32000 errors
+
+**P0 (Cycle 17+) Fix — Domain Reload Sticky Flag**
+- `_domain_reload_in_progress` flag now auto-expires after 30s, cleared on successful reconnect
+- Prevents permanent "busy" state if domain reload doesn't complete (e.g., compile error)
 
 ## Code Locations
 
@@ -161,8 +204,8 @@ Append-only JSONL crash log for unhandled exceptions:
 - Python crash log: `server/src/unity_mcp/crash_log.py`
 - Python server filtering: `server/src/unity_mcp/server_filtering.py` (with v0.23.0 TCP probe)
 - Python server wrapper: `server/src/unity_mcp/server.py` (main() crash handler)
-- C#: `unity-plugin/Editor/MCPServer.cs`
-- Tests: `server/tests/test_bridge.py` (37), `server/tests/test_connection_slot.py` (8), `server/tests/test_lockfile.py` (17), `server/tests/test_crash_log.py` (10), `server/tests/test_server.py` (4 new main() crash tests)
+- C#: `unity-plugin/Editor/CommandRouter.cs`, `unity-plugin/Editor/MCPServer.cs`
+- Tests: `server/tests/test_bridge.py` (37), `server/tests/test_bridge_edge_cases.py` (6 new P0+P2 tests), `server/tests/test_heartbeat.py` (4 new P3+P5 tests: double-check + graceful stop), `server/tests/test_connection_slot.py` (8), `server/tests/test_lockfile.py` (17), `server/tests/test_crash_log.py` (10), `server/tests/test_server.py` (4 new main() crash tests), `server/tests/test_parent_death.py` (updated for P3+P5)
 
 ## Reconnection Strategy
 
@@ -223,6 +266,13 @@ On TimeoutError / ConnectionError:
 - `test_bridge_auto_retry_on_retry_hint`, `test_bridge_no_retry_on_normal_error`
 - `test_send_raises_timeout_error_after_max_retries`, `test_bridge_retry_respects_max_retries`
 - `test_idle_retry_gets_one_grace_attempt`
+- `test_domain_reload_pins_busy_for_all_retries` — DomainReloadError sets `domain_reload_in_progress=True` flag which persists across retries, preventing `_probe_busy()` from returning False early when Editor.log clears "compiling" status before TCP port 9700 is restored
+- `test_non_domain_reload_still_re_evaluates_probe` — Non-DomainReloadError exceptions still allow `_probe_busy()` re-evaluation per attempt (existing behavior)
+
+**P0 + P2 (Cycle 17+) — Edge case fixes:**
+- `test_domain_reload_flag_auto_expires` — flag clears after DOMAIN_RELOAD_EXPIRY_S=30s even if domain reload never completes
+- `test_startup_grace_latch_recovery` — send() retries reconnect instead of immediate failure when grace period expired
+- `test_reconnect_clears_domain_reload_flags` — successful reconnect clears both `_domain_reload_in_progress` and `_domain_reload_since`
 
 **Heartbeat:**
 - `test_heartbeat_default_interval_is_15`, `test_heartbeat_detects_zombie_connection`
@@ -231,6 +281,12 @@ On TimeoutError / ConnectionError:
 - `test_heartbeat_immediate_close_on_domain_reload_error`
 - `test_heartbeat_respects_reconnect_cooldown`
 - `test_ensure_heartbeat_restarts_dead_task`, `test_heartbeat_survives_tick_exception`
+
+**P3 (Cycle 17+) — Parent Death Double-Check:**
+- `test_ppid_mismatch_requires_two_checks` — single PPID change doesn't exit
+- `test_ppid_mismatch_counter_resets_on_match` — counter zeroes if PPID matches next check
+- `test_ppid_mismatch_exits_on_second_mismatch` — raises SystemExit(0) on consecutive mismatches
+- `test_ppid_mismatch_allows_cleanup` — SystemExit permits finally blocks and atexit handlers
 
 **Raw ping:**
 - `test_raw_ping_bypasses_send_retry`, `test_raw_ping_raises_on_disconnected`

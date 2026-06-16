@@ -217,7 +217,7 @@ async def test_run_tests_calls_bridge(mock_bridge):
     """Test run_tests sends correct command to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "tests: 5 passed, 0 failed\nTime: 1.2s"})
     result = await run_tests(mode="EditMode")
-    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=30.0)
+    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=8.0)
     assert "passed" in result
 
 
@@ -225,23 +225,15 @@ async def test_run_tests_default_mode(mock_bridge):
     """Test run_tests defaults to EditMode"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "tests: 3 passed, 0 failed"})
     result = await run_tests()
-    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=30.0)
+    mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=8.0)
     assert "passed" in result
 
 
-async def test_run_tests_error_falls_through_to_poll(mock_bridge):
-    """run_tests error on initial send → falls through to poll → poll returns none → error string."""
-    import unity_mcp.tools.scene as _scene
-    orig_interval, orig_attempts = _scene._POLL_INTERVAL, _scene._POLL_ATTEMPTS
-    _scene._POLL_INTERVAL = 0
-    _scene._POLL_ATTEMPTS = 1
+async def test_run_tests_error_returns_started(mock_bridge):
+    """run_tests error on initial send → returns tests-started immediately."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Test framework not available"})
-    try:
-        result = await run_tests()
-    finally:
-        _scene._POLL_INTERVAL = orig_interval
-        _scene._POLL_ATTEMPTS = orig_attempts
-    assert "Error" in result
+    result = await run_tests()
+    assert "tests-started" in result
 
 
 async def test_get_test_results_calls_bridge(mock_bridge):
@@ -266,84 +258,20 @@ async def test_get_test_results_returns_none_when_no_run(mock_bridge):
     assert result == "none"
 
 
-async def test_run_tests_playmode_polls_after_disconnect(mock_bridge):
-    """run_tests PlayMode: on disconnect, polls get_test_results until results available."""
-    call_count = 0
-
-    async def side_effect(cmd, args, timeout=30.0):
-        nonlocal call_count
-        call_count += 1
-        if cmd == "run_tests":
-            raise ToolError("Unity connection lost")
-        if cmd == "get_test_results":
-            if call_count < 4:
-                return {"ok": True, "data": "pending"}
-            return {"ok": True, "data": "3 tests: 3 passed (2.1s)"}
-
-    mock_bridge.send = AsyncMock(side_effect=side_effect)
-
-    import unity_mcp.tools.scene as _scene
-    _scene._POLL_INTERVAL = 0
-    _scene._POLL_ATTEMPTS = 10
-    try:
-        result = await run_tests(mode="PlayMode")
-    finally:
-        _scene._POLL_INTERVAL = 2.0
-        _scene._POLL_ATTEMPTS = 30
-    assert "passed" in result
-    calls = [c for c in mock_bridge.send.call_args_list if c[0][0] == "get_test_results"]
-    assert len(calls) >= 1
-
-
-async def test_run_tests_playmode_timeout_returns_error(mock_bridge):
-    """run_tests PlayMode: returns error string if polling times out."""
-    async def side_effect(cmd, args, timeout=30.0):
-        if cmd == "run_tests":
-            raise ToolError("Unity connection lost")
-        return {"ok": True, "data": "pending"}
-
-    mock_bridge.send = AsyncMock(side_effect=side_effect)
-
-    import unity_mcp.tools.scene as _scene
-    _scene._POLL_INTERVAL = 0
-    _scene._POLL_ATTEMPTS = 3
-    try:
-        result = await run_tests(mode="PlayMode")
-    finally:
-        _scene._POLL_INTERVAL = 2.0
-        _scene._POLL_ATTEMPTS = 30
-    assert "Error" in result or "timeout" in result.lower()
-
-
-async def test_run_tests_editmode_catches_disconnect_and_polls(mock_bridge):
-    """run_tests EditMode: ToolError is caught → falls through to poll."""
-    import unity_mcp.tools.scene as _scene
-    orig_interval, orig_attempts = _scene._POLL_INTERVAL, _scene._POLL_ATTEMPTS
-    _scene._POLL_INTERVAL = 0
-    _scene._POLL_ATTEMPTS = 2
+async def test_run_tests_playmode_disconnect_returns_started(mock_bridge):
+    """run_tests PlayMode: on disconnect, returns tests-started immediately."""
     mock_bridge.send = AsyncMock(side_effect=ToolError("Unity connection lost"))
-    try:
-        result = await run_tests(mode="EditMode")
-    finally:
-        _scene._POLL_INTERVAL = orig_interval
-        _scene._POLL_ATTEMPTS = orig_attempts
-    assert "Error" in result
+    result = await run_tests(mode="PlayMode")
+    assert "tests-started" in result
+    assert "PlayMode" in result
 
 
-async def test_run_tests_playmode_tool_error_on_poll_swallowed(mock_bridge):
-    """run_tests PlayMode: ToolError from every get_test_results poll is swallowed; result is error string."""
-    mock_bridge.send = AsyncMock(side_effect=ToolError("disconnected"))
-
-    import unity_mcp.tools.scene as _scene
-    orig_interval, orig_attempts = _scene._POLL_INTERVAL, _scene._POLL_ATTEMPTS
-    _scene._POLL_INTERVAL = 0
-    _scene._POLL_ATTEMPTS = 3
-    try:
-        result = await run_tests(mode="PlayMode")
-    finally:
-        _scene._POLL_INTERVAL = orig_interval
-        _scene._POLL_ATTEMPTS = orig_attempts
-    assert "Error" in result
+async def test_run_tests_editmode_disconnect_returns_started(mock_bridge):
+    """run_tests EditMode: ToolError caught → returns tests-started."""
+    mock_bridge.send = AsyncMock(side_effect=ToolError("Unity connection lost"))
+    result = await run_tests(mode="EditMode")
+    assert "tests-started" in result
+    assert "EditMode" in result
 
 
 async def test_scene_new_calls_bridge(mock_bridge):
@@ -1050,9 +978,9 @@ def test_main_does_not_log_epipe_oserror():
 
 async def test_object_diff_sends_args(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "= (identical)"})
-    result = await object_diff(path_a="/Julia", path_b="SceneB:/Julia")
+    result = await object_diff(path_a="/Alice", path_b="SceneB:/Alice")
     mock_bridge.send.assert_called_once_with(
-        "object_diff", {"pathA": "/Julia", "pathB": "SceneB:/Julia"}, timeout=30.0
+        "object_diff", {"pathA": "/Alice", "pathB": "SceneB:/Alice"}, timeout=30.0
     )
     assert "identical" in result
 

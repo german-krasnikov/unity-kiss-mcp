@@ -368,3 +368,52 @@ def test_filter_tools_disabled_set_overrides_session_enable():
     tool = _make_tool("animation")
     result = filter_tools([tool], {"animation"})
     assert result == [], "disabled set must suppress session-enabled tools"
+
+
+# --- TDD FIX-33: single-source taxonomy ---
+
+def test_categories_derived_from_themed():
+    """Every tool in built-in CATEGORIES aliases must exist in _THEMED_CATEGORIES or _CORE_TOOLS.
+    Skips dynamically-registered plugin categories (not in _CATEGORY_ALIAS)."""
+    from unity_mcp.tools.gating import CATEGORIES, _THEMED_CATEGORIES, _CORE_TOOLS, _CATEGORY_ALIAS
+    themed_all = {t for tools in _THEMED_CATEGORIES.values() for t in tools}
+    for cat in _CATEGORY_ALIAS:  # only built-in aliases, skip plugin categories
+        for tool in CATEGORIES.get(cat, set()):
+            assert tool in themed_all or tool in _CORE_TOOLS, (
+                f"CATEGORIES['{cat}'] has '{tool}' not in _THEMED_CATEGORIES or _CORE_TOOLS"
+            )
+
+
+def test_no_orphan_themed_tools():
+    """Every non-CORE tool in _THEMED_CATEGORIES must appear in at least one CATEGORIES alias."""
+    from unity_mcp.tools.gating import CATEGORIES, _THEMED_CATEGORIES, _CORE_TOOLS, TIER1
+    cats_all = {t for tools in CATEGORIES.values() for t in tools}
+    themed_all = {t for tools in _THEMED_CATEGORIES.values() for t in tools}
+    # Tools that are in TIER1 don't need to be in CATEGORIES (they're always visible)
+    # But every non-TIER1 themed tool should be reachable via some category alias
+    for tool in themed_all:
+        if tool not in TIER1 and tool not in _CORE_TOOLS:
+            assert tool in cats_all, (
+                f"'{tool}' is in _THEMED_CATEGORIES but unreachable via any CATEGORIES alias"
+            )
+
+
+def test_old_category_aliases_work():
+    """All 8 legacy category names must still work with discover_tools/enable_category."""
+    from unity_mcp.tools.gating import CATEGORIES
+    expected_aliases = {"object", "animation", "asset", "advanced", "ui", "runtime", "connection", "session"}
+    assert expected_aliases.issubset(set(CATEGORIES.keys())), (
+        f"Missing aliases: {expected_aliases - set(CATEGORIES.keys())}"
+    )
+
+
+def test_category_alias_mapping_is_exhaustive():
+    """_CATEGORY_ALIAS must cover all non-empty themed groups."""
+    from unity_mcp.tools.gating import _CATEGORY_ALIAS, _THEMED_CATEGORIES
+    mapped_groups = set()
+    for groups in _CATEGORY_ALIAS.values():
+        mapped_groups.update(groups)
+    non_empty_themed = {k for k, v in _THEMED_CATEGORIES.items() if v}
+    assert non_empty_themed.issubset(mapped_groups), (
+        f"Themed groups not mapped to any alias: {non_empty_themed - mapped_groups}"
+    )

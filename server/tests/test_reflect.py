@@ -399,22 +399,18 @@ async def test_wire_event_empty_response_mismatch():
 
 # ── set_property_delta ────────────────────────────────────────────────────────
 
-async def test_set_property_delta_match():
-    resp = _snap({"value_after": "100"})
-    result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
+async def test_set_property_delta_arrow_format():
+    # C# returns "100 → 105" — should be silent (delta is relative, can't verify absolute)
+    result = await reflect("set_property_delta", {"prop": "health", "value": "5"}, "100 → 105", _dummy_send)
     assert result is None
 
 
-async def test_set_property_delta_mismatch():
-    resp = _snap({"value_after": "50"})
-    result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
-    assert isinstance(result, Mismatch)
-    assert "health" in result.msg
+async def test_set_property_delta_error_returns_none():
+    result = await reflect("set_property_delta", {"prop": "health", "value": "5"}, "Failed: property not found", _dummy_send)
+    assert result is None
 
 
-async def test_set_property_delta_empty_snapshot_mismatch():
-    # "ok\n---\n" — snapshot section exists but is empty → no keys → snap={}
-    resp = "ok\n---\n"
-    result = await reflect("set_property_delta", {"prop": "health", "value": "100"}, resp, _dummy_send)
-    assert isinstance(result, Mismatch)
-    assert "no snapshot" in result.msg
+async def test_set_property_delta_empty_response():
+    # No arrow, no error — unexpected format, stay silent
+    result = await reflect("set_property_delta", {"prop": "health", "value": "5"}, "ok no snapshot", _dummy_send)
+    assert result is None

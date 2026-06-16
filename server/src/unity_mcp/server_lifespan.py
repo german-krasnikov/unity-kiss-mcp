@@ -5,7 +5,7 @@ All functions are pure-ish: they mutate the Middleware object passed in
 but have no hidden side-effects beyond that.
 """
 import os
-from typing import Optional, Callable
+from typing import Optional
 from .middleware import Middleware
 
 

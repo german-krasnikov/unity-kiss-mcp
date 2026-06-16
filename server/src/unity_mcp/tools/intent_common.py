@@ -1,22 +1,9 @@
 """Shared DSL utilities for Tier B intent tools."""
-import re
 from typing import Optional
 from ..sampling_postproc import strip_fences  # backward-compat re-export
+from ..utils import parse_kv  # consolidated — was local copy
 
 __all__ = ["strip_fences", "parse_kv", "parse_indent_tree", "sanitize_intent", "build_batch_line"]
-
-
-def parse_kv(line: str) -> dict[str, str]:
-    """Parse 'key=value key2="quoted value"' into dict."""
-    result: dict[str, str] = {}
-    # Match key="quoted" or key=unquoted
-    for m in re.finditer(r'(\w+)=("(?:[^"\\]|\\.)*"|[^\s]+)', line):
-        key = m.group(1)
-        val = m.group(2)
-        if val.startswith('"') and val.endswith('"'):
-            val = val[1:-1]
-        result[key] = val
-    return result
 
 
 def parse_indent_tree(dsl: str) -> list[dict]:

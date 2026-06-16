@@ -52,19 +52,38 @@ def test_vfx_detect_kind_particle_from_emit():
     assert detect_kind("emit sparks from engine") == "particle"
 
 
-def test_vfx_detect_kind_shader_from_dissolve():
+def test_vfx_detect_kind_particle_from_dissolve():
     from unity_mcp.tools.vfx_intent_tool import detect_kind
-    assert detect_kind("dissolve effect on death") == "shader"
+    assert detect_kind("dissolve effect on death") == "particle"
 
 
-def test_vfx_detect_kind_shader_from_glow():
+def test_vfx_detect_kind_particle_from_glow():
     from unity_mcp.tools.vfx_intent_tool import detect_kind
-    assert detect_kind("glow outline on selection") == "shader"
+    assert detect_kind("glow outline on selection") == "particle"
 
 
 def test_vfx_detect_kind_default_particle():
     from unity_mcp.tools.vfx_intent_tool import detect_kind
     assert detect_kind("some generic vfx") == "particle"
+
+
+def test_detect_kind_always_particle():
+    """All inputs, including shader keywords, return particle."""
+    from unity_mcp.tools.vfx_intent_tool import detect_kind
+    for intent in ["dissolve effect", "glow outline", "shader magic", "material swap", "big explosion", "random text"]:
+        assert detect_kind(intent) == "particle", f"Failed for: {intent}"
+
+
+def test_vfx_shader_keyword_produces_particle_batch():
+    """Shader keywords go through particle path without crashing."""
+    from unity_mcp.tools.vfx_intent_tool import detect_kind, build_vfx_batch, parse_vfx_dsl
+    kind = detect_kind("add dissolve effect to enemy")
+    assert kind == "particle"
+    dsl = "SET startColor = #FFFFFF\nMODULE sizeOverLifetime ENABLED"
+    data = parse_vfx_dsl(dsl)
+    lines = build_vfx_batch("/Enemy", data)
+    assert len(lines) == 2
+    assert all("particle" in l for l in lines)
 
 
 # ---------------------------------------------------------------------------

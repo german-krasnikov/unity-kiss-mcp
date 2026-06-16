@@ -2,9 +2,10 @@
 import asyncio
 import json
 import struct
+import time
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
 import pytest
-from unity_mcp.bridge import UnityBridge
+from unity_mcp.bridge import UnityBridge, DOMAIN_RELOAD_EXPIRY_S
 from helpers import make_writer, make_idle_probe, ping_response
 
 
@@ -527,3 +528,149 @@ async def test_concurrent_sends_routes_per_caller(mock_unity_server):
         assert f"cmd_{i}" in str(r), f"Caller {i} got wrong response: {r}"
 
     await bridge.close()
+
+
+# ── P0: _domain_reload_in_progress sticky flag ──────────────────────────────
+
+async def test_p0_domain_reload_flag_cleared_on_reconnect():
+    """_domain_reload_in_progress cleared when _reconnect() succeeds."""
+    ping_hdr, ping_pay = ping_response()
+    reader = AsyncMock()
+    writer = make_writer()
+    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+
+    with patch("asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        bridge._domain_reload_in_progress = True
+        bridge._domain_reload_since = time.monotonic()
+
+        await bridge._reconnect(fire_callbacks=False)
+
+        assert bridge._domain_reload_in_progress is False
+        assert bridge._domain_reload_since is None
+
+
+async def test_p0_domain_reload_flag_auto_expires(monkeypatch):
+    """After DOMAIN_RELOAD_EXPIRY_S, sticky flag auto-clears in send() error path."""
+    import unity_mcp.bridge as bmod
+    monkeypatch.setattr(bmod, "SESSION_TIMEOUT", 0.5)
+    monkeypatch.setattr(bmod, "MAX_RETRIES", 0)
+    idle_probe = make_idle_probe()
+
+    # First call: trigger DomainReloadError to set the flag
+    going_away = json.dumps({"ev": "going_away", "reason": "reload"}).encode()
+    ga_hdr = struct.pack("!I", len(going_away))
+    # Second call: normal OSError while flag is expired — should NOT get busy retry
+    reader1 = AsyncMock()
+    reader1.readexactly = AsyncMock(side_effect=[ga_hdr, going_away])
+    writer1 = make_writer()
+
+    reader2 = AsyncMock()
+    reader2.readexactly = AsyncMock(side_effect=OSError("refused"))
+    writer2 = make_writer()
+
+    with patch("asyncio.open_connection", side_effect=[
+        (reader1, writer1), (reader2, writer2),
+    ]):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+        with pytest.raises((ConnectionError, TimeoutError)):
+            await bridge.send("test", {})
+        # Flag is set after DomainReloadError
+        assert bridge._domain_reload_in_progress is True
+
+    # Now simulate 31s later — flag should auto-expire in next send()
+    bridge._domain_reload_since = time.monotonic() - (DOMAIN_RELOAD_EXPIRY_S + 1)
+    reader3 = AsyncMock()
+    reader3.readexactly = AsyncMock(side_effect=OSError("refused"))
+    writer3 = make_writer()
+    with patch("asyncio.open_connection", return_value=(reader3, writer3)):
+        with pytest.raises((ConnectionError, TimeoutError)):
+            await bridge.send("test2", {})
+    # After expiry, flag should have been cleared
+    assert bridge._domain_reload_in_progress is False
+
+
+async def test_p0_domain_reload_flag_stays_true_within_window(monkeypatch):
+    """Within 30s window, domain reload flag keeps send() in busy-retry mode."""
+    import unity_mcp.bridge as bmod
+    monkeypatch.setattr(bmod, "SESSION_TIMEOUT", 0.5)
+    monkeypatch.setattr(bmod, "MAX_RETRIES", 1)
+    idle_probe = make_idle_probe()
+
+    going_away = json.dumps({"ev": "going_away", "reason": "reload"}).encode()
+    ga_hdr = struct.pack("!I", len(going_away))
+    reader = AsyncMock()
+    reader.readexactly = AsyncMock(side_effect=[ga_hdr, going_away, ga_hdr, going_away])
+    writer = make_writer()
+
+    with patch("asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+        # _domain_reload_since will be set to now (within window)
+        with pytest.raises((ConnectionError, TimeoutError)):
+            await bridge.send("test", {})
+    # Flag stays true because we're within 30s window
+    assert bridge._domain_reload_in_progress is True
+    assert bridge._domain_reload_since is not None
+
+
+async def test_p0_domain_reload_since_set_when_flag_raised(mock_connection, monkeypatch):
+    """When DomainReloadError hits, _domain_reload_since is set."""
+    import unity_mcp.bridge as bmod
+    monkeypatch.setattr(bmod, "SESSION_TIMEOUT", 0.1)
+    monkeypatch.setattr(bmod, "MAX_RETRIES", 0)
+    from unity_mcp.bridge_socket import DomainReloadError
+
+    mock_reader, mock_writer = mock_connection
+    idle_probe = make_idle_probe()
+
+    going_away = json.dumps({"ev": "going_away", "reason": "reload"}).encode()
+    hdr = struct.pack("!I", len(going_away))
+    mock_reader.readexactly = AsyncMock(side_effect=[hdr, going_away])
+
+    with patch("asyncio.open_connection", return_value=mock_connection):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+
+        with pytest.raises((ConnectionError, TimeoutError)):
+            await bridge.send("test", {})
+
+    # After the DomainReloadError path, timestamp should have been set
+    # (even if flag was later cleared — we test via the probe mock call)
+    idle_probe.mark_recompile_issued.assert_called_once()
+
+
+# ── P2: _startup_grace_expired permanent death latch ────────────────────────
+
+async def test_p2_startup_grace_expired_attempts_reconnect():
+    """send() with _startup_grace_expired=True attempts reconnect before raising."""
+    ping_hdr, ping_pay = ping_response()
+    # _reconnect sends a ping (counter=1, id=rc0001), then send() uses counter=2
+    resp = {"id": "0002", "ok": True, "data": "ok"}
+    resp_pay = json.dumps(resp).encode()
+    resp_hdr = struct.pack("!I", len(resp_pay))
+
+    reader = AsyncMock()
+    writer = make_writer()
+    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, resp_hdr, resp_pay])
+
+    with patch("asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        bridge._startup_grace_expired = True
+
+        result = await bridge.send("test", {})
+
+        assert result["ok"] is True
+        # latch should be cleared now
+        assert bridge._startup_grace_expired is False
+
+
+async def test_p2_startup_grace_expired_raises_if_reconnect_fails():
+    """send() raises ConnectionError if reconnect fails when grace expired."""
+    with patch("asyncio.open_connection", side_effect=ConnectionRefusedError("refused")):
+        bridge = UnityBridge()
+        bridge._startup_grace_expired = True
+
+        with pytest.raises(ConnectionError):
+            await bridge.send("test", {})

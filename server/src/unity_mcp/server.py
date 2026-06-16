@@ -95,7 +95,7 @@ async def _filter_tools(tools: list, bridge_) -> list:
 
 
 COMMAND_TIMEOUTS: dict[str, float] = {
-    "run_tests": 120.0,
+    "run_tests": 10.0,
     "run_playtest": 120.0,
     "fuzz_playtest": 120.0,
     "compile_preflight": 60.0,

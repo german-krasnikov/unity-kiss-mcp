@@ -247,3 +247,34 @@ def test_ui_builder_layout_group_type_key_not_component_key():
     mc_lines = [l for l in lines if "manage_component" in l]
     assert not any("component=" in l for l in mc_lines), f"Wrong key: {mc_lines}"
     assert any("type=VerticalLayoutGroup" in l for l in mc_lines), mc_lines
+
+
+# ---------------------------------------------------------------------------
+# 8. FIX-17: spacing emits set_property, not manage_component arg
+# ---------------------------------------------------------------------------
+
+def test_build_ui_batch_spacing_emits_set_property():
+    """spacing=10 must produce a separate set_property line, not a manage_component arg."""
+    from unity_mcp.tools.ui_intent_tool import parse_ui_dsl, build_ui_batch
+    dsl = "canvas Canvas\n  layout Menu dir=vertical spacing=10"
+    nodes = parse_ui_dsl(dsl)
+    lines = build_ui_batch(nodes, parent=None)
+    mc_lines = [l for l in lines if "manage_component" in l]
+    sp_lines = [l for l in lines if "set_property" in l and "spacing" in l]
+    # manage_component must NOT contain spacing
+    assert not any("spacing" in l for l in mc_lines), f"spacing leaked into manage_component: {mc_lines}"
+    # set_property must contain spacing=10
+    assert sp_lines, f"Expected set_property for spacing, got lines: {lines}"
+    assert "prop=spacing" in sp_lines[0], sp_lines[0]
+    assert "value=10" in sp_lines[0], sp_lines[0]
+    assert "component=VerticalLayoutGroup" in sp_lines[0], sp_lines[0]
+
+
+def test_build_ui_batch_no_spacing_no_extra_line():
+    """Layout without spacing must NOT emit set_property."""
+    from unity_mcp.tools.ui_intent_tool import parse_ui_dsl, build_ui_batch
+    dsl = "canvas Canvas\n  layout Menu dir=vertical"
+    nodes = parse_ui_dsl(dsl)
+    lines = build_ui_batch(nodes, parent=None)
+    sp_lines = [l for l in lines if "set_property" in l and "spacing" in l]
+    assert not sp_lines, f"Unexpected set_property for spacing: {sp_lines}"

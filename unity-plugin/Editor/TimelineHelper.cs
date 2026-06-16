@@ -199,12 +199,7 @@ namespace UnityMCP.Editor
             if (!TrackTypes.TryGetValue(typeName, out var trackType))
                 throw new ArgumentException($"Unknown track type: {typeName}. Valid: Animation, Audio, Activation, Control, Signal, Group");
 
-            // Use reflection to call CreateTrack<T> with dynamic type
-            var method = typeof(TimelineAsset).GetMethod("CreateTrack", new[] { typeof(TrackAsset), typeof(string) });
-            if (method == null)
-                throw new InvalidOperationException("CreateTrack method not found via reflection");
-            var generic = method.MakeGenericMethod(trackType);
-            var track = (TrackAsset)generic.Invoke(timeline, new object[] { null, trackName });
+            var track = timeline.CreateTrack(trackType, null, trackName);
             return track;
         }
 

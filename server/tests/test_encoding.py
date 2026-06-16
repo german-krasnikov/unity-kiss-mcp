@@ -262,8 +262,9 @@ def test_install_configure_writes_utf8_no_bom(tmp_path):
     import importlib.util
     import json
 
+    install_py = Path(__file__).resolve().parent.parent.parent / "install.py"
     spec = importlib.util.spec_from_file_location(
-        "install", "/Users/german/Work/python/unity-kiss-mcp/install.py"
+        "install", install_py
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

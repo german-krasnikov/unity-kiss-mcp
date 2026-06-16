@@ -44,6 +44,35 @@ def test_animator_parse_dsl_transition_no_condition():
     assert result["transitions"][0]["condition"] is None
 
 
+def test_trans_anystate_parsed():
+    from unity_mcp.tools.animator_intent_tool import parse_animator_dsl
+    dsl = "TRANS * -> Jump dur=0.1 if Jump"
+    result = parse_animator_dsl(dsl)
+    assert result["transitions"] == [
+        {"source": "*", "target": "Jump", "duration": "0.1", "condition": "Jump"}
+    ]
+
+
+def test_trans_normal_still_works():
+    from unity_mcp.tools.animator_intent_tool import parse_animator_dsl
+    dsl = "TRANS Idle -> Jump dur=0.2"
+    result = parse_animator_dsl(dsl)
+    assert result["transitions"] == [
+        {"source": "Idle", "target": "Jump", "duration": "0.2", "condition": None}
+    ]
+
+
+def test_validate_anystate_ok():
+    from unity_mcp.tools.animator_intent_tool import validate_animator_dsl
+    dsl_data = {
+        "params": [("Jump", "trigger", "")],
+        "states": [("Idle", "Idle.anim"), ("Jump", "Jump.anim")],
+        "default": "Idle",
+        "transitions": [{"source": "*", "target": "Jump", "duration": "0.1", "condition": "Jump"}],
+    }
+    assert validate_animator_dsl(dsl_data) is None
+
+
 def test_animator_parse_dsl_ignores_unknown_keywords():
     from unity_mcp.tools.animator_intent_tool import parse_animator_dsl
     dsl = "PARAM Speed float 0\nFOO bar baz"

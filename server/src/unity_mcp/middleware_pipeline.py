@@ -179,7 +179,9 @@ def wrap_send(send_fn, mw: Optional["Middleware"] = None):
                 predicted = prior_fn(args)
                 if predicted:
                     p_cmd, p_args = predicted
-                    asyncio.create_task(mw._background_prefetch(p_cmd, p_args, send_fn))
+                    t = asyncio.create_task(mw._background_prefetch(p_cmd, p_args, send_fn))
+                    mw._bg_tasks.add(t)
+                    t.add_done_callback(mw._bg_tasks.discard)
 
         # HierarchyDiff: reset on writes, apply diff on get_hierarchy reads
         if cmd in WRITE_CMDS:

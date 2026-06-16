@@ -30,7 +30,8 @@ class HeartbeatMixin:
     Expected instance attributes (set by UnityBridge.__init__):
       _heartbeat_task, _heartbeat_interval, _ping_failures,
       _last_reconnect_at, _min_reconnect_interval,
-      _lock, _probe, _writer, _counter, _reader
+      _lock, _probe, _writer, _counter, _reader,
+      _ppid_mismatch_count
     """
 
     def start_heartbeat(self, interval: float = 15.0) -> None:
@@ -56,14 +57,22 @@ class HeartbeatMixin:
 
     async def _heartbeat_tick(self, interval: float) -> None:
         """Single heartbeat iteration. Separated for safety-net wrapping."""
-        # Parent death = immediate hard exit. No clean shutdown — parent is already dead,
-        # nobody reads our stdout. OS releases flock and closes TCP sockets on exit.
+        # Parent death: stop heartbeat, let process die naturally from BrokenPipeError.
+        # Never raise SystemExit/BaseException from a background task — it kills
+        # the anyio task group, closing stdio → -32000 for any in-flight MCP call.
         if os.getppid() != _ORIGINAL_PPID:
-            import logging
-            logging.getLogger("unity_mcp.bridge").warning(
-                "Parent died (ppid %d → %d), exiting", _ORIGINAL_PPID, os.getppid()
-            )
-            os._exit(0)
+            self._ppid_mismatch_count += 1
+            if self._ppid_mismatch_count >= 2:
+                import logging
+                logging.getLogger("unity_mcp.bridge").warning(
+                    "Parent died (ppid %d → %d), stopping heartbeat",
+                    _ORIGINAL_PPID, os.getppid()
+                )
+                self.stop_heartbeat()
+                return
+            return  # skip tick, recheck next heartbeat
+        else:
+            self._ppid_mismatch_count = 0
         if not self.connected:
             # Track cumulative disconnected time for startup-grace deadline.
             if self._reconnect_started_at is None:
@@ -136,13 +145,18 @@ class HeartbeatMixin:
         return (time.monotonic() - self._last_reconnect_at) >= self._min_reconnect_interval
 
     async def _raw_ping(self, timeout: float = 5.0) -> None:
-        """Send ping directly on socket, bypassing send() retry machinery."""
+        """Send ping directly on socket, bypassing send() retry machinery.
+
+        P4 SAFETY: both _raw_ping and send() hold self._lock for their full
+        write→read cycle. asyncio.Lock serialises them — heartbeat ping can
+        never interleave with a tool-call response, so ID collision is impossible.
+        """
         async with self._lock:
             if not self.connected:
                 raise ConnectionError("Not connected")
             self._counter += 1
             ping_id = f"hb{self._counter:04x}"
-            payload = json.dumps({"id": ping_id, "cmd": "ping", "args": {}}).encode("utf-8")
+            payload = json.dumps({"id": ping_id, "cmd": "ping", "args": {}}, ensure_ascii=False).encode("utf-8")
             self._writer.write(struct.pack("!I", len(payload)) + payload)
             await self._writer.drain()
             resp = await asyncio.wait_for(self._read_response(), timeout=timeout)

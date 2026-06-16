@@ -9,7 +9,7 @@ namespace UnityMCP.Editor
 {
     internal static class ReferenceHelper
     {
-        private const int MAX_ARRAY = 100;
+        internal const int MAX_ARRAY = 100;
         private const int MAX_SCAN = 5000;
 
         private struct RefEntry
@@ -131,15 +131,13 @@ namespace UnityMCP.Editor
             return refs;
         }
 
-        private static void WalkProperties(SerializedObject so, string compType, string goPath, List<RefEntry> refs)
+        internal static void WalkObjectRefs(SerializedObject so, Action<SerializedProperty, string> onRef,
+            bool skipBuiltins = true)
         {
             var prop = so.GetIterator();
             if (!prop.NextVisible(true)) return;
-
-            do
-            {
-                if (prop.name == "m_Script" || prop.name == "m_GameObject") continue;
-
+            do {
+                if (skipBuiltins && (prop.name == "m_Script" || prop.name == "m_GameObject")) continue;
                 if (prop.isArray && prop.propertyType == SerializedPropertyType.Generic)
                 {
                     int cap = Math.Min(prop.arraySize, MAX_ARRAY);
@@ -147,14 +145,17 @@ namespace UnityMCP.Editor
                     {
                         var elem = prop.GetArrayElementAtIndex(i);
                         if (elem.propertyType == SerializedPropertyType.ObjectReference)
-                            AddRefEntry(refs, compType, $"{prop.name}[{i}]", elem, goPath);
+                            onRef(elem, $"{prop.name}[{i}]");
                     }
                 }
                 else if (prop.propertyType == SerializedPropertyType.ObjectReference)
-                {
-                    AddRefEntry(refs, compType, prop.name, prop, goPath);
-                }
+                    onRef(prop, prop.name);
             } while (prop.NextVisible(false));
+        }
+
+        private static void WalkProperties(SerializedObject so, string compType, string goPath, List<RefEntry> refs)
+        {
+            WalkObjectRefs(so, (prop, label) => AddRefEntry(refs, compType, label, prop, goPath));
         }
 
         private static void AddRefEntry(List<RefEntry> refs, string compType, string propPath, SerializedProperty prop, string goPath)
@@ -220,38 +221,23 @@ namespace UnityMCP.Editor
             if (scanned >= MAX_SCAN) return;
             scanned++;
 
+            int localCount = count;
             var go = t.gameObject;
             foreach (var comp in go.GetComponents<Component>())
             {
                 if (comp == null || comp is Transform) continue;
                 var so = new SerializedObject(comp);
-                var prop = so.GetIterator();
-                if (!prop.NextVisible(true)) continue;
-
-                do
+                WalkObjectRefs(so, (p, label) =>
                 {
-                    if (prop.isArray && prop.propertyType == SerializedPropertyType.Generic)
-                    {
-                        int cap = Math.Min(prop.arraySize, MAX_ARRAY);
-                        for (int i = 0; i < cap; i++)
-                        {
-                            var elem = prop.GetArrayElementAtIndex(i);
-                            if (MatchesTarget(elem, targetId))
-                            {
-                                sb.Append(ComponentSerializer.GetPath(go))
-                                  .Append(" [").Append(comp.GetType().Name).Append("].").Append(prop.name).Append('[').Append(i).AppendLine("]");
-                                count++;
-                            }
-                        }
-                    }
-                    else if (MatchesTarget(prop, targetId))
+                    if (MatchesTarget(p, targetId))
                     {
                         sb.Append(ComponentSerializer.GetPath(go))
-                          .Append(" [").Append(comp.GetType().Name).Append("].").AppendLine(prop.name);
-                        count++;
+                          .Append(" [").Append(comp.GetType().Name).Append("].").AppendLine(label);
+                        localCount++;
                     }
-                } while (prop.NextVisible(false));
+                }, skipBuiltins: false);
             }
+            count = localCount;
 
             foreach (Transform child in t)
                 ScanForReferencesTo(child, targetId, targetGo, sb, ref count, ref scanned);

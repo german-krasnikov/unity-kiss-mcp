@@ -1,11 +1,37 @@
-// 8 built-in IChipKindProvider implementations.
+// 9 built-in IChipKindProvider implementations.
 // All internal — registered by ChipKindRegistry.EnsureBuiltIns().
-// HierarchyChipProvider.Navigate uses SceneObjectFinder (CLI-internal, no View dep).
+// AssetChipProviderBase: shared FormatPayload + Navigate(PingAsset) + DefaultDepth + Create.
+// HierarchyChipProvider: fully custom (instance ID, depth/summary, SceneObjectFinder).
 using UnityEditor;
 using UnityEngine;
 
 namespace UnityMCP.Editor.Chat
 {
+    internal abstract class AssetChipProviderBase : IChipKindProvider
+    {
+        public abstract string Key      { get; }
+        public abstract int    Priority { get; }
+        public abstract string IconName { get; }
+        public abstract string HexColor { get; }
+        public virtual  string DefaultDepth => "path";
+
+        public abstract bool CanHandle(Object obj, string assetPath);
+
+        public virtual ChipData Create(Object obj, string assetPath)
+            => new ChipData(Key, assetPath, obj.name, 0);
+
+        public virtual string FormatPayload(ChipData chip, ChipPayloadContext ctx)
+            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
+
+        public virtual void Navigate(string reference)
+        {
+            var obj = AssetDatabase.LoadAssetAtPath<Object>(reference);
+            if (obj == null) { Debug.LogWarning("[MCP Chat] Asset not found: " + reference); return; }
+            EditorGUIUtility.PingObject(obj);
+            Selection.activeObject = obj;
+        }
+    }
+
     internal sealed class HierarchyChipProvider : IChipKindProvider
     {
         public string Key      => ChipKindKeys.Hierarchy;
@@ -51,43 +77,27 @@ namespace UnityMCP.Editor.Chat
         }
     }
 
-    internal sealed class SceneChipProvider : IChipKindProvider
+    internal sealed class SceneChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.Scene;
-        public int    Priority => 200;
-        public string IconName => "d_SceneAsset Icon";
-        public string HexColor => "#c084fc";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.Scene;
+        public override int    Priority => 200;
+        public override string IconName => "d_SceneAsset Icon";
+        public override string HexColor => "#c084fc";
 
-        public bool CanHandle(Object obj, string assetPath)
+        public override bool CanHandle(Object obj, string assetPath)
             => obj != null && !string.IsNullOrEmpty(assetPath) && assetPath.EndsWith(".unity");
-
-        public ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
     }
 
-    internal sealed class ScriptChipProvider : IChipKindProvider
+    internal sealed class ScriptChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.Script;
-        public int    Priority => 300;
-        public string IconName => "d_cs Script Icon";
-        public string HexColor => "#4ade80";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.Script;
+        public override int    Priority => 300;
+        public override string IconName => "d_cs Script Icon";
+        public override string HexColor => "#4ade80";
 
-        public bool CanHandle(Object obj, string assetPath) => obj is MonoScript;
+        public override bool CanHandle(Object obj, string assetPath) => obj is MonoScript;
 
-        public ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference)
+        public override void Navigate(string reference)
         {
             var ms = AssetDatabase.LoadAssetAtPath<MonoScript>(reference);
             if (ms == null) { Debug.LogWarning("[MCP Chat] Script not found: " + reference); return; }
@@ -95,134 +105,72 @@ namespace UnityMCP.Editor.Chat
         }
     }
 
-    internal sealed class PrefabChipProvider : IChipKindProvider
+    internal sealed class PrefabChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.Prefab;
-        public int    Priority => 400;
-        public string IconName => "d_Prefab Icon";
-        public string HexColor => "#60a5fa";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.Prefab;
+        public override int    Priority => 400;
+        public override string IconName => "d_Prefab Icon";
+        public override string HexColor => "#60a5fa";
 
-        public bool CanHandle(Object obj, string assetPath)
+        public override bool CanHandle(Object obj, string assetPath)
             => obj != null && !string.IsNullOrEmpty(assetPath) && assetPath.EndsWith(".prefab");
-
-        public ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
     }
 
-    internal sealed class MaterialChipProvider : IChipKindProvider
+    internal sealed class MaterialChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.Material;
-        public int    Priority => 500;
-        public string IconName => "d_Material Icon";
-        public string HexColor => "#f97316";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.Material;
+        public override int    Priority => 500;
+        public override string IconName => "d_Material Icon";
+        public override string HexColor => "#f97316";
 
-        public bool CanHandle(Object obj, string assetPath) => obj is Material;
-
-        public ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
+        public override bool CanHandle(Object obj, string assetPath) => obj is Material;
     }
 
-    internal sealed class TextureChipProvider : IChipKindProvider
+    internal sealed class TextureChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.Texture;
-        public int    Priority => 600;
-        public string IconName => "d_Texture Icon";
-        public string HexColor => "#facc15";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.Texture;
+        public override int    Priority => 600;
+        public override string IconName => "d_Texture Icon";
+        public override string HexColor => "#facc15";
 
-        public bool CanHandle(Object obj, string assetPath) => obj is Texture;
-
-        public ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
+        public override bool CanHandle(Object obj, string assetPath) => obj is Texture;
     }
 
-    internal sealed class SOChipProvider : IChipKindProvider
+    internal sealed class SOChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.ScriptableObject;
-        public int    Priority => 700;
-        public string IconName => "d_ScriptableObject Icon";
-        public string HexColor => "#fb7185";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.ScriptableObject;
+        public override int    Priority => 700;
+        public override string IconName => "d_ScriptableObject Icon";
+        public override string HexColor => "#fb7185";
 
-        public bool CanHandle(Object obj, string assetPath) => obj is ScriptableObject;
-
-        public ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
+        public override bool CanHandle(Object obj, string assetPath) => obj is ScriptableObject;
     }
 
-    internal sealed class FolderChipProvider : IChipKindProvider
+    internal sealed class FolderChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.Folder;
-        public int    Priority => 150;
-        public string IconName => "d_Folder Icon";
-        public string HexColor => "#a78bfa";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.Folder;
+        public override int    Priority => 150;
+        public override string IconName => "d_Folder Icon";
+        public override string HexColor => "#a78bfa";
 
-        public bool CanHandle(Object obj, string assetPath)
+        public override bool CanHandle(Object obj, string assetPath)
             => obj is DefaultAsset && !string.IsNullOrEmpty(assetPath)
                && AssetDatabase.IsValidFolder(assetPath);
-
-        public ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
     }
 
-    internal sealed class AssetChipProvider : IChipKindProvider
+    internal sealed class AssetChipProvider : AssetChipProviderBase
     {
-        public string Key      => ChipKindKeys.Asset;
-        public int    Priority => int.MaxValue;
-        public string IconName => "d_DefaultAsset Icon";
-        public string HexColor => "#94a3b8";
-        public string DefaultDepth => "path";
+        public override string Key      => ChipKindKeys.Asset;
+        public override int    Priority => int.MaxValue;
+        public override string IconName => "d_DefaultAsset Icon";
+        public override string HexColor => "#94a3b8";
 
-        public bool CanHandle(Object obj, string assetPath) => true; // fallback
+        public override bool CanHandle(Object obj, string assetPath) => true; // fallback
 
-        public ChipData Create(Object obj, string assetPath)
+        public override ChipData Create(Object obj, string assetPath)
         {
             var path = string.IsNullOrEmpty(assetPath) ? (obj != null ? obj.name : "") : assetPath;
             return new ChipData(Key, path, obj != null ? obj.name : path, 0);
-        }
-
-        public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
-            => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
-
-        public void Navigate(string reference) => BuiltInChipProviderHelper.PingAsset(reference);
-    }
-
-    internal static class BuiltInChipProviderHelper
-    {
-        internal static void PingAsset(string assetPath)
-        {
-            var obj = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-            if (obj == null) { Debug.LogWarning("[MCP Chat] Asset not found: " + assetPath); return; }
-            EditorGUIUtility.PingObject(obj);
-            Selection.activeObject = obj;
         }
     }
 }

@@ -378,6 +378,80 @@ async def test_idle_retry_gets_one_grace_attempt():
     assert call_count == 2  # initial connect + 1 grace retry
 
 
+# ── Fix A: DomainReloadError pins busy for all retries ───────────────────────
+
+def _make_going_away_frame() -> bytes:
+    """Minimal going_away frame that triggers DomainReloadError in _read_response."""
+    msg = json.dumps({"ev": "going_away", "reason": "domain_reload"}).encode()
+    return struct.pack("!I", len(msg)) + msg
+
+
+async def test_domain_reload_pins_busy_for_all_retries():
+    """DomainReloadError: probe clearing mid-retry must NOT stop retries early."""
+    probe = make_idle_probe()
+    probe.has_strong_busy_signal.return_value = False  # probe already cleared
+
+    frame = _make_going_away_frame()
+
+    call_count = 0
+
+    async def fake_open(*a, **kw):
+        nonlocal call_count
+        call_count += 1
+        reader = AsyncMock()
+        writer = make_writer()
+        if call_count == 1:
+            # First call: server sends going_away → DomainReloadError
+            writer.get_extra_info = Mock(return_value=None)
+            reader.readexactly.side_effect = [frame[:4], frame[4:]]
+        else:
+            # Subsequent retries: connection refused
+            raise ConnectionRefusedError("refused")
+        return reader, writer
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=fake_open):
+        with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
+            bridge = UnityBridge(probe=probe)
+            await bridge.connect()
+            with pytest.raises((ConnectionError, TimeoutError)):
+                await bridge.send("run_tests", {})
+
+    # domain_reload_in_progress=True must keep retrying past the first ConnectionRefused
+    # Initial connect + at least MAX_RETRIES more attempts
+    from unity_mcp.bridge import MAX_RETRIES
+    assert call_count >= MAX_RETRIES + 1, (
+        f"Expected >={MAX_RETRIES + 1} open_connection calls (domain reload pinned), got {call_count}"
+    )
+
+
+async def test_non_domain_reload_does_not_pin_busy():
+    """Non-DomainReloadError: probe returning False stops retries at grace attempt."""
+    probe = make_idle_probe()
+    probe.has_strong_busy_signal.return_value = False  # always idle
+
+    call_count = 0
+
+    async def fake_open(*a, **kw):
+        nonlocal call_count
+        call_count += 1
+        reader = AsyncMock()
+        writer = make_writer()
+        return reader, writer
+
+    with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=fake_open):
+        with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
+            bridge = UnityBridge(probe=probe)
+            await bridge.connect()
+            with patch.object(bridge, "_read_response", side_effect=ConnectionError("plain")):
+                with pytest.raises(ConnectionError):
+                    await bridge.send("test", {})
+
+    # idle probe: attempt 0 → 1 grace → give up = 2 open_connection calls total
+    assert call_count == 2, (
+        f"Expected 2 open_connection calls (grace only), got {call_count}"
+    )
+
+
 # ── Tier 2c: Heartbeat ────────────────────────────────────────────────────────
 
 async def test_heartbeat_detects_zombie_connection():

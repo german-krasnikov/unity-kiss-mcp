@@ -1,6 +1,7 @@
 using System;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace UnityMCP.Editor
 {
@@ -65,7 +66,7 @@ namespace UnityMCP.Editor
                 // Render directly into our own RT (avoids black-buffer from unrendered frame)
                 rt = new RenderTexture(width, height, 24);
                 sv.camera.targetTexture = rt;
-                sv.camera.Render();
+                RenderOffscreen(sv.camera);
                 sv.camera.targetTexture = null;
 
                 RenderTexture.active = rt;
@@ -117,7 +118,7 @@ namespace UnityMCP.Editor
 
                 var previousTarget = camera.targetTexture;
                 camera.targetTexture = renderTexture;
-                camera.Render();
+                RenderOffscreen(camera);
                 camera.targetTexture = previousTarget;
 
                 RenderTexture.active = renderTexture;
@@ -132,6 +133,25 @@ namespace UnityMCP.Editor
                 if (renderTexture != null) UnityEngine.Object.DestroyImmediate(renderTexture);
                 if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
             }
+        }
+
+        /// <summary>Render camera to its current targetTexture, using SRP path when available.</summary>
+        internal static void RenderOffscreen(Camera camera)
+        {
+            if (GraphicsSettings.currentRenderPipeline != null)
+            {
+                try
+                {
+                    var req = new RenderPipeline.StandardRequest();
+                    if (RenderPipeline.SupportsRenderRequest(camera, req))
+                    {
+                        RenderPipeline.SubmitRenderRequest(camera, req);
+                        return;
+                    }
+                }
+                catch { /* fallback to Camera.Render for pipelines that don't support StandardRequest */ }
+            }
+            camera.Render();
         }
 
         private static Camera FindCamera(string cameraName)

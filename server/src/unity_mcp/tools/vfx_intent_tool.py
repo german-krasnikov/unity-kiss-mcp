@@ -1,4 +1,4 @@
-"""vfx_intent — NL → VFX DSL → particle/shader batch commands."""
+"""vfx_intent — NL → VFX DSL → particle batch commands."""
 import re
 from typing import Optional
 from ..sampling import SamplingService
@@ -37,8 +37,6 @@ _PRESETS: dict[str, dict] = {
     },
 }
 
-_PARTICLE_KEYWORDS = {"explosion", "burst", "emit", "particle", "spark", "fire", "smoke", "rain", "snow"}
-_SHADER_KEYWORDS = {"dissolve", "glow", "outline", "shader", "material"}
 
 _PROMPT_TEMPLATE = """\
 Generate a VFX DSL for Unity particle system. Use ONLY:
@@ -64,11 +62,7 @@ def get_preset_config(name: str) -> Optional[dict]:
 
 
 def detect_kind(intent: str) -> str:
-    low = intent.lower()
-    if any(k in low for k in _SHADER_KEYWORDS):
-        return "shader"
-    if any(k in low for k in _PARTICLE_KEYWORDS):
-        return "particle"
+    """Detect VFX kind. Currently particle-only; shader DSL not yet implemented."""
     return "particle"
 
 
@@ -108,7 +102,7 @@ def build_vfx_batch(target: str, data: dict) -> list[str]:
 async def vfx_intent(target: str, intent: str, kind: str = "auto", dry_run: bool = False) -> str:
     """Convert NL intent to Unity VFX setup. Presets bypass Haiku entirely.
 
-    kind: particle|shader|material|auto. dry_run=True skips execution.
+    kind: particle|auto (shader/material not yet implemented). dry_run=True skips execution.
     """
     # Preset bypass
     preset = get_preset_config(intent.strip())

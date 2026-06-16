@@ -1,17 +1,25 @@
 """Shared utilities."""
+import re
+
+# Paren group matches flat tuples: (1, 0, 0). Nested parens NOT supported.
+_KV_RE = re.compile(r'(\w+)=("(?:[^"\\]|\\.)*"|\((?:[^)]*)\)|[^\s]+)')
+
+
+def parse_kv(text: str) -> dict[str, str]:
+    """Parse key=value pairs. Handles quotes and parens: value=(1, 0, 0)"""
+    return {m.group(1): m.group(2).strip('"') for m in _KV_RE.finditer(text)}
 
 
 def parse_kv_line(line: str) -> tuple[str, dict[str, str]]:
-    parts = line.split()
-    if not parts:
+    """Extract command + kv dict from a batch line."""
+    stripped = line.strip()
+    if not stripped:
         return "", {}
-    cmd = parts[0]
-    kv: dict[str, str] = {}
-    for p in parts[1:]:
-        if "=" in p:
-            k, v = p.split("=", 1)
-            kv[k] = v
-    return cmd, kv
+    first_kv = _KV_RE.search(stripped)
+    if not first_kv:
+        return stripped.split()[0], {}
+    cmd = stripped[: first_kv.start()].strip()
+    return (cmd.split()[0] if cmd else ""), parse_kv(stripped[first_kv.start() :])
 
 
 def _levenshtein(a: str, b: str) -> int:

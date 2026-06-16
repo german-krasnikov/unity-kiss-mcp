@@ -8,8 +8,6 @@ namespace UnityMCP.Editor
 {
     internal static class ValidateReferencesHelper
     {
-        private const int MAX_ARRAY = 100;
-
         public static string Validate(string path, int depth, bool ignoreOptional, bool verbose = false)
         {
             // ignoreOptional reserved for future use
@@ -45,41 +43,23 @@ namespace UnityMCP.Editor
                 errors++;
                 return;
             }
+            int localOk = ok, localErrors = errors, localMissing = missing;
             foreach (var comp in go.GetComponents<Component>())
             {
                 if (comp == null)
                 {
                     sb.Append("[ERROR] ").Append(goPath).AppendLine(" — missing script (null component)");
-                    errors++;
+                    localErrors++;
                     continue;
                 }
                 if (comp is Transform) continue;
 
                 var so = new SerializedObject(comp);
-                var prop = so.GetIterator();
-                if (!prop.NextVisible(true)) continue;
-
                 var compType = comp.GetType().Name;
-                do
-                {
-                    if (prop.name == "m_Script" || prop.name == "m_GameObject") continue;
-
-                    if (prop.isArray && prop.propertyType == SerializedPropertyType.Generic)
-                    {
-                        int cap = Math.Min(prop.arraySize, MAX_ARRAY);
-                        for (int i = 0; i < cap; i++)
-                        {
-                            var elem = prop.GetArrayElementAtIndex(i);
-                            if (elem.propertyType == SerializedPropertyType.ObjectReference)
-                                CheckRef(elem, $"{prop.name}[{i}]", goPath, compType, sb, ref ok, ref errors, ref missing, verbose);
-                        }
-                    }
-                    else if (prop.propertyType == SerializedPropertyType.ObjectReference)
-                    {
-                        CheckRef(prop, prop.name, goPath, compType, sb, ref ok, ref errors, ref missing, verbose);
-                    }
-                } while (prop.NextVisible(false));
+                ReferenceHelper.WalkObjectRefs(so, (p, label) =>
+                    CheckRef(p, label, goPath, compType, sb, ref localOk, ref localErrors, ref localMissing, verbose));
             }
+            ok = localOk; errors = localErrors; missing = localMissing;
         }
 
         private static void CheckRef(SerializedProperty prop, string propName, string goPath,

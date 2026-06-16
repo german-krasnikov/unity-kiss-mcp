@@ -15,7 +15,7 @@ MULTI_SCENE_HIERARCHY = """[MainScene]
 [AdditiveScene]
 ├─ Enemy $d
 │  └─ Health $e
-├─ Julia $f"""
+├─ Alice $f"""
 
 SINGLE_SCENE_HIERARCHY = """├─ Player $a
 │  ├─ Camera $b
@@ -54,13 +54,13 @@ class TestPathCacheMultiScene:
         m = _m(MULTI_SCENE_HIERARCHY)
         assert "/Player" in m.known_paths
         assert "/Enemy" in m.known_paths
-        assert "/Julia" in m.known_paths
+        assert "/Alice" in m.known_paths
 
     def test_scene_ownership(self):
         m = _m(MULTI_SCENE_HIERARCHY)
         assert m.path_to_scene.get("/Player") == "MainScene"
         assert m.path_to_scene.get("/Enemy") == "AdditiveScene"
-        assert m.path_to_scene.get("/Julia") == "AdditiveScene"
+        assert m.path_to_scene.get("/Alice") == "AdditiveScene"
 
     def test_single_scene_no_scene_ownership(self):
         m = _m(SINGLE_SCENE_HIERARCHY)

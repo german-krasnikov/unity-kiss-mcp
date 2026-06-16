@@ -227,16 +227,16 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Search_MultiScene_FindsBothScenes()
         {
-            var mainGo = new GameObject("Julia_UniqueSearch");
+            var mainGo = new GameObject("Alice_UniqueSearch");
             _toDestroy.Add(mainGo);
-            CreateIn(_additiveScene, "Julia_UniqueSearch");
+            CreateIn(_additiveScene, "Alice_UniqueSearch");
 
-            var result = SearchHelper.Search("Julia_UniqueSearch");
+            var result = SearchHelper.Search("Alice_UniqueSearch");
 
             var lines = result.Split('\n');
             int count = 0;
             foreach (var line in lines)
-                if (line.Contains("Julia_UniqueSearch")) count++;
+                if (line.Contains("Alice_UniqueSearch")) count++;
 
             Assert.That(count, Is.EqualTo(2), $"Expected 2 results, got {count}:\n{result}");
         }
@@ -244,9 +244,9 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Search_MultiScene_ResultHasScenePrefix()
         {
-            CreateIn(_additiveScene, "Julia_PrefixCheck");
+            CreateIn(_additiveScene, "Alice_PrefixCheck");
 
-            var result = SearchHelper.Search("Julia_PrefixCheck");
+            var result = SearchHelper.Search("Alice_PrefixCheck");
 
             Assert.That(result, Does.Contain(":/"), $"Expected scene prefix in:\n{result}");
         }
@@ -257,10 +257,10 @@ namespace UnityMCP.Editor.Tests
             EditorSceneManager.CloseScene(_additiveScene, true);
             _additiveScene = default;
 
-            var go = new GameObject("Julia_NoPrefix");
+            var go = new GameObject("Alice_NoPrefix");
             _toDestroy.Add(go);
 
-            var result = SearchHelper.Search("Julia_NoPrefix");
+            var result = SearchHelper.Search("Alice_NoPrefix");
 
             Assert.That(result, Does.Not.Contain(":/"), $"No scene prefix expected:\n{result}");
         }

@@ -16,7 +16,11 @@ namespace UnityMCP.Editor
         public static event System.Action<string, string> OnAskUser;  // (requestId, questionsJson)
 
         // Testable compilation state (defaults to real EditorApplication state)
-        internal static Func<bool> IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+        internal static Func<bool> IsCompiling = () =>
+        {
+            if (!UnityEditor.EditorApplication.isCompiling) return false;
+            return MCPServer.CompileElapsedSeconds < 120.0;
+        };
         internal static Func<bool> IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
         internal static Func<string, bool> IsToolEnabledFn = MCPSettings.IsToolEnabled;
 
@@ -475,7 +479,8 @@ namespace UnityMCP.Editor
             cmd == "screenshot" || cmd == "get_enabled_tools" || cmd == "compile_status" ||
             cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "sync_status" ||
             cmd == "get_compile_errors" || cmd == "diagnose" ||  // C4: escape-hatch + diagnose reachable while wedged
-            cmd == "force_refresh";  // G11: real force-recompile must work when wedged
+            cmd == "force_refresh" ||  // G11: real force-recompile must work when wedged
+            cmd == "get_test_results";  // P1: reads SessionState only — safe during compile
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {

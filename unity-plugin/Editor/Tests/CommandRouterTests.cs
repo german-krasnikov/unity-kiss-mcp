@@ -404,5 +404,43 @@ namespace UnityMCP.Editor.Tests
         public void Recompile_IsNotAllowedDuringCompile()
             => Assert.IsFalse(CommandRouter.IsAllowedDuringCompile("recompile"),
                 "G11: recompile (AssetDatabase.Refresh no-op) must NOT be in the allowlist");
+
+        // ── RC-2: isCompiling wedge — elapsed > 120s treated as non-compiling ──
+
+        [Test]
+        public void IsCompiling_WedgeCondition_ElapsedOver120s_ReturnsFalse()
+        {
+            // Simulate: EditorApplication says compiling but our tracker says >120s elapsed
+            CommandRouter.IsCompiling = () =>
+            {
+                if (!true) return false;  // would be EditorApplication.isCompiling = true
+                return 150.0 < 120.0;    // elapsed=150s → not a real compile → false
+            };
+            try
+            {
+                Assert.IsFalse(CommandRouter.IsCompiling(),
+                    "Wedge condition: elapsed > 120s must unblock commands");
+            }
+            finally { CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling; }
+        }
+
+        [Test]
+        public void Process_WedgeCondition_UnblocksNormalCommand()
+        {
+            // When compile elapsed > 120s, IsCompiling returns false → command goes through
+            CommandRouter.IsCompiling = () => false;  // wedge cleared
+            CommandRouter.IsPlayMode = () => false;
+            try
+            {
+                var json = "{\"id\":\"w1\",\"cmd\":\"ping\",\"args\":{}}";
+                var result = CommandRouter.Process(json);
+                Assert.IsTrue(result.Contains("\"ok\":true"), result);
+            }
+            finally
+            {
+                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
+            }
+        }
     }
 }

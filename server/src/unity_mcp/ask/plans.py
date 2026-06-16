@@ -1,5 +1,5 @@
 """ToolPlan dataclass and canonical templates for ask() tool."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

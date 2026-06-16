@@ -46,7 +46,7 @@ def parse_animator_dsl(dsl: str) -> dict:
         elif line.startswith("DEFAULT "):
             result["default"] = line.split(None, 1)[1]
         elif line.startswith("TRANS "):
-            m = re.match(r"TRANS (\w+) -> (\w+) dur=([\d.]+)(?:\s+if\s+(.+))?", line)
+            m = re.match(r"TRANS ([\w*]+) -> (\w+) dur=([\d.]+)(?:\s+if\s+(.+))?", line)
             if m:
                 result["transitions"].append({
                     "source": m.group(1), "target": m.group(2),

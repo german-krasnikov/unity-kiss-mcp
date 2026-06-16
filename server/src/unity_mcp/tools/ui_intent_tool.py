@@ -119,10 +119,13 @@ def build_ui_batch(nodes: list[dict], parent: Optional[str]) -> list[str]:
         # Layout component
         layout_comp = _LAYOUT_COMPONENTS.get(node["type"])
         if layout_comp:
-            comp_args: dict = {"action": "add", "path": _node_path(node, name_map), "type": layout_comp}
+            node_path = _node_path(node, name_map)
+            lines.append(build_batch_line("manage_component", action="add",
+                                          path=node_path, type=layout_comp))
             if "spacing" in attrs:
-                comp_args["spacing"] = attrs["spacing"]
-            lines.append(build_batch_line("manage_component", **comp_args))
+                lines.append(build_batch_line("set_property", path=node_path,
+                                              component=layout_comp, prop="spacing",
+                                              value=attrs["spacing"]))
 
     return lines
 

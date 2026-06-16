@@ -54,6 +54,20 @@ namespace UnityMCP.Editor.Tests
                 () => CodeExecutor.SecurityScan("using R = System.Reflection; R.Assembly.Load(null);"));
         }
 
+        [Test]
+        public void BlocksUsingAliasProcess()
+        {
+            Assert.Throws<System.InvalidOperationException>(
+                () => CodeExecutor.SecurityScan("using P = System.Diagnostics; P.Process.Start(\"cmd\");"));
+        }
+
+        [Test]
+        public void NormalUsingNotAffected()
+        {
+            Assert.DoesNotThrow(
+                () => CodeExecutor.SecurityScan("using System.Linq; var x = new System.Collections.Generic.List<int>{1,2,3}.First(); return x;"));
+        }
+
         // ── Missing blocked entries ──────────────────────────────────────────
 
         [Test]

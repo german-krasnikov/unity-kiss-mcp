@@ -8,12 +8,10 @@ namespace UnityMCP.Editor
 {
     internal static class RemapReferencesHelper
     {
-        private const int MAX_ARRAY = 100;
-
         public static string RemapReferences(string sourcePath, string targetPath, string mappingsText)
         {
-            var sourceGo = ComponentSerializer.FindObject(sourcePath);
-            if (sourceGo == null) throw new ArgumentException(ErrorHelper.ObjectNotFound(sourcePath));
+            if (ComponentSerializer.FindObject(sourcePath) == null)
+                throw new ArgumentException(ErrorHelper.ObjectNotFound(sourcePath));
             var targetGo = ComponentSerializer.FindObject(targetPath);
             if (targetGo == null) throw new ArgumentException(ErrorHelper.ObjectNotFound(targetPath));
 
@@ -28,29 +26,11 @@ namespace UnityMCP.Editor
                 if (comp == null) continue;
 
                 var so = new SerializedObject(comp);
-                var prop = so.GetIterator();
-                if (!prop.NextVisible(true)) continue;
-
                 Undo.RecordObject(comp, "Remap References");
                 bool modified = false;
 
-                do
-                {
-                    if (prop.isArray && prop.propertyType == SerializedPropertyType.Generic)
-                    {
-                        int cap = Math.Min(prop.arraySize, MAX_ARRAY);
-                        for (int i = 0; i < cap; i++)
-                        {
-                            var elem = prop.GetArrayElementAtIndex(i);
-                            if (elem.propertyType == SerializedPropertyType.ObjectReference)
-                                RemapProperty(elem, $"{prop.name}[{i}]", sourcePath, targetPath, mappings, sb, ref remapped, ref kept, ref errors, ref modified);
-                        }
-                    }
-                    else if (prop.propertyType == SerializedPropertyType.ObjectReference)
-                    {
-                        RemapProperty(prop, prop.name, sourcePath, targetPath, mappings, sb, ref remapped, ref kept, ref errors, ref modified);
-                    }
-                } while (prop.NextVisible(false));
+                ReferenceHelper.WalkObjectRefs(so, (p, label) =>
+                    RemapProperty(p, label, sourcePath, targetPath, mappings, sb, ref remapped, ref kept, ref errors, ref modified));
 
                 if (modified) so.ApplyModifiedProperties();
             }

@@ -40,21 +40,9 @@ async def _rule_set_property_delta(
 ) -> Optional[Mismatch]:
     if "Failed" in response or "Error" in response:
         return None
-
-    snap = _parse_snapshot(response)
-    prop = args.get("prop", "")
-    leaf = prop.rsplit(".", 1)[-1].lower()
-
-    # Use value_after if present in snapshot, else fall back to generic snap lookup
-    actual = snap.get("value_after") or snap.get(leaf)
-    if actual is None:
-        if not snap:
-            return Mismatch(f"no snapshot for set_property_delta — cannot verify '{prop}'")
-        return None
-
-    expected = str(args.get("value", ""))
-    if expected and not _values_close(expected, actual):
-        return Mismatch(f"set_property_delta: expected {leaf}={expected}, got {actual}")
+    if " → " not in response:
+        return None  # unexpected format — silent
+    # Delta is relative, can't verify absolute value without readback. Stay silent.
     return None
 
 

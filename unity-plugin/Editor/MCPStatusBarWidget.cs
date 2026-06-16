@@ -167,10 +167,15 @@ namespace UnityMCP.Editor
 
         private static void OnPillClick(ClickEvent _)
         {
+            var phantoms = MCPServer.PhantomCount;
             var m = new GenericMenu();
             m.AddItem(new GUIContent("Restart"),  false, MCPActions.Restart);
             m.AddItem(new GUIContent("Reimport"), false, MCPActions.Reimport);
             m.AddItem(new GUIContent("Kill"),     false, MCPActions.Kill);
+            if (phantoms > 0)
+                m.AddItem(new GUIContent($"Kill Phantoms ({phantoms})"), false, () => MCPServer.KillPhantoms());
+            else
+                m.AddDisabledItem(new GUIContent("Kill Phantoms"));
             m.AddSeparator("");
             m.AddItem(new GUIContent("Open Status"), false, MCPStatusWindow.ShowWindow);
             m.DropDown(_pillContainer.worldBound);

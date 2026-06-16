@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -7,11 +6,6 @@ namespace UnityMCP.Editor
 {
     internal static class MultiViewCapture
     {
-        // F18: cache reflection lookup — reset on domain reload (statics clear automatically)
-        private static bool _renderReflectionCached;
-        private static Type _cachedReqType;
-        private static System.Reflection.MethodInfo _cachedSubmitMethod;
-
         public static string CaptureToFile(GameObject target, int cellSize = 512, int supersample = 2,
             string customAngles = null, float zoom = 1f, Vector3 offset = default, float fixedSize = 0f,
             string highlight = null, bool showColliders = false)
@@ -239,40 +233,7 @@ namespace UnityMCP.Editor
             return new Bounds(go.transform.position, Vector3.one * 3f);
         }
 
-        static void RenderCamera(Camera cam)
-        {
-            if (!_renderReflectionCached)
-            {
-                var rpType = typeof(RenderPipeline);
-                _cachedSubmitMethod = rpType.GetMethod("SubmitRenderRequest",
-                    BindingFlags.Public | BindingFlags.Static,
-                    null, new[] { typeof(Camera), typeof(object) }, null);
-
-                if (_cachedSubmitMethod != null)
-                {
-                    foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
-                    {
-                        var reqType = asm.GetType("UnityEngine.Rendering.Universal.UniversalAdditionalCameraData+SingleCameraRequest");
-                        if (reqType == null)
-                            reqType = asm.GetType("UnityEngine.Rendering.Universal.SingleCameraRequest");
-                        if (reqType != null) { _cachedReqType = reqType; break; }
-                    }
-                }
-                _renderReflectionCached = true;
-            }
-
-            if (_cachedSubmitMethod != null && _cachedReqType != null && GraphicsSettings.currentRenderPipeline != null)
-            {
-                try
-                {
-                    var request = System.Activator.CreateInstance(_cachedReqType);
-                    _cachedSubmitMethod.Invoke(null, new[] { cam, request });
-                    return;
-                }
-                catch { /* fallback below */ }
-            }
-            cam.Render();
-        }
+        static void RenderCamera(Camera cam) => ScreenshotCapture.RenderOffscreen(cam);
 
         internal static (Vector3 pos, Quaternion rot, float sizeMultiplier) GetStandardView(
             string angle, Vector3 center, float distance)

@@ -98,7 +98,9 @@ class MiddlewareAsyncMixin:
             and cache_key not in self._haiku_in_flight
         ):
             self._haiku_in_flight.add(cache_key)
-            asyncio.create_task(self._haiku_to_cache(cmd, result, focus, cache_key))
+            t = asyncio.create_task(self._haiku_to_cache(cmd, result, focus, cache_key))
+            self._bg_tasks.add(t)
+            t.add_done_callback(self._bg_tasks.discard)
 
         if res.method in ("skip", "passthrough"):
             return result

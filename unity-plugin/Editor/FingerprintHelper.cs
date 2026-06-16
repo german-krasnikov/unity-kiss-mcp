@@ -25,8 +25,14 @@ namespace UnityMCP.Editor
             foreach (var root in roots)
                 AppendFingerprint(sb, root.transform, depth, 0);
 
-            var hash = sb.ToString().GetHashCode();
-            return $"fp:{hash:X8}";
+            return $"fp:{Fnv1a(sb.ToString()):X8}";
+        }
+
+        private static uint Fnv1a(string s)
+        {
+            uint h = 2166136261u;
+            foreach (char c in s) { h ^= c; h *= 16777619u; }
+            return h;
         }
 
         private static void AppendFingerprint(StringBuilder sb, Transform t, int maxDepth, int depth)

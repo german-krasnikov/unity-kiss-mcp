@@ -16,7 +16,7 @@ from .middleware_types import (
 from .middleware_guards import MiddlewareGuardsMixin
 from .middleware_reads import MiddlewareReadsMixin
 from .middleware_async import MiddlewareAsyncMixin
-from .middleware_paths import PathResolverMixin, _levenshtein  # noqa: F401
+from .middleware_paths import PathResolverMixin
 
 # Re-export for backward compat
 from .middleware_pipeline import wrap_send  # noqa: F401
@@ -80,6 +80,7 @@ class Middleware(MiddlewareGuardsMixin, MiddlewareReadsMixin, MiddlewareAsyncMix
         self._distill_cache: OrderedDict = OrderedDict()
         self._MAX_DISTILL_CACHE = 64
         self._haiku_in_flight: set = set()
+        self._bg_tasks: set = set()  # prevent GC of fire-and-forget tasks
         # Disambiguator (Cycle 5d Item 1)
         self._disambig_enabled: bool = os.environ.get("UNITY_MCP_DISAMBIG", "1") != "0"
         self._disambig = None  # lazy
@@ -129,3 +130,4 @@ class Middleware(MiddlewareGuardsMixin, MiddlewareReadsMixin, MiddlewareAsyncMix
         self._last_hierarchy_full = None
         self._hierarchy_call_id = 0
         self._last_hierarchy_call = 0
+        self._bg_tasks.clear()

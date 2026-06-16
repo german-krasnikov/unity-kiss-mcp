@@ -91,7 +91,7 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void BT_YInverted()
+        public void BottomTop_YInverted()
         {
             // BT = bottom to top: root (no incoming) should have HIGHER Y than its child
             var g = Chain(MermaidDir.BT, "A", "B");

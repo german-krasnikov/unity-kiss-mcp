@@ -98,6 +98,18 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 
 5. **Per-command timeouts (C#)**: run_tests=130s, run_playtest=130s, batch=65s, wait_until/move_to/test_step=30s, default=25s
 
+**run_tests Fire-and-Forget (v0.32.0)** — `run_tests(mode="EditMode"|"PlayMode", filter=None)` returns immediately with message `"tests-started|{mode}|poll get_test_results every 5s for up to 2min"`. Does NOT poll internally. User/caller must poll `get_test_results()` externally. **Why:** avoids TCP blocking on domain reload (Editor.log clears "compiling" status before port 9700 restored). Initial send() uses short 8s timeout (fire-and-forget). If `DomainReloadError` caught, returns immediately. Bridge resilience: when `DomainReloadError` occurs, pins `domain_reload_in_progress=True` for all subsequent retries within that send() call, preventing `_probe_busy()` from returning False too early. `get_test_results` allowed during compile (added to CommandRouter.IsAllowedDuringCompile, v0.31.1 P1 fix). **External polling pattern:**
+```python
+result = await run_tests(mode="EditMode")  # → "tests-started|EditMode|..."
+# Now poll externally:
+import asyncio
+for _ in range(24):  # 2min @ 5s intervals  
+    await asyncio.sleep(5)
+    result = await get_test_results()
+    if result not in ("pending", "none"):
+        return result
+```
+
 6. **Post-mutation features**: console error capture, SuggestNext (recommends verification tool), auto-return parent subtree after create/delete
 
 7. **In-Unity Chat Session Control (v0.19.0, F20–F30)**

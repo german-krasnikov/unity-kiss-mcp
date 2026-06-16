@@ -188,6 +188,17 @@ namespace UnityMCP.Editor.Tests
         }
 
         [Test]
+        public void SavePorts_RoundTrip_ResolveReadsBackSavedValues()
+        {
+            var path = Path.Combine(Path.GetTempPath(), "mcp_roundtrip_" + System.Guid.NewGuid().ToString("N") + ".json");
+            PortResolver.SavePorts(path, 9510, 9511);
+            var json = File.ReadAllText(path);
+            Assert.AreEqual(9510, PortResolver.ResolvePort(null, json, 9500));
+            Assert.AreEqual(9511, PortResolver.ResolveChatPort(null, json, 9510, 9512));
+            File.Delete(path);
+        }
+
+        [Test]
         public void SavePorts_OnCorruptInputFile_WritesValidJson()
         {
             // If MCP_Port.json is corrupt, SavePorts must still produce valid JSON.

@@ -131,29 +131,19 @@ async def recompile() -> str:
     return await _send("recompile", {}, timeout=60.0)
 
 
-_POLL_INTERVAL = 3.0
-_POLL_ATTEMPTS = 60
-
 
 async def run_tests(mode: str = "EditMode", filter: str | None = None) -> str:
-    """Run Unity tests. mode: EditMode or PlayMode. filter: pipe-separated test names."""
-    import asyncio
+    """Start Unity tests (returns immediately). mode: EditMode or PlayMode. filter: pipe-separated test names. Poll get_test_results every 5s for results."""
     args = {"mode": mode}
     if filter:
         args["filter"] = filter
     try:
-        return await _send("run_tests", args, timeout=30.0)
+        result = await _send("run_tests", args, timeout=8.0)
+        if result and result not in ("pending", "none"):
+            return result
     except Exception:
-        pass  # TCP died (domain reload) — fall through to poll
-    for _ in range(_POLL_ATTEMPTS):
-        await asyncio.sleep(_POLL_INTERVAL)
-        try:
-            result = await _send("get_test_results", {})
-            if result and result not in ("pending", "none"):
-                return result
-        except Exception:
-            pass  # transient reconnect failure — keep polling
-    return f"Error: {mode} test results not received after {_POLL_ATTEMPTS * _POLL_INTERVAL:.0f}s"
+        pass  # TCP died (domain reload expected) — return immediately
+    return f"tests-started|{mode}|poll get_test_results every 5s for up to 2min"
 
 
 async def get_test_results() -> str:

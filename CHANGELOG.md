@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.32.0] — 2026-06-16 <!-- run_tests fire-and-forget + P5 heartbeat fix -->
+
+- **run_tests Fire-and-Forget Protocol (Server v0.32.0)** — `run_tests(mode)` now returns immediately with message `"tests-started|{mode}|poll get_test_results every 5s for up to 2min"`. Does NOT poll internally. **Why:** avoids inline TCP blocking on domain reload (Editor.log clears "compiling" status before port 9700 restored). Initial send() uses short 8s timeout (fire-and-forget pattern). If `DomainReloadError` caught, returns immediately. **Caller pattern:**
+  ```python
+  result = await run_tests(mode="EditMode")  # → "tests-started|EditMode|..."
+  for _ in range(24):  # poll externally, 2min @ 5s intervals
+      await asyncio.sleep(5)
+      result = await get_test_results()
+      if result not in ("pending", "none"): return result
+  ```
+  **Bridge resilience continues:** When `DomainReloadError` caught, pins `domain_reload_in_progress=True` for all retries (v0.31.1 P0 fix). `get_test_results` allowed during compile (v0.31.1 P1 fix).
+
+- **P5: Graceful Heartbeat Stop on Parent Death** — When parent process dies (2 consecutive PPID mismatches), calls `stop_heartbeat()` instead of `raise SystemExit(0)`. **Why:** `SystemExit` is `BaseException` — escapes `except Exception` safety net in `_heartbeat_loop`, kills anyio task group, closes stdio → -32000 errors on in-flight MCP calls. Process now dies naturally from `BrokenPipeError` on next stdio write, preserving in-flight operation integrity. **Tests:** test_heartbeat.py updated (P3 + P5 scenarios).
+
+- **Tests:** 2424 Python unit tests passed (was 2400, +24 from v0.32.0 fire-and-forget pattern), 70 live passed, all 2623+ C# EditMode green.
+
+## [v0.31.1] — 2026-06-16 <!-- run_tests TCP disconnect fix -->
+
+- **run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent timeout when domain reload clears Editor.log "compiling" status before TCP port 9700 is restored. **(Fix A: bridge.py)** When `DomainReloadError` is caught, pin `domain_reload_in_progress=True` flag for all subsequent retries within that send() call. Prevents `_probe_busy()` re-evaluation from returning False too early, allowing full exponential backoff (2s/4s/8s) instead of bailing after ~2s. **(Fix B: tools/scene.py)** Reduce poll attempts 60→40 (120s total, matches `SESSION_TIMEOUT`). Add `_ping_reload_port()` helper that pings reload mini-server on port 9600 before each `get_test_results` attempt. Gracefully degrades when reload port unavailable (old plugin). **Tests:** 2 new tests in test_bridge.py (domain reload retry pinning), 4 new tests in test_scene_run_tests.py (reload port ping gate, degrade on missing port, timeout behavior), 5 existing poll tests in test_server.py patched with ping mock. All 2400 unit tests pass.
+
 ## [v0.31.0] — 2026-06-16 <!-- Architecture review: 13 bugfixes (security, crashes, correctness, DRY) -->
 
 - **Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan pipeline: (1) strip C# comments + whitespace densification (via regex `//.*$` + `\s{2,}` collapse) (2) OrdinalIgnoreCase matching (3) +11 new blocked entries: `EditorApplication.Exit`, `Application.Quit`, `Environment.FailFast`, `ExportPackage`, `ImportPackage`, `OpenProject`, `ProjectWindowUtil`, `using` aliases (`System.IO`, `Diagnostics`, `Net`, `Reflection`). **Tests:** 15 new bypass tests verify blocked patterns caught.

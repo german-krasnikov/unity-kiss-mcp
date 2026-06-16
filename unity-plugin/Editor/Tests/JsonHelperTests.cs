@@ -156,5 +156,48 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void GetCommandTimeout_Batch_Returns65()
             => Assert.AreEqual(65, MCPServer.GetCommandTimeout("batch"));
+
+        // ── FIX-21: RFC 8259 control character escaping ─────────────────────
+
+        [Test]
+        public void EscapeJson_ControlChars_AllEscaped()
+        {
+            // \x00 (NUL), \x08 (\b), \x0C (\f), \x1B (ESC)
+            var input = "\x00\x08\x0c\x1b";
+            var escaped = JsonHelper.EscapeJson(input);
+            Assert.AreEqual("\\u0000\\b\\f\\u001b", escaped);
+        }
+
+        [Test]
+        public void EscapeJson_NormalText_Unchanged()
+        {
+            Assert.AreEqual("hello world 123", JsonHelper.EscapeJson("hello world 123"));
+        }
+
+        [Test]
+        public void UnescapeJson_BackslashB_And_F()
+        {
+            Assert.AreEqual("\b", JsonHelper.UnescapeJsonString("\\b"));
+            Assert.AreEqual("\f", JsonHelper.UnescapeJsonString("\\f"));
+            Assert.AreEqual("a\b\f", JsonHelper.UnescapeJsonString("a\\b\\f"));
+        }
+
+        [Test]
+        public void UnescapeJson_UnicodeEscape_ControlChar()
+        {
+            //  = ESC
+            Assert.AreEqual("\x1b", JsonHelper.UnescapeJsonString("\\u001b"));
+            // A = 'A'
+            Assert.AreEqual("A", JsonHelper.UnescapeJsonString("\\u0041"));
+        }
+
+        [Test]
+        public void RoundTrip_ControlChars()
+        {
+            var original = "line\x00with\bnull\fand\x1besc\tand\ttabs";
+            var escaped = JsonHelper.EscapeJson(original);
+            var roundTripped = JsonHelper.UnescapeJsonString(escaped);
+            Assert.AreEqual(original, roundTripped);
+        }
     }
 }

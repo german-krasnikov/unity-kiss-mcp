@@ -109,10 +109,12 @@ def _tcp_probe(port: int, timeout: float = 0.2) -> bool:
         return False
 
 
-def read_unity_port() -> int:
+def read_unity_port(skip_probe: bool = False) -> int:
     """Discover Unity MCP port from discovery files, env var, or default 9500.
 
     Priority: env var → CWD project match → newest mtime → 9500.
+    skip_probe: if True, skip TCP connectivity check (useful during reconnect
+                when port may be transiently down due to domain reload).
     """
     if os.environ.get("UNITY_MCP_PORT"):
         try:
@@ -130,7 +132,7 @@ def read_unity_port() -> int:
             port = int(lines[0])
             pid = int(f.stem)
             os.kill(pid, 0)
-            if not _tcp_probe(port):
+            if not skip_probe and not _tcp_probe(port):
                 continue
             project_path = lines[1] if len(lines) > 1 else ""
             project = lines[2] if len(lines) > 2 else "?"
@@ -140,7 +142,7 @@ def read_unity_port() -> int:
             try:
                 lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
                 port = int(lines[0])
-                if not _tcp_probe(port):
+                if not skip_probe and not _tcp_probe(port):
                     continue
                 project_path = lines[1] if len(lines) > 1 else ""
                 project = lines[2] if len(lines) > 2 else "?"

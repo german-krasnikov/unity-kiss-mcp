@@ -76,25 +76,23 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
 }
 
 # ---------------------------------------------------------------------------
-# Backward-compat: legacy CATEGORIES dict (old category names — still works)
+# Backward-compat: CATEGORIES derived from _THEMED_CATEGORIES
 # ---------------------------------------------------------------------------
 
+_CATEGORY_ALIAS: dict[str, list[str]] = {
+    "object":     ["SCENE_EDIT", "COMPONENTS"],
+    "animation":  ["ANIMATION"],
+    "asset":      ["ASSETS", "SHADERS_MATERIAL"],
+    "advanced":   ["ADVANCED_CODE", "META"],
+    "ui":         ["UI", "VFX"],
+    "runtime":    ["RUNTIME", "UNIT_TESTS"],
+    "connection": ["CONNECTION"],
+    "session":    ["SESSION_SKILLS", "SCREENSHOTS"],
+}
+
 CATEGORIES: dict[str, set[str]] = {
-    "object": {"find_objects", "get_object_detail", "get_components_list", "set_active", "set_material", "wire_event", "unwire_event", "set_property_delta"},
-    "animation": {"animation", "timeline", "animator", "particle"},
-    "asset": {"asset", "material", "prefab", "scriptable_object", "project_settings"},
-    "advanced": {
-        "shader", "references", "validate_references", "menu", "checkpoint", "recompile", "execute_code",
-        "check_colliders", "get_schema", "scan_scene", "spatial_query", "auto_fix", "smart_build",
-        "apply_template", "save_template", "list_templates",
-    },
-    "ui": {"create_ui", "set_rect", "validate_layout", "get_spatial_context"},
-    "runtime": {"invoke_method", "set_runtime_property", "wait_until", "move_to", "query_state", "test_step", "run_playtest", "fuzz_playtest"},
-    "connection": {"list_connections", "reconnect_unity"},
-    "session": {
-        "fingerprint", "scene_diff", "get_changes", "save_session", "load_session",
-        "screenshot_baseline", "screenshot_compare", "save_skill", "use_skill", "list_skills",
-    },
+    alias: set().union(*(set(_THEMED_CATEGORIES[k]) for k in groups))
+    for alias, groups in _CATEGORY_ALIAS.items()
 }
 
 # TIER1: always visible (legacy + CORE)

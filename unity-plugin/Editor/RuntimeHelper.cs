@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -10,6 +11,22 @@ namespace UnityMCP.Editor
 {
     internal static class RuntimeHelper
     {
+        private static readonly List<TaskCompletionSource<string>> _activeTcs = new();
+
+        [InitializeOnLoadMethod]
+        static void HookReload()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload += () =>
+            {
+                lock (_activeTcs)
+                {
+                    foreach (var t in _activeTcs)
+                        t.TrySetResult("err:domain reload — operation aborted");
+                    _activeTcs.Clear();
+                }
+            };
+        }
+
         public static string InvokeMethod(string path, string componentType, string methodName, string args)
         {
             var go = ComponentSerializer.FindObject(path);
@@ -77,15 +94,22 @@ namespace UnityMCP.Editor
         public static void WaitUntil(string path, string componentType, string field,
             string expectedValue, float timeout, bool negate, TaskCompletionSource<string> tcs)
         {
+            lock (_activeTcs) _activeTcs.Add(tcs);
             float startTime = Time.realtimeSinceStartup;
             float lastCheck = -1f;
+
+            void Complete(string result)
+            {
+                EditorApplication.update -= Tick;
+                lock (_activeTcs) _activeTcs.Remove(tcs);
+                tcs.TrySetResult(result);
+            }
 
             void Tick()
             {
                 if (!EditorApplication.isPlaying)
                 {
-                    EditorApplication.update -= Tick;
-                    tcs.TrySetResult($"wait_until: Play Mode stopped before condition met.");
+                    Complete("wait_until: Play Mode stopped before condition met.");
                     return;
                 }
 
@@ -95,8 +119,7 @@ namespace UnityMCP.Editor
 
                 if (now - startTime >= timeout)
                 {
-                    EditorApplication.update -= Tick;
-                    tcs.TrySetResult($"wait_until: timeout after {timeout}s — {field} never matched '{expectedValue}'");
+                    Complete($"wait_until: timeout after {timeout}s — {field} never matched '{expectedValue}'");
                     return;
                 }
 
@@ -105,15 +128,13 @@ namespace UnityMCP.Editor
                     var go = ComponentSerializer.FindObject(path);
                     if (go == null)
                     {
-                        EditorApplication.update -= Tick;
-                        tcs.TrySetResult($"wait_until: object '{path}' destroyed during wait");
+                        Complete($"wait_until: object '{path}' destroyed during wait");
                         return;
                     }
                     var comp = FindComponent(go, componentType);
                     if (comp == null)
                     {
-                        EditorApplication.update -= Tick;
-                        tcs.TrySetResult($"wait_until: component '{componentType}' lost during wait");
+                        Complete($"wait_until: component '{componentType}' lost during wait");
                         return;
                     }
 
@@ -123,15 +144,13 @@ namespace UnityMCP.Editor
 
                     if (matches)
                     {
-                        EditorApplication.update -= Tick;
                         var condition = negate ? $"{field}!={expectedValue}" : $"{field}={expectedValue}";
-                        tcs.TrySetResult($"{condition} after {now - startTime:F1}s");
+                        Complete($"{condition} after {now - startTime:F1}s");
                     }
                 }
                 catch (Exception e)
                 {
-                    EditorApplication.update -= Tick;
-                    tcs.TrySetResult($"wait_until error: {e.Message}");
+                    Complete($"wait_until error: {e.Message}");
                 }
             }
 
@@ -173,6 +192,7 @@ namespace UnityMCP.Editor
             var method = comp.GetType().GetMethod(moveName, BindingFlags.Public | BindingFlags.Instance);
             if (method == null) { tcs.TrySetResult($"Error: method '{moveName}' not found"); return; }
 
+            lock (_activeTcs) _activeTcs.Add(tcs);
             float startTime = Time.realtimeSinceStartup;
             bool completed = false;
 
@@ -181,15 +201,23 @@ namespace UnityMCP.Editor
                 completed = true;
                 float elapsed = Time.realtimeSinceStartup - startTime;
                 EditorApplication.delayCall += () =>
+                {
+                    lock (_activeTcs) _activeTcs.Remove(tcs);
                     tcs.TrySetResult($"MoveTo {(success ? "arrived" : "blocked")} at " +
                         $"({target.x.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}," +
                         $"{target.y.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}," +
                         $"{target.z.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}) after " +
                         elapsed.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "s");
+                };
             };
 
             try { method.Invoke(comp, new object[] { target, callback }); }
-            catch (Exception e) { tcs.TrySetResult($"Error: {e.InnerException?.Message ?? e.Message}"); return; }
+            catch (Exception e)
+            {
+                lock (_activeTcs) _activeTcs.Remove(tcs);
+                tcs.TrySetResult($"Error: {e.InnerException?.Message ?? e.Message}");
+                return;
+            }
 
             // Timeout fallback
             void TimeoutCheck()
@@ -198,6 +226,7 @@ namespace UnityMCP.Editor
                 if (Time.realtimeSinceStartup - startTime >= timeout)
                 {
                     EditorApplication.update -= TimeoutCheck;
+                    lock (_activeTcs) _activeTcs.Remove(tcs);
                     tcs.TrySetResult($"MoveTo timeout after {timeout}s — still moving");
                 }
             }
@@ -207,6 +236,8 @@ namespace UnityMCP.Editor
         public static void TestStep(string path, string position, string checksBefore, string checksAfter,
             float waitAfter, float timeout, TaskCompletionSource<string> tcs)
         {
+            lock (_activeTcs) _activeTcs.Add(tcs);
+
             // Phase 1: take BEFORE snapshot (synchronous, main thread)
             string beforeSnapshot = string.IsNullOrEmpty(checksBefore) ? "" : GameStateHelper.Snapshot(checksBefore);
 
@@ -218,19 +249,24 @@ namespace UnityMCP.Editor
             string moveResult = null;
             float startTime = Time.realtimeSinceStartup;
 
+            void Complete(string result)
+            {
+                EditorApplication.update -= Tick;
+                lock (_activeTcs) _activeTcs.Remove(tcs);
+                tcs.TrySetResult(result);
+            }
+
             void Tick()
             {
                 if (!EditorApplication.isPlaying)
                 {
-                    EditorApplication.update -= Tick;
-                    tcs.TrySetResult(BuildTestStepReport(beforeSnapshot, "stopped", "", "Play Mode stopped"));
+                    Complete(BuildTestStepReport(beforeSnapshot, "stopped", "", "Play Mode stopped"));
                     return;
                 }
 
                 if (Time.realtimeSinceStartup - startTime >= timeout + waitAfter + 2f)
                 {
-                    EditorApplication.update -= Tick;
-                    tcs.TrySetResult(BuildTestStepReport(beforeSnapshot, moveResult ?? "timeout", "", "timeout"));
+                    Complete(BuildTestStepReport(beforeSnapshot, moveResult ?? "timeout", "", "timeout"));
                     return;
                 }
 
@@ -247,10 +283,9 @@ namespace UnityMCP.Editor
                 if (Time.realtimeSinceStartup - settleStart < waitAfter) return;
 
                 // Phase 5: AFTER snapshot + console check
-                EditorApplication.update -= Tick;
                 string afterSnapshot = string.IsNullOrEmpty(checksAfter) ? "" : GameStateHelper.Snapshot(checksAfter);
                 string console = ConsoleCapture.GetLogs(10, "error,warning");
-                tcs.TrySetResult(BuildTestStepReport(beforeSnapshot, moveResult, afterSnapshot, console));
+                Complete(BuildTestStepReport(beforeSnapshot, moveResult, afterSnapshot, console));
             }
 
             EditorApplication.update += Tick;

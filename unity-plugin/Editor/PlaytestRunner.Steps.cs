@@ -251,24 +251,9 @@ namespace UnityMCP.Editor
                     break;
 
                 case StepType.TraceFlow:
-                    try
-                    {
-                        var srcVal = ReadValue(step.Path, "", step.Method);
-                        var dstVal = ReadValue(step.Query, "", step.Method);
-                        phase = Phase.WaitingPoll;
-                        // Reuse WaitingPoll with custom query — set query to magic sentinel
-                        // Actually TRACE_FLOW uses its own data, so we just log and done for now
-                        // (async version would use WaitingPoll; sync: just report)
-                        results.Add($"{label} TRACE_FLOW {step.Path}→{step.Query} [{step.Method}]: src={srcVal}, dst={dstVal}");
-                        passed++;
-                        phase = Phase.Done;
-                    }
-                    catch (Exception e)
-                    {
-                        results.Add($"{label} TRACE_FLOW — ERR: {e.Message}");
-                        failed++;
-                        phase = Phase.Done;
-                    }
+                    results.Add($"{label} TRACE_FLOW: not yet implemented — use ASSERT for field verification");
+                    failed++;
+                    phase = Phase.Done;
                     break;
 
                 case StepType.AssertCta:

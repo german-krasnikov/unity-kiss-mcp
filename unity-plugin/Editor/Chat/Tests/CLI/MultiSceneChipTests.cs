@@ -17,7 +17,10 @@ namespace UnityMCP.Editor.Chat.Tests
                 BindingFlags.NonPublic | BindingFlags.Static);
 
         private static bool IsAssetPath(string path)
-            => (bool)_isAssetPath.Invoke(null, new object[] { path });
+        {
+            Assert.IsNotNull(_isAssetPath, "ChipContextResolver.IsAssetPath not found");
+            return (bool)_isAssetPath.Invoke(null, new object[] { path });
+        }
 
         // ── IsAssetPath — unit (no Unity scene needed) ───────────────────────
 

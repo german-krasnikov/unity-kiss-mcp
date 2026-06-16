@@ -30,16 +30,6 @@ def _gate(feature: str, difficulty: float) -> bool:
     return decision.run
 
 
-def _record(feature: str, has_image: bool = None) -> None:
-    """Sync record — kept for legacy/CLI paths without event loop."""
-    if _budget_tracker is None:
-        return
-    from .budget.registry import get_feature
-    meta = get_feature(feature)
-    image = meta.image if has_image is None else has_image
-    _budget_tracker.record(feature, meta.est_in, meta.est_out, image)
-
-
 async def _record_async(feature: str, has_image: bool = None) -> None:
     """Async-safe budget record. Use in production async paths."""
     if _budget_tracker is None:

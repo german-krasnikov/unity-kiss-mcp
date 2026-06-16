@@ -1,5 +1,4 @@
 """Helper: annotate before/after images with SoM circles, call sampling."""
-import hashlib
 import os
 import tempfile
 from typing import TYPE_CHECKING, Optional
@@ -20,15 +19,12 @@ async def diff_with_annotation(
     """Annotate both frames with SoM circles, call sampling, cleanup."""
     from PIL import Image
     from .overlay import annotate
+    from .extract import build_path_pool
 
     # Build canonical pool once from union of both frames — ensures circles and
     # legend share the same index space (fixes index mismatch on subset frames).
     effective_after = rects_after or rects
-    pool = sorted(
-        {r.get("path") for r in rects if r.get("path")} |
-        {r.get("path") for r in effective_after if r.get("path")},
-        key=lambda p: hashlib.sha256(p.encode()).hexdigest(),
-    )[:30]  # cap @ 30 to keep indices small ints
+    pool = build_path_pool(rects, effective_after)
 
     with tempfile.TemporaryDirectory() as tmp:
         ann_before = os.path.join(tmp, "before.png")

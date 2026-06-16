@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 4726 Tests (2364 Python · 2282 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 4813 Tests (2410 Python · 2323 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -230,6 +230,20 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.32.0</b> — 2026-06-16 — **run_tests Fire-and-Forget Protocol (Server v0.32.0)** — `run_tests(mode)` now …</summary>
+
+**run_tests Fire-and-Forget Protocol (Server v0.32.0)** — `run_tests(mode)` now returns immediately with message `"tests-started|{mode}|poll …
+
+</details>
+
+<details>
+<summary><b>v0.31.1</b> — 2026-06-16 — **run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent …</summary>
+
+**run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent timeout when domain reload clears Editor.log "compiling" status …
+
+</details>
+
+<details>
 <summary><b>v0.31.0</b> — 2026-06-16 — **Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan …</summary>
 
 **Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan pipeline: (1) strip C# comments + whitespace densification (via regex …
@@ -251,22 +265,10 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.29.38</b> — 2026-06-15 — **Codex Interactive User Input (Plugin v0.29.38)** — Codex CLI can now show …</summary>
-
-**Codex Interactive User Input (Plugin v0.29.38)** — Codex CLI can now show interactive `AskUserCard` via JSON-RPC `tool/requestUserInput` and …
-
-</details>
-
-<details>
-<summary><b>v0.29.37</b> — 2026-06-15 — **Claude Interactive User Input (Plugin v0.29.37, Server)** — Claude CLI …</summary>
-
-**Claude Interactive User Input (Plugin v0.29.37, Server)** — Claude CLI `AskUserQuestion` now routes through MCP `permission_prompt_tool` → Unity …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.29.38** — 2026-06-15 — **Codex Interactive User Input (Plugin v0.29.38)** — Codex CLI can now show …
+- **v0.29.37** — 2026-06-15 — **Claude Interactive User Input (Plugin v0.29.37, Server)** — Claude CLI …
 - **v0.29.11** — 2026-06-15 — **Interactive Permission Protocol Fix (Plugin v0.29.11, Sprint 1C)** — Fixes …
 - **v0.29.2** — 2026-06-15 — **Chat Assembly Split (Plugin v0.29.2)** — `UnityMCP.Editor.Chat` split into …
 - **v0.27.4** — 2026-06-14 — **Reload Recovery Package (Plugin + Server v0.27.4)** — Independent UPM package …

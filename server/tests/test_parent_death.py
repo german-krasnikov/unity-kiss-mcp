@@ -1,34 +1,23 @@
 """TDD tests for parent-death detection in bridge_heartbeat.py."""
 import asyncio
 import os
-from unittest.mock import patch, MagicMock, AsyncMock, PropertyMock
+from unittest.mock import patch, AsyncMock
 
 import pytest
 
 import unity_mcp.bridge_heartbeat as hb_module
 
 
-# ---------------------------------------------------------------------------
-# _ORIGINAL_PPID — captured at module level
-# ---------------------------------------------------------------------------
-
 def test_original_ppid_is_module_level_int():
-    """_ORIGINAL_PPID must be an int captured at module import time."""
     assert isinstance(hb_module._ORIGINAL_PPID, int)
     assert hb_module._ORIGINAL_PPID > 0
 
 
 def test_original_ppid_matches_real_ppid_at_import():
-    """_ORIGINAL_PPID should match the actual ppid (we haven't reparented)."""
     assert hb_module._ORIGINAL_PPID == os.getppid()
 
 
-# ---------------------------------------------------------------------------
-# _heartbeat_tick parent-death guard
-# ---------------------------------------------------------------------------
-
 def _make_bridge_mixin():
-    """Return a minimal HeartbeatMixin instance with mocked internals."""
     from unity_mcp.bridge_heartbeat import HeartbeatMixin
 
     class _Stub(HeartbeatMixin):
@@ -42,6 +31,8 @@ def _make_bridge_mixin():
             self._counter = 0
             self._reconnect_started_at = None
             self._startup_grace_expired = False
+            self._ppid_mismatch_count = 0
+            self._connected = True
 
         @property
         def connected(self):
@@ -60,25 +51,63 @@ def _make_bridge_mixin():
 
 
 @pytest.mark.asyncio
-async def test_parent_death_detection_calls_exit():
-    """When os.getppid() != _ORIGINAL_PPID, heartbeat calls os._exit(0)."""
+async def test_parent_death_stops_heartbeat_no_systemexit():
+    """After 2 consecutive PPID mismatches, heartbeat stops — no SystemExit/os._exit."""
     bridge = _make_bridge_mixin()
-    bridge._connected = True  # so tick reaches ppid check
 
-    # Make _ORIGINAL_PPID differ from current ppid
     fake_original = os.getppid() + 9999
     with patch.object(hb_module, "_ORIGINAL_PPID", fake_original), \
-         patch("os.getppid", return_value=os.getppid()), \
-         patch("os._exit") as mock_exit:
+         patch("unity_mcp.bridge_heartbeat.os.getppid", return_value=os.getppid()):
+        # First mismatch: returns early
         await bridge._heartbeat_tick(15.0)
-        mock_exit.assert_called_once_with(0)
+        assert bridge._ppid_mismatch_count == 1
+
+        # Second mismatch: stops heartbeat, does NOT raise
+        await bridge._heartbeat_tick(15.0)
+        assert bridge._ppid_mismatch_count == 2
+        assert bridge._heartbeat_task is None  # stopped
+
+
+@pytest.mark.asyncio
+async def test_single_ppid_mismatch_does_not_stop():
+    """Single mismatch is a race guard — heartbeat keeps running."""
+    bridge = _make_bridge_mixin()
+    bridge._heartbeat_task = asyncio.ensure_future(asyncio.sleep(999))
+
+    fake_original = os.getppid() + 9999
+    with patch.object(hb_module, "_ORIGINAL_PPID", fake_original), \
+         patch("unity_mcp.bridge_heartbeat.os.getppid", return_value=os.getppid()):
+        await bridge._heartbeat_tick(15.0)
+        assert bridge._ppid_mismatch_count == 1
+        assert bridge._heartbeat_task is not None  # still running
+
+    bridge._heartbeat_task.cancel()
+    try:
+        await bridge._heartbeat_task
+    except asyncio.CancelledError:
+        pass
+
+
+@pytest.mark.asyncio
+async def test_ppid_match_resets_counter():
+    """When ppid matches again, mismatch counter resets."""
+    bridge = _make_bridge_mixin()
+    bridge._ppid_mismatch_count = 1
+    bridge._connected = False
+
+    real_ppid = os.getppid()
+    with patch.object(hb_module, "_ORIGINAL_PPID", real_ppid), \
+         patch("unity_mcp.bridge_heartbeat.os.getppid", return_value=real_ppid), \
+         patch("asyncio.sleep", new=AsyncMock()):
+        await bridge._heartbeat_tick(15.0)
+        assert bridge._ppid_mismatch_count == 0
 
 
 @pytest.mark.asyncio
 async def test_parent_alive_no_exit():
-    """When ppid unchanged, heartbeat does NOT call os._exit(0)."""
+    """When ppid unchanged, no exit called."""
     bridge = _make_bridge_mixin()
-    bridge._connected = False  # disconnected → short sleep path
+    bridge._connected = False
 
     real_ppid = os.getppid()
     with patch.object(hb_module, "_ORIGINAL_PPID", real_ppid), \

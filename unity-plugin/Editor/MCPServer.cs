@@ -39,12 +39,37 @@ namespace UnityMCP.Editor
                     _entries[i] = new ClientEntry();
             }
 
+            private static bool IsSocketAlive(TcpClient client)
+            {
+                try
+                {
+                    var s = client.Client;
+                    if (s == null || !s.Connected) return false;
+                    if (s.Poll(0, SelectMode.SelectRead))
+                        return s.Available > 0;
+                    return true;
+                }
+                catch { return false; }
+            }
+
             // Returns (index, generation, clientCts) for the new entry
             internal (int index, long generation, CancellationTokenSource clientCts) Add(
                 TcpClient client, CancellationToken parentToken)
             {
                 lock (_lock)
                 {
+                    // Evict dead connections before looking for a slot
+                    for (int i = 0; i < MaxClients; i++)
+                    {
+                        var c = _entries[i].Client;
+                        if (c != null && !IsSocketAlive(c))
+                        {
+                            try { _entries[i].Cts?.Cancel(); } catch { }
+                            try { c.Close(); } catch { }
+                            _entries[i].Client = null;
+                            _entries[i].Cts = null;
+                        }
+                    }
                     // Find empty slot first
                     for (int i = 0; i < MaxClients; i++)
                     {
@@ -125,10 +150,45 @@ namespace UnityMCP.Editor
                     lock (_lock)
                     {
                         for (int i = 0; i < MaxClients; i++)
-                            if (_entries[i].Client != null) return true;
+                            if (_entries[i].Client != null && IsSocketAlive(_entries[i].Client)) return true;
                         return false;
                     }
                 }
+            }
+
+            internal int CountPhantoms()
+            {
+                int count = 0;
+                lock (_lock)
+                {
+                    for (int i = 0; i < MaxClients; i++)
+                    {
+                        var c = _entries[i].Client;
+                        if (c != null && !IsSocketAlive(c)) count++;
+                    }
+                }
+                return count;
+            }
+
+            internal int KillPhantoms()
+            {
+                int killed = 0;
+                lock (_lock)
+                {
+                    for (int i = 0; i < MaxClients; i++)
+                    {
+                        var c = _entries[i].Client;
+                        if (c != null && !IsSocketAlive(c))
+                        {
+                            try { _entries[i].Cts?.Cancel(); } catch { }
+                            try { c.Close(); } catch { }
+                            _entries[i].Client = null;
+                            _entries[i].Cts = null;
+                            killed++;
+                        }
+                    }
+                }
+                return killed;
             }
         }
 
@@ -143,8 +203,9 @@ namespace UnityMCP.Editor
         private static volatile bool _isCompiling;
         private static readonly string PortFilePath =
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "MCP_Port.json"));
-        private static readonly int Port = GetPort();
-        private static readonly int ChatPort = GetChatPort();
+        private static int _port;
+        private static int _chatPort;
+        private static bool _portsResolved;
         private static DateTime _compileStartTime;
 
         private static string ReadPortFileOrNull()
@@ -153,20 +214,27 @@ namespace UnityMCP.Editor
             catch { return null; }
         }
 
-        private static int GetPort()
+        private static void EnsurePorts()
         {
+            if (_portsResolved) return;
             var env = System.Environment.GetEnvironmentVariable("UNITY_MCP_PORT");
-            return PortResolver.ResolvePort(env, ReadPortFileOrNull(), 9500);
+            _port = PortResolver.ResolvePort(env, ReadPortFileOrNull(), 9500);
+            var chatEnv = System.Environment.GetEnvironmentVariable("UNITY_MCP_CHAT_PORT");
+            _chatPort = PortResolver.ResolveChatPort(chatEnv, ReadPortFileOrNull(), _port, _port + 1);
+            _portsResolved = true;
         }
 
-        private static int GetChatPort()
-        {
-            var env = System.Environment.GetEnvironmentVariable("UNITY_MCP_CHAT_PORT");
-            return PortResolver.ResolveChatPort(env, ReadPortFileOrNull(), Port, Port + 1);
-        }
+        private static int Port { get { EnsurePorts(); return _port; } }
+        private static int ChatPort { get { EnsurePorts(); return _chatPort; } }
 
         public static void SavePorts(int port, int chatPort)
-            => PortResolver.SavePorts(PortFilePath, port, chatPort);
+        {
+            PortResolver.SavePorts(PortFilePath, port, chatPort);
+            _port = port;
+            _chatPort = chatPort;
+            _portsResolved = true;
+            WritePortFile(port);
+        }
 
         private const int MaxMessageSize = 10_000_000;
 
@@ -214,10 +282,20 @@ namespace UnityMCP.Editor
             }
         }
         public static bool IsClientConnected => _mainSlot.AnyConnected || _chatSlot.AnyConnected;
+        public static int PhantomCount => _mainSlot.CountPhantoms() + _chatSlot.CountPhantoms();
+        public static int KillPhantoms()
+        {
+            var killed = _mainSlot.KillPhantoms() + _chatSlot.KillPhantoms();
+            if (killed > 0) UnityEngine.Debug.Log($"[MCP] Killed {killed} phantom connection(s)");
+            return killed;
+        }
         public static int ServerPort => Port;
         public static int ServerChatPort => ChatPort;
         // Reads reloadPort from MCP_Port.json. Returns 0 if reload-package is not installed.
         public static int ServerReloadPort => PortResolver.ReadReloadPort(PortFilePath);
+        public static double CompileElapsedSeconds => _isCompiling
+            ? (DateTime.UtcNow - _compileStartTime).TotalSeconds
+            : 0.0;
 
         private static double _lastWatchdogCheck;
 

@@ -75,16 +75,12 @@ def _build_legend_for_diff(
     rects_after: Optional[list[dict]],
 ) -> str:
     """Build a combined legend with stable indices for before+after frames."""
-    from .som.extract import assign_indices
+    from .som.extract import assign_indices, build_path_pool
     from .som.overlay import _leaf
     if not rects and not rects_after:
         return "(no marks)"
     # Build canonical pool — union of both frames, capped at 30 for small indices
-    pool = sorted(
-        {r.get("path") for r in (rects or []) if r.get("path")} |
-        {r.get("path") for r in (rects_after or []) if r.get("path")},
-        key=lambda p: hashlib.sha256(p.encode()).hexdigest(),
-    )[:30]
+    pool = build_path_pool(rects or [], rects_after)
     # Use single merged rect list with paired pool for stable indices
     merged = [{"path": p} for p in pool]
     indexed = assign_indices(merged, path_pool=pool)

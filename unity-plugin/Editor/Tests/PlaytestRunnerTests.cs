@@ -137,5 +137,22 @@ namespace UnityMCP.Editor.Tests
             var report = PlaytestRunner.BuildReport(results, 1, 0, Time.realtimeSinceStartup - 0.1f);
             StringAssert.Contains("SNAPSHOT", report);
         }
+
+        // ── TraceFlow ────────────────────────────────────────────────────────
+
+        [Test]
+        public void TraceFlow_ReportsNotImplemented()
+        {
+            var step = new PlaytestStep { Type = StepType.TraceFlow };
+            var results = new List<string>();
+            int passed = 0, failed = 0;
+
+            PlaytestRunner.ExecuteSyncStep(step, null, results, ref passed, ref failed, 0);
+
+            Assert.AreEqual(0, passed, "TraceFlow should not increment passed");
+            Assert.AreEqual(1, failed, "TraceFlow should increment failed");
+            Assert.AreEqual(1, results.Count);
+            StringAssert.Contains("not yet implemented", results[0]);
+        }
     }
 }

@@ -6,8 +6,6 @@ from typing import Optional
 class SchemaCache:
     """LRU cache mapping component type → frozenset of property names."""
 
-    LEN_CAP = 256
-
     def __init__(self, max_size: int = 256) -> None:
         self._max = max_size
         self._data: OrderedDict[str, frozenset] = OrderedDict()
