@@ -33,14 +33,11 @@ namespace UnityMCP.Editor
             }
 
             // Scene-qualified path: "SceneName:/RootObj/Child"
-            var sceneIdx = path.IndexOf(":/");
-            if (sceneIdx > 0)
+            var parsed = ScenePathParser.Parse(path);
+            if (parsed.SceneName != null)
             {
-                var sceneName = path.Substring(0, sceneIdx);
-                var scenePath = path.Substring(sceneIdx + 2);
-                if (scenePath.StartsWith("/")) scenePath = scenePath.Substring(1);
-                var sceneParts = scenePath.Split('/');
-                var sceneRoot = FindRootInScene(sceneName, sceneParts[0]);
+                var sceneParts = parsed.LocalPath.Split('/');
+                var sceneRoot = FindRootInScene(parsed.SceneName, sceneParts[0]);
                 if (sceneRoot == null) return null;  // strict scene boundary — no fuzzy cross-scene
                 GameObject current = sceneRoot;
                 for (int i = 1; i < sceneParts.Length; i++)
@@ -208,6 +205,26 @@ namespace UnityMCP.Editor
                 t = t.parent;
             }
             return SceneContext.Current.QualifyPath(go, path);
+        }
+    }
+
+    /// <summary>Parses "SceneName:/local/path" → (sceneName, localPath). Shared between finders.</summary>
+    internal readonly struct ScenePathParser
+    {
+        public readonly string SceneName;   // null if not scene-qualified
+        public readonly string LocalPath;   // path without scene prefix, leading '/' stripped
+
+        private ScenePathParser(string scene, string local) { SceneName = scene; LocalPath = local; }
+
+        internal static ScenePathParser Parse(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return new ScenePathParser(null, path);
+            int sep = path.IndexOf(":/", System.StringComparison.Ordinal);
+            if (sep <= 0) return new ScenePathParser(null, path);
+            var scene = path.Substring(0, sep);
+            var local = path.Substring(sep + 2);  // skip ":/"
+            if (local.StartsWith("/")) local = local.Substring(1);
+            return new ScenePathParser(scene, local);
         }
     }
 }

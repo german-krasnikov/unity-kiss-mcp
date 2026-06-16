@@ -10,7 +10,7 @@ async def asset(action: str, path: str | None = None, type: str | None = None,
                 prop: str | None = None, value: str | None = None,
                 recursive: bool = False, labels: str | None = None,
                 output: str | None = None) -> str:
-    """Asset database. action: find|get_info|create|move|duplicate|delete|get_dependencies|import_settings|export_package|import_package. find: type+name+folder+labels. create: type=Folder|Material|PhysicMaterial. export_package: path+output. import_package: path (filesystem)."""
+    """Asset database. action: find|get_info|create|move|validate_move|duplicate|delete|get_dependencies|import_settings|export_package|import_package. find: type+name+folder+labels. create: type=Folder|Material|PhysicMaterial. move/validate_move: source+dest (Assets/ paths). Moves .meta correctly. export_package: path+output. import_package: path (filesystem)."""
     return await _send("asset", _args(
         action=action, path=path, type=type, name=name, folder=folder,
         source=source, dest=dest, prop=prop, value=value,

@@ -14,6 +14,54 @@ namespace UnityMCP.Editor.Chat
         private DropdownField      _agentDropdown;
         private const string       DropdownPrefKey = "MCPChat.SelectedBackend";
 
+        // Model selector
+        private string        _selectedModel = "";
+        private DropdownField _modelDropdown;
+        private TextField     _customModelField;
+        private const string  CustomModelSentinel = "__custom__";
+
+        internal static readonly Dictionary<BackendKind, (string label, string modelId)[]> ModelPresetsPerKind
+            = new Dictionary<BackendKind, (string, string)[]>
+        {
+            [BackendKind.Claude] = new[]
+            {
+                ("Default",   ""),
+                ("Sonnet",    "claude-sonnet-4-6"),
+                ("Opus",      "claude-opus-4-8"),
+                ("Haiku",     "claude-haiku-4-5"),
+                ("Fable",     "claude-fable-5"),
+                ("Custom...", CustomModelSentinel),
+            },
+            [BackendKind.Codex] = new[]
+            {
+                ("Default",   ""),
+                ("o3",        "o3"),
+                ("o4-mini",   "o4-mini"),
+                ("o3-pro",    "o3-pro"),
+                ("gpt-4.1",   "gpt-4.1"),
+                ("Custom...", CustomModelSentinel),
+            },
+            [BackendKind.Gemini] = new[]
+            {
+                ("Default",   ""),
+                ("2.5 Pro",   "gemini-2.5-pro"),
+                ("2.5 Flash", "gemini-2.5-flash"),
+                ("2.0 Flash", "gemini-2.0-flash"),
+                ("Custom...", CustomModelSentinel),
+            },
+        };
+
+        // Backward-compat alias for existing tests
+        internal static (string label, string modelId)[] ModelPresets
+            => ModelPresetsPerKind[BackendKind.Claude];
+
+        private static string ModelPrefKeyFor(BackendKind kind)
+            => $"MCPChat.SelectedModel.{kind}";
+
+        private static (string label, string modelId)[] PresetsForKind(BackendKind kind)
+            => ModelPresetsPerKind.TryGetValue(kind, out var p) ? p
+               : new[] { ("Default", "") };
+
         private void RefreshBackends()
         {
             var projectRoot = Path.GetDirectoryName(Application.dataPath);
@@ -68,9 +116,119 @@ namespace UnityMCP.Editor.Chat
                 _backend?.Stop();
                 ResetTokenCounters();
                 CreateBackend();
+                RebuildModelDropdown();
             });
 
             return _agentDropdown;
+        }
+
+        private VisualElement BuildModelSelector()
+        {
+            var presets = PresetsForKind(_selectedKind);
+            var labels  = new List<string>();
+            foreach (var p in presets) labels.Add(p.label);
+
+            _modelDropdown = new DropdownField(labels, 0) { tooltip = "Model" };
+            _modelDropdown.AddToClassList("agent-selector");
+
+            _customModelField = new TextField { tooltip = "Custom model ID", value = "" };
+            _customModelField.AddToClassList("agent-selector");
+            _customModelField.style.display  = DisplayStyle.None;
+            _customModelField.style.minWidth = 120;
+
+            // Restore saved selection
+            var saved = EditorPrefs.GetString(ModelPrefKeyFor(_selectedKind), "");
+            var idx   = System.Array.FindIndex(presets, p => p.label == saved);
+            if (idx >= 0)
+            {
+                _modelDropdown.SetValueWithoutNotify(presets[idx].label);
+                if (presets[idx].modelId == CustomModelSentinel)
+                {
+                    var customVal = EditorPrefs.GetString(ModelPrefKeyFor(_selectedKind) + ".custom", "");
+                    _customModelField.value          = customVal;
+                    _customModelField.style.display  = DisplayStyle.Flex;
+                    _selectedModel                   = customVal;
+                }
+                else
+                {
+                    _selectedModel = presets[idx].modelId;
+                }
+            }
+
+            _modelDropdown.RegisterValueChangedCallback(evt =>
+            {
+                var presetArr = PresetsForKind(_selectedKind);
+                var p = System.Array.Find(presetArr, x => x.label == evt.newValue);
+                EditorPrefs.SetString(ModelPrefKeyFor(_selectedKind), evt.newValue);
+
+                if (p.modelId == CustomModelSentinel)
+                {
+                    _customModelField.style.display = DisplayStyle.Flex;
+                    _selectedModel = _customModelField.value;
+                    return; // don't restart backend until user types a value
+                }
+
+                _customModelField.style.display = DisplayStyle.None;
+                _selectedModel = p.modelId;
+                _backend?.Stop();
+                ResetTokenCounters();
+                CreateBackend();
+            });
+
+            _customModelField.RegisterCallback<FocusOutEvent>(_ => ApplyCustomModel());
+            _customModelField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                    ApplyCustomModel();
+            });
+
+            _modelDropdown.SetEnabled(presets.Length > 1);
+
+            var container = new VisualElement();
+            container.style.flexDirection = FlexDirection.Row;
+            container.Add(_modelDropdown);
+            container.Add(_customModelField);
+            return container;
+        }
+
+        private void ApplyCustomModel()
+        {
+            var val = _customModelField?.value ?? "";
+            EditorPrefs.SetString(ModelPrefKeyFor(_selectedKind) + ".custom", val);
+            _selectedModel = val;
+            _backend?.Stop();
+            ResetTokenCounters();
+            CreateBackend();
+        }
+
+        private void RebuildModelDropdown()
+        {
+            if (_modelDropdown == null) return;
+            var presets = PresetsForKind(_selectedKind);
+            var labels  = new List<string>();
+            foreach (var p in presets) labels.Add(p.label);
+
+            _modelDropdown.choices = labels;
+
+            var saved = EditorPrefs.GetString(ModelPrefKeyFor(_selectedKind), "");
+            var idx   = System.Array.FindIndex(presets, p => p.label == saved);
+            if (idx < 0) idx = 0;
+
+            _modelDropdown.SetValueWithoutNotify(presets[idx].label);
+            _modelDropdown.SetEnabled(presets.Length > 1);
+
+            if (presets[idx].modelId == CustomModelSentinel && _customModelField != null)
+            {
+                var customVal = EditorPrefs.GetString(ModelPrefKeyFor(_selectedKind) + ".custom", "");
+                _customModelField.value         = customVal;
+                _customModelField.style.display = DisplayStyle.Flex;
+                _selectedModel                  = customVal;
+            }
+            else
+            {
+                _selectedModel = presets[idx].modelId;
+                if (_customModelField != null) _customModelField.style.display = DisplayStyle.None;
+            }
         }
     }
 }

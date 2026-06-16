@@ -18,7 +18,7 @@ namespace UnityMCP.Editor
             EditorPrefs.GetBool(KeyPrefix + toolName, true);
 
         public static bool AutoDiscardScene =>
-            EditorPrefs.GetBool(KeyAutoDiscard, true);
+            EditorPrefs.GetBool(KeyAutoDiscard, false);
 
         // ── Catalog persistence (P1) ─────────────────────────────────────────
         public static void SetCatalog(string json) =>

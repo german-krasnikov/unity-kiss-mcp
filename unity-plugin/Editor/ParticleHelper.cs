@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace UnityMCP.Editor
@@ -32,6 +33,9 @@ namespace UnityMCP.Editor
             var ps = GetPS(path);
             Undo.RecordObject(ps, "Set Particle Property");
             SetModuleProperty(ps, module, prop, value);
+            EditorUtility.SetDirty(ps);
+            if (!EditorApplication.isPlaying)
+                EditorSceneManager.MarkSceneDirty(ps.gameObject.scene);
             return $"set: {module}.{prop} = {value}";
         }
 
@@ -40,6 +44,9 @@ namespace UnityMCP.Editor
             var ps = GetPS(path);
             Undo.RecordObject(ps, "Apply Particle Preset");
             ApplyPresetInternal(ps, preset);
+            EditorUtility.SetDirty(ps);
+            if (!EditorApplication.isPlaying)
+                EditorSceneManager.MarkSceneDirty(ps.gameObject.scene);
             return $"preset: {preset} applied to {path}";
         }
 

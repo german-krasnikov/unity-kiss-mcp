@@ -1,4 +1,4 @@
-"""Live Haiku visual diff tests — fixture-based, deterministic.
+"""Live CLI visual diff tests — fixture-based, deterministic.
 
 Each test calls real claude CLI ($0.001/test). Cost cap fixture asserts
 ≤2 calls per test. Total session cost: ~$0.004.
@@ -14,7 +14,7 @@ from unity_mcp.sampling import SamplingService
 
 FIXTURES = Path(__file__).parent / "fixtures" / "visual_diff"
 
-pytestmark = [pytest.mark.live, pytest.mark.live_haiku, pytest.mark.asyncio]
+pytestmark = [pytest.mark.live, pytest.mark.live_cli, pytest.mark.asyncio]
 
 
 CASES = [
@@ -27,7 +27,7 @@ CASES = [
 
 
 @pytest.mark.parametrize("pair,prompt,must,must_not", CASES)
-async def test_haiku_visual_diff(pair, prompt, must, must_not, visual_verify_enabled, cost_cap):
+async def test_cli_visual_diff(pair, prompt, must, must_not, visual_verify_enabled, cost_cap):
     s = SamplingService()
     if not s.enabled:
         pytest.skip("UNITY_MCP_VISUAL_VERIFY!=1")
@@ -38,7 +38,7 @@ async def test_haiku_visual_diff(pair, prompt, must, must_not, visual_verify_ena
         pytest.skip(f"fixture {pair} missing — run recorder.py")
 
     result = await s.verify_visual_diff(str(before), str(after), prompt)
-    assert result, f"Haiku returned None/empty for {pair}"
+    assert result, f"CLI returned None/empty for {pair}"
 
     upper = result.upper()
     assert must in upper, f"Expected {must!r} in result, got: {result!r}"

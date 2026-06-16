@@ -15,7 +15,7 @@ namespace UnityMCP.Editor.Chat
             {
                 case ChatEventKind.TextDelta:
                     if (_activity.FirstToken()) OnActivityChanged();
-                    _transcript.AppendOrExtendAssistant(ev.Text);
+                    _transcript?.AppendOrExtendAssistant(ev.Text);
                     break;
                 case ChatEventKind.TurnDone:
                     ReloadGuard.OnTurnFinished(); // #1 unlock after turn complete
@@ -32,14 +32,16 @@ namespace UnityMCP.Editor.Chat
                     // are visible to BareNameNormalizer's scene-wide pass (closes cache-staleness gap).
                     _resolver?.Refresh();
                     _lastRefresh = EditorApplication.timeSinceStartup;
-                    _transcript.FinalizeAssistant();
-                    if (ev.InputTokens > 0 || ev.OutputTokens > 0)
+                    _transcript?.FinalizeAssistant();
+                    if (ev.InputTokens > 0 || ev.OutputTokens > 0 || ev.CostUsd > 0f)
                     {
                         // result.usage carries cumulative session totals, not per-turn deltas.
                         _inputTokens  = ev.InputTokens;
                         _outputTokens = ev.OutputTokens;
-                        _tokenReadout.text =
-                            $"↑ {TokenFormat.Abbr(_inputTokens)}  ↓ {TokenFormat.Abbr(_outputTokens)}";
+                        _costUsd      = ev.CostUsd;
+                        if (_tokenReadout != null)
+                            _tokenReadout.text =
+                                TokenFormat.FormatReadout(_inputTokens, _outputTokens, _costUsd);
                     }
                     var hasErrors = CompileErrorCapture.HasErrors();
                     if (hasErrors)

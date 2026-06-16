@@ -205,5 +205,38 @@ namespace UnityMCP.Editor.Chat.Tests
             int emptyCount = System.Array.FindAll(args, s => s == "").Length;
             Assert.AreEqual(0, emptyCount);
         }
+
+        // ── Model param ───────────────────────────────────────────────────────
+
+        [Test]
+        public void CodexArgBuilder_WithModel_InjectsModelFlag()
+        {
+            var (args, _) = CodexArgBuilder.Build(
+                SomePrompt, null, DefaultPythonCmd, DefaultPythonArgs,
+                model: "o3");
+
+            CollectionAssert.Contains(args, "--model");
+            var idx = System.Array.IndexOf(args, "--model");
+            Assert.AreEqual("o3", args[idx + 1]);
+        }
+
+        [Test]
+        public void CodexArgBuilder_NullModel_NoModelFlag()
+        {
+            var (args, _) = CodexArgBuilder.Build(
+                SomePrompt, null, DefaultPythonCmd, DefaultPythonArgs);
+
+            CollectionAssert.DoesNotContain(args, "--model");
+        }
+
+        [Test]
+        public void CodexArgBuilder_EmptyModel_NoModelFlag()
+        {
+            var (args, _) = CodexArgBuilder.Build(
+                SomePrompt, null, DefaultPythonCmd, DefaultPythonArgs,
+                model: "");
+
+            CollectionAssert.DoesNotContain(args, "--model");
+        }
     }
 }

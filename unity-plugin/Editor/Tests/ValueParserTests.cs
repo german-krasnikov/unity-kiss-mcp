@@ -206,5 +206,74 @@ namespace UnityMCP.Editor.Tests
             }
             finally { Object.DestroyImmediate(go); }
         }
+
+        // ── ParseFloats ───────────────────────────────────────────────────────
+
+        [Test]
+        public void ParseFloats_FourValues_ParsesCorrectly()
+        {
+            var f = ValueParser.ParseFloats("1.5, 2.5, 100, 50", 4);
+            Assert.AreEqual(4, f.Length);
+            Assert.AreEqual(1.5f, f[0], 0.001f);
+            Assert.AreEqual(2.5f, f[1], 0.001f);
+            Assert.AreEqual(100f, f[2], 0.001f);
+            Assert.AreEqual(50f, f[3], 0.001f);
+        }
+
+        [Test]
+        public void ParseFloats_SixValues_ParsesCorrectly()
+        {
+            var f = ValueParser.ParseFloats("(1,2,3,4,5,6)", 6);
+            Assert.AreEqual(6, f.Length);
+            Assert.AreEqual(1f, f[0], 0.001f);
+            Assert.AreEqual(6f, f[5], 0.001f);
+        }
+
+        [Test]
+        public void ParseFloats_WrongCount_ThrowsArgumentException()
+        {
+            Assert.Throws<System.ArgumentException>(() => ValueParser.ParseFloats("1,2,3", 4));
+        }
+
+        [Test]
+        public void ParseFloats_InvalidFloat_ThrowsArgumentException()
+        {
+            Assert.Throws<System.ArgumentException>(() => ValueParser.ParseFloats("1,2,abc,4", 4));
+        }
+
+        [Test]
+        public void ParseFloats_WithParens_StripsAndParses()
+        {
+            var f = ValueParser.ParseFloats("(10, 20, 30, 40)", 4);
+            Assert.AreEqual(10f, f[0], 0.001f);
+            Assert.AreEqual(40f, f[3], 0.001f);
+        }
+
+        // ── SetPropertyValue — Rect branch ────────────────────────────────────
+
+        [Test]
+        public void SetPropertyValue_Rect_SetsViewportRect()
+        {
+            var go = new GameObject("VP_RectTest");
+            go.AddComponent<Camera>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<Camera>());
+                var prop = so.FindProperty("m_NormalizedViewPortRect");
+                Assert.IsNotNull(prop, "m_NormalizedViewPortRect must exist on Camera");
+                Assert.AreEqual(SerializedPropertyType.Rect, prop.propertyType);
+                ValueParser.SetPropertyValue(prop, "0.1, 0.2, 0.8, 0.6");
+                so.ApplyModifiedProperties();
+                var r = go.GetComponent<Camera>().rect;
+                Assert.AreEqual(0.1f, r.x, 0.01f);
+                Assert.AreEqual(0.2f, r.y, 0.01f);
+                Assert.AreEqual(0.8f, r.width, 0.01f);
+                Assert.AreEqual(0.6f, r.height, 0.01f);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+        // Note: Bounds/RectInt/BoundsInt integration tests omitted — no built-in
+        // component exposes those as serialized properties in EditMode.
+        // Parse coverage is provided by ParseFloats tests above.
     }
 }

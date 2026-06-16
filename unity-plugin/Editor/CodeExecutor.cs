@@ -27,7 +27,19 @@ namespace UnityMCP.Editor
             "Environment.Exit", "Environment.SetEnvironmentVariable",
             "using System.Diagnostics", "using System.IO", "using System.Net",
             "using System.Reflection",
+            // Terminate/crash
+            "EditorApplication.Exit", "Application.Quit", "Environment.FailFast",
+            // Data exfiltration / untrusted import
+            "AssetDatabase.ExportPackage", "AssetDatabase.ImportPackage",
+            // Project switching / arbitrary asset creation
+            "EditorApplication.OpenProject", "ProjectWindowUtil",
+            // Using-alias bypass (= NS form not caught by "using NS" entries)
+            "= System.IO", "= System.Diagnostics", "= System.Net", "= System.Reflection",
         };
+
+        // Pre-densified blocked patterns (whitespace stripped) for O(1) SecurityScan matching
+        private static readonly string[] BlockedDense =
+            Blocked.Select(b => System.Text.RegularExpressions.Regex.Replace(b, @"\s+", "")).ToArray();
 
         private const string Usings =
             "using UnityEngine; using UnityEditor; using System; using System.Linq; using System.Collections.Generic;";
@@ -62,14 +74,27 @@ namespace UnityMCP.Editor
 
         internal static void SecurityScan(string code)
         {
-            // Normalize whitespace so newline-split bypass (e.g. "method\n.Invoke(") is caught
-            var normalized = System.Text.RegularExpressions.Regex.Replace(code, @"\s+", " ");
-            foreach (var blocked in Blocked)
+            var stripped = StripComments(code);
+            // Remove all whitespace so comment-split and newline-split bypasses are caught
+            var dense = System.Text.RegularExpressions.Regex.Replace(stripped, @"\s+", "");
+            for (int i = 0; i < Blocked.Length; i++)
             {
-                if (normalized.Contains(blocked))
+                if (dense.IndexOf(BlockedDense[i], StringComparison.OrdinalIgnoreCase) >= 0)
                     throw new InvalidOperationException(
-                        $"Security: blocked pattern '{blocked}'. Only UnityEngine/UnityEditor APIs allowed.");
+                        $"Security: blocked pattern '{Blocked[i]}'. Only UnityEngine/UnityEditor APIs allowed.");
             }
+        }
+
+        private static string StripComments(string code)
+        {
+            // Strip block comments /* ... */ including multiline
+            code = System.Text.RegularExpressions.Regex.Replace(
+                code, @"/\*.*?\*/", "", System.Text.RegularExpressions.RegexOptions.Singleline);
+            // Collapse string literal contents so // inside strings doesn't trigger line-comment strip
+            code = System.Text.RegularExpressions.Regex.Replace(code, @"""(?:[^""\\]|\\.)*""", "\"\"");
+            // Strip single-line comments // to end of line
+            code = System.Text.RegularExpressions.Regex.Replace(code, @"//[^\n]*", "");
+            return code;
         }
 
         private static void EnsureRoslyn()

@@ -148,7 +148,12 @@ namespace UnityMCP.Editor.Chat
         }
 
         private static bool IsAssetPath(string path)
-            => !string.IsNullOrEmpty(path) && !path.StartsWith("/");
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            if (path.StartsWith("/")) return false;                                          // unqualified scene path
+            if (path.IndexOf(":/", System.StringComparison.Ordinal) > 0) return false;     // scene-qualified "SceneName:/..."
+            return true;
+        }
 
         private static GameObject FindGo(string path)
         {

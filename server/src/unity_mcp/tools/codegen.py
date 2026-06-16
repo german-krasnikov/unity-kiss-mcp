@@ -48,7 +48,7 @@ async def auto_fix(ctx: _Context) -> str:
             max_tokens=500,
         )
         METRICS.inc("codegen_calls")
-        suggestion = response.content[0].text if response.content else "No suggestion"
+        suggestion = getattr(response.content, "text", "No suggestion")
         return f"ERRORS:\n{error_text}\n\nSUGGESTED FIX:\n{suggestion}"
     except Exception as e:
         return f"ERRORS:\n{error_text}\n\n(Auto-fix unavailable: {e})"
@@ -63,7 +63,7 @@ async def smart_build(description: str, ctx: _Context) -> str:
             max_tokens=1000,
         )
         METRICS.inc("codegen_calls")
-        code = response.content[0].text if response.content else ""
+        code = getattr(response.content, "text", "")
         m = re.search(r"```(?:csharp|cs)?\n(.*?)```", code, re.DOTALL)
         if m:
             code = m.group(1).strip()

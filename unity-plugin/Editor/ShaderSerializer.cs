@@ -107,7 +107,7 @@ namespace UnityMCP.Editor
                     shader.GetPropertyDefaultFloatValue(i).ToString("G4", IC),
                 UnityEngine.Rendering.ShaderPropertyType.Texture => "Texture",
                 UnityEngine.Rendering.ShaderPropertyType.Int =>
-                    ((int)shader.GetPropertyDefaultFloatValue(i)).ToString(),
+                    shader.GetPropertyDefaultIntValue(i).ToString(),
                 _ => type.ToString()
             };
         }

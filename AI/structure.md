@@ -2,7 +2,7 @@
 
 ```
 unity-kiss-mcp/
-├── server/                     # Python MCP Server (2038 unit tests, 70 live = 2108 total Python)
+├── server/                     # Python MCP Server (2362 unit tests, 70 live = 2432 total Python, v0.30.4)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
@@ -66,7 +66,7 @@ unity-kiss-mcp/
 │   │   │   ├── overlay.py      # Pillow-based SoM overlay renderer (numbered circles, boxes)
 │   │   │   ├── extract.py      # Parse and filter rects from Unity screenshot payload
 │   │   │   └── diff_annotate.py # Annotate before/after images with SoM, call sampling
-│   │   ├── tools/              # Tool modules (26 files + __init__)
+│   │   ├── tools/              # Tool modules (27 files + __init__, asset tool extended v0.30.4)
 │   │   │   ├── __init__.py     # Tool module registry
 │   │   │   ├── reload_ladder.py # Reload recovery T0-T5 ladder (MVID-delta healing proof)
 │   │   │   ├── objects.py      # create/delete/find/inspect/set_parent/set_material
@@ -78,7 +78,7 @@ unity-kiss-mcp/
 │   │   │   ├── spatial.py      # validate_layout, get_spatial_context, scan_scene, check_colliders, spatial_query
 │   │   │   ├── ui.py           # create_ui, set_rect, menu, shader
 │   │   │   ├── animation.py    # animation, timeline, animator, particle
-│   │   │   ├── asset.py        # asset, material, prefab, scriptable_object, project_settings
+│   │   │   ├── asset.py        # asset, material, prefab, scriptable_object, project_settings, validate_move (v0.30.4)
 │   │   │   ├── connection.py   # list_connections, reconnect_unity
 │   │   │   ├── autobatch.py    # setup_objects, set_properties, configure_objects
 │   │   │   ├── gating.py       # TIER1 + category-based capability filtering (permission_prompt in CORE_TOOLS, v0.29.37)
@@ -97,7 +97,7 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~2068 unit tests + 70 live tests + conftest.py (v0.26.0 quality audit)
+│   └── tests/                  # ~2362 unit tests + 70 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
@@ -138,7 +138,7 @@ unity-kiss-mcp/
 │   ├── UnityMCP.Reload.asmdef                # Core assembly (no references)
 │   ├── package.json                          # v0.1.4, "com.unity-mcp.reload"
 │   └── package.json.meta
-├── unity-plugin/               # Unity Editor Plugin (130+ C# files, ~14000 LOC, v0.29.2: Chat split into CLI+View)
+├── unity-plugin/               # Unity Editor Plugin (130+ C# files, ~14000 LOC, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, etc.) + 25 tests
@@ -233,6 +233,15 @@ unity-kiss-mcp/
 │       │   ├── PermissionsHeaderAnimTests.cs # 7 NUnit tests (shield pulse, state logic)
 │       │   ├── ChatHeaderAnimTests.cs     # 7 NUnit tests (wifi arc, state logic)
 │       │   ├── ChatSettingsHookEventTests.cs # NUnit tests (event firing, hook execution) (F26)
+│       │   ├── CodeExecutorSecurityBypassTests.cs # Security hardening: comment-strip, whitespace densify, blocked patterns (v0.31.0, 15 tests)
+│       │   ├── CodeExecutorSecurityTests.cs # Core security + whitespace bypass tests
+│       │   ├── CodeExecutorSecurityWhitespaceBypassTests.cs # Whitespace evasion scenarios
+│       │   ├── ConsoleCaptureTests.cs     # Multi-level console filter + comma-separated levels (v0.31.0)
+│       │   ├── MultiSceneHierarchyTests.cs # Multi-scene hierarchy tests
+│       │   ├── MultiSceneOperationsTests.cs # Multi-scene CRUD operations
+│       │   ├── MultiSceneFinderTests.cs   # Object finding across scenes (updated v0.31.0)
+│       │   ├── SceneContextMultiSceneTests.cs # Scene context multi-scene behavior
+│       │   ├── ScenePathParserTests.cs    # Multi-scene path parsing: "SceneName:/" extraction (v0.31.0)
 │       ├── Chat/                          # Optional in-Unity Agent Chat (v0.29.2: split into CLI + View, UNITY_MCP_CHAT define)
 │       │   ├── CLI/                        # Chat.CLI assembly (protocol, parsing, backends, independent compile)
 │       │   │   ├── ChatEvent.cs               # Normalized event struct
@@ -263,11 +272,14 @@ unity-kiss-mcp/
 │       │   │       ├── ChatStreamParserTests.cs # Parse stream-json events + control_request routing
 │       │   │       ├── ClaudeArgBuilderTests.cs # CLI arg building + permission-prompt-tool (v0.29.37)
 │       │   │       ├── CodexAppServerParserTests.cs # Codex JSON-RPC + requestUserInput (v0.29.38)
+│       │   │       ├── CodexArgBuilderTests.cs # Codex CLI args + model wiring (v0.30.4, 33 tests)
 │       │   │       ├── ControlResponseBuilderTests.cs # Response serialization including CodexUserInputResponse (v0.29.38)
 │       │   │       ├── GeminiArgBuilderTests.cs # Gemini gcloud args + settings.json port update + field mapping (v0.30.1, 217 tests)
 │       │   │       ├── GeminiParserTests.cs   # Gemini stream-json parsing: prompt echo filter, tool prefix, ask_user suppression (v0.30.1, 190 tests)
 │       │   │       ├── GeminiTestFixtures.cs  # Shared Gemini test payloads (v0.30.1, 33 LOC)
-│       │   │       └── ... # 32+ total CLI tests
+│       │   │       ├── MultiSceneChipTests.cs # Scene-qualified object path parsing + display (v0.30.4, 74 tests)
+│       │   │       ├── TokenFormatTests.cs    # Token cost display + null-safe guards (v0.30.4, 12 tests)
+│       │   │       └── ... # 40+ total CLI tests
 │       │   ├── View/                       # Chat.View assembly (UI windows, rendering, cards)
 │       │   │   ├── MCPChatWindow.cs           # EditorWindow UI + interaction (partial class)
 │       │   │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates + domain refresh trigger (F27) (partial class)
@@ -366,7 +378,11 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── ApproveFlowTests.cs     # Interactive approvals flow
 │       │   │   │   │   ├── ChipSequenceTests.cs
 │       │   │   │   │   ├── ChipSendSequenceTests.cs
-│       │   │   │   │   └── ... # 45+ total View tests
+│       │   │   │   │   ├── ModelSelectorTests.cs   # Per-backend model dropdown + preset selection (v0.30.4, 231 tests)
+│       │   │   │   │   ├── SetModeTests.cs         # Ask↔Agent mode switch + session persistence (v0.30.4, 120 tests)
+│       │   │   │   │   ├── TokenResetTests.cs      # Token counter reset + cost display (v0.30.4 upd v0.31.0, 14 tests + cost fix)
+│       │   │   │   │   ├── TokenFormatTests.cs     # Token cost display formatting + null-safe guards (v0.31.0, 12 tests)
+│       │   │   │   │   └── ... # 48+ total View tests
 │       │   │   │   └── Markdown/                # Render tests
 │       │   │   │       ├── MarkdownParserTests.cs
 │       │   │   │       ├── MermaidParserTests.cs
@@ -384,7 +400,7 @@ unity-kiss-mcp/
 │       ├── UnityMCP.Runtime.TestHelpers.asmdef # Separate assembly for test utilities
 │       └── TestHelpers/
 │           └── TestDummyMB.cs             # Dummy MonoBehaviour for AddComponent<> in editor tests (moved from Editor/Chat/Tests v0.25.0)
-├── unity-test-project/          # Unity 6000.3 test project (2623 NUnit tests incl. Editor + Chat)
+├── unity-test-project/          # Unity 6000.3 test project (2690+ NUnit tests incl. Editor + Chat, v0.30.4: +69 new)
 │   ├── Assets/Tests/Editor/     # NUnit test files
 │   ├── Assets/Animations/       # Animation clips + controllers
 │   ├── Assets/Scenes/

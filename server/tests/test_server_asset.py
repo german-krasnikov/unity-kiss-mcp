@@ -108,3 +108,18 @@ async def test_asset_delete_error_raises_tool_error(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Cannot delete read-only asset"})
     with pytest.raises(ToolError, match="Cannot delete read-only asset"):
         await asset(action="delete", path="Assets/ReadOnly.mat")
+
+
+async def test_asset_validate_move(mock_bridge):
+    """validate_move passes source and dest to bridge."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok"})
+    await asset(action="validate_move", source="Assets/A.prefab", dest="Assets/B.prefab")
+    args = mock_bridge.send.call_args[0][1]
+    assert args == {"action": "validate_move", "source": "Assets/A.prefab", "dest": "Assets/B.prefab"}
+
+
+async def test_asset_validate_move_error_from_unity(mock_bridge):
+    """validate_move raises ToolError when Unity returns ok=False."""
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "destination already exists"})
+    with pytest.raises(ToolError, match="destination already exists"):
+        await asset(action="validate_move", source="Assets/A.prefab", dest="Assets/Existing.prefab")

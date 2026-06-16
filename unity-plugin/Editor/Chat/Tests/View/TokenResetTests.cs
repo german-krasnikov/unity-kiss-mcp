@@ -14,6 +14,8 @@ namespace UnityMCP.Editor.Chat.Tests
             .GetField("_inputTokens",  BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly FieldInfo s_outputTokens = typeof(MCPChatWindow)
             .GetField("_outputTokens", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo s_costUsd = typeof(MCPChatWindow)
+            .GetField("_costUsd", BindingFlags.NonPublic | BindingFlags.Instance);
 
         private MCPChatWindow CreateWindow()
         {
@@ -32,6 +34,18 @@ namespace UnityMCP.Editor.Chat.Tests
 
             Assert.AreEqual(0, (int)s_inputTokens .GetValue(w));
             Assert.AreEqual(0, (int)s_outputTokens.GetValue(w));
+            UnityEngine.Object.DestroyImmediate(w);
+        }
+
+        [Test]
+        public void ResetTokenCounters_ZeroesCostUsd()
+        {
+            var w = CreateWindow();
+            s_costUsd.SetValue(w, 0.005f);
+
+            w.ResetTokenCounters();
+
+            Assert.AreEqual(0f, (float)s_costUsd.GetValue(w));
             UnityEngine.Object.DestroyImmediate(w);
         }
 
@@ -76,6 +90,23 @@ namespace UnityMCP.Editor.Chat.Tests
 
             Assert.AreEqual(77, (int)s_inputTokens .GetValue(w), "no reset when mode unchanged");
             Assert.AreEqual(88, (int)s_outputTokens.GetValue(w), "no reset when mode unchanged");
+            UnityEngine.Object.DestroyImmediate(w);
+        }
+
+        [Test]
+        public void CostUsd_MultipleTurns_UsesLatestNotSum()
+        {
+            var w = CreateWindow();
+            var handleEvent = typeof(MCPChatWindow)
+                .GetMethod("HandleEvent", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            // First turn: cumulative total = 0.002
+            handleEvent.Invoke(w, new object[] { ChatEvent.TurnDone("s1", costUsd: 0.002f, inputTokens: 100, outputTokens: 50) });
+            // Second turn: cumulative total = 0.005 (not a delta — this IS the new session total)
+            handleEvent.Invoke(w, new object[] { ChatEvent.TurnDone("s1", costUsd: 0.005f, inputTokens: 200, outputTokens: 80) });
+
+            // Must be 0.005 (latest cumulative total), not 0.007 (double-counted sum)
+            Assert.AreEqual(0.005f, (float)s_costUsd.GetValue(w), 1e-6f);
             UnityEngine.Object.DestroyImmediate(w);
         }
 

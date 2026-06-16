@@ -21,9 +21,13 @@ namespace UnityMCP.Editor.Chat
         {
             var go = (GameObject)obj;
             var path = ComponentSerializer.GetPath(go);
+            return new ChipData(Key, path, FormatHierarchyDisplay(path, go.name), go.GetInstanceID());
+        }
+
+        internal static string FormatHierarchyDisplay(string path, string leafName)
+        {
             var sep = path.IndexOf(":/", System.StringComparison.Ordinal);
-            var display = sep >= 0 ? path.Substring(0, sep) + "/" + go.name : go.name;
-            return new ChipData(Key, path, display, go.GetInstanceID());
+            return sep >= 0 ? "[" + path.Substring(0, sep) + "] " + leafName : leafName;
         }
 
         public string FormatPayload(ChipData chip, ChipPayloadContext ctx)

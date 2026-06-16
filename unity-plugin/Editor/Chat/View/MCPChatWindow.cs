@@ -15,6 +15,7 @@ namespace UnityMCP.Editor.Chat
         private BackendKind    _selectedKind = BackendKind.Claude;
         private PermissionConfig _permConfig = new PermissionConfig();
         private int            _inputTokens, _outputTokens;
+        private float          _costUsd;
         private readonly TurnUndoTracker  _undoTracker       = new TurnUndoTracker();
         private readonly SessionAllowlist  _sessionAllowlist  = new SessionAllowlist();
         private readonly SentTextCache _sentTextCache = new SentTextCache();
@@ -62,6 +63,7 @@ namespace UnityMCP.Editor.Chat
         internal void ResetTokenCounters()
         {
             _inputTokens = _outputTokens = 0;
+            _costUsd = 0f;
             if (_tokenReadout != null) _tokenReadout.text = "";
         }
 
@@ -181,10 +183,11 @@ namespace UnityMCP.Editor.Chat
         private void SetMode(bool agentMode)
         {
             if (_agentMode == agentMode) return;
+            var resumeId = _backend?.SessionId;   // capture before Stop() clears the process
             _agentMode = agentMode;
             _backend?.Stop();
             ResetTokenCounters();
-            CreateBackend();
+            CreateBackendWithSession(resumeId);
             _askBtn?.EnableInClassList("mode-toggle-btn--active",   !agentMode);
             _agentBtn?.EnableInClassList("mode-toggle-btn--active", agentMode);
         }
@@ -194,6 +197,8 @@ namespace UnityMCP.Editor.Chat
         private void CreateBackendWithSession(string resumeSessionId, BackendConfigStore store = null)
         {
             store ??= BackendConfigStore.Load();
+            store = ApplySelectedModel(store, _selectedKind, _selectedModel);
+
             var providerId = BackendProviderRegistry.KindToId(_selectedKind);
             var provider   = BackendProviderRegistry.Get(providerId);
             if (provider != null)
@@ -211,6 +216,78 @@ namespace UnityMCP.Editor.Chat
             _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan",
                 _selectedAgent, _permConfig, resumeSessionId,
                 store.Claude.Model, store.Claude.ExtraArgs);
+        }
+
+        // Pure helper — no allocation if model unchanged.
+        internal static BackendConfigStore CloneWithModel(BackendConfigStore src, string model)
+        {
+            if (src.Claude.Model == model) return src;
+            return new BackendConfigStore
+            {
+                Claude = new ClaudeBackendConfig
+                {
+                    PermissionMode = src.Claude.PermissionMode,
+                    Model          = model,
+                    ExtraArgs      = src.Claude.ExtraArgs,
+                },
+                Codex  = src.Codex,
+                Gemini = src.Gemini,
+                Chips  = src.Chips,
+            };
+        }
+
+        internal static BackendConfigStore ApplySelectedModel(
+            BackendConfigStore src, BackendKind kind, string selectedModel)
+        {
+            if (string.IsNullOrEmpty(selectedModel) || selectedModel == "__custom__") return src;
+            switch (kind)
+            {
+                case BackendKind.Claude:
+                    if (src.Claude.Model == selectedModel) return src;
+                    return new BackendConfigStore
+                    {
+                        Claude = new ClaudeBackendConfig
+                        {
+                            PermissionMode = src.Claude.PermissionMode,
+                            Model          = selectedModel,
+                            ExtraArgs      = src.Claude.ExtraArgs,
+                        },
+                        Codex  = src.Codex,
+                        Gemini = src.Gemini,
+                        Chips  = src.Chips,
+                    };
+                case BackendKind.Codex:
+                    if (src.Codex.Model == selectedModel) return src;
+                    return new BackendConfigStore
+                    {
+                        Claude = src.Claude,
+                        Codex  = new CodexBackendConfig
+                        {
+                            Model             = selectedModel,
+                            PermissionMode    = src.Codex.PermissionMode,
+                            StartupTimeoutSec = src.Codex.StartupTimeoutSec,
+                            ExtraArgs         = src.Codex.ExtraArgs,
+                        },
+                        Gemini = src.Gemini,
+                        Chips  = src.Chips,
+                    };
+                case BackendKind.Gemini:
+                    if (src.Gemini.Model == selectedModel) return src;
+                    return new BackendConfigStore
+                    {
+                        Claude = src.Claude,
+                        Codex  = src.Codex,
+                        Gemini = new GeminiBackendConfig
+                        {
+                            Model        = selectedModel,
+                            ApprovalMode = src.Gemini.ApprovalMode,
+                            Sandbox      = src.Gemini.Sandbox,
+                            ExtraArgs    = src.Gemini.ExtraArgs,
+                        },
+                        Chips  = src.Chips,
+                    };
+                default: return src;
+            }
         }
 
         internal void CancelTurn()

@@ -12,6 +12,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.Timeline;
 
 namespace UnityMCP.Editor.Tests
@@ -328,6 +329,33 @@ namespace UnityMCP.Editor.Tests
 
             StringAssert.Contains("Shader:", result);
             StringAssert.Contains("properties:", result);
+        }
+
+        [Test]
+        public void Serialize_ShaderWithIntProperty_DoesNotThrow()
+        {
+            // Exercises the GetPropertyDefaultIntValue branch in ShaderSerializer (line 110)
+            const string assetPath = "Assets/TestShaders/AllTypes.shader";
+            var loaded = AssetDatabase.LoadAssetAtPath<Shader>(assetPath);
+            if (loaded == null)
+                Assert.Inconclusive("AllTypes.shader not found — expected at Assets/TestShaders/AllTypes.shader");
+
+            // Verify the shader actually has an Int property
+            bool hasInt = false;
+            for (int i = 0; i < loaded.GetPropertyCount(); i++)
+            {
+                if (loaded.GetPropertyType(i) == ShaderPropertyType.Int)
+                { hasInt = true; break; }
+            }
+            if (!hasInt)
+                Assert.Inconclusive("AllTypes.shader has no Int property — add _IntProp");
+
+            // Serialize as shader asset path → mat==null path → GetDefaultValue Int branch
+            string result = null;
+            Assert.DoesNotThrow(() => result = ShaderSerializer.Serialize(assetPath, "shader"));
+            Assert.IsNotNull(result);
+            StringAssert.Contains("_IntProp", result);
+            StringAssert.Contains("42", result);
         }
     }
 

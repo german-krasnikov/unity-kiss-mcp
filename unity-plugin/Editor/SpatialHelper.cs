@@ -18,15 +18,23 @@ namespace UnityMCP.Editor
                 System.Globalization.CultureInfo.InvariantCulture, out var f) ? f : def;
         }
 
+        private static bool TryParseVec3(string s, out Vector3 v)
+        {
+            v = default;
+            var parts = s.Trim('(', ')').Split(',');
+            if (parts.Length != 3) return false;
+            if (!float.TryParse(parts[0], System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var x)) return false;
+            if (!float.TryParse(parts[1], System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var y)) return false;
+            if (!float.TryParse(parts[2], System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var z)) return false;
+            v = new Vector3(x, y, z);
+            return true;
+        }
+
         private static Vector3 ParseVec3(string s)
         {
-            // expects "(x,y,z)"
-            var clean = s.Trim('(', ')');
-            var parts = clean.Split(',');
-            return new Vector3(
-                float.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture),
-                float.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture),
-                float.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture));
+            if (!TryParseVec3(s, out var v))
+                throw new System.ArgumentException($"Invalid position format '{s}', expected '(x,y,z)'");
+            return v;
         }
 
         public static string Raycast(string fromArg, string toArg, string layerMask)

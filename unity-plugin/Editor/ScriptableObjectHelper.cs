@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using UnityEditor;
@@ -55,7 +54,7 @@ namespace UnityMCP.Editor
             while (prop.NextVisible(false))
             {
                 if (prop.name == "m_Script") continue;
-                sb.AppendLine($"{prop.name}: {SerializedPropertyToString(prop)}");
+                sb.AppendLine($"{prop.name}: {ComponentSerializer.GetPropertyValueString(prop)}");
             }
             return sb.ToString().TrimEnd('\n', '\r');
         }
@@ -121,39 +120,6 @@ namespace UnityMCP.Editor
         {
             return TypeCache.GetTypesDerivedFrom<ScriptableObject>()
                 .FirstOrDefault(t => t.Name == name || t.FullName == name);
-        }
-
-        internal static string SerializedPropertyToString(SerializedProperty p)
-        {
-            switch (p.propertyType)
-            {
-                case SerializedPropertyType.Integer:    return p.intValue.ToString();
-                case SerializedPropertyType.Float:      return p.floatValue.ToString(CultureInfo.InvariantCulture);
-                case SerializedPropertyType.Boolean:    return p.boolValue.ToString();
-                case SerializedPropertyType.String:     return p.stringValue;
-                case SerializedPropertyType.Enum:       return p.enumNames[p.enumValueIndex];
-                case SerializedPropertyType.Vector2:
-                {
-                    var v = p.vector2Value;
-                    return $"({v.x.ToString("G4", CultureInfo.InvariantCulture)},{v.y.ToString("G4", CultureInfo.InvariantCulture)})";
-                }
-                case SerializedPropertyType.Vector3:
-                {
-                    var v = p.vector3Value;
-                    return $"({v.x.ToString("G4", CultureInfo.InvariantCulture)},{v.y.ToString("G4", CultureInfo.InvariantCulture)},{v.z.ToString("G4", CultureInfo.InvariantCulture)})";
-                }
-                case SerializedPropertyType.Vector4:
-                {
-                    var v = p.vector4Value;
-                    return $"({v.x.ToString("G4", CultureInfo.InvariantCulture)},{v.y.ToString("G4", CultureInfo.InvariantCulture)},{v.z.ToString("G4", CultureInfo.InvariantCulture)},{v.w.ToString("G4", CultureInfo.InvariantCulture)})";
-                }
-                case SerializedPropertyType.Color:      return $"#{ColorUtility.ToHtmlStringRGBA(p.colorValue)}";
-                case SerializedPropertyType.ObjectReference:
-                    if (p.objectReferenceValue == null) return "null";
-                    var assetPath = AssetDatabase.GetAssetPath(p.objectReferenceValue);
-                    return !string.IsNullOrEmpty(assetPath) ? assetPath : p.objectReferenceValue.name;
-                default: return p.type;
-            }
         }
 
     }

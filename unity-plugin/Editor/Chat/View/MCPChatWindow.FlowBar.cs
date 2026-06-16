@@ -87,6 +87,10 @@ namespace UnityMCP.Editor.Chat
             sel.AddToClassList("footer-selector");
             bar.Add(sel);
 
+            var modelSel = BuildModelSelector();
+            modelSel.AddToClassList("footer-selector");
+            bar.Add(modelSel);
+
             var seg = new VisualElement(); seg.AddToClassList("mode-segment");
             _askBtn   = MakeModeBtn("Ask",   false);
             _agentBtn = MakeModeBtn("Agent", true);

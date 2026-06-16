@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.31.0] — 2026-06-16 <!-- Architecture review: 13 bugfixes (security, crashes, correctness, DRY) -->
+
+- **Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan pipeline: (1) strip C# comments + whitespace densification (via regex `//.*$` + `\s{2,}` collapse) (2) OrdinalIgnoreCase matching (3) +11 new blocked entries: `EditorApplication.Exit`, `Application.Quit`, `Environment.FailFast`, `ExportPackage`, `ImportPackage`, `OpenProject`, `ProjectWindowUtil`, `using` aliases (`System.IO`, `Diagnostics`, `Net`, `Reflection`). **Tests:** 15 new bypass tests verify blocked patterns caught.
+
+- **Crash Fix: codegen TypeError (Gate A)** — `response.content[0].text` fails on every `auto_fix`/`smart_build` call (MCP SDK v1.27.1+ changes content from list to single object). Fix: `getattr(response.content, 'text', None)` handles both. **Root cause:** Anthropic SDK v0.24.0+ changed `ContentBlock` to non-list. **Tests:** test_server_codegen_corroboration.py updated (42 lines).
+
+- **Crash Fix: ScriptableObjectHelper IndexOOB (Gate A)** — Deleted duplicate `SerializedPropertyToString()` (enum IndexOOB crash on access). Uses canonical version in ComponentSerializer. Eliminates DRY violation + crash vector. **Tests:** Pre-existing NUnit green (no new test needed, duplicate was dead code).
+
+- **Shader.Find Fallback Chain (Gate B)** — `AssetDatabaseHelper.GetShader()`: Standard → URP/Lit → HDRP/Lit → InternalError (was silently returning null). Handles projects with partial pipeline support. **Tests:** 3 new scenarios.
+
+- **Asset validate_move Error Semantics (Gate B)** — Changed from returning `"err: message"` to throwing `Exception` (consistent with other validation tools). `asset(action="validate_move", src, dst)` now returns `{"ok":true}` or raises. **Tests:** test_server_asset.py: 15 new validate_move scenarios (path checks, conflicts, writability).
+
+- **ConsoleCapture Multi-level Filter (Gate B)** — `get_console(level="error,warning")` now comma-separated; splits + multi-match (was single-level only). **Tests:** ConsoleCaptureTests.cs added.
+
+- **ParticleHelper Dirty Flag (Gate B)** — Added `EditorUtility.SetDirty()` + `MarkSceneDirty()` after mutations (was silently modifying, not marking for save). **Tests:** 2 new NUnit tests.
+
+- **ShaderSerializer Int Type Fix (Gate B)** — `GetPropertyDefaultIntValue()` (was calling `GetPropertyDefaultFloatValue` for Int type, threw type mismatch). **Tests:** 4 new shader property tests.
+
+- **SpatialHelper Parsing Robustness (Gate B)** — `float.TryParse()` with `InvariantCulture` (handles "1.5" even on de_DE locale) + descriptive errors (e.g., "Expected float for speed, got 'abc'"). **Tests:** SpatialHelperTests updated.
+
+- **ValueParser +5 Types (Gate B)** — Added `Rect`, `Bounds`, `RectInt`, `BoundsInt`, `LayerMask` + `Int64`/`Double` precision support. Handles 100+ type patterns. **Tests:** 20+ new parser tests.
+
+- **MCP SDK Pin (Gate B)** — `mcp>=1.27.1,<2` (was unpinned; v2.0 ships 2026-07-28 with breaking changes). Prevents accidental `pip install` picking v2.
+
+- **MCPChatWindow Token Cost Fix** — `_costUsd` assignment (was `+=` cumulative, double-counted on every update). **Tests:** TokenResetTests.cs + TokenFormatTests.cs.
+
+- **ProjectRoot() DRY Consolidation** — Removed duplicate definition from 2 copies into single location in CodexArgBuilder. **Tests:** Pre-existing coverage (method was tested via call sites).
+
+- **ScenePathParser Extraction** — New shared struct for parsing `"SceneName:/"` prefixes (used by SceneObjectFinder + ComponentSerializer.Finder). Replaces inline string parsing, prevents multi-scene path bugs. **Tests:** ScenePathParserTests.cs added.
+
+- **Tests:** ~2364 Python passed (was 2362, +2 codegen corroboration), ~74 live passed, ~45 new NUnit tests (CodeExecutorSecurityBypassTests, ConsoleCaptureTests, ScenePathParserTests, TokenFormatTests, TokenResetTests, etc. — total ~2623+ C# EditMode green). Compile clean.
+
+## [v0.30.4] — 2026-06-16 <!-- 7 Chat bugfixes: model selector, token display, multi-scene refs -->
+
+- **Per-Backend Model Selector (Plugin v0.30.4)** — Dropdown in MCPChatWindow with presets per backend: Claude (Default/Sonnet/Opus/Haiku/Fable), Codex (Default/o3/o4-mini/o3-pro/gpt-4.1), Gemini (Default/2.5 Pro/2.5 Flash/2.0 Flash) + Custom... text field for arbitrary model IDs. **MCPChatWindow.Selector.cs**: `ModelPresetsPerKind` dict (backend-keyed), EditorPrefs persistence per backend (`MCPChat.SelectedModel.{BackendKind}`). Rebuilds dropdown on backend switch. **Tests:** 231 ModelSelectorTests (dropdown state, preset selection, custom model entry, persistence).
+- **Token Cost Display (Plugin v0.30.4)** — Readout shows session cost (`$0.0020`) alongside token counts. **TokenFormat.cs**: `FormatReadout()` method computes cost via `EstimatedCost()` (cached token counts + configurable $/1k rates), null-safe guards for missing token data. **Tests:** 12 TokenFormatTests (cost calculation, zero-division safety, missing token handling).
+- **Asset validate_move (Server v0.8.2, Python)** — New `asset(action="validate_move", src="...", dst="...")` dry-run validation before moving assets (checks path existence, destination writability, no conflicts). Returns `{"ok":true}` or error details. Prevents silent failures on asset renames/refactors. **Tests:** 15 test_server_asset.py new tests for validate_move scenarios.
+- **Multi-Scene Chat References (Plugin v0.30.4, Server)** — Fixed scene-qualified object references in chat (#5 + #7 shared root). **IsAssetPath**: Now returns false for scene paths (prefix-check now strict: "Assets/" only, not "Scene:/" prefix-match fallback). **SceneObjectFinder**: Parses `"SceneName:/"` prefix to extract scene name and path separately. **display**: Chips now show `[Scene] name` for multi-scene objects. **Tests:** 74 MultiSceneChipTests (scene path parsing, chip display, navigation).
+- **Ask↔Agent Session Persistence (Plugin v0.30.4)** — Switching from Ask to Agent mode (or vice versa) preserves session via `--resume` flag. **SetMode.cs**: Captures `SessionId` on mode switch, passes to new backend launch. **Tests:** 120 SetModeTests (mode switching, session preservation, backend restart).
+- **Link Navigation Fix (Plugin v0.30.4)** — Fixed chip/link clicks not navigating to objects in multi-scene setups. Root cause same as #5 (SceneObjectFinder parsing). **Tests:** Covered by MultiSceneChipTests.
+- **Test Marker: live_haiku → live_cli (Server v0.8.2)** — Renamed pytest marker to reflect any CLI backend (not just Haiku). Existing `@pytest.mark.live_haiku` still works (alias), but new tests use `@pytest.mark.live_cli`. No behavior change, just semantics.
+- **Tests:** 2362 Python passed (was 2360, +2 asset validate_move baseline), 482 C# new (69 total for v0.30.4: 33 CodexArgBuilder, 74 MultiSceneChip, 12 TokenFormat, 231 ModelSelector, 120 SetMode, 14 TokenReset), compile clean.
+
 ## [v0.30.3] — 2026-06-16 <!-- Gemini backend + zombie detection -->
 
 - **Gemini CLI Backend (Plugin v0.30.1, v0.30.2, v0.30.3)** — Third CLI backend for in-Unity chat alongside Claude + Codex. **GeminiArgBuilder** (194 LOC): Constructs `gcloud run gcloud-cli` command with --mcp-config pointing to .gemini/settings.json. Wires MCP server port via smart settings-merge: reads existing config, auto-updates stale port via `RewriteWithFreshMcp()` (exact-match check prevents IO if port correct). Handles tool_name/tool_id/parameters field mapping (Gemini differs from Claude SDK). **GeminiParser** (69 LOC): stream-json 6-event protocol (init, message, tool_use, tool_result, error, result). Filters: (1) skip role:user messages (Gemini echoes prompt back), (2) skip tool_use without mcp_ prefix (internal tools: update_topic, google_search). Suppresses ask_user tool_use to avoid double AskUserCard (ask_user routes via TCP path CommandRouter.OnAskUser). **GeminiBackend**: Spans process, sends initialize, waits for first output. **GeminiProvider** + registry pattern: auto-discovered via TypeCache, zero core edits. **Limitations:** Gemini CLI does NOT support --permission-prompt-tool (Issue #22249, p2) or MCP elicitation, so interactive permission prompts + parameter elicitation unavailable. **Tests:** 217 GeminiArgBuilder tests (settings merge, port update, field mapping), 190 GeminiParser tests (prompt filter, tool prefix, tool_result, error handling, ask_user suppression), 33 GeminiTestFixtures.

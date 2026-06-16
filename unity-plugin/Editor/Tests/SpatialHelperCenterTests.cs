@@ -88,6 +88,30 @@ namespace UnityMCP.Editor.Tests
             StringAssert.Contains("No objects within radius", result);
         }
 
+        // FIX-10: ParseVec3 via Raycast path (no outer catch) — tests TryParse hardening
+        [Test]
+        public void ParseVec3_ValidInput_ReturnsVector()
+        {
+            // ObjectsInRadius with center=(1.5,2.3,4.1) parses correctly — no exception
+            Assert.DoesNotThrow(() => SpatialHelper.ObjectsInRadius(null, 1f, center: "1.5,2.3,4.1"));
+        }
+
+        [Test]
+        public void ParseVec3_Malformed_ThrowsArgumentException()
+        {
+            var ex = Assert.Throws<System.ArgumentException>(() =>
+                SpatialHelper.ObjectsInRadius(null, 5f, center: "1,abc,3"));
+            StringAssert.Contains("Invalid", ex.Message);
+        }
+
+        [Test]
+        public void ParseVec3_WrongPartCount_ThrowsArgumentException()
+        {
+            var ex = Assert.Throws<System.ArgumentException>(() =>
+                SpatialHelper.ObjectsInRadius(null, 5f, center: "1,2"));
+            StringAssert.Contains("Invalid", ex.Message);
+        }
+
         // Scenario 26: float output uses '.' not ',' as decimal separator under de-DE locale
         [Test]
         public void InFrontOf_DeDE_Locale_UsesInvariantDecimalSeparator()

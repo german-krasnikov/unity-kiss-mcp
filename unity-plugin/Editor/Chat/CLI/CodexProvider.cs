@@ -11,6 +11,7 @@ namespace UnityMCP.Editor.Chat
         public IChatBackend Create(BackendCreateArgs a)
             => new CodexAppServerBackend(a.ResumeSessionId,
                 a.Store?.Codex.StartupTimeoutSec ?? 30,
-                a.Store?.Codex.ExtraArgs);
+                a.Store?.Codex.ExtraArgs,
+                a.Store?.Codex.Model);
     }
 }

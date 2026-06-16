@@ -13,6 +13,7 @@ namespace UnityMCP.Editor.Chat
         private readonly string[] _pythonArgs;
         private readonly int      _startupTimeoutSec;
         private readonly string   _extraArgs;
+        private readonly string   _model;
 
         // ── State machine ─────────────────────────────────────────────────────
         private int    _nextId;           // atomic JSON-RPC id counter
@@ -22,11 +23,12 @@ namespace UnityMCP.Editor.Chat
         protected override bool   IsPersistentProcess => true;
 
         internal CodexAppServerBackend(string resumeSessionId = null,
-            int startupTimeoutSec = 30, string extraArgs = null)
+            int startupTimeoutSec = 30, string extraArgs = null, string model = null)
         {
             SessionId          = resumeSessionId;
             _startupTimeoutSec = startupTimeoutSec;
             _extraArgs         = extraArgs;
+            _model             = model;
 
             var packageRoot = Path.GetFullPath("Packages/com.unity-mcp.editor");
             var serverDir   = ChatMcpConfigWriter.ResolveServerDir(packageRoot);
@@ -51,6 +53,12 @@ namespace UnityMCP.Editor.Chat
             args.Add($"mcp_servers.unity.args=[{CodexArgBuilder.BuildTomlStringArray(_pythonArgs)}]");
             args.Add("-c");
             args.Add($"mcp_servers.unity.startup_timeout_sec={_startupTimeoutSec}");
+
+            if (!string.IsNullOrEmpty(_model))
+            {
+                args.Add("--model");
+                args.Add(_model);
+            }
 
             if (!string.IsNullOrEmpty(_extraArgs))
                 foreach (var token in ArgTokenizer.Split(_extraArgs))
@@ -91,7 +99,7 @@ namespace UnityMCP.Editor.Chat
                 var instr    = string.IsNullOrEmpty(snapshot)
                     ? "null"
                     : $"\"{JsonHelper.EscapeJson(snapshot)}\"";
-                var cwd      = JsonHelper.EscapeJson(ProjectRoot());
+                var cwd      = JsonHelper.EscapeJson(CodexArgBuilder.ProjectRoot());
                 base.WriteLineToProc(
                     $"{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"thread/start\"," +
                     $"\"params\":{{\"cwd\":\"{cwd}\",\"baseInstructions\":{instr}}}}}");
@@ -137,15 +145,6 @@ namespace UnityMCP.Editor.Chat
             var content = JsonHelper.ExtractArray(msg, "content");
             var first   = JsonHelper.ExtractFirstArrayObject(content);
             return (first != null ? JsonHelper.ExtractString(first, "text") : null) ?? "";
-        }
-
-        private static string ProjectRoot()
-        {
-#if UNITY_EDITOR
-            return System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath) ?? ".";
-#else
-            return System.IO.Directory.GetCurrentDirectory();
-#endif
         }
 
     }

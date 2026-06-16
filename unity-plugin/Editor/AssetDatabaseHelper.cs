@@ -8,7 +8,7 @@ namespace UnityMCP.Editor
     internal static class AssetDatabaseHelper
     {
         const int MaxFindResults = 200;
-        static readonly string[] ValidActions = { "find", "get_info", "create", "move", "duplicate", "delete", "get_dependencies", "import_settings", "export_package", "import_package" };
+        static readonly string[] ValidActions = { "find", "get_info", "create", "move", "validate_move", "duplicate", "delete", "get_dependencies", "import_settings", "export_package", "import_package" };
 
         internal static string Execute(string action, string argsJson)
         {
@@ -18,6 +18,7 @@ namespace UnityMCP.Editor
                 case "get_info":        return GetInfo(argsJson);
                 case "create":          return Create(argsJson);
                 case "move":            return Move(argsJson);
+                case "validate_move":   return ValidateMove(argsJson);
                 case "duplicate":       return Duplicate(argsJson);
                 case "delete":          return Delete(argsJson);
                 case "get_dependencies":return GetDependencies(argsJson);
@@ -116,7 +117,13 @@ namespace UnityMCP.Editor
             switch (type)
             {
                 case "Material":
-                    asset = new Material(Shader.Find("Standard"));
+                    var shader = Shader.Find("Standard")
+                        ?? Shader.Find("Universal Render Pipeline/Lit")
+                        ?? Shader.Find("HDRP/Lit")
+                        ?? Shader.Find("Hidden/InternalErrorShader");
+                    if (shader == null)
+                        throw new System.Exception("No default shader found. Specify shader via 'shader' arg.");
+                    asset = new Material(shader);
                     break;
                 case "PhysicMaterial":
                     asset = new PhysicsMaterial();
@@ -139,8 +146,25 @@ namespace UnityMCP.Editor
             ValidatePath(source);
             ValidatePath(dest);
 
+            var preCheck = AssetDatabase.ValidateMoveAsset(source, dest);
+            if (!string.IsNullOrEmpty(preCheck)) throw new System.Exception(preCheck);
+
             var error = AssetDatabase.MoveAsset(source, dest);
             if (!string.IsNullOrEmpty(error)) throw new System.Exception(error);
+            return "ok: " + dest;
+        }
+
+        static string ValidateMove(string argsJson)
+        {
+            var source = JsonHelper.ExtractString(argsJson, "source");
+            var dest   = JsonHelper.ExtractString(argsJson, "dest");
+            if (string.IsNullOrEmpty(source)) throw new System.Exception("source is required");
+            if (string.IsNullOrEmpty(dest))   throw new System.Exception("dest is required");
+            ValidatePath(source);
+            ValidatePath(dest);
+            var error = AssetDatabase.ValidateMoveAsset(source, dest);
+            if (!string.IsNullOrEmpty(error))
+                throw new System.Exception(error);
             return "ok";
         }
 

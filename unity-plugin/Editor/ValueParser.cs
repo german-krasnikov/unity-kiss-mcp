@@ -90,14 +90,40 @@ namespace UnityMCP.Editor
             switch (property.propertyType)
             {
                 case SerializedPropertyType.Integer:
+                    switch (property.numericType)
+                    {
+                        case SerializedPropertyNumericType.Int64:
+                            if (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lv))
+                                throw new ArgumentException($"Invalid long: '{value}'");
+                            property.longValue = lv; break;
+                        case SerializedPropertyNumericType.UInt64:
+                            if (!ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ulv))
+                                throw new ArgumentException($"Invalid ulong: '{value}'");
+                            property.ulongValue = ulv; break;
+                        default:
+                            if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal))
+                                throw new ArgumentException($"Invalid int: '{value}'");
+                            property.intValue = intVal; break;
+                    }
+                    break;
                 case SerializedPropertyType.LayerMask:
-                    if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var intVal))
-                        throw new ArgumentException($"Invalid int: '{value}'");
-                    property.intValue = intVal; break;
+                    if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lmVal))
+                        throw new ArgumentException($"Invalid LayerMask: '{value}'");
+                    property.intValue = lmVal; break;
                 case SerializedPropertyType.Float:
-                    if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var fVal))
-                        throw new ArgumentException($"Invalid float: '{value}'");
-                    property.floatValue = fVal; break;
+                    if (property.numericType == SerializedPropertyNumericType.Double)
+                    {
+                        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var dv))
+                            throw new ArgumentException($"Invalid double: '{value}'");
+                        property.doubleValue = dv;
+                    }
+                    else
+                    {
+                        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var fVal))
+                            throw new ArgumentException($"Invalid float: '{value}'");
+                        property.floatValue = fVal;
+                    }
+                    break;
                 case SerializedPropertyType.Boolean: property.boolValue = ParseBool(value); break;
                 case SerializedPropertyType.String: property.stringValue = value; break;
                 case SerializedPropertyType.Vector2: property.vector2Value = ParseVector2(value); break;
@@ -130,6 +156,29 @@ namespace UnityMCP.Editor
                         throw new ArgumentException($"Invalid int: '{value}'");
                     property.arraySize = arrSize; break;
                 case SerializedPropertyType.ObjectReference: SetObjectReference(property, value); break;
+                case SerializedPropertyType.Rect:
+                {
+                    var f = ParseFloats(value, 4);
+                    property.rectValue = new Rect(f[0], f[1], f[2], f[3]); break;
+                }
+                case SerializedPropertyType.Bounds:
+                {
+                    var f = ParseFloats(value, 6);
+                    property.boundsValue = new Bounds(
+                        new Vector3(f[0], f[1], f[2]), new Vector3(f[3], f[4], f[5])); break;
+                }
+                case SerializedPropertyType.RectInt:
+                {
+                    var f = ParseFloats(value, 4);
+                    property.rectIntValue = new RectInt((int)f[0], (int)f[1], (int)f[2], (int)f[3]); break;
+                }
+                case SerializedPropertyType.BoundsInt:
+                {
+                    var f = ParseFloats(value, 6);
+                    property.boundsIntValue = new BoundsInt(
+                        new Vector3Int((int)f[0], (int)f[1], (int)f[2]),
+                        new Vector3Int((int)f[3], (int)f[4], (int)f[5])); break;
+                }
                 default: throw new ArgumentException($"Unsupported property type: {property.propertyType}");
             }
         }

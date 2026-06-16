@@ -52,7 +52,7 @@ def _make_ctx(text: str) -> MagicMock:
     content = MagicMock()
     content.text = text
     response = MagicMock()
-    response.content = [content]
+    response.content = content  # single object, not list — matches real MCP SDK shape
     ctx = MagicMock()
     ctx.session.create_message = AsyncMock(return_value=response)
     return ctx
@@ -107,3 +107,43 @@ async def test_smart_build_empty_response_returns_early(monkeypatch):
 
     send_mock.assert_not_called()
     assert "empty" in result.lower()
+
+
+async def test_auto_fix_returns_suggestion_text(monkeypatch):
+    """auto_fix extracts .text from single-object content (getattr path, not [0] indexing)."""
+    import unity_mcp.editor_log as el
+    import unity_mcp.tools.codegen as codegen
+
+    content = MagicMock()
+    content.text = "Change line 5 to use UnityEngine.Debug.Log"
+    response = MagicMock()
+    response.content = content  # single object, not list
+
+    send_mock = AsyncMock(side_effect=lambda cmd, args=None, **kw: (
+        "" if cmd == "get_console" else "No compilation errors."
+    ))
+    monkeypatch.setattr(codegen, "_send", send_mock)
+
+    ctx = MagicMock()
+    ctx.session.create_message = AsyncMock(return_value=response)
+
+    with patch.object(el, "corroborate", return_value="some error CS0001"):
+        result = await codegen.auto_fix(ctx)
+
+    assert "Change line 5" in result
+
+
+async def test_smart_build_extracts_code_from_single_object_content(monkeypatch):
+    """smart_build extracts .text via getattr from single-object content and strips fences."""
+    import unity_mcp.tools.codegen as codegen
+
+    inner = "var go = new GameObject(\"Cube\");"
+    ctx = _make_ctx(f"```cs\n{inner}\n```")
+
+    send_mock = AsyncMock(return_value="ok")
+    monkeypatch.setattr(codegen, "_send", send_mock)
+
+    await codegen.smart_build("create a cube", ctx)
+
+    called_code = send_mock.call_args[0][1]["code"]
+    assert called_code == inner

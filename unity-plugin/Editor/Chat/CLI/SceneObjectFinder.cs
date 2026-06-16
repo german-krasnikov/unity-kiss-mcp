@@ -11,11 +11,15 @@ namespace UnityMCP.Editor.Chat
         internal static GameObject FindGameObject(string path)
         {
             if (string.IsNullOrEmpty(path)) return null;
-            var parts = path.TrimStart('/').Split('/');
-            if (parts.Length == 0) return null;
+
+            // Parse optional "SceneName:/local/path" prefix
+            var parsed = UnityMCP.Editor.ScenePathParser.Parse(path);
+
+            var parts = parsed.LocalPath.TrimStart('/').Split('/');
+            if (parts.Length == 0 || string.IsNullOrEmpty(parts[0])) return null;
 
             GameObject current = null;
-            foreach (var root in GetAllRoots())
+            foreach (var root in GetAllRoots(parsed.SceneName))
             {
                 if (root.name == parts[0]) { current = root; break; }
             }
@@ -30,15 +34,16 @@ namespace UnityMCP.Editor.Chat
             return current;
         }
 
-        private static IEnumerable<GameObject> GetAllRoots()
+        private static IEnumerable<GameObject> GetAllRoots(string sceneNameFilter = null)
         {
             int n = EditorSceneManager.sceneCount;
             for (int i = 0; i < n; i++)
             {
                 var scene = EditorSceneManager.GetSceneAt(i);
-                if (scene.isLoaded)
-                    foreach (var go in scene.GetRootGameObjects())
-                        yield return go;
+                if (!scene.isLoaded) continue;
+                if (sceneNameFilter != null && scene.name != sceneNameFilter) continue;
+                foreach (var go in scene.GetRootGameObjects())
+                    yield return go;
             }
         }
     }

@@ -83,21 +83,18 @@ namespace UnityMCP.Editor
             lock (_lock)
             {
                 var combined = BuildCombined();
-
-                if (!string.IsNullOrEmpty(level) && Enum.TryParse<LogType>(level, true, out LogType filterType))
-                    combined = FilterByType(combined, filterType);
+                var levelFilter = ParseLevels(level);
+                combined = FilterByTypes(combined, levelFilter);
 
                 List<LogEntry> selected;
                 if (first > 0 && count > 0)
                 {
-                    // first N from init, last (count-first) from ring
-                    var initEntries = GetInitEntries(first);
-                    var ringEntries = GetRingEntries(count - first);
+                    // first N from init, last (count-first) from ring — filter each independently
+                    var initEntries = FilterByTypes(GetInitEntries(first), levelFilter);
+                    var ringEntries = FilterByTypes(GetRingEntries(count - first), levelFilter);
                     selected = new List<LogEntry>(initEntries.Count + ringEntries.Count);
                     selected.AddRange(initEntries);
                     selected.AddRange(ringEntries);
-                    if (!string.IsNullOrEmpty(level) && Enum.TryParse<LogType>(level, true, out LogType ft2))
-                        selected = FilterByType(selected, ft2);
                 }
                 else if (count > 0)
                 {
@@ -185,12 +182,30 @@ namespace UnityMCP.Editor
             return all.GetRange(skip, all.Count - skip);
         }
 
-        private static List<LogEntry> FilterByType(List<LogEntry> entries, LogType type)
+        private static List<LogType> ParseLevels(string level)
         {
+            if (string.IsNullOrEmpty(level)) return null;
+            var types = new List<LogType>();
+            foreach (var part in level.Split(','))
+                if (Enum.TryParse<LogType>(part.Trim(), true, out var t))
+                    types.Add(t);
+            return types.Count > 0 ? types : null;
+        }
+
+        private static List<LogEntry> FilterByTypes(List<LogEntry> entries, List<LogType> types)
+        {
+            if (types == null) return entries;
             var result = new List<LogEntry>(entries.Count);
             foreach (var e in entries)
-                if (e.Type == type) result.Add(e);
+                if (types.Contains(e.Type)) result.Add(e);
             return result;
         }
+
+#if UNITY_INCLUDE_TESTS
+        internal static void InjectForTest(string message, LogType type)
+        {
+            OnLogReceived(message, null, type);
+        }
+#endif
     }
 }

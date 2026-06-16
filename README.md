@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 4565 Tests (2333 Python · 2152 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 4726 Tests (2364 Python · 2282 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -230,6 +230,27 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.31.0</b> — 2026-06-16 — **Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan …</summary>
+
+**Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan pipeline: (1) strip C# comments + whitespace densification (via regex …
+
+</details>
+
+<details>
+<summary><b>v0.30.4</b> — 2026-06-16 — **Per-Backend Model Selector (Plugin v0.30.4)** — Dropdown in MCPChatWindow …</summary>
+
+**Per-Backend Model Selector (Plugin v0.30.4)** — Dropdown in MCPChatWindow with presets per backend: Claude (Default/Sonnet/Opus/Haiku/Fable), Codex …
+
+</details>
+
+<details>
+<summary><b>v0.30.3</b> — 2026-06-16 — **Gemini CLI Backend (Plugin v0.30.1, v0.30.2, v0.30.3)** — Third CLI backend …</summary>
+
+**Gemini CLI Backend (Plugin v0.30.1, v0.30.2, v0.30.3)** — Third CLI backend for in-Unity chat alongside Claude + Codex.
+
+</details>
+
+<details>
 <summary><b>v0.29.38</b> — 2026-06-15 — **Codex Interactive User Input (Plugin v0.29.38)** — Codex CLI can now show …</summary>
 
 **Codex Interactive User Input (Plugin v0.29.38)** — Codex CLI can now show interactive `AskUserCard` via JSON-RPC `tool/requestUserInput` and …
@@ -244,29 +265,11 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.29.11</b> — 2026-06-15 — **Interactive Permission Protocol Fix (Plugin v0.29.11, Sprint 1C)** — Fixes …</summary>
-
-**Interactive Permission Protocol Fix (Plugin v0.29.11, Sprint 1C)** — Fixes non-functional permission prompts from Sprint 1B.
-
-</details>
-
-<details>
-<summary><b>v0.29.2</b> — 2026-06-15 — **Chat Assembly Split (Plugin v0.29.2)** — `UnityMCP.Editor.Chat` split into …</summary>
-
-**Chat Assembly Split (Plugin v0.29.2)** — `UnityMCP.Editor.Chat` split into two independent assemblies: `UnityMCP.Editor.Chat.CLI` (protocol, …
-
-</details>
-
-<details>
-<summary><b>v0.27.4</b> — 2026-06-14 — **Reload Recovery Package (Plugin + Server v0.27.4)** — Independent UPM package …</summary>
-
-**Reload Recovery Package (Plugin + Server v0.27.4)** — Independent UPM package `com.unity-mcp.reload` (asmdef references:[]) provides …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.29.11** — 2026-06-15 — **Interactive Permission Protocol Fix (Plugin v0.29.11, Sprint 1C)** — Fixes …
+- **v0.29.2** — 2026-06-15 — **Chat Assembly Split (Plugin v0.29.2)** — `UnityMCP.Editor.Chat` split into …
+- **v0.27.4** — 2026-06-14 — **Reload Recovery Package (Plugin + Server v0.27.4)** — Independent UPM package …
 - **v0.26.0** — 2026-06-13 — **Test Quality Audit (Server + Plugin v0.26.0)** — Systematic cleanup of test …
 - **v0.25.13** — 2026-06-12 — **UTF-8 Encoding Round-3 (Server + Plugin v0.25.13)** — **(C1: Python test I/O …
 - **v0.25.12** — 2026-06-12 — **UTF-8 Everywhere (Server + Plugin v0.25.12)** — **(Round 1)** Python file I/O …

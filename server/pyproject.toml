@@ -6,7 +6,7 @@ license = {text = "MIT"}
 authors = [{name = "German Krasnikov", email = "german.krasnikov@gmail.com"}]
 requires-python = ">=3.10"
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp>=1.27.1,<2",
     "pydantic>=2.0",
     "Pillow>=10.0",
 ]
@@ -35,7 +35,7 @@ filterwarnings = [
 ]
 markers = [
     "live: requires running Unity Editor with MCP plugin on :9500",
-    "live_haiku: also calls real claude CLI (~$0.001/call) — opt-in via 'pytest -m \"live and live_haiku\"'",
+    "live_cli: also calls real claude CLI (~$0.001/call) — opt-in via 'pytest -m \"live and live_cli\"'",
 ]
 
 [build-system]
