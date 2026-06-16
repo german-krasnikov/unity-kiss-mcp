@@ -26,6 +26,8 @@ namespace UnityMCP.Editor.Chat
         RateLimit,
         /// <summary>Session state change.</summary>
         SessionState,
+        /// <summary>Keepalive ping — resets inactivity watchdog without rendering anything.</summary>
+        Heartbeat,
     }
 
     /// <summary>Immutable event emitted by ChatStreamParser.</summary>
@@ -107,5 +109,8 @@ namespace UnityMCP.Editor.Chat
 
         public static ChatEvent SessionState(string state) =>
             new ChatEvent(ChatEventKind.SessionState, state: state);
+
+        public static ChatEvent Heartbeat() =>
+            new ChatEvent(ChatEventKind.Heartbeat);
     }
 }

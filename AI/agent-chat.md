@@ -76,7 +76,7 @@ Each CLI-based backend is a strategy over **4 variation axes:**
 
 **CodexArgBuilder** (v0.14.0): Constructs `codex app-server` argv + init args. Three `-c mcp_servers.unity*` flags passed at initialization. Format: `-c mcp_servers.{unity,unity_auth,unity_plugins}=<value>`.
 
-**CodexAppServerParser** (v0.14.0, replaces CodexStreamParser): JSON-RPC 2.0 notification/response parser → ChatEvent. Emits agent_message (via delta tokens), mcp_tool_call, command_execution (aggregated_output or declined), file_change (changes array), and turn.completed (usage stats; CostUsd=0). 15+ NUnit test cases cover all paths.
+**CodexAppServerParser** (v0.14.0, replaces CodexStreamParser, v0.30.5 silent abort fix): JSON-RPC 2.0 notification/response parser → ChatEvent. Emits agent_message (via delta tokens), mcp_tool_call, command_execution (aggregated_output or declined), file_change (changes array), and turn.completed (usage stats; CostUsd=0). **v0.30.5 fix:** Codex sets `status:"completed"` even on tool errors; real indicator is `result.isError:true` (no space). Parser now checks `!resultObj.Contains("\"isError\":true")` pattern-match. On error with empty text, appends `"[MCP tool error]"` placeholder. Emits `ChatEvent.Heartbeat()` on "reasoning" events (o3/o3-pro silent thinking). 15+ NUnit test cases cover all paths, +6 new error scenario tests.
 
 **BackendRegistry** & **BackendKind** (simplified v0.20.0): Central enum + factory. User selects Claude (persistent stdin) or Codex (persistent JSON-RPC) from dropdown; MCPChatWindow.CreateBackend dispatches to the right subclass. BackendKind = {Claude, Codex} (removed spawn-per-turn CodexBackend entry).
 
@@ -180,6 +180,19 @@ Files: `TurnUndoTracker.cs` (group lifecycle), `RestoreButton.cs` (button UI + r
 
 **Result:** Agents can now safely mutate scene state with instant undo per turn. Full isolation: behind UNITY_MCP_CHAT define. 9 EditMode tests in Chat, 6 EditMode tests in Core.
 
+### Inactivity Watchdog for Reasoning Models (v0.30.5)
+
+**MCPChatWindow.Drain.cs** now monitors event silence to handle Codex reasoning models (o3, o3-pro) that think silently for 2–5 minutes. **Implementation:**
+
+1. **`_lastEventTime`** — timestamp of the most recent drained event
+2. **`InactivityTimeoutSec`** property — returns 300s for Codex (long thinking), 90s for Claude/Gemini (normal responses)
+3. **DrainAndRender() watchdog check** — If no events for longer than timeout while backend is running, emit failure card `"[Timed out: no response for {timeout}s]"`, finalize turn, call `OnTurnFailed()` (resets undo group, unlocks reload)
+4. **Resets:** `_lastEventTime` updated on every OnSend (turn start) and every event drain
+
+**Why:** Old code assumed event silence = dead process and called `OnProcessDead()`, killing in-flight reasoning work. New approach: explicit timeout lets reasoning complete, fails gracefully if truly stuck. `ChatEvent.Heartbeat()` (emitted by CodexAppServerParser on reasoning events) resets watchdog without rendering anything.
+
+**Tests:** 2 new inactivity timeout scenarios.
+
 ### Chat Context Resolution via Chips (F2, plugin 0.9.0)
 
 `ChipContextResolver.cs` resolves object-path chips to plain text at send-time. Three depth levels:
@@ -207,6 +220,30 @@ Stream-json output from `claude -p` emits raw JSON tool cards. Chat parses and h
 **Rendered:** `🔧 Editing /Enemies/Boss (Health.value = 100)`
 
 Mapping in `ToolVerbMap.cs` (tool name → human action).
+
+### Per-Backend Model Selector (v0.30.5)
+
+**MCPChatWindow.Selector.cs** provides a dropdown menu for model selection with presets per backend. **Implementation:**
+
+1. **Presets expanded (v0.30.5):**
+   - **Claude:** Default, Fable 5, Opus 4.8/4.7/4.6, Sonnet 4.6, Haiku 4.5, Custom...
+   - **Codex:** Default, GPT-5.5, GPT-5.4/5.4-Mini, o3-pro, o3, o4-mini, GPT-4.1/4.1-Mini, Custom...
+   - **Gemini:** Default, 3.5 Flash, 3.1 Pro Preview, 3 Pro Preview, 3 Flash Preview, 2.5 Pro, 2.5 Flash, 2.5 Flash Lite, Custom...
+
+2. **ModelPresets.cs (NEW)** — Extracted from BackendConfig.cs:
+   - `ModelPresetEntry` (label, modelId)
+   - `ModelPresetsConfig` (Claude[], Codex[], Gemini[])
+   - `ModelPresetDefaults.All` — hardcoded fallback presets per BackendKind
+
+3. **BackendConfigStore.GetPresetsForKind(BackendKind)** — Lookup presets in Library/MCP_ChatBackendConfig.json ModelPresets field; if not found, use hardcoded defaults. Allows users to override model lists without recompile.
+
+4. **EditorPrefs persistence** — Selected model saved per backend (`MCPChat.SelectedModel.{Claude|Codex|Gemini}`). Rebuilt on backend switch.
+
+5. **Custom field** — Typing an arbitrary model ID adds it to the dropdown (e.g., "claude-opus-4-8-123-custom").
+
+**Why:** Codex reasoning (o3/o3-pro) requires explicit model selection (no default equivalents). Claude/Gemini update frequently; presets decouple model list from plugin version.
+
+**Tests:** 44 BackendConfigStoreTests (preset lookup, fallback, config merge), 231 ModelSelectorTests (dropdown state, persistence, custom entry, backend switching).
 
 ### Drag-Drop GameObjects / Assets
 

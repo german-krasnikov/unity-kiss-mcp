@@ -11,6 +11,8 @@ namespace UnityMCP.Editor.Chat
     public partial class MCPChatWindow
     {
         private double _lastRefresh;
+        // Watchdog: timestamp of the last drained event; checked for 30s inactivity.
+        private double _lastEventTime;
 
         // #1 Save turn state before domain reload so it can be resumed after.
         private void SaveStateBeforeReload()
@@ -154,9 +156,15 @@ namespace UnityMCP.Editor.Chat
                 // task#10 RESOLVED: sentText now carries the full-path payload (paths + [kind:path]
                 // block) from PendingLlmPayload, matching the fresh-send payload exactly.
                 _backend.SendTurn(UserTurnBuilder.Build(sentText));
+                _lastEventTime = EditorApplication.timeSinceStartup; // watchdog reset
                 if (_activity.Send()) OnActivityChanged();
             }
         }
+
+        // Codex reasoning models (o3, o3-pro) can think silently for 2-5 minutes.
+        // Claude/Gemini: 90s is plenty for normal responses.
+        private double InactivityTimeoutSec =>
+            _selectedKind == BackendKind.Codex ? 300.0 : 90.0;
 
         private void DrainAndRender()
         {
@@ -176,9 +184,24 @@ namespace UnityMCP.Editor.Chat
                     // F6: dead process — treat as failed turn.
                     _undoTracker.OnTurnFailed();
                     if (_activity.Fail()) OnActivityChanged();
+                    return;
+                }
+                // Inactivity watchdog: process alive but no events for too long after turn started.
+                // Fires when a backend silently stalls after a tool error (no turn/completed emitted).
+                if (_activity.Phase != ActivityPhase.Idle && _backend != null && _backend.IsRunning
+                    && _lastEventTime > 0
+                    && EditorApplication.timeSinceStartup - _lastEventTime > InactivityTimeoutSec)
+                {
+                    ReloadGuard.OnTurnFinished();
+                    ResetTurnFlags();
+                    _undoTracker.OnTurnFailed();
+                    _transcript?.AppendOrExtendAssistant($"\n[Timed out: no response for {(int)InactivityTimeoutSec}s]");
+                    _transcript?.FinalizeAssistant();
+                    if (_activity.Fail()) OnActivityChanged();
                 }
                 return;
             }
+            _lastEventTime = EditorApplication.timeSinceStartup;
             // Refresh the ref cache at most ~1/sec while streaming so objects Claude just
             // created become clickable without reopening the window.
             if (EditorApplication.timeSinceStartup - _lastRefresh > 1.0)

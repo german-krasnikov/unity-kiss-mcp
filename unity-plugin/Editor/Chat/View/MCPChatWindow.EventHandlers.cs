@@ -127,7 +127,7 @@ namespace UnityMCP.Editor.Chat
                 case ChatEventKind.ToolProgress:
                 case ChatEventKind.RateLimit:
                 case ChatEventKind.SessionState:
-                    // Silently swallowed in Sprint 1A — no UI yet.
+                case ChatEventKind.Heartbeat:
                     break;
             }
         }

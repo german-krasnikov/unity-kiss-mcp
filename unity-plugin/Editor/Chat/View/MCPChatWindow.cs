@@ -58,6 +58,7 @@ namespace UnityMCP.Editor.Chat
         private void ResetTurnFlags()
         {
             _turnEditedCode = _turnHasToolCalls = _needsRefresh = false;
+            _lastEventTime = 0;
         }
 
         internal void ResetTokenCounters()

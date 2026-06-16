@@ -129,7 +129,12 @@ namespace UnityMCP.Editor.Chat
                 case "mcpToolCall":   // camelCase in app-server (NOT mcp_tool_call)
                     DispatchMcpToolCall(eventType, item, sink);
                     break;
-                // reasoning, agentMessage, userMessage, etc. — ignore
+                case "reasoning":
+                    // Reasoning tokens are silent (not rendered) but prove the process is alive.
+                    // Emit Heartbeat so the inactivity watchdog resets without affecting UI.
+                    sink.Add(ChatEvent.Heartbeat());
+                    break;
+                // agentMessage, userMessage, etc. — ignore
             }
         }
 
@@ -149,15 +154,20 @@ namespace UnityMCP.Editor.Chat
             }
 
             // item/completed
-            var status = JsonHelper.ExtractString(item, "status");
-            var ok     = status == "completed";
+            var status    = JsonHelper.ExtractString(item, "status");
+            var resultObj = JsonHelper.ExtractObject(item, "result");
+            // Codex sets status:"completed" even when the MCP tool returned an error.
+            // The real indicator is result.isError:true (no space in Codex JSON).
+            var ok        = status == "completed" && !resultObj.Contains("\"isError\":true");
             string resultText;
-            if (ok)
+            if (status == "completed")
             {
-                var resultObj = JsonHelper.ExtractObject(item, "result");
-                var content   = JsonHelper.ExtractArray(resultObj, "content");
-                var first     = JsonHelper.ExtractFirstArrayObject(content);
-                resultText    = (first != null ? JsonHelper.ExtractString(first, "text") : null) ?? "";
+                // Extract text from result.content[0].text regardless of isError flag.
+                var content = JsonHelper.ExtractArray(resultObj, "content");
+                var first   = JsonHelper.ExtractFirstArrayObject(content);
+                resultText  = (first != null ? JsonHelper.ExtractString(first, "text") : null) ?? "";
+                if (!ok && string.IsNullOrEmpty(resultText))
+                    resultText = "[MCP tool error]";
             }
             else
             {

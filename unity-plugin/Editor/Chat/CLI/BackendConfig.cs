@@ -2,6 +2,7 @@
 // JsonUtility requires [Serializable] + public fields.
 // H15: HierarchyDepth default changed from "summary" to "path" (BREAKING).
 // P4: Generic override layer via parallel arrays (JsonUtility-friendly).
+// Model preset types live in ModelPresets.cs.
 using System;
 using System.Collections.Generic;
 using UnityEngine;

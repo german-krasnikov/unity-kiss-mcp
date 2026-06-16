@@ -18,49 +18,21 @@ namespace UnityMCP.Editor.Chat
         private string        _selectedModel = "";
         private DropdownField _modelDropdown;
         private TextField     _customModelField;
-        private const string  CustomModelSentinel = "__custom__";
+        private const string  CustomModelSentinel = ModelPresetDefaults.CustomSentinel;
 
-        internal static readonly Dictionary<BackendKind, (string label, string modelId)[]> ModelPresetsPerKind
-            = new Dictionary<BackendKind, (string, string)[]>
-        {
-            [BackendKind.Claude] = new[]
-            {
-                ("Default",   ""),
-                ("Sonnet",    "claude-sonnet-4-6"),
-                ("Opus",      "claude-opus-4-8"),
-                ("Haiku",     "claude-haiku-4-5"),
-                ("Fable",     "claude-fable-5"),
-                ("Custom...", CustomModelSentinel),
-            },
-            [BackendKind.Codex] = new[]
-            {
-                ("Default",   ""),
-                ("o3",        "o3"),
-                ("o4-mini",   "o4-mini"),
-                ("o3-pro",    "o3-pro"),
-                ("gpt-4.1",   "gpt-4.1"),
-                ("Custom...", CustomModelSentinel),
-            },
-            [BackendKind.Gemini] = new[]
-            {
-                ("Default",   ""),
-                ("2.5 Pro",   "gemini-2.5-pro"),
-                ("2.5 Flash", "gemini-2.5-flash"),
-                ("2.0 Flash", "gemini-2.0-flash"),
-                ("Custom...", CustomModelSentinel),
-            },
-        };
+        // Backward-compat property for existing tests — returns default presets (no config I/O)
+        internal static Dictionary<BackendKind, (string label, string modelId)[]> ModelPresetsPerKind
+            => ModelPresetDefaults.All;
 
         // Backward-compat alias for existing tests
         internal static (string label, string modelId)[] ModelPresets
-            => ModelPresetsPerKind[BackendKind.Claude];
+            => ModelPresetDefaults.All[BackendKind.Claude];
 
         private static string ModelPrefKeyFor(BackendKind kind)
             => $"MCPChat.SelectedModel.{kind}";
 
         private static (string label, string modelId)[] PresetsForKind(BackendKind kind)
-            => ModelPresetsPerKind.TryGetValue(kind, out var p) ? p
-               : new[] { ("Default", "") };
+            => BackendConfigStore.Load().GetPresetsForKind(kind);
 
         private void RefreshBackends()
         {

@@ -207,6 +207,50 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual("path", cfg.DepthFor("completely_unknown_key"));
         }
 
+        // ── ModelPresets / GetPresetsForKind ──────────────────────────────────
+
+        [Test]
+        public void GetPresetsForKind_EmptyConfig_ReturnsDefaults()
+        {
+            var store   = new BackendConfigStore(); // ModelPresetsConfig with empty arrays
+            var presets = store.GetPresetsForKind(BackendKind.Claude);
+            // Must equal the static defaults
+            var defaults = ModelPresetDefaults.For(BackendKind.Claude);
+            Assert.AreEqual(defaults.Length, presets.Length);
+            Assert.AreEqual(defaults[0].label, presets[0].label);
+        }
+
+        [Test]
+        public void GetPresetsForKind_CustomEntries_WrapsWithDefaultAndCustom()
+        {
+            var store = new BackendConfigStore();
+            store.ModelPresets.Claude = new[]
+            {
+                new ModelPresetEntry { label = "My Model", modelId = "my-model-id" },
+            };
+            var presets = store.GetPresetsForKind(BackendKind.Claude);
+            // Default + 1 custom + Custom... = 3
+            Assert.AreEqual(3, presets.Length);
+            Assert.AreEqual("Default",   presets[0].label);
+            Assert.AreEqual("",          presets[0].modelId);
+            Assert.AreEqual("My Model",  presets[1].label);
+            Assert.AreEqual("my-model-id", presets[1].modelId);
+            Assert.AreEqual("Custom...", presets[2].label);
+            Assert.AreEqual(ModelPresetDefaults.CustomSentinel, presets[2].modelId);
+        }
+
+        [Test]
+        public void ModelPresetDefaults_AllKinds_HaveDefaultAndCustom()
+        {
+            foreach (var kind in new[] { BackendKind.Claude, BackendKind.Codex, BackendKind.Gemini })
+            {
+                var p = ModelPresetDefaults.For(kind);
+                Assert.AreEqual("Default",   p[0].label,              $"{kind}: first must be Default");
+                Assert.AreEqual("Custom...", p[p.Length - 1].label,   $"{kind}: last must be Custom...");
+                Assert.AreEqual(ModelPresetDefaults.CustomSentinel, p[p.Length - 1].modelId);
+            }
+        }
+
         private sealed class FakeDepthProvider : IChipKindProvider
         {
             public string Key          => "custom_depth_test";

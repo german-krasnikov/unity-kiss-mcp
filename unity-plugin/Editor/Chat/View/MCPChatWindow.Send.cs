@@ -37,6 +37,7 @@ namespace UnityMCP.Editor.Chat
             _transcript.SetLastTurnChips(displayMsg.Chips);
             _transcript.AppendUserBubble(displayMsg, llmPayload, screenshotPath);
             _backend.SendTurn(turnJson);
+            _lastEventTime = EditorApplication.timeSinceStartup; // watchdog reset
             if (_chipField != null) { _chipField.ClearChips(); _chipField.Text = ""; }
             else if (_input != null) { _input.value = ""; _input.cursorIndex = _input.selectIndex = 0; }
             _heightCalc.Reset();

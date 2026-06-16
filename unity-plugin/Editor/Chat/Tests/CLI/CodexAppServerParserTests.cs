@@ -184,9 +184,18 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void UnknownItemType_Ignored()
+        public void ReasoningItem_EmitsHeartbeat()
         {
             const string line = "{\"method\":\"item/started\",\"params\":{\"item\":{\"type\":\"reasoning\",\"id\":\"rs_1\"}}}";
+            var events = Parse(line);
+            Assert.AreEqual(1, events.Count);
+            Assert.AreEqual(ChatEventKind.Heartbeat, events[0].Kind);
+        }
+
+        [Test]
+        public void UnknownItemType_Ignored()
+        {
+            const string line = "{\"method\":\"item/started\",\"params\":{\"item\":{\"type\":\"userMessage\",\"id\":\"um_1\"}}}";
             var events = Parse(line);
             Assert.AreEqual(0, events.Count);
         }
@@ -238,6 +247,45 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(1, events.Count);
             Assert.AreEqual(ChatEventKind.Error, events[0].Kind);
             StringAssert.Contains("Process exited", events[0].Text);
+        }
+
+        // ── item/completed mcpToolCall with isError:true (completed but erroring) ──
+
+        // Codex sets status:"completed" even when MCP tool returns an error.
+        // The real indicator is result.isError:true in the result object.
+        private const string S_McpToolCompletedWithIsError =
+            "{\"method\":\"item/completed\",\"params\":{\"item\":{\"type\":\"mcpToolCall\",\"id\":\"call_err1\",\"server\":\"unity\",\"tool\":\"get_component\",\"status\":\"completed\",\"arguments\":{},\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"[MCP error] get_component: No such object\"}],\"isError\":true},\"error\":null,\"durationMs\":12}}}";
+
+        private const string S_McpToolCompletedWithIsErrorEmptyContent =
+            "{\"method\":\"item/completed\",\"params\":{\"item\":{\"type\":\"mcpToolCall\",\"id\":\"call_empty\",\"server\":\"unity\",\"tool\":\"get_hierarchy\",\"status\":\"completed\",\"arguments\":{},\"result\":{\"content\":[],\"isError\":true},\"error\":null,\"durationMs\":5}}}";
+
+        [Test]
+        public void ItemCompleted_McpToolCall_IsErrorTrue_EmitsToolResultNotOk()
+        {
+            var events = Parse(S_McpToolCompletedWithIsError);
+            Assert.AreEqual(1, events.Count);
+            Assert.AreEqual(ChatEventKind.ToolResult, events[0].Kind);
+            Assert.IsFalse(events[0].IsOk);
+            StringAssert.Contains("[MCP error]", events[0].Text);
+        }
+
+        [Test]
+        public void ItemCompleted_McpToolCall_EmptyContentWithIsError_EmitsToolResultNotOk()
+        {
+            var events = Parse(S_McpToolCompletedWithIsErrorEmptyContent);
+            Assert.AreEqual(1, events.Count);
+            Assert.AreEqual(ChatEventKind.ToolResult, events[0].Kind);
+            Assert.IsFalse(events[0].IsOk);
+            Assert.IsFalse(string.IsNullOrEmpty(events[0].Text), "error text must not be empty");
+        }
+
+        [Test]
+        public void ItemCompleted_McpToolCall_NoIsError_StillOk()
+        {
+            // Regression: existing S_McpToolCompleted (no isError) must remain ok=true
+            var events = Parse(S_McpToolCompleted);
+            Assert.AreEqual(1, events.Count);
+            Assert.IsTrue(events[0].IsOk);
         }
 
         // ── tool/requestUserInput (Codex interactive questions) ───────────────
