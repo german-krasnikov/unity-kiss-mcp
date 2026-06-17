@@ -1,14 +1,21 @@
-// 9 built-in IChipKindProvider implementations.
+// 10 built-in IChipKindProvider implementations.
 // All internal — registered by ChipKindRegistry.EnsureBuiltIns().
 // AssetChipProviderBase: shared FormatPayload + Navigate(PingAsset) + DefaultDepth + Create.
 // HierarchyChipProvider: fully custom (instance ID, depth/summary, SceneObjectFinder).
+using System;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace UnityMCP.Editor.Chat
 {
     internal abstract class AssetChipProviderBase : IChipKindProvider
     {
+        // Set by AssetViewerFactory [InitializeOnLoad]. Returns true if viewer handled the path.
+        // Same seam pattern as ChipPillFactory.AddToContextAction.
+        internal static Func<string, bool> ViewerLauncher;
+
         public abstract string Key      { get; }
         public abstract int    Priority { get; }
         public abstract string IconName { get; }
@@ -25,6 +32,7 @@ namespace UnityMCP.Editor.Chat
 
         public virtual void Navigate(string reference)
         {
+            if (ViewerLauncher?.Invoke(reference) == true) return;
             var obj = AssetDatabase.LoadAssetAtPath<Object>(reference);
             if (obj == null) { Debug.LogWarning("[MCP Chat] Asset not found: " + reference); return; }
             EditorGUIUtility.PingObject(obj);
@@ -112,6 +120,10 @@ namespace UnityMCP.Editor.Chat
         public override string IconName => "d_Prefab Icon";
         public override string HexColor => "#60a5fa";
 
+        // C9/C10: Navigate uses base.Navigate → ViewerLauncher (wired by AssetViewerFactory [InitializeOnLoad]).
+        // .prefab registered in AssetViewerFactory.RegisterBuiltIns → PrefabViewerWindow.ViewerAdapter.
+        // No static OnNavigate field — eliminates multi-window nulling race (C10).
+
         public override bool CanHandle(Object obj, string assetPath)
             => obj != null && !string.IsNullOrEmpty(assetPath) && assetPath.EndsWith(".prefab");
     }
@@ -172,5 +184,75 @@ namespace UnityMCP.Editor.Chat
             var path = string.IsNullOrEmpty(assetPath) ? (obj != null ? obj.name : "") : assetPath;
             return new ChipData(Key, path, obj != null ? obj.name : path, 0);
         }
+    }
+
+    internal sealed class ModelChipProvider : AssetChipProviderBase
+    {
+        private static readonly string[] _exts = { ".fbx", ".obj", ".blend", ".dae" };
+
+        public override string Key      => ChipKindKeys.Model;
+        public override int    Priority => 450;
+        public override string IconName => "d_Mesh Icon";
+        public override string HexColor => "#34d399";
+
+        public override bool CanHandle(Object obj, string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath)) return false;
+            var ext = Path.GetExtension(assetPath).ToLowerInvariant();
+            foreach (var e in _exts) if (ext == e) return true;
+            return false;
+        }
+    }
+
+    internal sealed class AudioChipProvider : AssetChipProviderBase
+    {
+        private static readonly string[] _exts = { ".wav", ".mp3", ".ogg", ".aiff" };
+
+        public override string Key      => ChipKindKeys.Audio;
+        public override int    Priority => 550;
+        public override string IconName => "d_AudioClip Icon";
+        public override string HexColor => "#a78bfa";
+
+        public override bool CanHandle(Object obj, string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath)) return false;
+            var ext = Path.GetExtension(assetPath).ToLowerInvariant();
+            foreach (var e in _exts) if (ext == e) return true;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Chip kind for external image files dropped from Finder or pasted from clipboard.
+    /// Priority 50 — beats all asset providers (they need non-null obj).
+    /// CanHandle: obj must be null AND path must have an image extension.
+    /// FormatPayload returns "" — images are sent as binary image_url blocks, not text refs.
+    /// </summary>
+    internal sealed class ImageChipProvider : IChipKindProvider
+    {
+        private static readonly string[] _exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tiff", ".tif" };
+
+        public string Key        => ChipKindKeys.Image;
+        public int    Priority   => 50;
+        public string IconName   => "d_Texture Icon";
+        public string HexColor   => "#f472b6";
+        public string DefaultDepth => "path";
+
+        public bool CanHandle(Object obj, string assetPath)
+        {
+            if (obj != null || string.IsNullOrEmpty(assetPath)) return false;
+            var ext = Path.GetExtension(assetPath).ToLowerInvariant();
+            foreach (var e in _exts) if (ext == e) return true;
+            return false;
+        }
+
+        public ChipData Create(Object obj, string assetPath)
+            => new ChipData(Key, assetPath, Path.GetFileName(assetPath), 0);
+
+        // Images go as binary image_url blocks — no text bracket needed.
+        public string FormatPayload(ChipData chip, ChipPayloadContext ctx) => "";
+
+        public void Navigate(string reference)
+            => Application.OpenURL("file://" + reference);
     }
 }

@@ -50,21 +50,26 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void TestRunner_StaleTimeout_DetectsExpiredRun()
         {
-            var fakeStart = (float)(EditorApplication.timeSinceStartup - 700.0);
-            if (fakeStart <= 0f)
+            // Inject fake uptime via seam — test always runs regardless of actual Editor uptime
+            TestRunner.GetTimeSinceStartup = () => 1000.0;
+            try
             {
-                Assert.Ignore("Editor uptime < 700s — cannot forge a stale timestamp");
-                return;
+                // Start time = 1000 - 700 = 300, so elapsed = 700 > StaleTimeoutSec(600)
+                const float fakeStart = 300f;
+                SessionState.SetBool(KeyPending, true);
+                SessionState.SetFloat(KeyStartTime, fakeStart);
+
+                var result = TestRunner.GetResults();
+
+                Assert.AreEqual("none (stale pending cleared)", result,
+                    "Expired pending run must be cleared and reported as stale");
+                Assert.IsFalse(SessionState.GetBool(KeyPending, true),
+                    "KeyPending must be reset after stale detection");
             }
-            SessionState.SetBool(KeyPending, true);
-            SessionState.SetFloat(KeyStartTime, fakeStart);
-
-            var result = TestRunner.GetResults();
-
-            Assert.AreEqual("none (stale pending cleared)", result,
-                "Expired pending run must be cleared and reported as stale");
-            Assert.IsFalse(SessionState.GetBool(KeyPending, true),
-                "KeyPending must be reset after stale detection");
+            finally
+            {
+                TestRunner.GetTimeSinceStartup = () => EditorApplication.timeSinceStartup;
+            }
         }
 
         [Test]

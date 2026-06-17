@@ -97,37 +97,52 @@ namespace UnityMCP.Editor.Chat
             parent.Add(extraField);
         }
 
+        /// <summary>
+        /// Shared: "Auto: path" hint + optional install hint + binary path EditorPrefs field.
+        /// Used by Gemini, Kimi, and OpenCode forms.
+        /// </summary>
+        private static void BuildBinarySection(
+            VisualElement parent,
+            string binaryName,
+            string prefKey,
+            string installHint)
+        {
+            var autoPath = ChatBinaryResolver.Resolve(binaryName);
+            var hint = new Label($"Auto: {autoPath ?? "not found"}");
+            hint.style.fontSize = 10;
+            hint.style.color    = new StyleColor(autoPath != null
+                ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
+            parent.Add(hint);
+
+            if (autoPath == null && !string.IsNullOrEmpty(installHint))
+            {
+                var install = new Label(installHint);
+                install.style.fontSize   = 9;
+                install.style.color      = new StyleColor(new Color(0.9f, 0.7f, 0.3f));
+                install.style.whiteSpace = WhiteSpace.Normal;
+                parent.Add(install);
+            }
+
+            var pathField = new TextField("Binary Path")
+                { value = EditorPrefs.GetString(prefKey, "") };
+            pathField.RegisterValueChangedCallback(e =>
+            {
+                if (string.IsNullOrEmpty(e.newValue))
+                    EditorPrefs.DeleteKey(prefKey);
+                else
+                    EditorPrefs.SetString(prefKey, e.newValue);
+            });
+            parent.Add(pathField);
+        }
+
         internal static void BuildGeminiForm(
             VisualElement parent,
             GeminiBackendConfig config,
             Action onSave)
         {
-            var autoGeminiPath = ChatBinaryResolver.Resolve("gemini");
-            var hint = new Label($"Auto: {autoGeminiPath ?? "not found"}");
-            hint.style.fontSize = 10;
-            hint.style.color    = new StyleColor(autoGeminiPath != null
-                ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
-            parent.Add(hint);
-
-            if (autoGeminiPath == null)
-            {
-                var installHint = new Label("Install: npm install -g @google/gemini-cli");
-                installHint.style.fontSize   = 9;
-                installHint.style.color      = new StyleColor(new Color(0.9f, 0.7f, 0.3f));
-                installHint.style.whiteSpace = WhiteSpace.Normal;
-                parent.Add(installHint);
-            }
-
-            var geminiPathField = new TextField("Binary Path")
-                { value = EditorPrefs.GetString(ChatBinaryResolver.GeminiPrefKey, "") };
-            geminiPathField.RegisterValueChangedCallback(e =>
-            {
-                if (string.IsNullOrEmpty(e.newValue))
-                    EditorPrefs.DeleteKey(ChatBinaryResolver.GeminiPrefKey);
-                else
-                    EditorPrefs.SetString(ChatBinaryResolver.GeminiPrefKey, e.newValue);
-            });
-            parent.Add(geminiPathField);
+            BuildBinarySection(parent, "gemini",
+                ChatBinaryResolver.GeminiPrefKey,
+                "Install: npm install -g @google/gemini-cli");
 
             var modelField = new TextField("Model") { value = config.Model };
             modelField.RegisterValueChangedCallback(e => { config.Model = e.newValue; onSave(); });
@@ -143,6 +158,63 @@ namespace UnityMCP.Editor.Chat
             var sandboxToggle = new Toggle("Sandbox") { value = config.Sandbox };
             sandboxToggle.RegisterValueChangedCallback(e => { config.Sandbox = e.newValue; onSave(); });
             parent.Add(sandboxToggle);
+
+            var extraField = new TextField("Extra Args") { value = config.ExtraArgs };
+            extraField.RegisterValueChangedCallback(e => { config.ExtraArgs = e.newValue; onSave(); });
+            parent.Add(extraField);
+        }
+
+        internal static void BuildKimiForm(
+            VisualElement parent,
+            KimiBackendConfig config,
+            Action onSave)
+        {
+            BuildBinarySection(parent, "kimi",
+                ChatBinaryResolver.KimiPrefKey,
+                "Install: curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash");
+
+            var modelField = new TextField("Model") { value = config.Model };
+            modelField.RegisterValueChangedCallback(e => { config.Model = e.newValue; onSave(); });
+            parent.Add(modelField);
+
+            var approvalField = new DropdownField(
+                "Approval Mode",
+                new List<string> { "default", "yolo", "plan" },
+                config.ApprovalMode == "yolo" ? 1 : config.ApprovalMode == "plan" ? 2 : 0);
+            approvalField.RegisterValueChangedCallback(e =>
+            {
+                config.ApprovalMode = e.newValue == "default" ? "" : e.newValue;
+                onSave();
+            });
+            parent.Add(approvalField);
+
+            var extraField = new TextField("Extra Args") { value = config.ExtraArgs };
+            extraField.RegisterValueChangedCallback(e => { config.ExtraArgs = e.newValue; onSave(); });
+            parent.Add(extraField);
+        }
+
+        internal static void BuildOpenCodeForm(
+            VisualElement parent,
+            OpenCodeBackendConfig config,
+            Action onSave)
+        {
+            BuildBinarySection(parent, "opencode",
+                ChatBinaryResolver.OpenCodePrefKey,
+                "Install: curl -fsSL https://opencode.sh | bash");
+
+            var fmtHint = new Label("Model: provider/modelId  e.g. anthropic/claude-sonnet-4");
+            fmtHint.style.fontSize   = 9;
+            fmtHint.style.color      = new StyleColor(new Color(0.6f, 0.6f, 0.6f));
+            fmtHint.style.whiteSpace = WhiteSpace.Normal;
+            parent.Add(fmtHint);
+
+            var modelField = new TextField("Model") { value = config.Model };
+            modelField.RegisterValueChangedCallback(e => { config.Model = e.newValue; onSave(); });
+            parent.Add(modelField);
+
+            var skipToggle = new Toggle("Skip Permissions") { value = config.SkipPermissions };
+            skipToggle.RegisterValueChangedCallback(e => { config.SkipPermissions = e.newValue; onSave(); });
+            parent.Add(skipToggle);
 
             var extraField = new TextField("Extra Args") { value = config.ExtraArgs };
             extraField.RegisterValueChangedCallback(e => { config.ExtraArgs = e.newValue; onSave(); });

@@ -44,17 +44,37 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(result[0].Enabled);
         }
 
-        // ── Last entry is always Gemini (enabled) ─────────────────────────
+        // ── Last entry is always Kimi (enabled) ──────────────────────────────
 
         [Test]
-        public void Discover_GeminiIsLast()
+        public void Discover_OpenCodeIsLast()
         {
             var result = BackendRegistry.Discover(new string[0]);
-            Assert.AreEqual(3, result.Count); // Claude + Codex + Gemini
+            Assert.AreEqual(5, result.Count); // Claude + Codex + Gemini + Kimi + OpenCode
             var last = result[result.Count - 1];
-            Assert.AreEqual("Gemini",             last.DisplayName);
-            Assert.AreEqual(BackendKind.Gemini,   last.Kind);
+            Assert.AreEqual("OpenCode",             last.DisplayName);
+            Assert.AreEqual(BackendKind.OpenCode,   last.Kind);
             Assert.IsTrue(last.Enabled);
+        }
+
+        [Test]
+        public void Discover_KimiIsSecondToLast()
+        {
+            var result = BackendRegistry.Discover(new string[0]);
+            var kimi = result[result.Count - 2];
+            Assert.AreEqual("Kimi",          kimi.DisplayName);
+            Assert.AreEqual(BackendKind.Kimi, kimi.Kind);
+            Assert.IsTrue(kimi.Enabled);
+        }
+
+        [Test]
+        public void Discover_GeminiIsThirdToLast()
+        {
+            var result = BackendRegistry.Discover(new string[0]);
+            var gemini = result[result.Count - 3];
+            Assert.AreEqual("Gemini",           gemini.DisplayName);
+            Assert.AreEqual(BackendKind.Gemini, gemini.Kind);
+            Assert.IsTrue(gemini.Enabled);
         }
 
         // ── Agent files are discovered ────────────────────────────────────────
@@ -67,7 +87,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            Assert.AreEqual(4, result.Count); // Claude + code-reviewer + Codex + Gemini
+            Assert.AreEqual(6, result.Count); // Claude + code-reviewer + Codex + Gemini + Kimi + OpenCode
             Assert.AreEqual("code-reviewer", result[1].DisplayName);
             Assert.AreEqual("code-reviewer", result[1].AgentName);
             Assert.IsTrue(result[1].Enabled);
@@ -81,7 +101,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { userDir });
 
-            Assert.AreEqual(4, result.Count); // Claude + doc-keeper + Codex + Gemini
+            Assert.AreEqual(6, result.Count); // Claude + doc-keeper + Codex + Gemini + Kimi + OpenCode
             Assert.AreEqual("doc-keeper", result[1].AgentName);
         }
 
@@ -105,14 +125,16 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── Non-existent dirs don't throw ─────────────────────────────────────
 
         [Test]
-        public void Discover_NonExistentDirs_ReturnsClaudePlusCodexEntries()
+        public void Discover_NonExistentDirs_ReturnsBuiltInBackends()
         {
             var result = BackendRegistry.Discover(new[] { "/nonexistent/path1", "/nonexistent/path2" });
 
-            Assert.AreEqual(3, result.Count);
-            Assert.AreEqual("Claude", result[0].DisplayName);
-            Assert.AreEqual("Codex",  result[1].DisplayName);
-            Assert.AreEqual("Gemini", result[2].DisplayName);
+            Assert.AreEqual(5, result.Count);
+            Assert.AreEqual("Claude",   result[0].DisplayName);
+            Assert.AreEqual("Codex",    result[1].DisplayName);
+            Assert.AreEqual("Gemini",   result[2].DisplayName);
+            Assert.AreEqual("Kimi",     result[3].DisplayName);
+            Assert.AreEqual("OpenCode", result[4].DisplayName);
         }
 
         // ── Agent named "Claude" is skipped (collision guard) ─────────────────
@@ -125,8 +147,8 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            // Claude + Codex + Gemini, no extra "Claude" entry
-            Assert.AreEqual(3, result.Count);
+            // Claude + Codex + Gemini + Kimi + OpenCode, no extra "Claude" entry
+            Assert.AreEqual(5, result.Count);
         }
 
         // ── Agent named "Codex" is skipped (collision guard) ─────────────────

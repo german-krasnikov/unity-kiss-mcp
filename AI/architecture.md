@@ -129,6 +129,79 @@ for _ in range(24):  # 2min @ 5s intervals
    - **Multi-Scene Chat Reference Fix (Plugin + Server v0.8.2)**: Fixed scene-qualified object paths in chat. **IsAssetPath** now strict: returns false for "Scene:/" prefix (asset paths only "Assets/" prefix). **SceneObjectFinder** parses `"SceneName:/"` to extract scene name + path separately. Chips display `[Scene] name` for multi-scene objects. **Tests**: 74 MultiSceneChipTests (parsing, display, navigation).
    - **Ask↔Agent Session Persistence (Plugin)**: Switching backend mode preserves chat session via `--resume` flag. **SetMode.cs** captures `SessionId` on mode switch, passes to new backend launch. **Tests**: 120 SetModeTests (mode switch, persistence, restart).
 
+12. **Plugin Extensibility API + Image Drag-Drop + Asset Viewers (v0.34.0)**
+   - **Plugin Extensibility (Settings/Toolbar/Panels, CLI v0.34.0)**: New public seam interfaces for plugins to extend chat UI without core edits:
+     * **ISettingsProvider**: Plugins register custom settings UI pages (e.g., `OnBuildUI()` returns VisualElement foldout, `SectionName`/`Priority`)
+     * **IToolbarButtonProvider**: Plugins add toolbar buttons with click handlers and icon
+     * **IPanelProvider**: Plugins register side panels (dock + overlay support)
+     * **Registry classes**: `SettingsProviderRegistry`, `ToolbarButtonRegistry`, `PanelProviderRegistry` — all use `Register()` + discovery via `[InitializeOnLoad]` pattern
+     * **MCPChatWindow hook points**: Settings foldout + toolbar + left/right panels all query registries on window open, render provider content dynamically
+     * **Tests**: 72 PluginSettingsInjectionTests, 105 PluginToolbarButtonTests (button state, click handlers, lifecycle)
+   
+   - **Image Drag-Drop + Clipboard Paste (CLI v0.34.0)**:
+     * **ClipboardImageReader.cs** (142 LOC): Platform-specific clipboard image read (macOS: NSPasteboard Foundation PInvoke, Windows: CF_DIB check stub, Linux: xclip subprocess). Returns PNG bytes or null, never throws.
+     * **ImageAttachmentStore.cs** (96 LOC): Stores pasted/dropped images with temp file lifecycle. `AttachImage(bytes)` → saves to Library/.unitymcp_images/, returns relative path. `GetAttachedPaths()` → list of stored images. `Cleanup()` → removes stale files on session end.
+     * **MCPChatWindow.ClipPaste.cs** (partial): Wires clipboard paste via Ctrl+V in input field. Detects image mime-type, attaches, emits chat event with image reference.
+     * **MCPChatWindow.Chips.cs** (partial): DragAndDrop.paths routing — external files/folders (Finder drag) detected, filtered for images, attached same as paste.
+     * **UserTurnBuilder.cs** extended: Embeds image references in user turn JSON as `image_url` blocks (Claude SDK protocol).
+     * **Tests**: 37 ClipboardPasteTests (platform detection, mime-check, file write), 154 ImageDragDropTests (path filtering, attachment, multiple images), 76 UserTurnBuilderImageTests (turn JSON serialization with images)
+   
+   - **Inline Image Thumbnails in Chat (View v0.34.0)**:
+     * **InlineImageThumbnail.cs** (70 LOC): Renders thumbnail strips in chat paragraphs (max 100px height, click→full viewer)
+     * **MixedParagraphRenderer** extended: Detects `[img src="..."]` markdown, calls InlineImageThumbnail for rendering
+     * **Tests**: 116 InlineImageThumbnailTests (sizing, fallback on missing image, click navigation)
+   
+   - **Prefab Preview Window (View v0.34.0)**:
+     * **PrefabViewerWindow.cs** (151 LOC): EditorWindow displaying prefab 3D preview (camera orbit, zoom controls)
+     * **PrefabPreviewLoader.cs** (82 LOC): Instantiates prefab in temporary scene, loads preview scene, destroys on close
+     * **Wired**: Asset chip right-click "View" or MCPChatWindow chip click (via BuiltInChipProviders.ViewerLauncher seam) routes to PrefabViewerWindow.Open()
+     * **Tests**: 198 PrefabViewerWindowTests (window lifecycle, prefab loading, camera controls, cleanup)
+   
+   - **3D Asset Viewers (View v0.34.0)**:
+     * **AssetViewerFactory.cs** (83 LOC): Registry + factory for extensible media viewers. Wires WindowType → `IAssetViewer` implementations
+     * **ModelViewerWindow.cs** (151 LOC): Displays .fbx/.obj/.blend/.dae models (instant load via import settings, camera orbit/zoom)
+     * **SpriteViewerWindow.cs** (78 LOC): Displays sprite textures with grid overlay (100% zoom default, fit-to-window toggle)
+     * **AudioViewerWindow.cs** (142 LOC): Plays audio clips (play/pause/loop, duration display, waveform placeholder)
+     * **AudioUtilProxy.cs** (66 LOC): Wrapper for `AudioUtil.GetDurationInSamples()` (Editor-only API, reflection-based fallback for older Unity)
+     * **IAssetViewer interface**: Plugins implement to add custom viewers (e.g., video player, shader preview)
+     * **BuiltInChipProviders extended**: `AssetChipProviderBase.ViewerLauncher` seam — wired by AssetViewerFactory [InitializeOnLoad]. Chip Navigate() checks `ViewerLauncher?.Invoke(path)` first; if true, viewer handled; else falls back to ping
+     * **Tests**: 224 AssetViewerFactoryTests (factory dispatch, plugin registration, viewer lifecycle), 198 PrefabViewerWindowTests (see above)
+   
+   - **New CLI Backends: Kimi K2 + OpenCode (CLI v0.34.0)**:
+     * **Kimi K2 Backend**:
+       - **KimiArgBuilder.cs** (120 LOC): Constructs `kimi` subprocess argv with role-based NDJSON protocol (system→user→assistant messages)
+       - **KimiParser.cs** (74 LOC): Parses Kimi NDJSON response stream (newline-delimited events, tool calls, streaming tokens)
+       - **KimiBackend.cs** (35 LOC): CliBackendBase subclass — spawns `kimi` process, pipes turn JSON
+       - **KimiProvider.cs** (21 LOC): IBackendProvider Kimi implementation, auto-discovered via TypeCache
+       - **Tests**: 214 KimiArgBuilderTests (role mapping, token streaming, tool call parsing), 243 KimiParserTests (event parsing, multi-line tool results, error recovery)
+     
+     * **OpenCode Backend**:
+       - **OpenCodeArgBuilder.cs** (132 LOC): Constructs `opencode` CLI command with multi-provider model selection (Claude/GPT/Gemini). Wires models via `-m model-name` flag with format conversion (e.g., "anthropic/claude-sonnet-4" for OpenCode's provider syntax)
+       - **OpenCodeParser.cs** (92 LOC): Parses OpenCode stream-json (compatible with Claude SDK format)
+       - **OpenCodeBackend.cs** (49 LOC): CliBackendBase subclass — persists OpenCode process across turns (stdin loop)
+       - **OpenCodeProvider.cs** (21 LOC): IBackendProvider OpenCode implementation, auto-discovered via TypeCache
+       - **Tests**: 222 OpenCodeArgBuilderTests (model name mapping, provider formats, arg ordering), 273 OpenCodeParserTests (stream parsing, error handling, tool routing)
+     
+     * **BackendKind enum expanded**: Now includes Kimi + OpenCode (was Claude/Codex/Gemini). **BackendRegistry.cs**, **BackendConfig.cs**, **BackendProviderRegistry.cs** all updated
+     * **KimiBackendConfig + OpenCodeBackendConfig**: New [Serializable] config classes in Library/MCP_ChatBackendConfig.json
+   
+   - **Chip Kind Extensions (View v0.34.0)**:
+     * **ChipKindKeys extended**: Added Image, Model, Audio (beyond existing Hierarchy/Scene/Script/Prefab/Material/Texture/ScriptableObject/Asset/Folder)
+     * **BuiltInChipProviders extended**: `ModelChipProvider` (priority 450, handles .fbx/.obj/.blend/.dae), `AudioChipProvider` (priority 550, handles .wav/.mp3/.ogg/.aiff), `ImageChipProvider` (priority 50, handles external .png/.jpg/.bmp/.gif/.webp/.tiff — obj==null only)
+     * **Tests**: 84 new tests for new providers (MdBlock rendering, chip detection)
+   
+   - **ProviderRegistry Consolidation (CLI v0.34.0)**:
+     * **ProviderRegistry.cs** (82 LOC, new): Base class for extensible provider registries (DRY consolidation across Settings/Toolbar/Panel registries). Single `Register()` + `Resolve()` pattern, optional priority ordering
+     * **KeyRegex hoisting**: Moved `_KeyRegex` to non-generic companion to avoid static-in-generic reflection issues (C# generic type safety)
+     * **Tests**: 57 ProviderRegistryTests (concurrent registration, key uniqueness, priority ordering)
+   
+   - **Tests Summary (v0.34.0)**:
+     * Python: No new tests (0 changes to server/)
+     * C#: 1402 new tests across CLI + View assemblies
+       - CLI: 214 KimiArgBuilder + 243 KimiParser + 222 OpenCodeArgBuilder + 273 OpenCodeParser + 214 BuiltInChipProviders + 57 ProviderRegistry + 188 ImageAttachmentStore = 1411 tests
+       - View: 224 AssetViewerFactory + 198 PrefabViewerWindow + 154 ImageDragDrop + 116 InlineImageThumbnail + 105 PluginToolbar + 72 PluginSettings + 37 ClipboardPaste = 906 tests
+       - Total EditMode: ~3000+ green (was 2623)
+
 10. **Sprint 1B: Assembly Split + Interactive Permissions (v0.29.2)**
    - **Chat Assembly Split (asmdef)**: UnityMCP.Editor.Chat split into two: `UnityMCP.Editor.Chat.CLI` (protocol, parsing, backends, control flow) and `UnityMCP.Editor.Chat.View` (UI windows, rendering, cards). CLI assembly compiles when main plugin is broken (zero View dependencies); View always depends on CLI. Enables frontend reload before backend fully healthy. Asmdef references one-way: View → CLI → Editor core.
    - **Interactive Permission Prompts (v0.29.2→v0.29.11 fix)**: **Original (v0.29.2)** used non-functional `--permission-prompt-tool stdio` arg expecting `sdk_control_request` events. **Fixed (v0.29.11, Sprint 1C)** implements correct CLI v2.1.177+ protocol: (1) `CliBackendBase` sends `InitializeRequest()` handshake after spawn with `PreToolUse` hooks wired to hook_0; (2) backend emits `control_request` (not `sdk_control_request`) with `subtype:hook_callback` containing tool info; (3) `ChatStreamParser` routes to `PermissionPrompt` event; (4) `ControlResponseBuilder` serializes approvals as `{"continue":true/false}` (not `{"behavior":"allow"}`) + reason field; (5) legacy `sdk_control_request`/`permission` subtype still supported for backward compat. **ToolApprovalCard** (Allow/Deny/Session/Always + RiskClassifier + SessionAllowlist) and **AskUserCard** (radio/checkbox/freetext inputs). Response flows back to backend via stdout for tool call resume.

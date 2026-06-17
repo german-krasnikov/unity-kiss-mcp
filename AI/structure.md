@@ -260,11 +260,28 @@ unity-kiss-mcp/
 │       │   │   ├── GeminiArgBuilder.cs        # Build gcloud args + .gemini/settings.json (smart port merge, v0.30.1)
 │       │   │   ├── GeminiParser.cs            # Parse stream-json: skip role:user + non-mcp_ tools, suppress ask_user (v0.30.1)
 │       │   │   ├── GeminiProvider.cs          # IBackendProvider Gemini implementation (auto-discovered via TypeCache, v0.30.1)
-│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex, Gemini)
-│       │   │   ├── BackendConfig.cs           # [Serializable] Claude/Codex/Gemini configs + persistence
+│       │   │   ├── KimiBackend.cs             # Kimi: CliBackendBase subclass (Kimi K2 CLI, v0.34.0)
+│       │   │   ├── KimiArgBuilder.cs          # Build Kimi args + role-based NDJSON protocol (v0.34.0, 120 LOC)
+│       │   │   ├── KimiParser.cs              # Parse Kimi NDJSON response stream (v0.34.0, 74 LOC)
+│       │   │   ├── KimiProvider.cs            # IBackendProvider Kimi implementation (v0.34.0)
+│       │   │   ├── OpenCodeBackend.cs         # OpenCode: CliBackendBase subclass (multi-provider model selection, v0.34.0)
+│       │   │   ├── OpenCodeArgBuilder.cs      # Build OpenCode args + model name mapping (v0.34.0, 132 LOC)
+│       │   │   ├── OpenCodeParser.cs          # Parse OpenCode stream-json (v0.34.0, 92 LOC)
+│       │   │   ├── OpenCodeProvider.cs        # IBackendProvider OpenCode implementation (v0.34.0)
+│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex, Gemini, Kimi, OpenCode)
+│       │   │   ├── BackendConfig.cs           # [Serializable] configs per backend + KimiBackendConfig + OpenCodeBackendConfig (v0.34.0)
 │       │   │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (project-local Library/)
 │       │   │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (v0.30.1: redesigned with presets)
 │       │   │   ├── ControlResponseBuilder.cs  # Serialize approval + user input responses (v0.29.2+, CodexUserInputResponse v0.29.38)
+│       │   │   ├── ClipboardImageReader.cs    # Platform-specific clipboard image read (macOS/Windows/Linux, v0.34.0, 142 LOC)
+│       │   │   ├── ImageAttachmentStore.cs    # Temp file storage for pasted/dropped images (v0.34.0, 96 LOC)
+│       │   │   ├── ProviderRegistry.cs        # Base class for extensible provider registries (Settings/Toolbar/Panel, v0.34.0)
+│       │   │   ├── SettingsProviderRegistry.cs # Registry for ISettingsProvider implementations (v0.34.0)
+│       │   │   ├── ToolbarButtonRegistry.cs   # Registry for IToolbarButtonProvider implementations (v0.34.0)
+│       │   │   ├── PanelProviderRegistry.cs   # Registry for IPanelProvider implementations (v0.34.0)
+│       │   │   ├── ISettingsProvider.cs       # Plugin interface for custom settings UI (v0.34.0)
+│       │   │   ├── IToolbarButtonProvider.cs  # Plugin interface for toolbar buttons (v0.34.0)
+│       │   │   ├── IPanelProvider.cs          # Plugin interface for side panels (v0.34.0)
 │       │   │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
 │       │   │   ├── TranscriptSerializer.cs    # Serialize/deserialize chat history to plain-text (F21 reload survival)
 │       │   │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators (Chat.CLI)
@@ -347,6 +364,7 @@ unity-kiss-mcp/
 │       │   │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)
 │       │   │   │   ├── MarkdownParser.Blocks.cs # Block parsing helpers
 │       │   │   │   ├── MarkdownInline.cs      # Inline spans → Unity rich-text (noparse <>, protect code)
+│       │   │   │   ├── InlineImageThumbnail.cs # Image thumbnail rendering in paragraphs (v0.34.0, 70 LOC)
 │       │   │   │   ├── IChatBlockRenderer.cs  # Extension interface (can-render + render)
 │       │   │   │   ├── ChatBlockRendererRegistry.cs # Ordered first-match-wins
 │       │   │   │   ├── ChatBlockRendererFactory.cs # Default wiring (Mermaid first, Markdown catch-all); injects ChatRefResolver + AddRefToContext
@@ -354,10 +372,18 @@ unity-kiss-mcp/
 │       │   │   │   ├── MarkdownBlockRenderer.Table.cs # Table grid layout (partial)
 │       │   │   │   ├── MarkdownBlockRenderer.List.cs # Bullet/ordered list (partial)
 │       │   │   │   ├── ImageBlockRenderer.cs  # PNG/JPG → Texture2D + click-to-open (v0.23.0: IsImageFile guard)
-│       │   │   │   ├── Viewers/                # Media viewer windows (v0.23.0 Block 4)
+│       │   │   │   ├── Viewers/                # Media viewer windows (v0.23.0 Block 4, v0.34.0 expanded)
 │       │   │   │   │   ├── ImageViewerWindow.cs # Modal image viewer: zoom/pan/fit controls
 │       │   │   │   │   ├── MermaidViewerWindow.cs # Modal mermaid viewer: zoom/pan + exportable SVG
-│       │   │   │   │   └── ZoomPanManipulator.cs # DRY shared zoom/pan/fit logic (reusable for future viewers)
+│       │   │   │   │   ├── ZoomPanManipulator.cs # DRY shared zoom/pan/fit logic (reusable for future viewers)
+│       │   │   │   │   ├── IAssetViewer.cs      # Plugin interface for custom asset viewers (v0.34.0)
+│       │   │   │   │   ├── AssetViewerFactory.cs # Registry + factory for extensible viewers (v0.34.0, 83 LOC)
+│       │   │   │   │   ├── PrefabViewerWindow.cs # Prefab 3D preview window (v0.34.0, 151 LOC)
+│       │   │   │   │   ├── PrefabPreviewLoader.cs # Temporary scene prefab instantiation (v0.34.0, 82 LOC)
+│       │   │   │   │   ├── ModelViewerWindow.cs # 3D model viewer (.fbx/.obj/.blend/.dae, v0.34.0, 151 LOC)
+│       │   │   │   │   ├── SpriteViewerWindow.cs # Sprite texture viewer with grid (v0.34.0, 78 LOC)
+│       │   │   │   │   ├── AudioViewerWindow.cs # Audio clip player (v0.34.0, 142 LOC)
+│       │   │   │   │   └── AudioUtilProxy.cs    # Reflection wrapper for Editor AudioUtil (v0.34.0, 66 LOC)
 │       │   │   │   ├── Mermaid/               # Native Mermaid flowchart (no lib, pure parse+layout)
 │       │   │   │   │   ├── MermaidGraph.cs    # POCO: nodes, edges, direction
 │       │   │   │   │   ├── MermaidParser.cs   # lines → graph or null
@@ -371,8 +397,21 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── ChatStreamParserTests.cs # Parse stream-json events + control_request routing
 │       │   │   │   │   ├── ClaudeArgBuilderTests.cs # CLI arg building + permission-prompt-tool (v0.29.37)
 │       │   │   │   │   ├── CodexAppServerParserTests.cs # Codex JSON-RPC + requestUserInput (v0.29.38)
+│       │   │   │   │   ├── CodexArgBuilderTests.cs # Codex CLI args + model wiring (v0.30.4, 33 tests)
 │       │   │   │   │   ├── ControlResponseBuilderTests.cs # Response serialization including CodexUserInputResponse (v0.29.38)
-│       │   │   │   │   └── ... # 24+ total CLI tests
+│       │   │   │   │   ├── GeminiArgBuilderTests.cs # Gemini gcloud args + settings.json port update (v0.30.1, 217 tests)
+│       │   │   │   │   ├── GeminiParserTests.cs   # Gemini stream-json parsing (v0.30.1, 190 tests)
+│       │   │   │   │   ├── KimiArgBuilderTests.cs # Kimi K2 args + role NDJSON protocol (v0.34.0, 214 tests)
+│       │   │   │   │   ├── KimiParserTests.cs     # Kimi NDJSON response parsing (v0.34.0, 243 tests)
+│       │   │   │   │   ├── OpenCodeArgBuilderTests.cs # OpenCode args + model mapping (v0.34.0, 222 tests)
+│       │   │   │   │   ├── OpenCodeParserTests.cs # OpenCode stream-json parsing (v0.34.0, 273 tests)
+│       │   │   │   │   ├── ImageAttachmentStoreTests.cs # Image attachment storage + temp files (v0.34.0, 188 tests)
+│       │   │   │   │   ├── BuiltInChipProvidersTests.cs # Image/Model/Audio chip providers (v0.34.0, 214 tests)
+│       │   │   │   │   ├── ProviderRegistryTests.cs # Provider registry base class (v0.34.0, 57 tests)
+│       │   │   │   │   ├── MultiSceneChipTests.cs # Scene-qualified object path parsing + display (v0.30.4, 74 tests)
+│       │   │   │   │   ├── TokenFormatTests.cs    # Token cost display + null-safe guards (v0.30.4, 12 tests)
+│       │   │   │   │   ├── UserTurnBuilderImageTests.cs # User turn JSON with image serialization (v0.34.0, 76 tests)
+│       │   │   │   │   └── ... # 40+ total CLI tests
 │       │   │   │   ├── View/                  # View assembly tests (UI, cards, interactivity)
 │       │   │   │   │   ├── AskUserCardTests.cs     # User input dialog + Codex protocol (v0.29.38 addition)
 │       │   │   │   │   ├── ApproveFlowTests.cs     # Interactive approvals flow
@@ -382,6 +421,13 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── SetModeTests.cs         # Ask↔Agent mode switch + session persistence (v0.30.4, 120 tests)
 │       │   │   │   │   ├── TokenResetTests.cs      # Token counter reset + cost display (v0.30.4 upd v0.31.0, 14 tests + cost fix)
 │       │   │   │   │   ├── TokenFormatTests.cs     # Token cost display formatting + null-safe guards (v0.31.0, 12 tests)
+│       │   │   │   │   ├── ClipboardPasteTests.cs  # Clipboard image paste + mime detection (v0.34.0, 37 tests)
+│       │   │   │   │   ├── ImageDragDropTests.cs   # Image drag-drop from Finder (v0.34.0, 154 tests)
+│       │   │   │   │   ├── InlineImageThumbnailTests.cs # Image thumbnails in chat paragraphs (v0.34.0, 116 tests)
+│       │   │   │   │   ├── PrefabViewerWindowTests.cs # Prefab preview window (v0.34.0, 198 tests)
+│       │   │   │   │   ├── AssetViewerFactoryTests.cs # Media viewer factory + registry (v0.34.0, 224 tests)
+│       │   │   │   │   ├── PluginSettingsInjectionTests.cs # ISettingsProvider plugin interface (v0.34.0, 72 tests)
+│       │   │   │   │   ├── PluginToolbarButtonTests.cs # IToolbarButtonProvider plugin interface (v0.34.0, 105 tests)
 │       │   │   │   │   └── ... # 48+ total View tests
 │       │   │   │   └── Markdown/                # Render tests
 │       │   │   │       ├── MarkdownParserTests.cs

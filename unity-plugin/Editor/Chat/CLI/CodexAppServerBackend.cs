@@ -56,8 +56,8 @@ namespace UnityMCP.Editor.Chat
 
             if (!string.IsNullOrEmpty(_model))
             {
-                args.Add("--model");
-                args.Add(_model);
+                args.Add("-c");
+                args.Add($"model=\"{_model}\"");
             }
 
             if (!string.IsNullOrEmpty(_extraArgs))

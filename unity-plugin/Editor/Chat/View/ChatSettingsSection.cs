@@ -3,6 +3,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Debug = UnityEngine.Debug;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -66,6 +67,14 @@ namespace UnityMCP.Editor.Chat
             BackendSettingsForm.BuildGeminiForm(geminiFoldout, store.Gemini, () => store.Save());
             parent.Add(geminiFoldout);
 
+            var kimiFoldout = new Foldout { text = "Kimi Settings", value = false };
+            BackendSettingsForm.BuildKimiForm(kimiFoldout, store.Kimi, () => store.Save());
+            parent.Add(kimiFoldout);
+
+            var openCodeFoldout = new Foldout { text = "OpenCode Settings", value = false };
+            BackendSettingsForm.BuildOpenCodeForm(openCodeFoldout, store.OpenCode, () => store.Save());
+            parent.Add(openCodeFoldout);
+
             // Context Chips — per-kind depth + color overrides
             var chipFoldout = new Foldout { text = "Context Chips", value = false };
             BackendSettingsForm.BuildChipDisplayForm(chipFoldout, store.Chips, () =>
@@ -78,6 +87,15 @@ namespace UnityMCP.Editor.Chat
                 }
             });
             parent.Add(chipFoldout);
+
+            // Plugin settings — each provider gets its own foldout, collapsed by default.
+            foreach (var p in SettingsProviderRegistry.All)
+            {
+                var foldout = new Foldout { text = p.DisplayName, value = false };
+                try { p.BuildUI(foldout); }
+                catch (System.Exception e) { Debug.LogException(e); continue; }
+                parent.Add(foldout);
+            }
         }
 
         private static void ProbeAuthAsync(Label label)

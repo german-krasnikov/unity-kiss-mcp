@@ -34,23 +34,6 @@ namespace UnityMCP.Editor.Chat
                 _sandbox, _extraArgs);
         }
 
-        /// <summary>
-        /// Unwrap Claude SDK user turn JSON {"type":"user","message":{"role":"user","content":[{"type":"text","text":"..."}]}}
-        /// into plain text. Falls back to raw input if not that shape.
-        /// </summary>
-        internal static string ExtractPlainText(string turnJson)
-        {
-            if (string.IsNullOrEmpty(turnJson)) return turnJson;
-            var msg = JsonHelper.ExtractObject(turnJson, "message");
-            if (msg == null || msg == "{}") return turnJson;
-            var content = JsonHelper.ExtractArray(msg, "content");
-            if (string.IsNullOrEmpty(content) || content == "[]") return turnJson;
-            var first = JsonHelper.ExtractFirstArrayObject(content);
-            if (first == null) return turnJson;
-            var text = JsonHelper.ExtractString(first, "text");
-            return text ?? turnJson;
-        }
-
         protected override void ParseLine(string line, List<ChatEvent> sink)
             => GeminiParser.ParseLine(line, sink);
     }

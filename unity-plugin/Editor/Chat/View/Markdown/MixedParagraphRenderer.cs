@@ -1,6 +1,7 @@
 // Renders a paragraph containing [kind:ref] tags as a flex-wrap container.
-// Text runs -> Labels via MarkdownInline.ToRichText.
+// Text runs -> Labels via MarkdownInline.ToRichText. Image path tokens -> thumbnails.
 // Tag runs -> ChipPillFactory pills (response mode: no remove button, click-to-navigate).
+using System.Collections.Generic;
 using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
@@ -36,11 +37,8 @@ namespace UnityMCP.Editor.Chat
                             container.Add(br);
                         }
                         var stripped = StripOrphanBold(lines[i]);
-                        if (!string.IsNullOrEmpty(stripped))
-                        {
-                            var lbl = ChatLabel.Selectable(MarkdownInline.ToRichText(stripped), richText: true);
-                            container.Add(lbl);
-                        }
+                        foreach (var ve in SplitLineWithThumbs(stripped))
+                            container.Add(ve);
                     }
                 }
                 else
@@ -75,6 +73,41 @@ namespace UnityMCP.Editor.Chat
             if (startsDouble && !endsDouble) t = t.Substring(2).TrimStart();
             if (endsDouble   && !startsDouble) t = t.Substring(0, t.Length - 2).TrimEnd();
             return t;
+        }
+
+        /// <summary>
+        /// Splits a line on whitespace. Image-path tokens become InlineImageThumbnail elements;
+        /// remaining tokens are joined into a single Label each run. Returns empty if line is empty.
+        /// </summary>
+        internal static IEnumerable<VisualElement> SplitLineWithThumbs(string line)
+        {
+            if (string.IsNullOrEmpty(line)) yield break;
+
+            var tokens = line.Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
+            var textRun = new List<string>();
+
+            foreach (var token in tokens)
+            {
+                if (InlineImageThumbnail.IsImagePath(token))
+                {
+                    if (textRun.Count > 0)
+                    {
+                        yield return ChatLabel.Selectable(
+                            MarkdownInline.ToRichText(string.Join(" ", textRun)), richText: true);
+                        textRun.Clear();
+                    }
+                    var resolved = ImageBlockRenderer.ResolvePath(token.Trim('`'));
+                    yield return InlineImageThumbnail.Build(resolved);
+                }
+                else
+                {
+                    textRun.Add(token);
+                }
+            }
+
+            if (textRun.Count > 0)
+                yield return ChatLabel.Selectable(
+                    MarkdownInline.ToRichText(string.Join(" ", textRun)), richText: true);
         }
 
         private static VisualElement BuildPill(string kindKey, string rawRef)

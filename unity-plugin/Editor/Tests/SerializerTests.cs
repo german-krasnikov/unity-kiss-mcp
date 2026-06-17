@@ -248,8 +248,10 @@ namespace UnityMCP.Editor.Tests
         {
             _go = new GameObject("ShaderTest");
             var renderer = _go.AddComponent<MeshRenderer>();
-            // Use built-in Standard or URP lit shader
-            var shader = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit");
+            // Prefer URP Lit; fall back to Standard or Unlit
+            var shader = Shader.Find("Universal Render Pipeline/Lit")
+                         ?? Shader.Find("Standard")
+                         ?? Shader.Find("Unlit/Color");
             if (shader != null)
                 renderer.sharedMaterial = new Material(shader);
         }
@@ -314,15 +316,9 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Serialize_BuiltinShaderAssetPath_ContainsProperties()
         {
-            // Test via asset path for a known built-in shader
-            var shader = Shader.Find("Standard");
-            if (shader == null)
-                Assert.Inconclusive("Standard shader not found (URP-only project)");
-
-            // Get asset path via reflection — for built-ins this may be empty, use scene path fallback
             var renderer = _go.GetComponent<Renderer>();
             if (renderer == null || renderer.sharedMaterial == null)
-                Assert.Inconclusive("No material available");
+                Assert.Inconclusive("No shader available in this project (no Standard or URP Lit)");
 
             // Use scene-object path with target != "material" → LoadShader via renderer
             var result = ShaderSerializer.Serialize(Path, "shader");

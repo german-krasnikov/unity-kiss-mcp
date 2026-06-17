@@ -156,6 +156,21 @@ namespace UnityMCP.Editor
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Extract a numeric float value from JSON (works for both numbers and quoted strings).
+        /// Returns 0f if key not found or not parseable.
+        /// </summary>
+        public static float ExtractFloat(string json, string key)
+        {
+            var raw = ExtractString(json, key);
+            if (string.IsNullOrEmpty(raw)) return 0f;
+            if (float.TryParse(raw.Trim('"'),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var v))
+                return v;
+            return 0f;
+        }
+
         internal static string EscapeJson(string str)
         {
             if (string.IsNullOrEmpty(str)) return "";
@@ -180,6 +195,25 @@ namespace UnityMCP.Editor
             return sb.ToString();
         }
 
+        /// <summary>
+        /// Build a JSON string array: ["a","b","c"].
+        /// Items are JSON-escaped. Returns "[]" for null/empty input.
+        /// </summary>
+        public static string BuildJsonStringArray(string[] items)
+        {
+            if (items == null || items.Length == 0) return "[]";
+            var sb = new System.Text.StringBuilder("[");
+            for (int i = 0; i < items.Length; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append('"');
+                sb.Append(EscapeJson(items[i]));
+                sb.Append('"');
+            }
+            sb.Append(']');
+            return sb.ToString();
+        }
+
         /// <summary>Extract the first balanced JSON object from an array string like [{"a":1},{"b":2}].</summary>
         internal static string ExtractFirstArrayObject(string arrayJson)
         {
@@ -196,6 +230,37 @@ namespace UnityMCP.Editor
                 if (c == '{')  { depth++; continue; }
                 if (c == '}') { depth--; if (depth == 0) return arrayJson.Substring(start, i - start + 1); }
             }
+            return null;
+        }
+
+        /// <summary>
+        /// Extract the next balanced JSON object from arrayJson starting at or after <paramref name="pos"/>.
+        /// Advances pos past the closing '}'. Returns null when no more objects found.
+        /// </summary>
+        internal static string ExtractNextArrayObject(string arrayJson, ref int pos)
+        {
+            if (string.IsNullOrEmpty(arrayJson)) return null;
+            var start = arrayJson.IndexOf('{', pos);
+            if (start == -1) { pos = arrayJson.Length; return null; }
+            int depth = 0; bool inStr = false, esc = false;
+            for (int i = start; i < arrayJson.Length; i++)
+            {
+                char c = arrayJson[i];
+                if (esc) { esc = false; continue; }
+                if (inStr) { if (c == '\\') esc = true; else if (c == '"') inStr = false; continue; }
+                if (c == '"')  { inStr = true; continue; }
+                if (c == '{')  { depth++; continue; }
+                if (c == '}')
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        pos = i + 1;
+                        return arrayJson.Substring(start, i - start + 1);
+                    }
+                }
+            }
+            pos = arrayJson.Length;
             return null;
         }
     }

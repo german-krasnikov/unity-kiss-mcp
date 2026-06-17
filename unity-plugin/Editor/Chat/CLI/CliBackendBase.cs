@@ -128,6 +128,26 @@ namespace UnityMCP.Editor.Chat
 
         public void Dispose() => Stop();
 
+        // ── SHARED HELPERS ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Unwrap Claude SDK user turn JSON {"type":"user","message":{"role":"user","content":[{"type":"text","text":"..."}]}}
+        /// into plain text. Falls back to raw input if not that shape.
+        /// Used by spawn-per-turn backends (Gemini, Kimi) to pass plain text via -p.
+        /// </summary>
+        internal static string ExtractPlainText(string turnJson)
+        {
+            if (string.IsNullOrEmpty(turnJson)) return turnJson;
+            var msg = JsonHelper.ExtractObject(turnJson, "message");
+            if (msg == null || msg == "{}") return turnJson;
+            var content = JsonHelper.ExtractArray(msg, "content");
+            if (string.IsNullOrEmpty(content) || content == "[]") return turnJson;
+            var first = JsonHelper.ExtractFirstArrayObject(content);
+            if (first == null) return turnJson;
+            var text = JsonHelper.ExtractString(first, "text");
+            return text ?? turnJson;
+        }
+
         // ── PROTECTED VIRTUAL SEAMS (overridable in tests) ────────────────────
 
         protected virtual void DrainRawLines(List<string> buf) => _proc?.DrainLines(buf);

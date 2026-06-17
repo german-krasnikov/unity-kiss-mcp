@@ -1,5 +1,6 @@
 // CH1.test.5 + CH1.test.6: CodexAppServerBackend unit tests.
 // Tests SpawnNewProcess sends initialize immediately, and ExtractPromptText parsing.
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
@@ -78,21 +79,24 @@ namespace UnityMCP.Editor.Chat.Tests
                 .GetField("_nextId", BindingFlags.NonPublic | BindingFlags.Instance)
                 .GetValue(backend);
 
-            // Start() calls SpawnNewProcess → sends initialize → bumps _nextId
-            // ChatBinaryResolver will return "/fake/codex" from our override.
-            // _proc.Spawn will fail silently (no real process) but _nextId is incremented first.
-            try { backend.Start(); } catch { /* process spawn may fail in headless — that's ok */ }
+            // Start() calls SpawnNewProcess → sends initialize → bumps _nextId.
+            // Spawn may fail in headless (no real process) but _nextId must be incremented first.
+            Exception spawnException = null;
+            try { backend.Start(); }
+            catch (Exception ex) { spawnException = ex; }
 
             var idAfter = (int)typeof(CodexAppServerBackend)
                 .GetField("_nextId", BindingFlags.NonPublic | BindingFlags.Instance)
                 .GetValue(backend);
 
-            Assert.Greater(idAfter, idBefore,
-                "_nextId must be incremented by SpawnNewProcess (fire-and-forget initialize call)");
+            // _nextId must have been incremented by exactly 1 (the initialize message).
+            // If this fails AND spawnException != null, it means spawn threw before increment.
+            Assert.AreEqual(idBefore + 1, idAfter,
+                $"_nextId must be incremented by exactly 1; spawnException={spawnException?.Message}");
             backend.Stop();
         }
 
-        // ── BuildArgs must emit 3 -c flags for MCP config ─────────────────────
+        // ── BuildArgs must emit 3 -c flags for MCP config (no model) ────────
 
         [Test]
         public void BuildArgs_HasThreeMcpConfigFlags()
@@ -109,10 +113,35 @@ namespace UnityMCP.Editor.Chat.Tests
             for (int i = 0; i < args.Length - 1; i++)
                 if (args[i] == "-c") cValues.Add(args[i + 1]);
 
-            Assert.AreEqual(3, cValues.Count, "BuildArgs must emit exactly 3 -c flags");
+            Assert.AreEqual(3, cValues.Count, "BuildArgs without model must emit exactly 3 -c flags");
             Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity.command=")));
             Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity.args=")));
             Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity.startup_timeout_sec=")));
+            backend.Stop();
+        }
+
+        // ── BuildArgs with model must emit model via -c, NOT --model ─────────
+
+        [Test]
+        public void BuildArgs_WithModel_EmitsModelAsCFlag()
+        {
+            var backend = new CodexAppServerBackend(model: "o3");
+            var method  = typeof(CodexAppServerBackend)
+                .GetMethod("BuildArgs", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var result = ((string[] args, string[] stripEnvKeys))method.Invoke(
+                backend, new object[] { "/fake/codex", null });
+            var args = result.args;
+
+            var cValues = new List<string>();
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == "-c") cValues.Add(args[i + 1]);
+
+            // 4 -c flags total: 3 MCP + 1 model
+            Assert.AreEqual(4, cValues.Count, "BuildArgs with model must emit 4 -c flags");
+            Assert.IsTrue(cValues.Exists(v => v == "model=\"o3\""),
+                $"Expected -c model=\"o3\" but got: {string.Join(", ", cValues)}");
+            CollectionAssert.DoesNotContain(args, "--model", "app-server does not accept --model");
             backend.Stop();
         }
     }

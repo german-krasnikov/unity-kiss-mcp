@@ -65,7 +65,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Build_NullPng_FallsBackToTextOnly()
         {
-            var json = UserTurnBuilder.Build("hello", null);
+            var json = UserTurnBuilder.Build("hello", (byte[])null);
             Assert.IsFalse(json.Contains("\"type\":\"image\""));
         }
 

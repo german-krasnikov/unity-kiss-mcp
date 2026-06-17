@@ -15,5 +15,11 @@ namespace UnityMCP.Editor.Chat
         public const string ScriptableObject = "so";
         public const string Folder          = "folder";
         public const string Asset           = "asset";
+        // External image files dropped from Finder or pasted from clipboard.
+        public const string Image           = "image";
+        // 3D model assets (.fbx / .obj / .blend / .dae).
+        public const string Model           = "model";
+        // Audio assets (.wav / .mp3 / .ogg / .aiff).
+        public const string Audio           = "audio";
     }
 }

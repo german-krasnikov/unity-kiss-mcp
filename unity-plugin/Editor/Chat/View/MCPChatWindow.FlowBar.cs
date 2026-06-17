@@ -98,6 +98,8 @@ namespace UnityMCP.Editor.Chat
             seg.Add(_askBtn); seg.Add(_agentBtn);
             bar.Add(seg);
 
+            BuildPluginButtons(bar);
+
             var spacer = new VisualElement(); spacer.AddToClassList("footer-spacer");
             bar.Add(spacer);
 
@@ -105,6 +107,11 @@ namespace UnityMCP.Editor.Chat
 
             _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
             bar.Add(_tokenReadout);
+
+            var attachBtn = new Button(OnAttachImage) { text = "+" };
+            attachBtn.AddToClassList("chat-btn");
+            attachBtn.tooltip = "Attach image";
+            bar.Add(attachBtn);
 
             _sendBtn = new Button(OnSend) { text = "Send" };
             _sendBtn.AddToClassList("chat-btn"); _sendBtn.AddToClassList("chat-btn--send");
@@ -121,6 +128,14 @@ namespace UnityMCP.Editor.Chat
             btn.AddToClassList("mode-toggle-btn");
             if (_agentMode == isAgent) btn.AddToClassList("mode-toggle-btn--active");
             return btn;
+        }
+
+        private void OnAttachImage()
+        {
+            var path = EditorUtility.OpenFilePanelWithFilters(
+                "Attach image", "", new[] { "Image files", "png,jpg,jpeg,gif,webp", "All files", "*" });
+            if (!string.IsNullOrEmpty(path))
+                ProcessExternalPath(path, InsertInlineChip);
         }
     }
 }

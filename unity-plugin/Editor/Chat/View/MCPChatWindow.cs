@@ -175,6 +175,7 @@ namespace UnityMCP.Editor.Chat
             _input = _chipField.TextField;
             area.Add(_chipField);
             WireChipInput();
+            WireClipboardPaste();
 
             EnterKeySend.Attach(_input, OnSend);
             area.Add(BuildFooterBar());
@@ -231,8 +232,10 @@ namespace UnityMCP.Editor.Chat
                     Model          = model,
                     ExtraArgs      = src.Claude.ExtraArgs,
                 },
-                Codex  = src.Codex,
-                Gemini = src.Gemini,
+                Codex    = src.Codex,
+                Gemini   = src.Gemini,
+                Kimi     = src.Kimi,
+                OpenCode = src.OpenCode,
                 Chips  = src.Chips,
             };
         }
@@ -247,45 +250,83 @@ namespace UnityMCP.Editor.Chat
                     if (src.Claude.Model == selectedModel) return src;
                     return new BackendConfigStore
                     {
-                        Claude = new ClaudeBackendConfig
+                        Claude   = new ClaudeBackendConfig
                         {
                             PermissionMode = src.Claude.PermissionMode,
                             Model          = selectedModel,
                             ExtraArgs      = src.Claude.ExtraArgs,
                         },
-                        Codex  = src.Codex,
-                        Gemini = src.Gemini,
-                        Chips  = src.Chips,
+                        Codex    = src.Codex,
+                        Gemini   = src.Gemini,
+                        Kimi     = src.Kimi,
+                        OpenCode = src.OpenCode,
+                        Chips    = src.Chips,
                     };
                 case BackendKind.Codex:
                     if (src.Codex.Model == selectedModel) return src;
                     return new BackendConfigStore
                     {
-                        Claude = src.Claude,
-                        Codex  = new CodexBackendConfig
+                        Claude   = src.Claude,
+                        Codex    = new CodexBackendConfig
                         {
                             Model             = selectedModel,
                             PermissionMode    = src.Codex.PermissionMode,
                             StartupTimeoutSec = src.Codex.StartupTimeoutSec,
                             ExtraArgs         = src.Codex.ExtraArgs,
                         },
-                        Gemini = src.Gemini,
-                        Chips  = src.Chips,
+                        Gemini   = src.Gemini,
+                        Kimi     = src.Kimi,
+                        OpenCode = src.OpenCode,
+                        Chips    = src.Chips,
                     };
                 case BackendKind.Gemini:
                     if (src.Gemini.Model == selectedModel) return src;
                     return new BackendConfigStore
                     {
-                        Claude = src.Claude,
-                        Codex  = src.Codex,
-                        Gemini = new GeminiBackendConfig
+                        Claude   = src.Claude,
+                        Codex    = src.Codex,
+                        Gemini   = new GeminiBackendConfig
                         {
                             Model        = selectedModel,
                             ApprovalMode = src.Gemini.ApprovalMode,
                             Sandbox      = src.Gemini.Sandbox,
                             ExtraArgs    = src.Gemini.ExtraArgs,
                         },
-                        Chips  = src.Chips,
+                        Kimi     = src.Kimi,
+                        OpenCode = src.OpenCode,
+                        Chips    = src.Chips,
+                    };
+                case BackendKind.Kimi:
+                    if (src.Kimi.Model == selectedModel) return src;
+                    return new BackendConfigStore
+                    {
+                        Claude   = src.Claude,
+                        Codex    = src.Codex,
+                        Gemini   = src.Gemini,
+                        Kimi     = new KimiBackendConfig
+                        {
+                            Model        = selectedModel,
+                            ApprovalMode = src.Kimi.ApprovalMode,
+                            ExtraArgs    = src.Kimi.ExtraArgs,
+                        },
+                        OpenCode = src.OpenCode,
+                        Chips    = src.Chips,
+                    };
+                case BackendKind.OpenCode:
+                    if (src.OpenCode.Model == selectedModel) return src;
+                    return new BackendConfigStore
+                    {
+                        Claude   = src.Claude,
+                        Codex    = src.Codex,
+                        Gemini   = src.Gemini,
+                        Kimi     = src.Kimi,
+                        OpenCode = new OpenCodeBackendConfig
+                        {
+                            Model           = selectedModel,
+                            SkipPermissions = src.OpenCode.SkipPermissions,
+                            ExtraArgs       = src.OpenCode.ExtraArgs,
+                        },
+                        Chips    = src.Chips,
                     };
                 default: return src;
             }

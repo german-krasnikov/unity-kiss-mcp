@@ -108,13 +108,40 @@ namespace UnityMCP.Editor.Chat
                 Debug.LogWarning($"[MCP Chat] {obj.GetType().Name} not supported as a context chip");
         }
 
-        // F29: external path handler (Finder drag) — internal static for testability
+        // F29: external path handler (Finder drag) — internal static for testability.
+        // Image files (png/jpg/…) are copied to Library/MCPChat/Attachments/ before inserting.
         internal static void ProcessExternalPath(string path, ChipInserter insert)
         {
             if (string.IsNullOrEmpty(path)) return;
             var name = System.IO.Path.GetFileName(path);
             if (string.IsNullOrEmpty(name)) name = path;
-            insert(null, path, name);
+            var ext = System.IO.Path.GetExtension(path);
+            if (IsImageExtension(ext))
+            {
+                var dest = ImageAttachmentStore.ImportFile(path);
+                // C3: if ImportFile returns null (oversize, invalid magic, error) — abort, don't leak path
+                if (dest == null) return;
+                insert(null, dest, name);
+            }
+            else
+            {
+                insert(null, path, name);
+            }
+        }
+
+        /// <summary>Returns true for image file extensions (case-insensitive).</summary>
+        internal static bool IsImageExtension(string ext)
+        {
+            if (string.IsNullOrEmpty(ext)) return false;
+            switch (ext.ToLowerInvariant())
+            {
+                case ".png": case ".jpg": case ".jpeg":
+                case ".bmp": case ".gif": case ".webp":
+                case ".tiff": case ".tif":
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
 }

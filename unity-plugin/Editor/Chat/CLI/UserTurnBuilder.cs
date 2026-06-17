@@ -1,6 +1,7 @@
 // Builds the stdin JSON envelope for a user turn.
 // Pure logic: only System deps, NUnit-testable.
 using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace UnityMCP.Editor.Chat
@@ -31,6 +32,27 @@ namespace UnityMCP.Editor.Chat
             sb.Append(",{\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/png\",\"data\":\"");
             sb.Append(b64);
             sb.Append("\"}}");
+            sb.Append("]}}");
+            sb.Append('\n');
+            return sb.ToString();
+        }
+
+        /// <summary>User turn with multiple attached PNG images.</summary>
+        public static string Build(string text, IReadOnlyList<byte[]> images)
+        {
+            if (images == null || images.Count == 0)
+                return Build(text);
+
+            var sb = new StringBuilder();
+            sb.Append("{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[");
+            AppendTextBlock(sb, text);
+            foreach (var img in images)
+            {
+                if (img == null || img.Length == 0) continue;
+                sb.Append(",{\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/png\",\"data\":\"");
+                sb.Append(Convert.ToBase64String(img));
+                sb.Append("\"}}");
+            }
             sb.Append("]}}");
             sb.Append('\n');
             return sb.ToString();

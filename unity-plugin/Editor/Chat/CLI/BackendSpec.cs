@@ -1,7 +1,7 @@
 // Immutable descriptor for a backend / agent choice shown in the selector dropdown.
 namespace UnityMCP.Editor.Chat
 {
-    internal enum BackendKind { Claude, Codex, Gemini }
+    internal enum BackendKind { Claude, Codex, Gemini, Kimi, OpenCode }
 
     internal readonly struct BackendSpec
     {

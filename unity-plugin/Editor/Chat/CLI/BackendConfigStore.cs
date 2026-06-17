@@ -9,11 +9,13 @@ namespace UnityMCP.Editor.Chat
     [Serializable]
     internal sealed class BackendConfigStore
     {
-        public ClaudeBackendConfig  Claude       = new ClaudeBackendConfig();
-        public CodexBackendConfig   Codex        = new CodexBackendConfig();
-        public GeminiBackendConfig  Gemini       = new GeminiBackendConfig();
-        public ChipConfig           Chips        = new ChipConfig();
-        public ModelPresetsConfig   ModelPresets = new ModelPresetsConfig();
+        public ClaudeBackendConfig    Claude       = new ClaudeBackendConfig();
+        public CodexBackendConfig     Codex        = new CodexBackendConfig();
+        public GeminiBackendConfig    Gemini       = new GeminiBackendConfig();
+        public KimiBackendConfig      Kimi         = new KimiBackendConfig();
+        public OpenCodeBackendConfig  OpenCode     = new OpenCodeBackendConfig();
+        public ChipConfig             Chips        = new ChipConfig();
+        public ModelPresetsConfig     ModelPresets = new ModelPresetsConfig();
 
         private static string DefaultPath =>
             Path.Combine(Application.dataPath, "..", "Library", "MCP_ChatBackendConfig.json");
@@ -30,6 +32,8 @@ namespace UnityMCP.Editor.Chat
                 store.Claude        = store.Claude        ?? new ClaudeBackendConfig();
                 store.Codex         = store.Codex         ?? new CodexBackendConfig();
                 store.Gemini        = store.Gemini        ?? new GeminiBackendConfig();
+                store.Kimi          = store.Kimi          ?? new KimiBackendConfig();
+                store.OpenCode      = store.OpenCode      ?? new OpenCodeBackendConfig();
                 store.Chips         = store.Chips         ?? new ChipConfig();
                 store.ModelPresets  = store.ModelPresets  ?? new ModelPresetsConfig();
                 return store;

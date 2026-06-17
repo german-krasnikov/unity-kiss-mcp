@@ -1,6 +1,7 @@
 // Partial MCPChatWindow — send path: OnSend, DispatchTurn.
 // F13: AppendChipContext removed — ChipTextInterleaver handles chip serialization.
 // Text is clean by construction (InlineChipField — no FFFC/NBSP stripping needed).
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -20,7 +21,35 @@ namespace UnityMCP.Editor.Chat
             var llmText  = ChipTextInterleaver.ToLlmPayload(msg, store.Chips);
             if (string.IsNullOrEmpty(llmText)) return;
 
-            DispatchTurn(UserTurnBuilder.Build(llmText), msg, llmText);
+            var images = CollectImageChipBytes(msg.Chips);
+            var turnJson = images.Count > 0
+                ? UserTurnBuilder.Build(llmText, images)
+                : UserTurnBuilder.Build(llmText);
+            DispatchTurn(turnJson, msg, llmText, FirstImageChipPath(msg.Chips));
+        }
+
+        // Collect bytes from image chips (KindKey == "image") preserving order.
+        private static List<byte[]> CollectImageChipBytes(IReadOnlyList<ChipData> chips)
+        {
+            var result = new List<byte[]>();
+            if (chips == null) return result;
+            foreach (var chip in chips)
+            {
+                if (chip.KindKey != ChipKindKeys.Image) continue;
+                if (string.IsNullOrEmpty(chip.Path) || !File.Exists(chip.Path)) continue;
+                try { result.Add(File.ReadAllBytes(chip.Path)); }
+                catch { /* skip unreadable */ }
+            }
+            return result;
+        }
+
+        private static string FirstImageChipPath(IReadOnlyList<ChipData> chips)
+        {
+            if (chips == null) return null;
+            foreach (var chip in chips)
+                if (chip.KindKey == ChipKindKeys.Image && !string.IsNullOrEmpty(chip.Path) && File.Exists(chip.Path))
+                    return chip.Path;
+            return null;
         }
 
         // Shared send sequence.

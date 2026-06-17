@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.34.0] — 2026-06-17 <!-- Plugin extensibility + image drag-drop + asset viewers + Kimi K2 + OpenCode backends -->
+
+**Major Features:**
+
+- **Plugin Extensibility API** — New public interfaces for plugins to extend chat UI without core edits:
+  * **ISettingsProvider**: Plugins register custom settings pages
+  * **IToolbarButtonProvider**: Plugins add toolbar buttons  
+  * **IPanelProvider**: Plugins register side panels (dock + overlay support)
+  * All use `[InitializeOnLoad]` auto-discovery pattern via new registries
+
+- **Image Drag-Drop + Clipboard Paste** — Full image attachment workflow:
+  * **ClipboardImageReader.cs** — Platform-specific clipboard reads (macOS NSPasteboard, Windows CF_DIB, Linux xclip)
+  * **ImageAttachmentStore.cs** — Temp file lifecycle management for pasted/dropped images
+  * **MCPChatWindow integration** — Ctrl+V paste, Finder drag-and-drop, image reference embedding in turn JSON
+  * **Tests**: 37 ClipboardPaste + 154 ImageDragDrop + 76 UserTurnBuilderImage tests (367 total)
+
+- **Inline Image Thumbnails in Chat** — Images render as clickable thumbnails in paragraphs (max 100px height)
+  * **InlineImageThumbnail.cs** — Thumbnail rendering with click→full viewer navigation
+  * **Tests**: 116 InlineImageThumbnailTests
+
+- **Asset Viewers** — Extensible media preview system:
+  * **IAssetViewer interface** — Plugins implement custom viewers
+  * **AssetViewerFactory.cs** — Registry + factory with window management
+  * **Built-in viewers**: Prefab (3D preview), Model (.fbx/.obj/.blend/.dae), Sprite (with grid), Audio (with playback)
+  * **Seam pattern**: `AssetChipProviderBase.ViewerLauncher` — chip Navigate() routes to viewers first
+  * **Tests**: 224 AssetViewerFactory + 198 PrefabViewerWindow tests (422 total)
+
+- **Kimi K2 CLI Backend** (v0.34.0):
+  * **KimiArgBuilder.cs** — Role-based NDJSON protocol (system→user→assistant)
+  * **KimiParser.cs** — Newline-delimited event parsing
+  * **KimiBackend.cs + KimiProvider.cs** — Auto-discovered via TypeCache
+  * **Tests**: 214 KimiArgBuilder + 243 KimiParser (457 total)
+
+- **OpenCode CLI Backend** (v0.34.0):
+  * **OpenCodeArgBuilder.cs** — Multi-provider model selection (Claude/GPT/Gemini) with format conversion
+  * **OpenCodeParser.cs** — Stream-json parsing compatible with Claude SDK
+  * **OpenCodeBackend.cs + OpenCodeProvider.cs** — Persistent stdin loop, auto-discovered
+  * **Tests**: 222 OpenCodeArgBuilder + 273 OpenCodeParser (495 total)
+
+- **Chip Kind Extensions** — New media chip types:
+  * Image (external .png/.jpg/.bmp/.gif/.webp/.tiff), Model (.fbx/.obj/.blend/.dae), Audio (.wav/.mp3/.ogg/.aiff)
+  * Priority ordering prevents collisions with built-in asset providers
+
+- **Provider Registry Consolidation** — Base class for extensible registries:
+  * **ProviderRegistry.cs** — DRY consolidation (Settings/Toolbar/Panel registries inherit)
+  * **KeyRegex hoisting** — Non-generic companion avoids static-in-generic reflection issues
+  * **Tests**: 57 ProviderRegistryTests
+
+**Bug Fixes:**
+
+- **Codex app-server model flag** — Changed from `--model` to `-c model="..."` (v0.33.1 regression fix)
+- **GeminiBackend** — Removed deprecated file (superseded by GeminiBackend in CLI assembly)
+- **Settings layout scroll** — Added scrolling container for long settings pages
+- **Test corrections** — Eliminated 5 skipped tests via timeSinceStartup seam + URP shader setup
+- **Compile errors fixed** — All 13 build warnings resolved across new feature codebases
+
+**Test Summary (v0.34.0):**
+- Python: 0 new (no server changes)
+- C#: **1402 new tests** across CLI + View assemblies
+  - CLI backends: 214 KimiArgBuilder + 243 KimiParser + 222 OpenCodeArgBuilder + 273 OpenCodeParser = 952 tests
+  - Images: 188 ImageAttachmentStore + 76 UserTurnBuilderImage + 37 ClipboardPaste + 154 ImageDragDrop + 116 InlineImageThumbnail = 571 tests
+  - Viewers: 224 AssetViewerFactory + 198 PrefabViewerWindow = 422 tests
+  - Plugin API: 72 PluginSettings + 105 PluginToolbar = 177 tests
+  - Providers: 214 BuiltInChipProviders + 57 ProviderRegistry = 271 tests
+  - **Total EditMode: ~3000+ green** (was 2623, +377 net change)
+
+**Commits (13):**
+1. feat: plugin extensibility API — settings, toolbar buttons, panels
+2. feat: image drag-and-drop + clipboard paste into chat
+3. feat: inline image thumbnails in chat paragraphs
+4. feat: prefab preview window on chip click
+5. feat: asset preview viewers — 3D model, sprite, audio
+6. feat: Kimi K2 CLI backend — role-based NDJSON, MCP config file
+7. feat: OpenCode CLI backend — multi-provider model selection
+8. fix: eliminate skipped tests — timeSinceStartup seam + URP shader setup
+9. fix: compile errors + settings layout scroll + test corrections
+10. fix: P0+P1+P2 review findings — Kimi TurnDone, security hardening, prefab factory
+11. fix: inline image display in user bubble + attach button in footer
+12. fix: P2 MAJOR review findings — DRY registries, shared ExtractPlainText, error propagation
+13. fix: hoist KeyRegex to non-generic ProviderRegistry companion
+
 ## [v0.33.0] — 2026-06-16 <!-- Chat: Codex silent abort fix + model list expansion -->
 
 - **Codex Silent Abort Fix (Plugin v0.33.0)** — Fixes hung turns when Codex tools error silently. **Root cause:** Codex sets `status:"completed"` even when MCP tool returns error; only the nested `result.isError:true` flag indicates failure (no space in compact JSON). **Fix (CodexAppServerParser):** Changed isError detection from absent to `!resultObj.Contains("\"isError\":true")` pattern-match (handles both spaced and unspaced JSON). Extracts result text regardless of isError flag; if error and text empty, append `"[MCP tool error]"` placeholder. **Tests:** 6 new CodexAppServerParserTests covering tool errors, silent failures, and result text extraction.

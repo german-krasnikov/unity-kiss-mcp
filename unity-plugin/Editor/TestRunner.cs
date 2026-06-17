@@ -21,6 +21,9 @@ namespace UnityMCP.Editor
         private const string KeyStartTime = "UnityMCP_tests_start";
         private const double StaleTimeoutSec = 600.0; // 10 min max test run
 
+        // Testable seam — override in tests to avoid Editor-uptime dependency
+        internal static Func<double> GetTimeSinceStartup = () => EditorApplication.timeSinceStartup;
+
         [InitializeOnLoadMethod]
         private static void ResetOnReload()
         {
@@ -41,7 +44,7 @@ namespace UnityMCP.Editor
             {
                 // Clear stale pending flag (crashed/cancelled test run)
                 var start = SessionState.GetFloat(KeyStartTime, 0f);
-                if (start > 0f && EditorApplication.timeSinceStartup - start > StaleTimeoutSec)
+                if (start > 0f && GetTimeSinceStartup() - start > StaleTimeoutSec)
                 {
                     SessionState.SetBool(KeyPending, false);
                     return "none (stale pending cleared)";
@@ -55,7 +58,7 @@ namespace UnityMCP.Editor
 #if UNITY_INCLUDE_TESTS
         public static void Execute(string mode, Action<string> onComplete, string group = null, string filter = null)
         {
-            if (_isRunning == 1 && EditorApplication.timeSinceStartup - _runStartedAt > 120.0)
+            if (_isRunning == 1 && GetTimeSinceStartup() - _runStartedAt > 120.0)
                 _isRunning = 0;
 
             if (System.Threading.Interlocked.CompareExchange(ref _isRunning, 1, 0) != 0)

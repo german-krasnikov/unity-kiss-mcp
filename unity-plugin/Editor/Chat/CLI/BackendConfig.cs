@@ -35,6 +35,22 @@ namespace UnityMCP.Editor.Chat
         public string ExtraArgs    = "";
     }
 
+    [Serializable]
+    internal sealed class KimiBackendConfig
+    {
+        public string Model        = "kimi-k2.6"; // current default
+        public string ApprovalMode = "";           // "" | "yolo" | "plan"
+        public string ExtraArgs    = "";
+    }
+
+    [Serializable]
+    internal sealed class OpenCodeBackendConfig
+    {
+        public string Model            = "";    // "anthropic/claude-sonnet-4" or empty = opencode default
+        public bool   SkipPermissions  = true;  // --dangerously-skip-permissions
+        public string ExtraArgs        = "";
+    }
+
     /// <summary>Per-kind user overrides. Null fields = use provider default.</summary>
     internal readonly struct ChipDisplayOverride
     {

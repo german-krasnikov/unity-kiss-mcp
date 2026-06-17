@@ -12,7 +12,7 @@ def _import_lifespan():
         from unity_mcp.server import lifespan
         return lifespan
     except ImportError:
-        pytest.skip("lifespan not importable — skipping (TODO: adjust path)")
+        pytest.skip("lifespan not importable")
 
 
 async def test_lifespan_cancels_watchdog(monkeypatch):
