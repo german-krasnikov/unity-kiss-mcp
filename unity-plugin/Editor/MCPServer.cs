@@ -201,6 +201,9 @@ namespace UnityMCP.Editor
         private static volatile bool _shuttingDown;
         private static volatile bool _starting;
         private static volatile bool _isCompiling;
+        // Set on first compilationStarted; never cleared. Distinguishes real compile-in-progress
+        // from post-domain-reload stale EditorApplication.isCompiling on Windows.
+        private static volatile bool _compileStartedThisDomain;
         private static readonly string PortFilePath =
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "MCP_Port.json"));
         private static int _port;
@@ -297,6 +300,11 @@ namespace UnityMCP.Editor
             ? (DateTime.UtcNow - _compileStartTime).TotalSeconds
             : 0.0;
 
+        // True only if compilationStarted fired in THIS domain (never resets to false).
+        // Used to detect post-reload stale EditorApplication.isCompiling on Windows:
+        // if we never saw compilationStarted in this domain, isCompiling=true is a reload artifact.
+        public static bool CompileStartedThisDomain => _compileStartedThisDomain;
+
         private static double _lastWatchdogCheck;
 
         static MCPServer()
@@ -307,7 +315,7 @@ namespace UnityMCP.Editor
             EditorApplication.update += WatchdogTick;
             EditorApplication.quitting += OnQuit;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeReload;
-            CompilationPipeline.compilationStarted += _ => { _isCompiling = true; _compileStartTime = DateTime.UtcNow; WriteStateFile("compiling"); };
+            CompilationPipeline.compilationStarted += _ => { _isCompiling = true; _compileStartedThisDomain = true; _compileStartTime = DateTime.UtcNow; WriteStateFile("compiling"); };
             CompilationPipeline.compilationFinished += _ =>
             {
                 // R-4 fix: never write "ready" from compilationFinished.
@@ -355,11 +363,15 @@ namespace UnityMCP.Editor
                 _cts = cts;
                 var token = cts.Token; // local copy — safe from null after Stop()/OnBeforeReload()
 
-                for (int attempt = 0; attempt < 5; attempt++)
+                // Main listener: 3 fast retries on same port, then fall back to a free port.
+                // On Windows, ExclusiveAddressUse prevents TIME_WAIT reuse by the same process;
+                // falling back to a new port avoids the full TIME_WAIT window.
+                for (int attempt = 0; attempt < 4; attempt++)
                 {
+                    var bindPort = (attempt < 3) ? Port : PortResolver.FindFreePort(Port + 1, skipPort: ChatPort);
                     try
                     {
-                        _listener = new TcpListener(IPAddress.Loopback, Port);
+                        _listener = new TcpListener(IPAddress.Loopback, bindPort);
 #if UNITY_EDITOR_WIN
                         // Windows: SO_REUSEADDR = port-hijack; use ExclusiveAddressUse instead (CoplayDev #1173)
                         _listener.Server.ExclusiveAddressUse = true;
@@ -370,26 +382,41 @@ namespace UnityMCP.Editor
 #endif
 #endif
                         _listener.Start();
+                        if (bindPort != Port)
+                        {
+                            Debug.LogWarning($"[MCP] Port {Port} in TIME_WAIT, switched to {bindPort}");
+                            SavePorts(bindPort, ChatPort);
+                        }
                         break;
                     }
                     catch (SocketException se) when (se.SocketErrorCode == SocketError.AddressAlreadyInUse)
                     {
                         try { _listener?.Stop(); } catch { }
                         _listener = null;
-                        if (attempt == 4) throw;
-                        Debug.LogWarning($"[MCP] Port {Port} busy, retry {attempt + 1}/5...");
-                        await Task.Delay(500 * (attempt + 1), token);
+                        if (attempt == 3) throw;
+                        Debug.LogWarning($"[MCP] Port {bindPort} busy, retry {attempt + 1}/3...");
+                        await Task.Delay(400 * (attempt + 1), token);
                     }
                 }
 
                 // Chat listener — best-effort (non-fatal if chat port is unavailable)
                 for (int attempt = 0; attempt < 3; attempt++)
                 {
+                    var bindPort = (attempt < 2) ? ChatPort : PortResolver.FindFreePort(ChatPort + 1, skipPort: Port);
                     try
                     {
-                        _chatListener = new TcpListener(IPAddress.Loopback, ChatPort);
+                        _chatListener = new TcpListener(IPAddress.Loopback, bindPort);
+#if UNITY_EDITOR_WIN
+                        _chatListener.Server.ExclusiveAddressUse = true;
+#else
                         _chatListener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+#endif
                         _chatListener.Start();
+                        if (bindPort != ChatPort)
+                        {
+                            Debug.LogWarning($"[MCP] Chat port {ChatPort} in TIME_WAIT, switched to {bindPort}");
+                            SavePorts(Port, bindPort);
+                        }
                         break;
                     }
                     catch (SocketException se) when (se.SocketErrorCode == SocketError.AddressAlreadyInUse)
@@ -398,10 +425,10 @@ namespace UnityMCP.Editor
                         _chatListener = null;
                         if (attempt == 2)
                         {
-                            Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable after 3 attempts: {se.Message}");
+                            Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable after fallback: {se.Message}");
                             break;
                         }
-                        Debug.LogWarning($"[MCP] Chat port {ChatPort} busy, retry {attempt + 1}/3...");
+                        Debug.LogWarning($"[MCP] Chat port {bindPort} busy, retry {attempt + 1}/2...");
                         await Task.Delay(300 * (attempt + 1), token);
                     }
                     catch (SocketException se)
@@ -730,6 +757,14 @@ namespace UnityMCP.Editor
         }
 
         // ── Tier 2: State file ────────────────────────────────────────────────
+
+#if UNITY_INCLUDE_TESTS
+        internal static void ResetDomainStateForTests()
+        {
+            _compileStartedThisDomain = false;
+            _isCompiling = false;
+        }
+#endif
 
         internal static void WriteStateFile(string state)
         {

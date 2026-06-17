@@ -1,10 +1,11 @@
 // Resolves absolute paths to CLI binaries (claude, codex, uv, …).
-// Platform dispatch: where.exe (Windows), bash -lic (Linux), /bin/zsh -lc (macOS).
+// Platform dispatch: where.exe (Windows), bash -lic (Linux), zsh -lic (macOS).
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -107,32 +108,37 @@ namespace UnityMCP.Editor.Chat
                         };
                         break;
 
-                    default: // macOS
+                    case OperatingSystemFamily.MacOSX:
+                        // -lic: login+interactive so ~/.zshrc (kimi/opencode PATH) is sourced automatically.
                         psi = LoginShellCommand.Create("command -v \"$1\"", binary);
+                        psi.RedirectStandardError = true;
+                        psi.StandardErrorEncoding = new UTF8Encoding(false);
                         break;
+
+                    default:
+                        return null;
                 }
 
                 using var p = Process.Start(psi);
                 if (p == null) return null;
 
                 string result;
+                var sw = Stopwatch.StartNew();
                 if (SystemInfo.operatingSystemFamily == OperatingSystemFamily.Windows)
                 {
                     result = PickWindowsPath(p.StandardOutput.ReadToEnd());
                 }
-                else if (SystemInfo.operatingSystemFamily == OperatingSystemFamily.Linux)
-                {
-                    var allOutput = p.StandardOutput.ReadToEnd();
-                    try { p.StandardError.ReadToEnd(); } catch { } // drain stderr (suppress "no job control")
-                    result = PickLinuxPath(allOutput);
-                }
                 else
                 {
-                    // macOS: interior newline after Trim() == banner contamination → reject.
-                    result = RejectIfMultiline(p.StandardOutput.ReadToEnd().Trim());
+                    // Linux + macOS: parallel stdout+stderr read to avoid deadlock when stderr buffer fills.
+                    var stdoutTask = p.StandardOutput.ReadToEndAsync();
+                    var stderrTask = p.StandardError.ReadToEndAsync();
+                    Task.WhenAll(stdoutTask, stderrTask).Wait(2800);
+                    result = PickLinuxPath(stdoutTask.IsCompleted ? stdoutTask.Result : "");
                 }
 
-                if (!p.WaitForExit(3000)) { try { p.Kill(); } catch { } }
+                int remaining = Math.Max(0, 3000 - (int)sw.ElapsedMilliseconds);
+                if (!p.WaitForExit(remaining)) { try { p.Kill(); } catch { } }
                 return string.IsNullOrEmpty(result) ? null : result;
             }
             catch
@@ -177,13 +183,5 @@ namespace UnityMCP.Editor.Chat
             return null;
         }
 
-        /// <summary>
-        /// Returns null if trimmedOutput contains an interior '\n' (banner contamination).
-        /// Otherwise returns the value unchanged.
-        /// Interior newline after Trim() means multiple output lines were received — reject
-        /// to avoid treating a banner line as a valid path.
-        /// </summary>
-        internal static string RejectIfMultiline(string trimmedOutput)
-            => (trimmedOutput != null && trimmedOutput.Contains("\n")) ? null : trimmedOutput;
     }
 }

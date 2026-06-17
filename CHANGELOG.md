@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.34.6] — 2026-06-17 <!-- Binary resolver, model leak, Kimi K2 fixes, install docs -->
+
+**Fixed:**
+
+- **Binary Resolver — macOS zsh PATH sourcing** — Changed `bash -lc` to `zsh -lic` for macOS to correctly source `~/.zshrc` where kimi/opencode PATH is defined. Fixes "command not found" for CLI backends when installed via Homebrew. **Root cause:** bash doesn't inherit zsh profile. Switched to `LoginShellCommand.Create()` on macOS.
+
+- **Model Name Leak on Backend Switch** — Fixed crash when switching backends (e.g., Claude → Codex). Previous code stored selected model string in Unity EditorPref without backend-specific validation. **v0.34.2 regression** where Claude model "Sonnet 4.6" passed directly to Codex args (invalid). **Fix:** BackendConfigStore now mirrors model selection per-backend in JSON config (Claude/Codex/Gemini/Kimi each get separate `Model` field).
+
+- **Kimi K2 Protocol — 4 bugs fixed:**
+  * **Model autoconfig:** Kimi now reads `~/.kimi-code/models.json` (standard config location). Plugin writes model aliases + API model names at startup. Empty model field in BackendConfig falls back to kimi's own `config.toml` default (no hardcoded "kimi-k2.6" leak).
+  * **Config file path:** Removed `--mcp-config-file` flag — kimi automatically reads `~/.kimi-code/mcp.json` (spec-compliant). Plugin writes to standard location only.
+  * **Approval mode flags removed:** `--yolo` and `--plan` incompatible with `-p prompt` mode. Kimi ignores them silently; removed from argv to reduce noise.
+  * **Model ID migration:** Old model IDs (kimi-k2.6 → k2p6, kimi-k2.7-code → kimi-for-coding) auto-migrated on load via `BackendConfigStore.MigrateKimiModel()`.
+
+- **Binary Resolver — Parallelized stdout/stderr read** — Linux + macOS now read stdout and stderr in parallel to avoid deadlock when stderr buffer fills. Fixes rare "command not found" hang. Process timeout budget tracked with stopwatch to avoid exceeding 3s overall.
+
+- **Binary Resolver — Removed multiline rejection** — macOS "RejectIfMultiline" heuristic caused false-positive rejects. Now use unified `PickLinuxPath()` for both platforms. Detects path validity via file existence check, not multiline newlines.
+
+**Added:**
+
+- **Install docs:** `docs/install/kimi.md` — setup guide for Kimi K2 CLI backend (Homebrew, PATH, model config).
+- **Install docs:** `docs/install/gemini.md` — setup guide for Gemini CLI backend (gcloud auth, model selection).
+
+**Test Summary (v0.34.6):**
+- New tests: ChatBinaryResolverTests (27), KimiArgBuilderTests (72), KimiParserTests (26), BackendConfigStoreTests (47), ToolPingTests (24), ModelSelectorTests (17), CommandRouterTests (68 extended), ComponentSerializerTests (18), PortResolverTests (16) = ~215 new assertions
+- All green: 1562+ EditMode tests
+- **Commits (3):**
+  1. fix: Windows stability + macOS binary resolver + multi-scene disambiguation (v0.34.2)
+  2. fix: prevent model name leak when switching backends (Claude→Codex)
+  3. fix: Kimi K2 CLI backend — 4 protocol bugs + model autoconfig + install docs
+
 ## [v0.34.0] — 2026-06-17 <!-- Plugin extensibility + image drag-drop + asset viewers + Kimi K2 + OpenCode backends -->
 
 **Major Features:**

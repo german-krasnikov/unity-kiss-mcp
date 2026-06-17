@@ -36,6 +36,7 @@ namespace UnityMCP.Editor.Chat
                 store.OpenCode      = store.OpenCode      ?? new OpenCodeBackendConfig();
                 store.Chips         = store.Chips         ?? new ChipConfig();
                 store.ModelPresets  = store.ModelPresets  ?? new ModelPresetsConfig();
+                MigrateKimiModel(store);
                 return store;
             }
             catch
@@ -56,6 +57,21 @@ namespace UnityMCP.Editor.Chat
                 result[i + 1] = (entries[i].label, entries[i].modelId);
             result[result.Length - 1] = ("Custom...", ModelPresetDefaults.CustomSentinel);
             return result;
+        }
+
+        private static void MigrateKimiModel(BackendConfigStore store)
+        {
+            if (store.Kimi == null) return;
+            switch (store.Kimi.Model)
+            {
+                case "kimi-k2.7-code":
+                case "kimi-k2.7-code-highspeed":
+                    store.Kimi.Model = "kimi-for-coding"; break;
+                case "kimi-k2.6":
+                    store.Kimi.Model = "k2p6"; break;
+                case "kimi-k2.5":
+                    store.Kimi.Model = "k2p5"; break;
+            }
         }
 
         internal void Save(string path = null)

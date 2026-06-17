@@ -172,7 +172,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(0, events.Count);
         }
 
-        // ── M1: TurnDone (finish_reason) ──────────────────────────────────────
+        // ── M1: TurnDone (finish_reason fallback + meta hint) ────────────────
 
         [Test]
         public void Assistant_FinishReasonStop_EmitsTurnDone()
@@ -209,6 +209,30 @@ namespace UnityMCP.Editor.Chat.Tests
             var events = Parse(line);
             // tool_calls finish_reason with empty content + empty tool_calls → nothing
             Assert.IsFalse(events.Exists(e => e.Kind == ChatEventKind.TurnDone));
+        }
+
+        [Test]
+        public void Meta_SessionResumeHint_EmitsTurnDone()
+        {
+            var line = "{\"role\":\"meta\",\"type\":\"session.resume_hint\",\"session_id\":\"session_xxx\",\"command\":\"kimi -r session_xxx\",\"content\":\"...\"}";
+            var events = Parse(line);
+            Assert.AreEqual(1, events.Count);
+            Assert.AreEqual(ChatEventKind.TurnDone, events[0].Kind);
+        }
+
+        [Test]
+        public void Meta_OtherType_EmitsNothing()
+        {
+            var line = "{\"role\":\"meta\",\"type\":\"something_else\"}";
+            var events = Parse(line);
+            Assert.AreEqual(0, events.Count);
+        }
+
+        [Test]
+        public void Meta_NoTypeField_EmitsNothing()
+        {
+            var events = Parse("{\"role\":\"meta\"}");
+            Assert.AreEqual(0, events.Count);
         }
 
         // ── M3: tool error state ──────────────────────────────────────────────

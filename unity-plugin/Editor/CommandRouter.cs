@@ -15,12 +15,27 @@ namespace UnityMCP.Editor
         // Fired when ask_user command arrives; MCPChatWindow subscribes to show AskUserCard.
         public static event System.Action<string, string> OnAskUser;  // (requestId, questionsJson)
 
-        // Testable compilation state (defaults to real EditorApplication state)
-        internal static Func<bool> IsCompiling = () =>
+        // Testable compilation state (defaults to real EditorApplication state).
+        // Three-layer check:
+        //   1. EditorApplication.isCompiling — fast exit if not compiling at all.
+        //   2. MCPServer.CompileStartedThisDomain — rejects post-reload stale isCompiling on
+        //      Windows where isCompiling stays true for 1-3 ticks after domain load completes.
+        //   3. Elapsed < 120s — wedge guard: treat >120s latched compiling as done.
+
+        // Test seam for EditorApplication.isCompiling — allows WIN-1 tests to inject true
+        // without replacing the entire IsCompiling lambda.
+        internal static Func<bool> EditorIsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+
+        // Production lambda — saved separately so tests can restore it via DefaultIsCompiling
+        // instead of reconstructing the lambda by hand.
+        internal static readonly Func<bool> DefaultIsCompiling = () =>
         {
-            if (!UnityEditor.EditorApplication.isCompiling) return false;
+            if (!EditorIsCompiling()) return false;
+            if (!MCPServer.CompileStartedThisDomain) return false;  // stale reload artifact
             return MCPServer.CompileElapsedSeconds < 120.0;
         };
+
+        internal static Func<bool> IsCompiling = DefaultIsCompiling;
         internal static Func<bool> IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
         internal static Func<string, bool> IsToolEnabledFn = MCPSettings.IsToolEnabled;
 

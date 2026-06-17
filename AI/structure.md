@@ -453,6 +453,12 @@ unity-kiss-mcp/
 │   ├── Assets/Shaders/          # TestGraph.shadergraph
 │   ├── Assets/Scripts/          # Test helpers (GridPlayer, etc.)
 │   └── Packages/manifest.json   # References unity-plugin via file:
+├── docs/                       # User documentation
+│   ├── assets/                 # SVG diagrams and badges
+│   ├── install/                # Backend setup guides (v0.34.6+)
+│   │   ├── kimi.md             # Kimi K2 CLI backend: Homebrew, PATH, model config
+│   │   └── gemini.md           # Gemini backend: gcloud auth, model selection
+│   └── README.md               # Root documentation mirror
 ├── install.py                  # Setup/update/doctor/configure CLI (v0.23.0, 179 lines)
 ├── .mcp.json                   # uv-based config template (v0.23.0, no absolute paths)
 ├── scripts/                    # Tooling: changelog SVG, force_reset.sh (recovery), test updates

@@ -251,6 +251,53 @@ namespace UnityMCP.Editor.Chat.Tests
             }
         }
 
+        // ── Kimi model ID migration (v0.34.6) ─────────────────────────────────
+
+        [Test]
+        public void MigrateKimi_OldK27Code_BecomesKimiForCoding()
+        {
+            var json = "{\"Kimi\":{\"Model\":\"kimi-k2.7-code\",\"ApprovalMode\":\"\",\"ExtraArgs\":\"\"}}";
+            File.WriteAllText(_tempPath, json);
+            var store = BackendConfigStore.Load(_tempPath);
+            Assert.AreEqual("kimi-for-coding", store.Kimi.Model);
+        }
+
+        [Test]
+        public void MigrateKimi_OldK27CodeHighspeed_BecomesKimiForCoding()
+        {
+            var json = "{\"Kimi\":{\"Model\":\"kimi-k2.7-code-highspeed\",\"ApprovalMode\":\"\",\"ExtraArgs\":\"\"}}";
+            File.WriteAllText(_tempPath, json);
+            var store = BackendConfigStore.Load(_tempPath);
+            Assert.AreEqual("kimi-for-coding", store.Kimi.Model);
+        }
+
+        [Test]
+        public void MigrateKimi_OldK26_BecomesK2p6()
+        {
+            var json = "{\"Kimi\":{\"Model\":\"kimi-k2.6\",\"ApprovalMode\":\"\",\"ExtraArgs\":\"\"}}";
+            File.WriteAllText(_tempPath, json);
+            var store = BackendConfigStore.Load(_tempPath);
+            Assert.AreEqual("k2p6", store.Kimi.Model);
+        }
+
+        [Test]
+        public void MigrateKimi_OldK25_BecomesK2p5()
+        {
+            var json = "{\"Kimi\":{\"Model\":\"kimi-k2.5\",\"ApprovalMode\":\"\",\"ExtraArgs\":\"\"}}";
+            File.WriteAllText(_tempPath, json);
+            var store = BackendConfigStore.Load(_tempPath);
+            Assert.AreEqual("k2p5", store.Kimi.Model);
+        }
+
+        [Test]
+        public void MigrateKimi_NewId_Unchanged()
+        {
+            var json = "{\"Kimi\":{\"Model\":\"kimi-for-coding\",\"ApprovalMode\":\"\",\"ExtraArgs\":\"\"}}";
+            File.WriteAllText(_tempPath, json);
+            var store = BackendConfigStore.Load(_tempPath);
+            Assert.AreEqual("kimi-for-coding", store.Kimi.Model);
+        }
+
         private sealed class FakeDepthProvider : IChipKindProvider
         {
             public string Key          => "custom_depth_test";

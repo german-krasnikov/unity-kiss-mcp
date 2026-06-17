@@ -1,5 +1,5 @@
 // Build kimi CLI argv. Pure static — no process spawning, fully NUnit-testable.
-// MCP config written to ~/.kimi-code/mcp.json, passed via --mcp-config-file.
+// MCP config written to ~/.kimi-code/mcp.json (read automatically by kimi).
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,14 +27,13 @@ namespace UnityMCP.Editor.Chat
 #endif
             if (port == 0) port = 9500; // fallback for test context
 
+            WriteModelsConfig(dir);
             WriteMcpConfig(dir, port);
-            var configPath = Path.Combine(dir, "mcp.json");
 
             var args = new List<string>
             {
                 "-p", prompt,
                 "--output-format", "stream-json",
-                "--mcp-config-file", configPath,
             };
 
             if (!string.IsNullOrEmpty(model))
@@ -43,16 +42,55 @@ namespace UnityMCP.Editor.Chat
                 args.Add(model);
             }
 
-            if (string.Equals(approvalMode, "yolo", StringComparison.OrdinalIgnoreCase))
-                args.Add("--yolo");
-            else if (string.Equals(approvalMode, "plan", StringComparison.OrdinalIgnoreCase))
-                args.Add("--plan");
+            // --yolo/--plan incompatible with -p mode
 
             if (!string.IsNullOrEmpty(extraArgs))
                 foreach (var token in ArgTokenizer.Split(extraArgs))
                     args.Add(token);
 
             return (args.ToArray(), new string[0]); // Kimi uses OAuth — nothing to strip
+        }
+
+        // ── Models config ─────────────────────────────────────────────────────
+
+        private static readonly (string alias, string apiModel)[] KnownModels = new[]
+        {
+            ("kimi-for-coding", "kimi-for-coding"),
+            ("k2p6",            "k2p6"),
+            ("k2p5",            "k2p5"),
+        };
+
+        internal static void WriteModelsConfig(string dir)
+        {
+            if (string.IsNullOrEmpty(dir)) return;
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            var path    = Path.Combine(dir, "config.toml");
+            var content = File.Exists(path) ? File.ReadAllText(path, Encoding.UTF8) : "";
+            var sb      = new StringBuilder();
+
+            foreach (var (alias, apiModel) in KnownModels)
+            {
+                // Accept both short and full-path variants
+                if (content.Contains($"[models.\"{alias}\"]") ||
+                    content.Contains($"[models.\"kimi-code/{alias}\"]"))
+                    continue;
+
+                sb.AppendLine();
+                sb.AppendLine($"[models.\"{alias}\"]");
+                sb.AppendLine($"provider = \"managed:kimi-code\"");
+                sb.AppendLine($"model = \"{apiModel}\"");
+                sb.AppendLine($"max_context_size = 262144");
+                sb.AppendLine($"capabilities = [ \"thinking\", \"always_thinking\", \"image_in\", \"video_in\", \"tool_use\" ]");
+            }
+
+            if (sb.Length == 0) return; // nothing new to write
+
+            if (content.Length > 0 && !content.EndsWith("\n"))
+                content += "\n";
+
+            File.WriteAllText(path, content + sb.ToString(), new UTF8Encoding(false));
         }
 
         // ── MCP config ────────────────────────────────────────────────────────

@@ -24,6 +24,9 @@ namespace UnityMCP.Editor.Chat.Tests
             ChatBinaryResolver.WhichOverride = null;
             EditorPrefs.DeleteKey(ChatBinaryResolver.PrefKey);
             EditorPrefs.DeleteKey(ChatBinaryResolver.CodexPrefKey);
+            EditorPrefs.DeleteKey(ChatBinaryResolver.KimiPrefKey);
+            EditorPrefs.DeleteKey(ChatBinaryResolver.OpenCodePrefKey);
+            EditorPrefs.DeleteKey(ChatBinaryResolver.GeminiPrefKey);
         }
 
         [Test]
@@ -192,31 +195,29 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNull(ChatBinaryResolver.PickLinuxPath(""));
         }
 
-        // ── RejectIfMultiline ─────────────────────────────────────────────────
+        // ── macOS .zshrc banner handling (via PickLinuxPath) ──────────────────
 
         [Test]
-        public void RejectIfMultiline_CleanPath_ReturnsItself()
+        public void PickLinuxPath_ZshrcBannerThenKimiPath_ReturnsPath()
         {
-            Assert.AreEqual("/usr/local/bin/claude", ChatBinaryResolver.RejectIfMultiline("/usr/local/bin/claude"));
+            // .zshrc may print a banner before command -v outputs the path
+            var input = "Welcome to kimi-code!\n/Users/me/.kimi-code/bin/kimi\n";
+            Assert.AreEqual("/Users/me/.kimi-code/bin/kimi", ChatBinaryResolver.PickLinuxPath(input));
         }
 
         [Test]
-        public void RejectIfMultiline_InteriorNewline_ReturnsNull()
+        public void PickLinuxPath_ZshrcBannerThenOpencodeePath_ReturnsPath()
         {
-            // Interior \n after Trim() == banner contamination (multiple output lines)
-            Assert.IsNull(ChatBinaryResolver.RejectIfMultiline("/usr/local/bin/claude\nbanner line"));
+            var input = "opencode configured\n/Users/me/.opencode/bin/opencode\n";
+            Assert.AreEqual("/Users/me/.opencode/bin/opencode", ChatBinaryResolver.PickLinuxPath(input));
         }
 
         [Test]
-        public void RejectIfMultiline_NullInput_ReturnsNull()
+        public void PickLinuxPath_PathWithSpaces_ReturnsCorrectPath()
         {
-            Assert.IsNull(ChatBinaryResolver.RejectIfMultiline(null));
+            var input = "/Users/my user/.kimi-code/bin/kimi\n";
+            Assert.AreEqual("/Users/my user/.kimi-code/bin/kimi", ChatBinaryResolver.PickLinuxPath(input));
         }
 
-        [Test]
-        public void RejectIfMultiline_EmptyString_ReturnsEmpty()
-        {
-            Assert.AreEqual("", ChatBinaryResolver.RejectIfMultiline(""));
-        }
     }
 }

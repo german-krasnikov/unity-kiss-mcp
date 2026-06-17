@@ -104,15 +104,15 @@ namespace UnityMCP.Editor
                         else
                         {
                             if (ambiguous.Count == 0)
-                                ambiguous.Add($"{foundScene}:/{name}");
-                            ambiguous.Add($"{scene.name}:/{name}");
+                                ambiguous.Add($"{foundScene}:/{name} (#{found.GetInstanceID()})");
+                            ambiguous.Add($"{scene.name}:/{name} (#{root.GetInstanceID()})");
                         }
                     }
                 }
             }
             if (ambiguous.Count > 0)
                 throw new System.ArgumentException(
-                    $"Ambiguous: '{name}' exists in {ambiguous.Count} scenes. Use: " + string.Join(" or ", ambiguous));
+                    $"Ambiguous: '{name}' matches {ambiguous.Count} objects. Use instance ID: " + string.Join(" or ", ambiguous));
             return found;
         }
 

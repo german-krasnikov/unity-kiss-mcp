@@ -56,20 +56,11 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void Build_ContainsMcpConfigFileFlag()
+        public void Build_NoMcpConfigFileFlag()
         {
             var (args, _) = Build();
-            Assert.Contains("--mcp-config-file", args);
-            int idx = System.Array.IndexOf(args, "--mcp-config-file");
-            StringAssert.EndsWith("mcp.json", args[idx + 1]);
-        }
-
-        [Test]
-        public void Build_McpConfigFile_PointsToInjectedDir()
-        {
-            var (args, _) = Build();
-            int idx = System.Array.IndexOf(args, "--mcp-config-file");
-            StringAssert.StartsWith(_tempDir, args[idx + 1]);
+            Assert.IsFalse(System.Array.IndexOf(args, "--mcp-config-file") >= 0,
+                "--mcp-config-file must not be passed; kimi reads ~/.kimi-code/mcp.json automatically");
         }
 
         // ── StripEnvKeys ──────────────────────────────────────────────────────
@@ -111,19 +102,13 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── Approval mode ─────────────────────────────────────────────────────
 
         [Test]
-        public void Build_YoloMode_AddsYoloFlag()
+        public void Build_YoloPlan_NotAddedInPromptMode()
         {
             var (args, _) = Build(approvalMode: "yolo");
-            Assert.Contains("--yolo", args);
-        }
-
-        [Test]
-        public void Build_PlanMode_AddsPlanFlag()
-        {
-            var (args, _) = Build(approvalMode: "plan");
-            Assert.Contains("--plan", args);
             Assert.IsFalse(System.Array.IndexOf(args, "--yolo") >= 0,
-                "--yolo must not appear in plan mode");
+                "--yolo incompatible with -p mode");
+            Assert.IsFalse(System.Array.IndexOf(args, "--plan") >= 0,
+                "--plan incompatible with -p mode");
         }
 
         [Test]
@@ -209,6 +194,49 @@ namespace UnityMCP.Editor.Chat.Tests
             var content = File.ReadAllText(path);
             StringAssert.Contains("9900", content);
             StringAssert.DoesNotContain("9501", content);
+        }
+
+        // ── Models config ─────────────────────────────────────────────────────
+
+        [Test]
+        public void Build_WriteModelsConfig_CreatesConfigToml()
+        {
+            Build();
+            var path = Path.Combine(_tempDir, "config.toml");
+            Assert.IsTrue(File.Exists(path), "config.toml must be created");
+            var content = File.ReadAllText(path);
+            StringAssert.Contains("[models.\"kimi-for-coding\"]", content);
+            StringAssert.Contains("[models.\"k2p6\"]", content);
+            StringAssert.Contains("[models.\"k2p5\"]", content);
+            StringAssert.Contains("provider = \"managed:kimi-code\"", content);
+        }
+
+        [Test]
+        public void Build_WriteModelsConfig_SkipsExistingModel()
+        {
+            var path = Path.Combine(_tempDir, "config.toml");
+            File.WriteAllText(path, "[models.\"k2p6\"]\nprovider = \"managed:kimi-code\"\n");
+
+            KimiArgBuilder.WriteModelsConfig(_tempDir);
+
+            var content = File.ReadAllText(path);
+            // k2p6 must appear only once
+            Assert.AreEqual(1, CountOccurrences(content, "[models.\"k2p6\"]"),
+                "k2p6 must not be duplicated");
+            // other models still added
+            StringAssert.Contains("[models.\"kimi-for-coding\"]", content);
+            StringAssert.Contains("[models.\"k2p5\"]", content);
+        }
+
+        private static int CountOccurrences(string text, string pattern)
+        {
+            int count = 0, idx = 0;
+            while ((idx = text.IndexOf(pattern, idx, System.StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                idx += pattern.Length;
+            }
+            return count;
         }
     }
 }

@@ -22,7 +22,7 @@ async def permission_prompt(tool_name: str, input: dict, tool_use_id: str):
             })
         except Exception:
             return json.dumps({"behavior": "deny", "message": "Unity not connected or user dismissed"})
-    return json.dumps({"behavior": "allow"})
+    return json.dumps({"behavior": "allow", "updatedInput": input})
 
 
 def register(mcp, send, args):

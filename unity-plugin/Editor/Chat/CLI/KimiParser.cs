@@ -29,8 +29,13 @@ namespace UnityMCP.Editor.Chat
                         var content = JsonHelper.ExtractString(line, "content") ?? "";
                         if (content.Length > 0) sink.Add(ChatEvent.TextDelta(content));
                     }
-                    // Kimi emits finish_reason:"stop" on the final assistant message.
+                    // Fallback: some kimi versions may emit finish_reason:"stop".
                     if (JsonHelper.ExtractString(line, "finish_reason") == "stop")
+                        sink.Add(ChatEvent.TurnDone(null, 0f, 0, 0));
+                    break;
+
+                case "meta":
+                    if (JsonHelper.ExtractString(line, "type") == "session.resume_hint")
                         sink.Add(ChatEvent.TurnDone(null, 0f, 0, 0));
                     break;
 

@@ -165,6 +165,22 @@ namespace UnityMCP.Editor.Tests
             Assert.IsTrue(PortResolver.IsValidPort(port));
         }
 
+        [Test]
+        public void FindFreePort_WhenStartPortOccupied_ReturnsDifferentPort()
+        {
+            // Simulate TIME_WAIT: hold the start port, expect FindFreePort to skip past it
+            var blocker = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            blocker.Start();
+            var busyPort = ((System.Net.IPEndPoint)blocker.LocalEndpoint).Port;
+            try
+            {
+                var found = PortResolver.FindFreePort(busyPort);
+                Assert.AreNotEqual(busyPort, found);
+                Assert.IsTrue(PortResolver.IsValidPort(found));
+            }
+            finally { blocker.Stop(); }
+        }
+
         // ── SavePorts ─────────────────────────────────────────────────────────
 
         [Test]

@@ -38,7 +38,9 @@ async def test_non_ask_user_returns_allow(monkeypatch):
     send = AsyncMock()
     monkeypatch.setattr(mod, "_send", send)
     result = await mod.permission_prompt("Bash", {"command": "ls"}, "tu-3")
-    assert json.loads(result) == {"behavior": "allow"}
+    data = json.loads(result)
+    assert data["behavior"] == "allow"
+    assert data["updatedInput"] == {"command": "ls"}  # new schema: allow requires updatedInput
     send.assert_not_awaited()
 
 

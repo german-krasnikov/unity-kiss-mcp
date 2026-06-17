@@ -228,6 +228,23 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreSame(store, result, "sentinel must not be passed to CLI");
         }
 
+        // ── Regression: backend-switch model leak ─────────────────────────────
+        // Bug: switching Claude→Codex with _selectedModel="claude-sonnet-4-6" caused
+        // ApplySelectedModel(store, Codex, "claude-sonnet-4-6") to set Codex.Model
+        // to a Claude model ID → Codex API 400 error.
+        // Fix: _selectedModel reset to "" before CreateBackend on backend switch.
+        // The empty-string early-return in ApplySelectedModel prevents the leak.
+        [Test]
+        public void ApplySelectedModel_EmptyModel_CodexKind_DoesNotLeakClaudeModelId()
+        {
+            var store = new BackendConfigStore();
+            // Simulate: after backend switch, _selectedModel was reset to ""
+            var result = MCPChatWindow.ApplySelectedModel(store, BackendKind.Codex, "");
+            Assert.AreSame(store, result, "empty selectedModel must return same store");
+            Assert.AreNotEqual("claude-sonnet-4-6", result.Codex.Model,
+                "Codex must never receive a Claude model ID via leaked _selectedModel");
+        }
+
         // ── Codex extended model list ─────────────────────────────────────────
 
         [Test]

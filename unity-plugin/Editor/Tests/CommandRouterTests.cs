@@ -130,7 +130,7 @@ namespace UnityMCP.Editor.Tests
                 Assert.IsTrue(result.Contains("\"ok\":false"), result);
                 Assert.IsTrue(result.Contains("retry"), result);
             }
-            finally { CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling; }
+            finally { CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling; }
         }
 
         [Test]
@@ -144,7 +144,7 @@ namespace UnityMCP.Editor.Tests
                 Assert.IsTrue(result.Contains("\"ok\":true"), result);
                 Assert.IsTrue(result.Contains("pong"), result);
             }
-            finally { CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling; }
+            finally { CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling; }
         }
 
         // ── Process: play-mode guard blocks mutating commands ─────────────────
@@ -163,7 +163,7 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
                 CommandRouter.IsPlayMode  = () => UnityEditor.EditorApplication.isPlaying;
             }
         }
@@ -184,7 +184,7 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
                 CommandRouter.IsPlayMode  = () => UnityEditor.EditorApplication.isPlaying;
             }
         }
@@ -207,7 +207,7 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
                 CommandRouter.IsPlayMode  = () => UnityEditor.EditorApplication.isPlaying;
             }
         }
@@ -245,7 +245,7 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
                 CommandRouter.IsPlayMode  = () => UnityEditor.EditorApplication.isPlaying;
                 CommandRouter.IsToolEnabledFn = MCPSettings.IsToolEnabled;
             }
@@ -292,7 +292,7 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
             }
         }
 
@@ -312,7 +312,7 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
             }
         }
 
@@ -405,6 +405,54 @@ namespace UnityMCP.Editor.Tests
             => Assert.IsFalse(CommandRouter.IsAllowedDuringCompile("recompile"),
                 "G11: recompile (AssetDatabase.Refresh no-op) must NOT be in the allowlist");
 
+        // ── WIN-1: post-reload stale isCompiling — EditorApplication.isCompiling true but
+        //           compilationStarted never fired in this domain (Windows domain-reload artifact) ──
+
+        [Test]
+        public void IsCompiling_StaleReloadArtifact_EditorCompilingTrueButNoDomainStart_ReturnsFalse()
+        {
+            // Uses production DefaultIsCompiling with:
+            //   - EditorIsCompiling injected to true (simulates Windows stale tick after reload)
+            //   - MCPServer state reset so CompileStartedThisDomain=false (fresh domain)
+            // Guard 2 should block → returns false even though EditorApplication says "compiling".
+            CommandRouter.EditorIsCompiling = () => true;  // Windows stale artifact
+            CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
+            MCPServer.ResetDomainStateForTests();  // CompileStartedThisDomain=false
+            try
+            {
+                Assert.IsFalse(CommandRouter.IsCompiling(),
+                    "WIN-1: stale post-reload isCompiling must not block commands");
+            }
+            finally
+            {
+                CommandRouter.EditorIsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
+            }
+        }
+
+        [Test]
+        public void Process_StaleReloadArtifact_UnblocksCommand()
+        {
+            // End-to-end: stale Windows isCompiling (EditorIsCompiling=true, CompileStartedThisDomain=false)
+            // must not block commands — DefaultIsCompiling Guard 2 returns false.
+            CommandRouter.EditorIsCompiling = () => true;  // Windows stale artifact
+            CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
+            CommandRouter.IsPlayMode = () => false;
+            MCPServer.ResetDomainStateForTests();  // CompileStartedThisDomain=false
+            try
+            {
+                var json = "{\"id\":\"win1\",\"cmd\":\"ping\",\"args\":{}}";
+                var result = CommandRouter.Process(json);
+                Assert.IsTrue(result.Contains("\"ok\":true"), result);
+            }
+            finally
+            {
+                CommandRouter.EditorIsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
+                CommandRouter.IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
+            }
+        }
+
         // ── RC-2: isCompiling wedge — elapsed > 120s treated as non-compiling ──
 
         [Test]
@@ -421,7 +469,7 @@ namespace UnityMCP.Editor.Tests
                 Assert.IsFalse(CommandRouter.IsCompiling(),
                     "Wedge condition: elapsed > 120s must unblock commands");
             }
-            finally { CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling; }
+            finally { CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling; }
         }
 
         [Test]
@@ -438,7 +486,7 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.IsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
                 CommandRouter.IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
             }
         }

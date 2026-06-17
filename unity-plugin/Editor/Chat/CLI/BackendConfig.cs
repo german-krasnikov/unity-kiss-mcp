@@ -38,7 +38,7 @@ namespace UnityMCP.Editor.Chat
     [Serializable]
     internal sealed class KimiBackendConfig
     {
-        public string Model        = "kimi-k2.6"; // current default
+        public string Model        = ""; // empty = use kimi's config.toml default
         public string ApprovalMode = "";           // "" | "yolo" | "plan"
         public string ExtraArgs    = "";
     }

@@ -432,6 +432,24 @@ namespace UnityMCP.Editor.Tests
             Assert.IsNotNull(result);
             Assert.IsTrue(result.Contains("m_LocalPosition"), $"Expected position field, got:\n{result}");
         }
+
+        [Test]
+        public void FindRoot_DuplicateNamesInSameScene_ThrowsWithUniqueHints()
+        {
+            var a = new GameObject("DupTest");
+            var b = new GameObject("DupTest");
+            _toDestroy.Add(a);
+            _toDestroy.Add(b);
+
+            var ex = Assert.Throws<System.ArgumentException>(() => ComponentSerializer.FindObject("DupTest"));
+            // Message must say "matches" and contain "#" for instance IDs
+            StringAssert.Contains("matches", ex.Message);
+            StringAssert.Contains("#", ex.Message);
+            // Two different IDs must appear — hints are unique
+            Assert.AreNotEqual(a.GetInstanceID(), b.GetInstanceID());
+            StringAssert.Contains(a.GetInstanceID().ToString(), ex.Message);
+            StringAssert.Contains(b.GetInstanceID().ToString(), ex.Message);
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────

@@ -84,6 +84,7 @@ namespace UnityMCP.Editor.Chat
 
                 _selectedKind  = spec.Kind;
                 _selectedAgent = spec.AgentName;
+                _selectedModel = ""; // reset before CreateBackend so stale model doesn't leak to new backend
                 EditorPrefs.SetString(DropdownPrefKey, chosenName); // F23: persist selection.
                 _backend?.Stop();
                 ResetTokenCounters();

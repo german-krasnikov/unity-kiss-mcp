@@ -45,7 +45,7 @@ namespace UnityMCP.Editor.Chat
 
                 img.RegisterCallback<DetachFromPanelEvent>(_ =>
                 {
-                    if (tex != null) Object.DestroyImmediate(tex);
+                    if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
                 });
 
                 var captured = absolutePath;

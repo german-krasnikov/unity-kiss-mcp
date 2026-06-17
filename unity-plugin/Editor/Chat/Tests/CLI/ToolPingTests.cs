@@ -143,5 +143,29 @@ namespace UnityMCP.Editor.Chat.Tests
             var rec = new ToolCallRecord("set_property", "id7", "{\"path\":\"/X\"}");
             Assert.IsFalse(rec.HasResult, "Fresh record without result must have HasResult==false");
         }
+
+        [Test]
+        public void ExtractPath_PathsKey_ReturnsFirstPath()
+        {
+            var result = ToolPing.ExtractPath("{\"paths\":\"/A\"}");
+            Assert.AreEqual("/A", result);
+        }
+
+        [Test]
+        public void TryPing_AmbiguousPath_ReturnsFalseNoThrow()
+        {
+            var a = new GameObject("DupPing");
+            var b = new GameObject("DupPing");
+            try
+            {
+                var rec = new ToolCallRecord("set_property", "id8", "{\"path\":\"/DupPing\"}");
+                Assert.IsFalse(ToolPing.TryPing(rec));
+            }
+            finally
+            {
+                Object.DestroyImmediate(a);
+                Object.DestroyImmediate(b);
+            }
+        }
     }
 }

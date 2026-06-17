@@ -80,12 +80,11 @@ namespace UnityMCP.Editor.Chat
             },
             [BackendKind.Kimi] = new[]
             {
-                ("Default",          ""),
-                ("K2.7 Code",        "kimi-k2.7-code"),
-                ("K2.7 Code HQ",     "kimi-k2.7-code-highspeed"),
-                ("K2.6",             "kimi-k2.6"),
-                ("K2.5",             "kimi-k2.5"),
-                ("Custom...",        CustomSentinel),
+                ("Default",   ""),
+                ("K2.7 Code", "kimi-for-coding"),
+                ("K2.6",      "k2p6"),
+                ("K2.5",      "k2p5"),
+                ("Custom...", CustomSentinel),
             },
             [BackendKind.OpenCode] = new[]
             {
