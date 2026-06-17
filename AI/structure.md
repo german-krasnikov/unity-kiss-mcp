@@ -141,7 +141,7 @@ unity-kiss-mcp/
 ├── unity-plugin/               # Unity Editor Plugin (130+ C# files, ~14000 LOC, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
-│       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, etc.) + 25 tests
+│       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, SaveProjectSettings) + 35 tests (v0.35.0: 4-arg chain env→ProjectSettings→Library→FindFreePort)
 │       ├── CommandRouter.cs                # RegisterAll(), guards, core dispatch (partial class)
 │       ├── CommandRouter.ObjectHandlers.cs # Object mutation handlers (partial class)
 │       ├── CommandRouter.MediaHandlers.cs  # Media/asset handlers (partial class)
@@ -365,6 +365,8 @@ unity-kiss-mcp/
 │       │   │   │   ├── MarkdownParser.Blocks.cs # Block parsing helpers
 │       │   │   │   ├── MarkdownInline.cs      # Inline spans → Unity rich-text (noparse <>, protect code)
 │       │   │   │   ├── InlineImageThumbnail.cs # Image thumbnail rendering in paragraphs (v0.34.0, 70 LOC)
+│       │   │   │   ├── ChipInlinePreviewPanel.cs # Lazy-load toggle panel for media previews (v0.35.0, 57 LOC)
+│       │   │   │   ├── InlinePreviewBuilder.cs # Extensible preview factory (texture/image/model/prefab/audio, v0.35.0, 116 LOC)
 │       │   │   │   ├── IChatBlockRenderer.cs  # Extension interface (can-render + render)
 │       │   │   │   ├── ChatBlockRendererRegistry.cs # Ordered first-match-wins
 │       │   │   │   ├── ChatBlockRendererFactory.cs # Default wiring (Mermaid first, Markdown catch-all); injects ChatRefResolver + AddRefToContext
@@ -423,9 +425,13 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── TokenFormatTests.cs     # Token cost display formatting + null-safe guards (v0.31.0, 12 tests)
 │       │   │   │   │   ├── ClipboardPasteTests.cs  # Clipboard image paste + mime detection (v0.34.0, 37 tests)
 │       │   │   │   │   ├── ImageDragDropTests.cs   # Image drag-drop from Finder (v0.34.0, 154 tests)
-│       │   │   │   │   ├── InlineImageThumbnailTests.cs # Image thumbnails in chat paragraphs (v0.34.0, 116 tests)
+│       │   │   │   │   ├── InlineImageThumbnailTests.cs # Image thumbnails in chat paragraphs (v0.34.0, 116 tests + 13 extended v0.35.0)
+│       │   │   │   │   ├── ChipInlinePreviewPanelTests.cs # Inline preview toggle panel (v0.35.0, 8 tests)
+│       │   │   │   │   ├── InlinePreviewBuilderTests.cs # Preview factory extensibility (v0.35.0, 9 tests)
+│       │   │   │   │   ├── MultiImageBubbleTests.cs # Multi-image bubble rendering (v0.35.0, 3 tests)
+│       │   │   │   │   ├── ImageViewerWindowTests.cs # Image viewer window (v0.35.0, 8 tests)
 │       │   │   │   │   ├── PrefabViewerWindowTests.cs # Prefab preview window (v0.34.0, 198 tests)
-│       │   │   │   │   ├── AssetViewerFactoryTests.cs # Media viewer factory + registry (v0.34.0, 224 tests)
+│       │   │   │   │   ├── AssetViewerFactoryTests.cs # Media viewer factory + registry (v0.34.0, 224 tests + 11 extended v0.35.0)
 │       │   │   │   │   ├── PluginSettingsInjectionTests.cs # ISettingsProvider plugin interface (v0.34.0, 72 tests)
 │       │   │   │   │   ├── PluginToolbarButtonTests.cs # IToolbarButtonProvider plugin interface (v0.34.0, 105 tests)
 │       │   │   │   │   └── ... # 48+ total View tests

@@ -71,8 +71,22 @@ def main() -> None:
     g.add_argument("--collect", action="store_true", help="Collect live facts + write _meta.json")
     g.add_argument("--render", action="store_true", help="Read _meta.json + regenerate outputs")
     g.add_argument("--check", action="store_true", help="Render in-memory, exit 1 if stale")
+    g.add_argument("--check-facts", dest="check_facts", action="store_true",
+                   help="Collect fresh facts, exit 1 if _meta.json is stale")
     g.add_argument("--all", dest="all_", action="store_true", help="collect then render (default)")
     args = ap.parse_args()
+
+    if args.check_facts:
+        from readme_facts import collect_facts, load_meta
+        fresh = collect_facts(REPO_ROOT)
+        stored = load_meta(REPO_ROOT)
+        drifted = {k: (stored.get(k), fresh[k]) for k in fresh if stored.get(k) != fresh[k]}
+        if drifted:
+            for k, (was, now) in drifted.items():
+                print(f"DRIFT {k}: stored={was} actual={now}")
+            sys.exit(1)
+        print("facts OK")
+        return
 
     do_collect = args.collect or args.all_ or not any([args.collect, args.render, args.check, args.all_])
     do_render  = args.render  or args.all_ or not any([args.collect, args.render, args.check, args.all_])

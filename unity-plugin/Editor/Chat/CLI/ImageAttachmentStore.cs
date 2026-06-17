@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using UnityEngine;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -27,7 +28,11 @@ namespace UnityMCP.Editor.Chat
             {
                 var bytes = File.ReadAllBytes(srcAbsPath);
                 // C1: size guard
-                if (bytes.Length > MaxBytes) return null;
+                if (bytes.Length > MaxBytes)
+                {
+                    Debug.LogWarning($"[MCP Chat] Image too large (>{MaxBytes / 1_048_576}MB): {Path.GetFileName(srcAbsPath)}");
+                    return null;
+                }
                 var name  = Path.GetFileName(srcAbsPath);
                 return Write(bytes, name, storeDir ?? DefaultRoot);
             }
@@ -77,7 +82,11 @@ namespace UnityMCP.Editor.Chat
         private static string Write(byte[] bytes, string originalName, string dir)
         {
             // C2: reject non-image bytes (e.g. disguised executables)
-            if (!HasImageMagicBytes(bytes)) return null;
+            if (!HasImageMagicBytes(bytes))
+            {
+                Debug.LogWarning($"[MCP Chat] Unsupported image format: {originalName}");
+                return null;
+            }
             Directory.CreateDirectory(dir);
             var prefix = Md5Prefix(bytes);
             var dest   = Path.Combine(dir, prefix + "_" + originalName);

@@ -8,6 +8,7 @@ Phase 3 checks:
 Run: pytest -m live tests/live/test_sync_e2e.py -v
 """
 import asyncio
+import os
 import time
 
 import pytest
@@ -19,8 +20,8 @@ from tests.live.conftest import _connect_with_retry
 
 pytestmark = pytest.mark.live
 
-HOST = "127.0.0.1"
-PORT = 9500
+HOST = os.environ.get("UNITY_MCP_HOST", "127.0.0.1")
+PORT = int(os.environ.get("UNITY_MCP_PORT", "9500"))
 
 
 # ---------------------------------------------------------------------------

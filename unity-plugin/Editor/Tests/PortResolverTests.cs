@@ -232,5 +232,60 @@ namespace UnityMCP.Editor.Tests
             Assert.AreEqual(9501, PortResolver.ParsePortFromJson(content, "chatPort"));
             File.Delete(path);
         }
+
+        // ── ProjectSettings overrides ─────────────────────────────────────────
+
+        [Test]
+        public void ResolveChatPort_ProjectSettingsOverridesCache()
+        {
+            var result = PortResolver.ResolveChatPort(null, "{\"chatPort\":9601}", "{\"chatPort\":9501}", 9500, 9501);
+            Assert.AreEqual(9601, result);
+        }
+
+        [Test]
+        public void ResolveChatPort_EnvWinsOverProjectSettings()
+        {
+            var result = PortResolver.ResolveChatPort("9700", "{\"chatPort\":9601}", "{\"chatPort\":9501}", 9500, 9501);
+            Assert.AreEqual(9700, result);
+        }
+
+        [Test]
+        public void ResolveChatPort_FallsBackToCacheWhenNoProjectSettings()
+        {
+            var result = PortResolver.ResolveChatPort(null, null, "{\"chatPort\":9501}", 9500, 9501);
+            Assert.AreEqual(9501, result);
+        }
+
+        [Test]
+        public void ResolvePort_ProjectSettingsOverridesCache()
+        {
+            var result = PortResolver.ResolvePort(null, "{\"port\":9600}", "{\"port\":9500}", 9500);
+            Assert.AreEqual(9600, result);
+        }
+
+        [Test]
+        public void ResolvePort_FallsBackToCache()
+        {
+            var result = PortResolver.ResolvePort(null, null, "{\"port\":9500}", 9500);
+            Assert.AreEqual(9500, result);
+        }
+
+        [Test]
+        public void ResolvePort_EnvVarWinsOverProjectSettings()
+        {
+            var result = PortResolver.ResolvePort("9700", "{\"port\":9600}", "{\"port\":9500}", 9500);
+            Assert.AreEqual(9700, result);
+        }
+
+        [Test]
+        public void SaveProjectSettings_RoundTrips()
+        {
+            var path = Path.Combine(Path.GetTempPath(), "test_mcp_settings_" + System.Guid.NewGuid().ToString("N") + ".json");
+            PortResolver.SaveProjectSettings(path, 9600, 9601);
+            var json = File.ReadAllText(path);
+            Assert.AreEqual(9600, PortResolver.ParsePortFromJson(json, "port"));
+            Assert.AreEqual(9601, PortResolver.ParsePortFromJson(json, "chatPort"));
+            File.Delete(path);
+        }
     }
 }

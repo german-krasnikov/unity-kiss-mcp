@@ -25,7 +25,10 @@ namespace UnityMCP.Editor.Chat
         public abstract bool CanHandle(Object obj, string assetPath);
 
         public virtual ChipData Create(Object obj, string assetPath)
-            => new ChipData(Key, assetPath, obj.name, 0);
+        {
+            var name = obj != null ? obj.name : Path.GetFileNameWithoutExtension(assetPath);
+            return new ChipData(Key, assetPath, name, 0);
+        }
 
         public virtual string FormatPayload(ChipData chip, ChipPayloadContext ctx)
             => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
@@ -232,6 +235,9 @@ namespace UnityMCP.Editor.Chat
     {
         private static readonly string[] _exts = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tiff", ".tif" };
 
+        // Seam: View assembly wires this to ImageViewerWindow.Show at [InitializeOnLoad].
+        internal static Action<string> ImageFallbackViewer;
+
         public string Key        => ChipKindKeys.Image;
         public int    Priority   => 50;
         public string IconName   => "d_Texture Icon";
@@ -253,6 +259,9 @@ namespace UnityMCP.Editor.Chat
         public string FormatPayload(ChipData chip, ChipPayloadContext ctx) => "";
 
         public void Navigate(string reference)
-            => Application.OpenURL("file://" + reference);
+        {
+            if (AssetChipProviderBase.ViewerLauncher?.Invoke(reference) == true) return;
+            ImageFallbackViewer?.Invoke(reference);
+        }
     }
 }

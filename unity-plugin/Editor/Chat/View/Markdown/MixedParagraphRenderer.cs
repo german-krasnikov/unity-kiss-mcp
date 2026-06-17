@@ -118,14 +118,35 @@ namespace UnityMCP.Editor.Chat
 
             var capturedRef = rawRef;
             var capturedKey = kindKey;
-            pill.RegisterCallback<ClickEvent>(_ =>
+
+            var previewPanel = new ChipInlinePreviewPanel(capturedKey, capturedRef,
+                () =>
+                {
+                    var provider = ChipKindRegistry.ForKey(capturedKey);
+                    provider?.Navigate(capturedRef);
+                });
+
+            pill.RegisterCallback<ClickEvent>(evt =>
             {
-                var provider = ChipKindRegistry.ForKey(capturedKey);
-                provider?.Navigate(capturedRef);
+                if (evt.clickCount == 1)
+                    previewPanel.Toggle();
+                else if (evt.clickCount >= 2)
+                {
+                    var provider = ChipKindRegistry.ForKey(capturedKey);
+                    provider?.Navigate(capturedRef);
+                }
             });
 
-            ChipPillFactory.AttachAddToContextMenu(pill, chip);
-            return pill;
+            ChipPillFactory.AttachAddToContextMenu(pill, chip,
+                () => previewPanel.Toggle());
+
+            // Wrap pill + panel in a column container so panel sits below pill
+            var wrapper = new VisualElement();
+            wrapper.AddToClassList("chip-pill-wrapper");
+            wrapper.style.flexDirection = FlexDirection.Column;
+            wrapper.Add(pill);
+            wrapper.Add(previewPanel);
+            return wrapper;
         }
     }
 }

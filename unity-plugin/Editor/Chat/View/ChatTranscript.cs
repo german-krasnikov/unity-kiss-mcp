@@ -77,6 +77,47 @@ namespace UnityMCP.Editor.Chat
             }
         }
 
+        /// <summary>BUG 4 fix: multi-image overload — appends all images in imagePaths list.</summary>
+        internal void AppendUserBubble(string text,
+            IReadOnlyList<ChipData> chips, IReadOnlyList<string> imagePaths,
+            string llmPayload = null)
+        {
+            FinalizeAssistant();
+            object userData = llmPayload != null
+                ? (object)new UserBubbleData(text ?? "", llmPayload)
+                : (text ?? "");
+            var bubble    = MakeBubble(userData);
+            var row       = Row("msg-user");
+            bool hasChips = chips != null && chips.Count > 0;
+            if (hasChips)
+            {
+                var strip = new VisualElement(); strip.AddToClassList("user-chip-strip");
+                foreach (var c in chips)
+                {
+                    var p = ChipPillFactory.Build(c);
+                    ChipPillFactory.AttachAddToContextMenu(p, c);
+                    strip.Add(p);
+                }
+                bubble.Add(strip);
+            }
+            var dt = hasChips ? UserTextCleaner.Strip(text) : text;
+            if (!string.IsNullOrEmpty(dt))
+                bubble.Add(MixedParagraphRenderer.InlineElement(dt, "msg-text"));
+            if (imagePaths != null)
+                foreach (var ip in imagePaths) AppendImage(bubble, ip);
+            row.Add(bubble); Append(row);
+            if (!_restoring)
+            {
+                _entries.Add(new TranscriptEntry {
+                    EntryKind  = TranscriptEntry.Kind.User,
+                    Text       = text ?? "",
+                    ChipsData  = TranscriptSerializer.SerializeChips(chips),
+                    LlmPayload = llmPayload,
+                });
+                if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
+            }
+        }
+
         /// <summary>Legacy overload — kept for TryResumePendingTurn and existing tests.
         /// Pass llmPayload to store UserBubbleData (G1/G2/G3 payload inspector support).</summary>
         internal void AppendUserBubble(string text,

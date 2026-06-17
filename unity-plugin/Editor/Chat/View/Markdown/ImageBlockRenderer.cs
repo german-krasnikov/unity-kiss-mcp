@@ -79,7 +79,7 @@ namespace UnityMCP.Editor.Chat
         {
             if (path == null) return false;
             var ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp";
+            return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".tiff" or ".tif";
         }
 
         /// <summary>Returns an absolute path. Supports absolute or project-relative paths.</summary>

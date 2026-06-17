@@ -195,3 +195,11 @@ def read_meta_json(repo_root: pathlib.Path) -> dict:
     """Read docs/assets/_meta.json. Raises FileNotFoundError if missing."""
     path = repo_root / "docs" / "assets" / "_meta.json"
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_meta(repo_root: pathlib.Path) -> dict:
+    """Read docs/assets/_meta.json. Returns {} if missing."""
+    try:
+        return read_meta_json(repo_root)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}

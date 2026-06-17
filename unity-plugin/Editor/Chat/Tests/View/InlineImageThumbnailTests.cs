@@ -45,6 +45,19 @@ namespace UnityMCP.Editor.Chat.Tests
         public void IsImagePath_Empty_False()
             => Assert.IsFalse(InlineImageThumbnail.IsImagePath(""));
 
+        // BUG 2: missing extensions — these FAIL until IsImageFile is extended
+        [Test]
+        public void IsImagePath_Webp_ReturnsTrue()
+            => Assert.IsTrue(InlineImageThumbnail.IsImagePath("/path/img.webp"));
+
+        [Test]
+        public void IsImagePath_Tiff_ReturnsTrue()
+            => Assert.IsTrue(InlineImageThumbnail.IsImagePath("/path/img.tiff"));
+
+        [Test]
+        public void IsImagePath_Tif_ReturnsTrue()
+            => Assert.IsTrue(InlineImageThumbnail.IsImagePath("/path/img.tif"));
+
         // ── Build (missing file → placeholder Label) ──────────────────────────
 
         [Test]

@@ -261,6 +261,8 @@ namespace UnityMCP.Editor
             var output = JsonHelper.ExtractString(argsJson, "output");
             if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(output))
                 throw new System.Exception("export_package requires 'path' and 'output'");
+            var dir = Path.GetDirectoryName(output);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             var includeDeps = JsonHelper.ExtractString(argsJson, "include_deps") != "false";
             var opts = ExportPackageOptions.Recurse;
             if (includeDeps) opts |= ExportPackageOptions.IncludeDependencies;
@@ -273,10 +275,66 @@ namespace UnityMCP.Editor
             var path = JsonHelper.ExtractString(argsJson, "path");
             if (string.IsNullOrEmpty(path))
                 throw new System.Exception("import_package requires 'path'");
-            if (!System.IO.File.Exists(path))
+            if (!File.Exists(path))
                 throw new System.Exception($"Package not found: {path}");
+
+            System.Collections.Generic.List<string> assetPaths;
+            try { assetPaths = ReadPackageManifest(path); }
+            catch { assetPaths = new System.Collections.Generic.List<string>(); }
             AssetDatabase.ImportPackage(path, false);
-            return "ok";
+
+            var sb = new StringBuilder();
+            sb.Append("ok: ").Append(assetPaths.Count).Append(" assets");
+            foreach (var p in assetPaths) { sb.Append('\n'); sb.Append(p); }
+            return sb.ToString();
+        }
+
+        static bool ReadExact(Stream s, byte[] buf, int offset, int count)
+        {
+            int total = 0;
+            while (total < count)
+            {
+                int n = s.Read(buf, offset + total, count - total);
+                if (n <= 0) return false;
+                total += n;
+            }
+            return true;
+        }
+
+        static System.Collections.Generic.List<string> ReadPackageManifest(string packagePath)
+        {
+            var result = new System.Collections.Generic.List<string>();
+            using var fs = File.OpenRead(packagePath);
+            using var gz = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionMode.Decompress);
+            var header = new byte[512];
+            while (ReadExact(gz, header, 0, 512))
+            {
+                var name = Encoding.ASCII.GetString(header, 0, 100).TrimEnd('\0');
+                if (string.IsNullOrEmpty(name)) break;
+                var sizeStr = Encoding.ASCII.GetString(header, 124, 12).TrimEnd('\0').Trim();
+                long size = string.IsNullOrEmpty(sizeStr) ? 0 : System.Convert.ToInt64(sizeStr, 8);
+
+                if (name.EndsWith("/pathname") && size > 0 && size <= 65536)
+                {
+                    var buf = new byte[size];
+                    if (!ReadExact(gz, buf, 0, (int)size)) break;
+                    var assetPath = Encoding.UTF8.GetString(buf).Trim();
+                    assetPath = assetPath.Replace('\\', '/');
+                    if (assetPath.Contains("..")) continue;
+                    if (assetPath.StartsWith("Assets/") || assetPath.StartsWith("Packages/"))
+                        result.Add(assetPath);
+                    long padded = ((size + 511) / 512) * 512 - size;
+                    if (padded > 0) ReadExact(gz, new byte[padded], 0, (int)padded);
+                }
+                else if (size > 0)
+                {
+                    long padded = ((size + 511) / 512) * 512;
+                    var skip = new byte[65536];
+                    long rem = padded;
+                    while (rem > 0) { int n = gz.Read(skip, 0, (int)System.Math.Min(rem, skip.Length)); if (n <= 0) break; rem -= n; }
+                }
+            }
+            return result;
         }
     }
 }

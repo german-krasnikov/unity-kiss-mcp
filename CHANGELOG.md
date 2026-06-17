@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.35.0] — 2026-06-17 <!-- Media preview bubbles, asset export/import, port persistence, README facts auto-sync -->
+
+**Major Features:**
+
+- **Inline Media Preview Bubbles** — Phase 2 lazy-load media panel in chat:
+  * **ChipInlinePreviewPanel.cs** — Toggle panel with lazy texture/image/model/prefab/audio preview loading
+  * **InlinePreviewBuilder.cs** — Extensible preview factory with TextureLoader seam for testing
+  * **MultiImageBubbleTests.cs** — Multi-image bubble support (3 new tests)
+  * Chip providers register lazy-build handler via public seam, click shows/hides panel (no screen-space pollution)
+
+- **Asset Export/Import Enhancements:**
+  * `include_deps` parameter for `export_package` — skip dependencies if false (token optimization for large packages)
+  * Import manifest parsing — returns list of imported asset paths
+  * **AssetDatabaseHelper.cs extended** (+60 lines) — dependency filtering + import result tracking
+
+- **Port Persistence via ProjectSettings** — Survives Library purge:
+  * **PortResolver.cs extended** (+37 lines) — 4-arg ResolvePort chain: env → ProjectSettings/MCPSettings.json → Library/MCP_Port.json → FindFreePort
+  * **SaveProjectSettings()** — User-intent persistence at ProjectSettings/MCPSettings.json (separate from Library cache)
+  * 25 new NUnit tests (PortResolverTests: environment priority, fallback chain, dual-port edge cases)
+
+- **README Facts Auto-Sync Pipeline:**
+  * **readme_facts.py** — Extract stats (tools, tests, versions) from _meta.json (8 lines)
+  * **update_readme.py** — Render facts into README (generated marker blocks, +14 lines)
+  * **test_readme_facts.py** — Validation + --check-facts guard (114 lines, 6 test methods)
+  * Prevents manual README drift; CI/release script auto-syncs _meta.json → README
+
+**Test Summary (v0.35.0):**
+
+- **C# New Tests (120 total):**
+  - ChipInlinePreviewPanelTests: 8 tests
+  - ImageViewerWindowTests: 8 tests  
+  - InlinePreviewBuilderTests: 9 tests
+  - MultiImageBubbleTests: 3 tests
+  - PortResolverTests: 35 tests (new + extended)
+  - AssetHelperTests: 32 tests (extended)
+  - ChatChipPolicyTests: 8 tests (extended)
+  - ChipKindRegistryTests: 4 tests (extended)
+  - AssetViewerFactoryTests: 11 tests (extended)
+  - Other: 2 tests (ImageBlockRendererTests, InlineImageThumbnailTests extended)
+
+- **Python New Tests (6 + 6 extended):**
+  - test_readme_facts.py: 6 tests
+  - test_server_asset.py: 6 tests extended
+
+- **Total: ~126 new assertions across C# + Python**
+- All green: 5159 total tests (tests_unity: 2657, tests_python: 2422, tests_live: 80)
+
 ## [v0.34.6] — 2026-06-17 <!-- Binary resolver, model leak, Kimi K2 fixes, install docs -->
 
 **Fixed:**

@@ -1,5 +1,6 @@
 // TDD — AssetViewerFactory + ViewerLauncher seam tests (headless, EditMode).
 // All tests headless-safe: no AssetDatabase, no EditorWindow calls.
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 
@@ -219,6 +220,153 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var result = AudioUtilProxy.GetWaveform(null, 128, 32);
             Assert.IsNull(result);
+        }
+    }
+
+    // ── BUG 1: ImageChipProvider.Navigate should use ViewerLauncher, not OpenURL ──────────
+
+    [TestFixture]
+    public class ImageChipProviderNavigateTests
+    {
+        [SetUp]
+        public void SetUp()
+        {
+            AssetChipProviderBase.ViewerLauncher = null;
+            ImageChipProvider.ImageFallbackViewer = null;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            AssetChipProviderBase.ViewerLauncher = null;
+            ImageChipProvider.ImageFallbackViewer = null;
+        }
+
+        [Test]
+        public void Navigate_WhenViewerLauncherHandles_DoesNotCallFallback()
+        {
+            // Arrange
+            bool fallbackCalled = false;
+            ImageChipProvider.ImageFallbackViewer = _ => fallbackCalled = true;
+            AssetChipProviderBase.ViewerLauncher = _ => true; // viewer handles it
+
+            // Act
+            new ImageChipProvider().Navigate("/tmp/screenshot.png");
+
+            // Assert — ViewerLauncher short-circuits, fallback must not be called
+            Assert.IsFalse(fallbackCalled, "Navigate must not call fallback when ViewerLauncher handles the path");
+        }
+
+        [Test]
+        public void Navigate_WhenViewerLauncherNull_CallsImageFallbackViewer()
+        {
+            // Arrange
+            string capturedUrl = null;
+            ImageChipProvider.ImageFallbackViewer = url => capturedUrl = url;
+
+            // Act
+            new ImageChipProvider().Navigate("/tmp/screenshot.png");
+
+            // Assert
+            Assert.IsNotNull(capturedUrl, "Navigate must invoke ImageFallbackViewer fallback");
+            StringAssert.Contains("/tmp/screenshot.png", capturedUrl);
+        }
+
+        [Test]
+        public void Navigate_WhenViewerLauncherRegistered_CallsViewer()
+        {
+            // BUG 1: original code skips ViewerLauncher for ImageChipProvider entirely.
+            // After fix, .bmp/.gif should route through ViewerLauncher when registered.
+            var fake = new FakeViewer();
+            AssetViewerFactory.Reset();
+            AssetViewerFactory.Register(".bmp", fake);
+            AssetChipProviderBase.ViewerLauncher = AssetViewerFactory.TryShow;
+
+            new ImageChipProvider().Navigate("Assets/icon.bmp");
+
+            Assert.AreEqual(1, fake.Shown.Count, "Navigate must invoke registered viewer for .bmp");
+        }
+    }
+
+    // ── NRE: ModelChipProvider.Create / AudioChipProvider.Create with null obj ───────────
+
+    [TestFixture]
+    public class AssetChipProviderNullObjTests
+    {
+        // ModelChipProvider inherits AssetChipProviderBase.Create which does obj.name → NRE
+        [Test]
+        public void ModelChipProvider_Create_NullObj_NoThrow()
+        {
+            var provider = new ModelChipProvider();
+            Assert.DoesNotThrow(() => provider.Create(null, "Assets/model.fbx"),
+                "Create(null, path) must not throw NRE");
+        }
+
+        [Test]
+        public void ModelChipProvider_Create_NullObj_ReturnsChipWithPath()
+        {
+            var provider = new ModelChipProvider();
+            ChipData chip = default;
+            Assert.DoesNotThrow(() => chip = provider.Create(null, "Assets/model.fbx"));
+            Assert.AreEqual("Assets/model.fbx", chip.Path);
+        }
+
+        // AudioChipProvider inherits AssetChipProviderBase.Create → same NRE
+        [Test]
+        public void AudioChipProvider_Create_NullObj_NoThrow()
+        {
+            var provider = new AudioChipProvider();
+            Assert.DoesNotThrow(() => provider.Create(null, "Assets/clip.wav"),
+                "Create(null, path) must not throw NRE");
+        }
+
+        [Test]
+        public void AudioChipProvider_Create_NullObj_ReturnsChipWithPath()
+        {
+            var provider = new AudioChipProvider();
+            ChipData chip = default;
+            Assert.DoesNotThrow(() => chip = provider.Create(null, "Assets/clip.wav"));
+            Assert.AreEqual("Assets/clip.wav", chip.Path);
+        }
+    }
+
+    // ── BUG 8: AssetViewerFactory.RegisterBuiltIns missing .bmp and .gif ────────────────
+
+    [TestFixture]
+    public class AssetViewerFactoryBuiltInCoverageTests
+    {
+        [SetUp]    public void SetUp()    => AssetViewerFactory.ReRegisterBuiltIns();
+        [TearDown] public void TearDown() => AssetViewerFactory.Reset();
+
+        [Test]
+        public void RegisterBuiltIns_Bmp_HasViewer()
+        {
+            // BUG 8: .bmp is not registered in RegisterBuiltIns — this will FAIL
+            var viewer = AssetViewerFactory.ForPath("Assets/icon.bmp");
+            Assert.IsNotNull(viewer, ".bmp must have a registered viewer after RegisterBuiltIns");
+        }
+
+        [Test]
+        public void RegisterBuiltIns_Gif_HasViewer()
+        {
+            // BUG 8: .gif is not registered in RegisterBuiltIns — this will FAIL
+            var viewer = AssetViewerFactory.ForPath("Assets/anim.gif");
+            Assert.IsNotNull(viewer, ".gif must have a registered viewer after RegisterBuiltIns");
+        }
+
+        [Test]
+        public void RegisterBuiltIns_Png_HasViewer()
+        {
+            // Sanity: already registered, must keep passing
+            var viewer = AssetViewerFactory.ForPath("Assets/sprite.png");
+            Assert.IsNotNull(viewer, ".png must have a registered viewer");
+        }
+
+        [Test]
+        public void RegisterBuiltIns_Jpg_HasViewer()
+        {
+            var viewer = AssetViewerFactory.ForPath("Assets/photo.jpg");
+            Assert.IsNotNull(viewer, ".jpg must have a registered viewer");
         }
     }
 }

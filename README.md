@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 5078 Tests (2410 Python · 2588 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 5162 Tests (2422 Python · 2660 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -230,6 +230,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.35.0</b> — 2026-06-17 — **Inline Media Preview Bubbles** — Phase 2 lazy-load media panel in chat:</summary>
+
+**Inline Media Preview Bubbles** — Phase 2 lazy-load media panel in chat:
+
+</details>
+
+<details>
 <summary><b>v0.34.6</b> — 2026-06-17 — **Binary Resolver — macOS zsh PATH sourcing** — Changed `bash -lc` to `zsh …</summary>
 
 **Binary Resolver — macOS zsh PATH sourcing** — Changed `bash -lc` to `zsh -lic` for macOS to correctly source `~/.zshrc` where kimi/opencode PATH is …
@@ -258,15 +265,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.31.1</b> — 2026-06-16 — **run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent …</summary>
-
-**run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent timeout when domain reload clears Editor.log "compiling" status …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.31.1** — 2026-06-16 — **run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent …
 - **v0.31.0** — 2026-06-16 — **Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan …
 - **v0.30.4** — 2026-06-16 — **Per-Backend Model Selector (Plugin v0.30.4)** — Dropdown in MCPChatWindow …
 - **v0.30.3** — 2026-06-16 — **Gemini CLI Backend (Plugin v0.30.1, v0.30.2, v0.30.3)** — Third CLI backend …

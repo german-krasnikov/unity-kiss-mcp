@@ -28,13 +28,16 @@ namespace UnityMCP.Editor.Chat
         /// </summary>
         internal static Action<ChipData> AddToContextAction;
 
-        /// <summary>Attach a "Add to context" right-click menu to a pill.</summary>
-        internal static void AttachAddToContextMenu(VisualElement pill, ChipData chip)
+        /// <summary>Attach right-click menu to a pill: "Add to context" + optional "Preview".</summary>
+        internal static void AttachAddToContextMenu(VisualElement pill, ChipData chip,
+            Action onPreview = null)
         {
             pill.AddManipulator(new ContextualMenuManipulator(evt =>
             {
                 evt.menu.AppendAction("Add to context", _ =>
                     AddToContextAction?.Invoke(chip));
+                if (onPreview != null)
+                    evt.menu.AppendAction("Preview", _ => onPreview());
             }));
         }
 

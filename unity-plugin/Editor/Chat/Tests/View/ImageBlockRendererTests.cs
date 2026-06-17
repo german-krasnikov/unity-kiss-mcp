@@ -53,6 +53,19 @@ namespace UnityMCP.Editor.Chat.Tests
         public void IsImageFile_NullPath_ReturnsFalse()
             => Assert.IsFalse(ImageBlockRenderer.IsImageFile(null));
 
+        // BUG 2: missing extensions — these FAIL until IsImageFile is extended
+        [Test]
+        public void IsImageFile_Webp_ReturnsTrue()
+            => Assert.IsTrue(ImageBlockRenderer.IsImageFile("img.webp"));
+
+        [Test]
+        public void IsImageFile_Tiff_ReturnsTrue()
+            => Assert.IsTrue(ImageBlockRenderer.IsImageFile("img.tiff"));
+
+        [Test]
+        public void IsImageFile_Tif_ReturnsTrue()
+            => Assert.IsTrue(ImageBlockRenderer.IsImageFile("img.tif"));
+
         // ── AltLabel fallback ─────────────────────────────────────────────────
 
         [Test]

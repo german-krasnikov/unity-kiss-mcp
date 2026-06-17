@@ -6,21 +6,35 @@ namespace UnityMCP.Editor
 {
     internal static class PortResolver
     {
-        internal static int ResolvePort(string envValue, string jsonContent, int defaultStart)
+        // 4-arg: env → projectSettings → cache → FindFreePort
+        internal static int ResolvePort(string envValue, string projectJson, string cacheJson, int defaultStart)
         {
             if (envValue != null && int.TryParse(envValue, out var p) && IsValidPort(p)) return p;
-            var saved = ParsePortFromJson(jsonContent, "port");
-            if (saved.HasValue && IsValidPort(saved.Value)) return saved.Value;
+            var fromProject = ParsePortFromJson(projectJson, "port");
+            if (fromProject.HasValue && IsValidPort(fromProject.Value)) return fromProject.Value;
+            var fromCache = ParsePortFromJson(cacheJson, "port");
+            if (fromCache.HasValue && IsValidPort(fromCache.Value)) return fromCache.Value;
             return FindFreePort(defaultStart);
         }
 
-        internal static int ResolveChatPort(string envValue, string jsonContent, int mainPort, int defaultStart)
+        // 3-arg: backward compat — no projectSettings layer
+        internal static int ResolvePort(string envValue, string cacheJson, int defaultStart)
+            => ResolvePort(envValue, null, cacheJson, defaultStart);
+
+        // 5-arg: env → projectSettings → cache → FindFreePort
+        internal static int ResolveChatPort(string envValue, string projectJson, string cacheJson, int mainPort, int defaultStart)
         {
             if (envValue != null && int.TryParse(envValue, out var p) && IsValidPort(p)) return p;
-            var saved = ParsePortFromJson(jsonContent, "chatPort");
-            if (saved.HasValue && IsValidPort(saved.Value)) return saved.Value;
+            var fromProject = ParsePortFromJson(projectJson, "chatPort");
+            if (fromProject.HasValue && IsValidPort(fromProject.Value)) return fromProject.Value;
+            var fromCache = ParsePortFromJson(cacheJson, "chatPort");
+            if (fromCache.HasValue && IsValidPort(fromCache.Value)) return fromCache.Value;
             return FindFreePort(defaultStart, skipPort: mainPort);
         }
+
+        // 4-arg: backward compat — no projectSettings layer
+        internal static int ResolveChatPort(string envValue, string cacheJson, int mainPort, int defaultStart)
+            => ResolveChatPort(envValue, null, cacheJson, mainPort, defaultStart);
 
         internal static int? ParsePortFromJson(string json, string key)
         {
@@ -70,6 +84,17 @@ namespace UnityMCP.Editor
                 System.IO.File.WriteAllText(tmp, json);
                 if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath);
                 System.IO.File.Move(tmp, filePath);
+            }
+            catch { }
+        }
+
+        // Write user intent to ProjectSettings/MCPSettings.json (survives Library purge).
+        internal static void SaveProjectSettings(string filePath, int port, int chatPort)
+        {
+            try
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(filePath));
+                System.IO.File.WriteAllText(filePath, $"{{\"port\":{port},\"chatPort\":{chatPort}}}");
             }
             catch { }
         }

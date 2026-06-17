@@ -17,6 +17,7 @@ namespace UnityMCP.Editor.Chat
         {
             RegisterBuiltIns();
             AssetChipProviderBase.ViewerLauncher = TryShow;
+            ImageChipProvider.ImageFallbackViewer = path => ImageViewerWindow.Show(path);
         }
 
         private static void RegisterBuiltIns()
@@ -33,6 +34,8 @@ namespace UnityMCP.Editor.Chat
             Register(".jpeg", sprite);
             Register(".tga",  sprite);
             Register(".exr",  sprite);
+            Register(".bmp",  sprite);
+            Register(".gif",  sprite);
 
             var audio = new AudioViewerWindow.ViewerAdapter();
             Register(".wav",  audio);
@@ -78,6 +81,14 @@ namespace UnityMCP.Editor.Chat
         {
             _registry.Clear();
             AssetChipProviderBase.ViewerLauncher = null;
+            ImageChipProvider.ImageFallbackViewer = null;
+        }
+
+        // Test seam: re-run built-in registration on a clean registry.
+        internal static void ReRegisterBuiltIns()
+        {
+            _registry.Clear();
+            RegisterBuiltIns();
         }
     }
 }

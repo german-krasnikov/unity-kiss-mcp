@@ -262,5 +262,42 @@ namespace UnityMCP.Editor.Tests
             StringAssert.Contains("postamble", result);
             StringAssert.Contains("edge", result);
         }
+
+        // ── AssetDatabaseHelper export_package / import_package arg validation ──
+
+        static string ExecAssetAction(string action, string argsJson) =>
+            (string)InvokePrivate(typeof(AssetDatabaseHelper), "Execute", action, argsJson);
+
+        [Test]
+        public void ExportPackage_MissingOutput_Throws()
+        {
+            var ex = Assert.Throws<TargetInvocationException>(() =>
+                ExecAssetAction("export_package", "{\"path\":\"Assets/Foo\"}"));
+            StringAssert.Contains("output", ex.InnerException.Message);
+        }
+
+        [Test]
+        public void ExportPackage_MissingPath_Throws()
+        {
+            var ex = Assert.Throws<TargetInvocationException>(() =>
+                ExecAssetAction("export_package", "{\"output\":\"/tmp/x.unitypackage\"}"));
+            StringAssert.Contains("path", ex.InnerException.Message);
+        }
+
+        [Test]
+        public void ImportPackage_MissingPath_Throws()
+        {
+            var ex = Assert.Throws<TargetInvocationException>(() =>
+                ExecAssetAction("import_package", "{}"));
+            StringAssert.Contains("path", ex.InnerException.Message);
+        }
+
+        [Test]
+        public void ImportPackage_NonExistentFile_Throws()
+        {
+            var ex = Assert.Throws<TargetInvocationException>(() =>
+                ExecAssetAction("import_package", "{\"path\":\"/nonexistent/pkg.unitypackage\"}"));
+            StringAssert.Contains("not found", ex.InnerException.Message);
+        }
     }
 }

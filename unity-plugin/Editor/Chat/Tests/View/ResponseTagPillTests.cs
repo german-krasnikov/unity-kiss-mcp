@@ -146,16 +146,20 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var ve = MixedParagraphRenderer.Render("hello [hierarchy:/Player #1] world");
 
-            // Container must have 3 children: Label, pill, Label
+            // Container must have 3 children: Label, wrapper(pill+panel), Label
             Assert.AreEqual(3, ve.childCount,
-                $"Expected 3 children (Label+pill+Label), got {ve.childCount}");
+                $"Expected 3 children (Label+wrapper+Label), got {ve.childCount}");
 
             Assert.IsInstanceOf<Label>(ve[0], "first child must be Label");
             Assert.IsInstanceOf<Label>(ve[2], "last child must be Label");
 
-            var pill = ve[1];
-            Assert.IsTrue(pill.ClassListContains("inline-chip-pill"),
-                "middle child must have 'inline-chip-pill' class");
+            // Middle child is the pill wrapper — pill is inside it
+            var wrapper = ve[1];
+            Assert.IsTrue(wrapper.ClassListContains("chip-pill-wrapper"),
+                "middle child must have 'chip-pill-wrapper' class");
+
+            var pill = wrapper.Q(className: "inline-chip-pill");
+            Assert.IsNotNull(pill, "wrapper must contain an inline-chip-pill");
 
             // Response mode: no remove button (no Button child)
             var btn = pill.Q<Button>();

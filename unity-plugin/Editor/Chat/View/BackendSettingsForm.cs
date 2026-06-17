@@ -14,12 +14,45 @@ namespace UnityMCP.Editor.Chat
         private static readonly List<string> _depthOptions =
             new List<string> { "path", "summary", "full", "none" };
 
+        private static readonly (string name, string label)[] _allowedTypeRows =
+        {
+            ("GameObject",     "GameObject (Prefabs)"),
+            ("Material",       "Material"),
+            ("Texture",        "Texture (Texture2D, Cubemap...)"),
+            ("AnimationClip",  "Animation Clip"),
+            ("MonoScript",     "Script (MonoScript)"),
+            ("Mesh",           "Mesh (.fbx, .obj)"),
+            ("AudioClip",      "Audio Clip"),
+            ("ScriptableObject", "ScriptableObject"),
+        };
+
         /// <summary>Registry-driven chip display form: one row per registered kind.</summary>
         internal static void BuildChipDisplayForm(
             VisualElement parent,
             ChipConfig config,
             Action onSave)
         {
+            // Allowed asset types section
+            var header = new Label("Allowed Chip Types");
+            header.AddToClassList("settings-section-header");
+            parent.Add(header);
+
+            foreach (var (name, lbl) in _allowedTypeRows)
+            {
+                var toggle = new Toggle(lbl) { value = ChatChipPolicy.IsTypeEnabled(name) };
+                var capturedName = name;
+                toggle.RegisterValueChangedCallback(evt =>
+                    EditorPrefs.SetBool(ChatChipPolicy.PrefKey(capturedName), evt.newValue));
+                parent.Add(toggle);
+            }
+
+            var separator = new VisualElement();
+            separator.style.height      = 1;
+            separator.style.marginTop   = 4;
+            separator.style.marginBottom = 4;
+            separator.style.backgroundColor = new StyleColor(new Color(0.3f, 0.3f, 0.3f));
+            parent.Add(separator);
+
             foreach (var kindKey in ChipKindRegistry.AllKeys)
             {
                 var provider = ChipKindRegistry.ForKey(kindKey);

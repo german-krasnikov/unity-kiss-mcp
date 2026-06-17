@@ -95,18 +95,52 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(ChipKindRegistry.ForKey(ChipKindKeys.Hierarchy));
         }
 
-        // (i) All 9 built-ins present after reset (Folder was the 9th — CH3.test.1 fix)
+        // (i) All 12 built-ins present after reset (image/model/audio added — BUG: registry only has 9)
         [Test]
-        public void RegisterBuiltIns_All9Keys_Present()
+        public void RegisterBuiltIns_All12Keys_Present()
         {
             var allKeys = new[]
             {
-                ChipKindKeys.Hierarchy, ChipKindKeys.Folder, ChipKindKeys.Scene,
-                ChipKindKeys.Script, ChipKindKeys.Prefab, ChipKindKeys.Material,
-                ChipKindKeys.Texture, ChipKindKeys.ScriptableObject, ChipKindKeys.Asset
+                ChipKindKeys.Hierarchy, ChipKindKeys.Folder,  ChipKindKeys.Scene,
+                ChipKindKeys.Script,    ChipKindKeys.Prefab,  ChipKindKeys.Material,
+                ChipKindKeys.Texture,   ChipKindKeys.ScriptableObject, ChipKindKeys.Asset,
+                // BUG: these three are missing from ChipKindRegistry.EnsureBuiltIns — tests will FAIL
+                ChipKindKeys.Image, ChipKindKeys.Model, ChipKindKeys.Audio
             };
             foreach (var key in allKeys)
                 Assert.IsNotNull(ChipKindRegistry.ForKey(key), $"Built-in key '{key}' missing");
+        }
+
+        [Test]
+        public void RegisterBuiltIns_ModelKey_Present()
+        {
+            // BUG: ModelChipProvider not registered — will FAIL
+            Assert.IsNotNull(ChipKindRegistry.ForKey(ChipKindKeys.Model),
+                $"Built-in key '{ChipKindKeys.Model}' missing from registry");
+        }
+
+        [Test]
+        public void RegisterBuiltIns_AudioKey_Present()
+        {
+            // BUG: AudioChipProvider not registered — will FAIL
+            Assert.IsNotNull(ChipKindRegistry.ForKey(ChipKindKeys.Audio),
+                $"Built-in key '{ChipKindKeys.Audio}' missing from registry");
+        }
+
+        [Test]
+        public void RegisterBuiltIns_ImageKey_Present()
+        {
+            // BUG: ImageChipProvider not registered — will FAIL
+            Assert.IsNotNull(ChipKindRegistry.ForKey(ChipKindKeys.Image),
+                $"Built-in key '{ChipKindKeys.Image}' missing from registry");
+        }
+
+        [Test]
+        public void AllKeys_Count_Is12()
+        {
+            // BUG: AllKeys currently returns 9 — will FAIL until model/audio/image registered
+            var count = System.Linq.Enumerable.Count(ChipKindRegistry.AllKeys);
+            Assert.AreEqual(12, count, $"Expected 12 built-in keys, got {count}");
         }
 
         // (j) Priority ordering: lower Priority wins

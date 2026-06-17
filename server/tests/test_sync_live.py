@@ -6,6 +6,7 @@ These tests occupy the TCP slot; run AFTER all unit tests.
 Uses same bridge pattern as tests/live/conftest.py.
 """
 import asyncio
+import os
 import socket
 import time
 
@@ -16,7 +17,7 @@ from unity_mcp.bridge import UnityBridge
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-LIVE_PORT = 9500
+LIVE_PORT = int(os.environ.get("UNITY_MCP_PORT", "9500"))
 
 
 def _bridge_up() -> bool:

@@ -206,6 +206,8 @@ namespace UnityMCP.Editor
         private static volatile bool _compileStartedThisDomain;
         private static readonly string PortFilePath =
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "MCP_Port.json"));
+        private static readonly string _projectSettingsPath =
+            Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ProjectSettings", "MCPSettings.json"));
         private static int _port;
         private static int _chatPort;
         private static bool _portsResolved;
@@ -217,13 +219,21 @@ namespace UnityMCP.Editor
             catch { return null; }
         }
 
+        private static string ReadProjectSettingsOrNull()
+        {
+            try { return File.Exists(_projectSettingsPath) ? File.ReadAllText(_projectSettingsPath) : null; }
+            catch { return null; }
+        }
+
         private static void EnsurePorts()
         {
             if (_portsResolved) return;
             var env = System.Environment.GetEnvironmentVariable("UNITY_MCP_PORT");
-            _port = PortResolver.ResolvePort(env, ReadPortFileOrNull(), 9500);
+            var projectJson = ReadProjectSettingsOrNull();
+            var cacheJson = ReadPortFileOrNull();
+            _port = PortResolver.ResolvePort(env, projectJson, cacheJson, 9500);
             var chatEnv = System.Environment.GetEnvironmentVariable("UNITY_MCP_CHAT_PORT");
-            _chatPort = PortResolver.ResolveChatPort(chatEnv, ReadPortFileOrNull(), _port, _port + 1);
+            _chatPort = PortResolver.ResolveChatPort(chatEnv, projectJson, cacheJson, _port, _port + 1);
             _portsResolved = true;
         }
 
@@ -233,6 +243,7 @@ namespace UnityMCP.Editor
         public static void SavePorts(int port, int chatPort)
         {
             PortResolver.SavePorts(PortFilePath, port, chatPort);
+            PortResolver.SaveProjectSettings(_projectSettingsPath, port, chatPort);
             _port = port;
             _chatPort = chatPort;
             _portsResolved = true;

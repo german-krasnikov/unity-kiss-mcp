@@ -123,3 +123,45 @@ async def test_asset_validate_move_error_from_unity(mock_bridge):
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "destination already exists"})
     with pytest.raises(ToolError, match="destination already exists"):
         await asset(action="validate_move", source="Assets/A.prefab", dest="Assets/Existing.prefab")
+
+
+async def test_asset_export_package(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Exported to /tmp/rocks.unitypackage"})
+    result = await asset(action="export_package", path="Assets/Rocks", output="/tmp/rocks.unitypackage")
+    args = mock_bridge.send.call_args[0][1]
+    assert args == {"action": "export_package", "path": "Assets/Rocks", "output": "/tmp/rocks.unitypackage"}
+    assert "Exported to" in result
+
+
+async def test_asset_export_package_no_deps(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Exported to /tmp/x.unitypackage"})
+    await asset(action="export_package", path="Assets/Foo", output="/tmp/x.unitypackage", include_deps=False)
+    args = mock_bridge.send.call_args[0][1]
+    assert args["include_deps"] == "false"
+
+
+async def test_asset_export_package_default_includes_deps(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "Exported to /tmp/x.unitypackage"})
+    await asset(action="export_package", path="Assets/Foo", output="/tmp/x.unitypackage")
+    args = mock_bridge.send.call_args[0][1]
+    assert "include_deps" not in args  # omitted = C# defaults to true
+
+
+async def test_asset_import_package(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "ok: 2 assets\nAssets/Rock.prefab\nAssets/Rock.mat"})
+    result = await asset(action="import_package", path="/tmp/rocks.unitypackage")
+    args = mock_bridge.send.call_args[0][1]
+    assert args == {"action": "import_package", "path": "/tmp/rocks.unitypackage"}
+    assert "ok: 2 assets" in result
+
+
+async def test_asset_import_package_error(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Package not found: /tmp/missing.unitypackage"})
+    with pytest.raises(ToolError, match="Package not found"):
+        await asset(action="import_package", path="/tmp/missing.unitypackage")
+
+
+async def test_asset_export_package_error(mock_bridge):
+    mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "export_package requires 'path' and 'output'"})
+    with pytest.raises(ToolError, match="requires 'path' and 'output'"):
+        await asset(action="export_package", path="Assets/Foo", output=None)

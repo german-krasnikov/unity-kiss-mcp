@@ -52,6 +52,13 @@ namespace UnityMCP.Editor.Chat
             Apply();
         }
 
+        /// <summary>Set zoom to an explicit value without resetting pan. Used by 1:1 button.</summary>
+        public void SetZoom(float zoom)
+        {
+            Zoom = Mathf.Clamp(zoom, 0.1f, 10f);
+            Apply();
+        }
+
         private void OnWheel(WheelEvent evt)
         {
             float delta = -evt.delta.y * 0.05f;

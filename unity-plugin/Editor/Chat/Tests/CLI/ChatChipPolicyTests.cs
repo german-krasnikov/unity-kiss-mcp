@@ -1,5 +1,6 @@
 // NUnit tests for ChatChipPolicy type-allowlist.
 using NUnit.Framework;
+using UnityEditor;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -7,6 +8,13 @@ namespace UnityMCP.Editor.Chat.Tests
     [TestFixture]
     public class ChatChipPolicyTests
     {
+        [TearDown]
+        public void TearDown()
+        {
+            foreach (var name in new[] { "GameObject", "Material", "Texture", "AnimationClip", "MonoScript", "Mesh", "AudioClip", "ScriptableObject" })
+                EditorPrefs.DeleteKey($"MCPChat.ChipAllow.{name}");
+        }
+
         [Test] public void Prefab_Allowed()     => Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.GameObject)));
         [Test] public void Material_Allowed()   => Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Material)));
         [Test] public void Texture2D_Allowed()  => Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Texture2D)));
@@ -19,9 +27,60 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test] public void RenderTexture_Allowed() => Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.RenderTexture)));
         [Test] public void UserScriptableObjectSubclass_Allowed() => Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(FakeSO)));
 
+        [Test] public void Mesh_Allowed()      => Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Mesh)));
+        [Test] public void AudioClip_Allowed() => Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.AudioClip)));
+
         [Test] public void DefaultAsset_Rejected() => Assert.IsFalse(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEditor.DefaultAsset)));
         [Test] public void Null_Rejected()          => Assert.IsFalse(ChatChipPolicy.IsAllowedAssetType(null));
-        [Test] public void AudioClip_Rejected()     => Assert.IsFalse(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.AudioClip)));
+
+        // --- Pref-gating tests ---
+
+        [Test]
+        public void Material_DisabledByPref_Rejected()
+        {
+            EditorPrefs.SetBool("MCPChat.ChipAllow.Material", false);
+            Assert.IsFalse(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Material)));
+        }
+
+        [Test]
+        public void Material_EnabledByPref_Allowed()
+        {
+            EditorPrefs.SetBool("MCPChat.ChipAllow.Material", true);
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Material)));
+        }
+
+        [Test]
+        public void Default_NoPrefsSet_MaterialAllowed()
+        {
+            EditorPrefs.DeleteKey("MCPChat.ChipAllow.Material");
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Material)));
+        }
+
+        [Test]
+        public void Texture2D_DisabledViaTextureKey()
+        {
+            EditorPrefs.SetBool("MCPChat.ChipAllow.Texture", false);
+            Assert.IsFalse(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Texture2D)));
+        }
+
+        [Test]
+        public void KnownTypes_AllDefaultTrue()
+        {
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.GameObject)));
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Material)));
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Texture2D)));
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.AnimationClip)));
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEditor.MonoScript)));
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.Mesh)));
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.AudioClip)));
+            Assert.IsTrue(ChatChipPolicy.IsAllowedAssetType(typeof(UnityEngine.ScriptableObject)));
+        }
+
+        [Test]
+        public void PrefKey_Format()
+        {
+            Assert.AreEqual("MCPChat.ChipAllow.Material", ChatChipPolicy.PrefKey("Material"));
+        }
 
         private class FakeSO : UnityEngine.ScriptableObject {}
     }
