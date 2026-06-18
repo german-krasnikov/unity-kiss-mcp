@@ -316,6 +316,10 @@ namespace UnityMCP.Editor
         // if we never saw compilationStarted in this domain, isCompiling=true is a reload artifact.
         public static bool CompileStartedThisDomain => _compileStartedThisDomain;
 
+        // Authoritative compile state: set by compilationStarted, cleared by compilationFinished.
+        // Unlike EditorApplication.isCompiling, never stays latched after domain reload.
+        internal static bool IsReallyCompiling => _isCompiling;
+
         private static double _lastWatchdogCheck;
 
         static MCPServer()
@@ -703,6 +707,11 @@ namespace UnityMCP.Editor
                 var project = Path.GetFileName(Path.GetDirectoryName(Application.dataPath));
                 var info = $"{port}\n{Path.GetDirectoryName(Application.dataPath)}\n{project}";
                 File.WriteAllText(Path.Combine(dir, $"{pid}.port"), info);
+                if (_chatPort > 0)
+                {
+                    var chatInfo = $"{_chatPort}\n{Path.GetDirectoryName(Application.dataPath)}\n{project}";
+                    File.WriteAllText(Path.Combine(dir, $"{pid}.chat-port"), chatInfo);
+                }
             }
             catch (Exception e) { Debug.LogWarning($"[MCP] Could not write discovery file: {e.Message}"); }
         }
@@ -717,6 +726,8 @@ namespace UnityMCP.Editor
                 var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
                 var path = Path.Combine(dir, $"{pid}.port");
                 if (File.Exists(path)) File.Delete(path);
+                var chatPath = Path.Combine(dir, $"{pid}.chat-port");
+                if (File.Exists(chatPath)) File.Delete(chatPath);
             }
             catch { }
         }

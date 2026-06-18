@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.37.0] — 2026-06-18 <!-- Bridge stability, reload/recompile hardening, test infrastructure -->
+
+**Major Fixes:**
+
+- **Bridge Stability & Reload Recovery (v0.36.0):**
+  * **DomainReloadTracker** — dataclass with 30s expiry tracking domain reload state independently from compile probe. Three methods: `mark()` (on DomainReloadError), `clear()` (on success), `is_active()` (checks expiry). Shared between bridge.send() and heartbeat.
+  * **BridgeState enum** — four states (DISCONNECTED | CONNECTED | DOMAIN_RELOADING | FAILED) track connection lifecycle explicitly
+  * **should_retry()** — pure decision function extracting retry logic: signature `(error, attempt, deadline) → (should_retry, delay_s, reason)`. On DomainReloadError: marks reload + state→DOMAIN_RELOADING. On any error: checks reload.is_active() or probe_busy(), backoff 2^attempt ≤ 8s.
+  * **Atomic reader/writer close** (v0.36.0) — both reader and writer closed atomically within lock during _reconnect() to prevent zombie reads after close. Fixes CancelledError cleanup.
+  * **Bridge retry delays restored** — 2s→4s→8s backoff sequence (was regressed to 1s→2s→4s, giving up before domain reload completes)
+
+- **Reload/Recompile Hardening:**
+  * **MCPServer.IsReallyCompiling** — managed flag replaces latching EditorApplication.isCompiling. False-positive "backgrounded" compile state eliminated via 120s wedge guard.
+  * **SyncHelper.Refresh** — ForceUpdate defeats Bee "inputs unchanged" gate, unconditional recompile
+  * **ImportPackageSources** — mvfrm nuke + digestcache delete instead of per-file import (never reached Bee)
+  * **TestRunner.ResetOnReload** — clear stale SessionState results on domain reload
+  * **reload_ladder: cs_grace=1** — tolerates transient CS errors during import
+
+- **Chat Stability (v0.36.0):**
+  * **ChatMcpConfigWriter** — emits "env" block with UNITY_MCP_PORT in mcp.json (chat port propagation to Python)
+  * **MCPServer.WritePortFile** — dual files: {pid}.port (main) + {pid}.chat-port (Windows env fallback). CliBackendBase injects UNITY_MCP_CHAT=1 env marker.
+  * **server_filtering.py** — chat-port fallback when UNITY_MCP_CHAT=1. _is_pid_alive cross-platform check (Windows: OpenProcess/CloseHandle, Unix: os.kill(pid,0))
+  * **Timeout messaging** — includes last tool name: "[Timed out: no response for 300s (last tool: set_property)]"
+  * **Dead-process guard** — appends "[Process exited]" to transcript when backend unexpectedly exits
+
+- **Test Discovery:**
+  * **get_test_count** TCP command — async discovery via TestRunnerApi.RetrieveTestList, returns `N|edit=X|play=Y` (accurate count including parameterized tests). First call returns "discovering", subsequent calls return cached result (cleared on domain reload).
+  * **readme_facts.py** — TCP-first counting with retry for "discovering" state, grep fallback for offline
+
+- **Test Infrastructure:**
+  * **check_unity.py** — parses dlls= field from diagnose, exit 2 on stale assemblies. 12 new tests validate assembly detection.
+  * **ConsoleCaptureTests** — 8 new tests: ring buffer, GetErrorsSince, count tracking, empty buffer edge cases
+  * **TestPaths.EnsureFolder** — public segment-walk with [SetUpFixture] global cleanup
+  * **SerializerTests** — self-contained shader test (no order dependency on AllTypes.shader)
+  * **Roslyn DLL path fix** — Unity 6 ARM support (MonoBleedingEdge location)
+  * **bridge.connected fix** — Python 3.12 TransportSocket unwrap to _sock
+  * **PYTHONWARNDEFAULTENCODING=1** — all subprocess calls properly encoded
+
+**Test Summary (v0.37.0):**
+
+- **Python Tests (2472 total, all green):**
+  * New: test_bridge_reload_state.py (8), test_bridge_should_retry.py (8)
+  * Extended: test_bridge.py (+50), test_bridge_edge_cases.py (+44), test_check_unity.py (+76), test_server_edge_cases.py (+32)
+  * Test markers: 2450 unit tests (pytest unit), 78 live integration (live && !live_cli), 4 live CLI (live_cli)
+
+- **C# Tests (3699 NUnit, 101 reload-latch specific, all green):**
+  * New: ConsoleCaptureTests (8), TestAssemblySetup (1)
+  * Extended: CommandRouterTests (+12 for two-layer IsCompiling), TestRunnerTests, SerializerTests
+  * Live socket stability: 5 test_sync_live tests green (bridge.connected fix)
+
+- **Overall: 2472 Python + 3699 NUnit = 6171 total assertions, 100% pass rate**
+
 ## [v0.36.0] — 2026-06-18 <!-- Media preview redesign, chip click UX, asset navigation -->
 
 - **Media Preview Redesign:**

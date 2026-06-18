@@ -31,7 +31,7 @@ class HeartbeatMixin:
       _heartbeat_task, _heartbeat_interval, _ping_failures,
       _last_reconnect_at, _min_reconnect_interval,
       _lock, _probe, _writer, _counter, _reader,
-      _ppid_mismatch_count
+      _ppid_mismatch_count, _reload (DomainReloadTracker), _state (BridgeState)
     """
 
     def start_heartbeat(self, interval: float = 15.0) -> None:
@@ -118,6 +118,7 @@ class HeartbeatMixin:
             self._ping_failures = 0
         except DomainReloadError:
             self._probe.mark_recompile_issued()
+            self._reload.mark()          # FIX: mark so send() gets extended retry window
             async with self._lock:
                 await self.close()
             self._ping_failures = 0

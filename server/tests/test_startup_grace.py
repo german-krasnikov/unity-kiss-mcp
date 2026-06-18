@@ -123,8 +123,10 @@ async def test_post_grace_send_raises():
     probe.is_unity_busy.return_value = False
     probe.estimated_remaining_s.return_value = 5.0
 
+    from unity_mcp.bridge import BridgeState
     bridge = UnityBridge("127.0.0.1", 9999, probe=probe)
     bridge._startup_grace_expired = True
+    bridge._state = BridgeState.FAILED
 
     with pytest.raises(ConnectionError):
         await bridge.send("ping", {})

@@ -156,6 +156,7 @@ namespace UnityMCP.Editor.Chat
                 if (_activity.FirstToken()) OnActivityChanged();
                 _transcript.AppendToolChip(rec.Name, ok: true, toolId: rec.Id);
                 _turnHasToolCalls = true;
+                _lastToolName = rec.Name; // M1: track last tool for timeout hint
             }
             else
             {

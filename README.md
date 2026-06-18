@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 5253 Tests (2422 Python · 2751 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 6251 Tests (2472 Python · 3699 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -230,6 +230,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.37.0</b> — 2026-06-18 — **Bridge Stability & Reload Recovery (v0.36.0):**</summary>
+
+**Bridge Stability & Reload Recovery (v0.36.0):**
+
+</details>
+
+<details>
 <summary><b>v0.36.0</b> — 2026-06-18 — **Media Preview Redesign:**</summary>
 
 **Media Preview Redesign:**
@@ -258,15 +265,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.33.0</b> — 2026-06-16 — **Codex Silent Abort Fix (Plugin v0.33.0)** — Fixes hung turns when Codex tools …</summary>
-
-**Codex Silent Abort Fix (Plugin v0.33.0)** — Fixes hung turns when Codex tools error silently.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.33.0** — 2026-06-16 — **Codex Silent Abort Fix (Plugin v0.33.0)** — Fixes hung turns when Codex tools …
 - **v0.32.0** — 2026-06-16 — **run_tests Fire-and-Forget Protocol (Server v0.32.0)** — `run_tests(mode)` now …
 - **v0.31.1** — 2026-06-16 — **run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent …
 - **v0.31.0** — 2026-06-16 — **Security Hardening (Gate A: release blocker)** — CodeExecutor.SecurityScan …

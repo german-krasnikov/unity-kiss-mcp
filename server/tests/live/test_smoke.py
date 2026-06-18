@@ -19,19 +19,11 @@ async def test_create_object_appears_in_hierarchy(wrapped_bridge, sandbox):
 
 
 async def test_destroy_object_cleans_up(wrapped_bridge):
-    """Create object, DestroyImmediate, verify absent from find_objects."""
+    """Create object, delete via delete_object, verify absent from find_objects."""
     import uuid
     name = f"LiveDel_{uuid.uuid4().hex[:6]}"
     await wrapped_bridge.send("create_object", {"name": name})
-
-    # DestroyImmediate is the reliable way to delete in Editor mode
-    code = (
-        f'var go = GameObject.Find("{name}"); '
-        f'if(go) {{ UnityEngine.Object.DestroyImmediate(go); return "ok"; }} '
-        f'return "not found";'
-    )
-    r = await wrapped_bridge.send("execute_code", {"code": code})
-    assert "not found" not in r, f"DestroyImmediate failed: {r}"
+    await wrapped_bridge.send("delete_object", {"path": f"/{name}"})
 
     r2 = await wrapped_bridge.send("find_objects", {"name": name})
     assert not strip_markers(r2).strip(), f"Object still exists after destroy: {r2}"

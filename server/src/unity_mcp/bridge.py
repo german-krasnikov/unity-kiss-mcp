@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import json
 import os
 import select
@@ -14,13 +15,14 @@ from unity_mcp.bridge_socket import (
     _TCP_KEEPINTVL_DARWIN,
 )
 from unity_mcp.bridge_heartbeat import HeartbeatMixin
+from unity_mcp.bridge_reload_state import DomainReloadTracker, DOMAIN_RELOAD_EXPIRY_S
 from unity_mcp.compile_state import CompileStateProbe
 from unity_mcp.crash_log import CrashLogger
 from unity_mcp.metrics import METRICS
 
 # Re-export so existing `from .bridge import DomainReloadError` keeps working
 __all__ = [
-    "UnityBridge", "DomainReloadError",
+    "UnityBridge", "DomainReloadError", "BridgeState",
     "MIN_RECONNECT_INTERVAL", "DOMAIN_RELOAD_EXPIRY_S",
     "_apply_socket_options",
     "_TCP_KEEPALIVE_DARWIN", "_TCP_KEEPINTVL_DARWIN",
@@ -31,7 +33,13 @@ SESSION_TIMEOUT = float(os.environ.get("UNITY_MCP_SESSION_TIMEOUT", "120.0"))
 MAX_RETRIES = int(os.environ.get("UNITY_MCP_MAX_RETRIES", "3"))
 MIN_RECONNECT_INTERVAL = float(os.environ.get("UNITY_MCP_MIN_RECONNECT_INTERVAL", "5.0"))
 STARTUP_GRACE_S = float(os.environ.get("UNITY_MCP_STARTUP_GRACE", "90.0"))
-DOMAIN_RELOAD_EXPIRY_S: float = 30.0
+
+
+class BridgeState(enum.Enum):
+    DISCONNECTED = "disconnected"
+    CONNECTED = "connected"
+    DOMAIN_RELOADING = "domain_reloading"
+    FAILED = "failed"  # startup grace expired
 
 
 class UnityBridge(HeartbeatMixin):
@@ -54,7 +62,7 @@ class UnityBridge(HeartbeatMixin):
         )
         self._first_failure_ts: Optional[float] = None
         self._reconnect_started_at: Optional[float] = None
-        self._startup_grace_expired: bool = False
+        self._state: BridgeState = BridgeState.DISCONNECTED
         self._on_reconnect_callbacks: list = []
         self._crash_log = CrashLogger()
         self._heartbeat_task: Optional[asyncio.Task] = None
@@ -63,9 +71,17 @@ class UnityBridge(HeartbeatMixin):
         self._last_reconnect_at: float = 0.0
         self._min_reconnect_interval: float = MIN_RECONNECT_INTERVAL
         self._port_discoverer: Optional[Callable[[], int]] = port_discoverer
-        self._domain_reload_in_progress: bool = False
-        self._domain_reload_since: Optional[float] = None
+        self._reload: DomainReloadTracker = DomainReloadTracker()
         self._ppid_mismatch_count: int = 0
+
+    @property
+    def _startup_grace_expired(self) -> bool:
+        return self._state == BridgeState.FAILED
+
+    @_startup_grace_expired.setter
+    def _startup_grace_expired(self, value: bool) -> None:
+        if value:
+            self._state = BridgeState.FAILED
 
     def add_reconnect_callback(self, fn) -> None:
         self._on_reconnect_callbacks.append(fn)
@@ -76,6 +92,36 @@ class UnityBridge(HeartbeatMixin):
             timeout=CONNECT_TIMEOUT,
         )
         _apply_socket_options(self._writer.get_extra_info("socket"))
+
+    def should_retry(self, error: Exception, attempt: int, session_deadline: float) -> tuple[bool, float, str]:
+        """Decide if send() should retry after error.
+
+        Returns: (should_retry, delay_s, reason)
+        """
+        if isinstance(error, DomainReloadError):
+            # Always apply side effects regardless of retry decision
+            self._probe.mark_recompile_issued()
+            self._reload.mark()
+            self._state = BridgeState.DOMAIN_RELOADING
+
+        if attempt >= MAX_RETRIES:
+            return False, 0.0, "max_retries"
+        if time.monotonic() >= session_deadline:
+            return False, 0.0, "deadline"
+
+        if isinstance(error, DomainReloadError):
+            delay = min(2 ** (attempt + 1), 8.0)
+            return True, delay, "domain_reload"
+
+        busy = self._reload.is_active() or self._probe_busy()
+        if busy:
+            delay = min(2 ** (attempt + 1), 8.0)
+            return True, delay, "busy"
+
+        if attempt < 1:
+            return True, 1.0, "transient"
+
+        return False, 0.0, "grace_expired"
 
     def _probe_busy(self) -> bool:
         try:
@@ -89,11 +135,10 @@ class UnityBridge(HeartbeatMixin):
             self._heartbeat_task = asyncio.ensure_future(self._heartbeat_loop(self._heartbeat_interval))
 
     async def send(self, cmd: str, args: dict, timeout: float = 30.0) -> dict:
-        if self._startup_grace_expired:
+        if self._state == BridgeState.FAILED:
             try:
                 async with self._lock:
                     await self._reconnect(fire_callbacks=False)
-                # _reconnect cleared _startup_grace_expired on success
             except Exception:
                 raise ConnectionError(self._describe_failure(cmd, ConnectionRefusedError()))
         self._ensure_heartbeat()
@@ -104,7 +149,10 @@ class UnityBridge(HeartbeatMixin):
             raise ConnectionError(f"Outbound payload too large: {len(payload)} bytes (max 10MB)")
         header = struct.pack("!I", len(payload))
         session_deadline = time.monotonic() + SESSION_TIMEOUT
+        return await self._send_with_retry(cmd, header, payload, msg_id, timeout, session_deadline)
 
+    async def _send_with_retry(self, cmd: str, header: bytes, payload: bytes,
+                               msg_id: str, timeout: float, session_deadline: float) -> dict:
         attempt = 0
         result = None
         while attempt <= MAX_RETRIES:
@@ -117,8 +165,12 @@ class UnityBridge(HeartbeatMixin):
                         await self._reconnect(fire_callbacks=False)
                     self._writer.write(header + payload)
                     await self._writer.drain()
-                    result = await asyncio.wait_for(
-                        self._read_response(), timeout=timeout)
+                    try:
+                        result = await asyncio.wait_for(
+                            self._read_response(), timeout=timeout)
+                    except asyncio.CancelledError:
+                        await self.close()
+                        raise
             except (ConnectionRefusedError, asyncio.TimeoutError, ConnectionError,
                     asyncio.IncompleteReadError, OSError, json.JSONDecodeError,
                     RuntimeError) as e:
@@ -126,24 +178,13 @@ class UnityBridge(HeartbeatMixin):
                     await self.close()
                 if self._first_failure_ts is None:
                     self._first_failure_ts = time.monotonic()
-                if isinstance(e, DomainReloadError):
-                    self._probe.mark_recompile_issued()
-                    self._domain_reload_in_progress = True
-                    self._domain_reload_since = time.monotonic()
-                if self._domain_reload_in_progress and self._domain_reload_since is not None:
-                    if time.monotonic() - self._domain_reload_since > DOMAIN_RELOAD_EXPIRY_S:
-                        self._domain_reload_in_progress = False
-                        self._domain_reload_since = None
-                busy = self._domain_reload_in_progress or self._probe_busy()
+                do_retry, delay, reason = self.should_retry(e, attempt, session_deadline)
                 self._crash_log.log_disconnect(cmd=cmd, retry=attempt,
                                                error_type=type(e).__name__,
-                                               unity_busy=busy, port=self._port)
-                # Retry: only if busy (domain reload) OR first grace attempt
-                if attempt < MAX_RETRIES and (busy or attempt < 1):
-                    if time.monotonic() >= session_deadline:
-                        raise TimeoutError(f"Session deadline ({SESSION_TIMEOUT}s) exceeded") from e
+                                               unity_busy=reason in ("busy", "domain_reload"),
+                                               port=self._port)
+                if do_retry:
                     attempt += 1
-                    delay = min(2 ** attempt, 8.0) if busy else 1.0
                     await asyncio.sleep(delay)
                     continue
                 raise ConnectionError(self._describe_failure(cmd, e)) from e
@@ -157,7 +198,6 @@ class UnityBridge(HeartbeatMixin):
             # Unity retry hint (compilation busy)
             if not result.get("ok") and result.get("retry"):
                 # G17: check for terminal reload failure before re-sending.
-                # A wedged domain will never clear via retry — stop early.
                 try:
                     from unity_mcp.editor_log import detect_wedge
                     wedge = detect_wedge()
@@ -174,8 +214,8 @@ class UnityBridge(HeartbeatMixin):
                     continue
                 return result
 
-            self._domain_reload_in_progress = False
-            self._domain_reload_since = None
+            self._reload.clear()
+            self._state = BridgeState.CONNECTED
             if self._first_failure_ts is not None:
                 outage = time.monotonic() - self._first_failure_ts
                 METRICS.observe("recompile.duration_ms", outage * 1000)
@@ -237,25 +277,32 @@ class UnityBridge(HeartbeatMixin):
             ping = json.dumps({"id": ping_id, "cmd": "ping", "args": {}}, ensure_ascii=False).encode("utf-8")
             writer.write(struct.pack("!I", len(ping)) + ping)
             await writer.drain()
-            # Temporarily wire reader so _read_response works
-            self._reader = reader
-            pong = await asyncio.wait_for(self._read_response(), timeout=CONNECT_TIMEOUT)
+            # Read ping response directly from local reader (not self._reader)
+            # to avoid _reader/_writer desync during the await window.
+            hdr_bytes = await asyncio.wait_for(reader.readexactly(4), timeout=CONNECT_TIMEOUT)
+            length = struct.unpack("!I", hdr_bytes)[0]
+            if length == 0 or length > 10_000_000:
+                raise ConnectionError(f"Protocol desync on reconnect: length {length}")
+            pay_bytes = await asyncio.wait_for(reader.readexactly(length), timeout=CONNECT_TIMEOUT)
+            pong = json.loads(pay_bytes.decode("utf-8"))
+            if pong.get("ev") == "going_away":
+                raise DomainReloadError("Unity going_away during reconnect")
             if not pong.get("ok"):
                 raise ConnectionError("Unity ping failed after reconnect")
         except BaseException:
-            self._reader = None
             writer.close()
             try:
                 await writer.wait_closed()
             except Exception:
                 pass
             raise
+        # Atomic: assign both only after ping succeeds, no await between them.
+        self._reader = reader
         self._writer = writer
         self._first_failure_ts = None
         self._reconnect_started_at = None
-        self._startup_grace_expired = False
-        self._domain_reload_in_progress = False
-        self._domain_reload_since = None
+        self._state = BridgeState.CONNECTED
+        self._reload.clear()
         self._last_reconnect_at = time.monotonic()
         if fire_callbacks:
             for cb in self._on_reconnect_callbacks:
@@ -273,10 +320,13 @@ class UnityBridge(HeartbeatMixin):
             try:
                 r, _, _ = select.select([sock], [], [], 0)
                 if r:
-                    data = sock.recv(1, socket.MSG_PEEK)
+                    # TransportSocket (Python 3.12+) wraps raw socket in _sock;
+                    # use it if present and is a real socket, else call recv directly.
+                    raw = sock._sock if type(sock).__name__ == "TransportSocket" else sock
+                    data = raw.recv(1, socket.MSG_PEEK)
                     if not data:
                         return False
-            except (OSError, ValueError, BlockingIOError):
+            except (OSError, ValueError, BlockingIOError, AttributeError):
                 return False
         return True
 

@@ -813,6 +813,49 @@ async def test_sync_unity_run_ladder_starts_at_t2_with_valid_mvid(monkeypatch):
     assert "HEALED" in result, f"Expected HEALED from run_ladder, got {result!r}"
 
 
+# ── False-backgrounded regression tests ──────────────────────────────────────
+
+# FB-1: dur=0.0 on first poll but compile completes → NOT backgrounded (no skip)
+@pytest.mark.asyncio
+async def test_sync_no_false_backgrounded_on_early_dur_zero():
+    """dur=0.0 on first poll then state=ready: must complete, not trigger backgrounded hint.
+
+    Scenario: fast compile where dur resets to 0.0 before first poll (or compile
+    finishes before dur is updated). _FOCUS_HINT_AFTER default (15s) is NOT reached
+    because asyncio.sleep is mocked → timeline doesn't advance → hint never fires.
+    """
+    _sync._send = _make_send(
+        "sync_ack|epoch=1|will_compile=true",
+        status_seq=[
+            "epoch=1|state=compiling|dur=0.0",  # first poll: dur=0.0
+            "epoch=1|state=ready",               # compile done fast
+        ],
+    )
+    result = await _sync.sync_unity(timeout=60.0)
+    assert "sync clean" in result or result == ""
+
+
+# FB-2: dur progresses 0.0 → nonzero → ready: must complete normally
+@pytest.mark.asyncio
+async def test_sync_no_false_backgrounded_when_dur_progresses():
+    """dur=0.0 → dur=1.5 → state=ready: compile is live, must not trigger backgrounded.
+
+    Even with _FOCUS_HINT_AFTER=0 (instant threshold), once dur becomes nonzero
+    the backgrounded condition (dur=0.0) is no longer met, so the hint must not fire.
+    The sequence exits cleanly on state=ready.
+    """
+    _sync._send = _make_send(
+        "sync_ack|epoch=1|will_compile=true",
+        status_seq=[
+            "epoch=1|state=compiling|dur=0.0",  # compile not yet ticked
+            "epoch=1|state=compiling|dur=1.5",  # compile in progress
+            "epoch=1|state=ready",               # done
+        ],
+    )
+    result = await _sync.sync_unity(timeout=60.0)
+    assert "sync clean" in result or result == ""
+
+
 # A1 integration: sync_unity emits REIMPORT-NEEDED (not 'sync clean') when force_refresh TCP-dead
 @pytest.mark.asyncio
 async def test_sync_unity_emits_reimport_when_recovery_tcp_dead(monkeypatch):

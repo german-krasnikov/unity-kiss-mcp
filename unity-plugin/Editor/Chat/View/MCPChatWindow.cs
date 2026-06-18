@@ -54,11 +54,15 @@ namespace UnityMCP.Editor.Chat
             return false;
         }
 
+        // M1: name of the last tool call in the current turn (for timeout hint).
+        internal string _lastToolName;
+
         // P0-2: DRY helper — reset all per-turn flags (3 sites in Drain + CancelTurn + NewSession).
         private void ResetTurnFlags()
         {
             _turnEditedCode = _turnHasToolCalls = _needsRefresh = false;
-            _lastEventTime = 0;
+            _lastEventTime  = 0;
+            _lastToolName   = null;
         }
 
         internal void ResetTokenCounters()

@@ -12,9 +12,18 @@ namespace UnityMCP.Editor.Tests
     {
         private List<GameObject> _toDestroy = new List<GameObject>();
 
+        [SetUp]
+        public void SetUp()
+        {
+            CommandRouter.IsCompiling = () => false;
+            BatchHelper.IsCompiling = () => false;
+        }
+
         [TearDown]
         public void TearDown()
         {
+            CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
+            BatchHelper.IsCompiling = () => CommandRouter.IsCompiling();
             foreach (var go in _toDestroy)
                 if (go != null) Object.DestroyImmediate(go);
             _toDestroy.Clear();

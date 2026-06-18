@@ -10,7 +10,7 @@ def test_server_filtering_importable_in_isolation():
     venv_python = sys.executable
     result = subprocess.run(
         [venv_python, "-c", "import unity_mcp.server_filtering"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8",
     )
     assert result.returncode == 0, f"Circular import: {result.stderr}"
 

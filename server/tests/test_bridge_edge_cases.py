@@ -533,7 +533,7 @@ async def test_concurrent_sends_routes_per_caller(mock_unity_server):
 # ── P0: _domain_reload_in_progress sticky flag ──────────────────────────────
 
 async def test_p0_domain_reload_flag_cleared_on_reconnect():
-    """_domain_reload_in_progress cleared when _reconnect() succeeds."""
+    """_reload tracker cleared when _reconnect() succeeds."""
     ping_hdr, ping_pay = ping_response()
     reader = AsyncMock()
     writer = make_writer()
@@ -541,13 +541,12 @@ async def test_p0_domain_reload_flag_cleared_on_reconnect():
 
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()
-        bridge._domain_reload_in_progress = True
-        bridge._domain_reload_since = time.monotonic()
+        bridge._reload.mark()
 
         await bridge._reconnect(fire_callbacks=False)
 
-        assert bridge._domain_reload_in_progress is False
-        assert bridge._domain_reload_since is None
+        assert bridge._reload.is_active() is False
+        assert bridge._reload._since is None
 
 
 async def test_p0_domain_reload_flag_auto_expires(monkeypatch):
@@ -576,19 +575,19 @@ async def test_p0_domain_reload_flag_auto_expires(monkeypatch):
         await bridge.connect()
         with pytest.raises((ConnectionError, TimeoutError)):
             await bridge.send("test", {})
-        # Flag is set after DomainReloadError
-        assert bridge._domain_reload_in_progress is True
+        # Tracker is active after DomainReloadError
+        assert bridge._reload.is_active() is True
 
-    # Now simulate 31s later — flag should auto-expire in next send()
-    bridge._domain_reload_since = time.monotonic() - (DOMAIN_RELOAD_EXPIRY_S + 1)
+    # Now simulate 31s later — tracker should auto-expire in next send()
+    bridge._reload._since = time.monotonic() - (DOMAIN_RELOAD_EXPIRY_S + 1)
     reader3 = AsyncMock()
     reader3.readexactly = AsyncMock(side_effect=OSError("refused"))
     writer3 = make_writer()
     with patch("asyncio.open_connection", return_value=(reader3, writer3)):
         with pytest.raises((ConnectionError, TimeoutError)):
             await bridge.send("test2", {})
-    # After expiry, flag should have been cleared
-    assert bridge._domain_reload_in_progress is False
+    # After expiry, tracker should be inactive
+    assert bridge._reload.is_active() is False
 
 
 async def test_p0_domain_reload_flag_stays_true_within_window(monkeypatch):
@@ -610,9 +609,9 @@ async def test_p0_domain_reload_flag_stays_true_within_window(monkeypatch):
         # _domain_reload_since will be set to now (within window)
         with pytest.raises((ConnectionError, TimeoutError)):
             await bridge.send("test", {})
-    # Flag stays true because we're within 30s window
-    assert bridge._domain_reload_in_progress is True
-    assert bridge._domain_reload_since is not None
+    # Tracker stays active because we're within 30s window
+    assert bridge._reload.is_active() is True
+    assert bridge._reload._since is not None
 
 
 async def test_p0_domain_reload_since_set_when_flag_raised(mock_connection, monkeypatch):
@@ -644,7 +643,8 @@ async def test_p0_domain_reload_since_set_when_flag_raised(mock_connection, monk
 # ── P2: _startup_grace_expired permanent death latch ────────────────────────
 
 async def test_p2_startup_grace_expired_attempts_reconnect():
-    """send() with _startup_grace_expired=True attempts reconnect before raising."""
+    """send() with _state=FAILED attempts reconnect before raising."""
+    from unity_mcp.bridge import BridgeState
     ping_hdr, ping_pay = ping_response()
     # _reconnect sends a ping (counter=1, id=rc0001), then send() uses counter=2
     resp = {"id": "0002", "ok": True, "data": "ok"}
@@ -657,20 +657,133 @@ async def test_p2_startup_grace_expired_attempts_reconnect():
 
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()
-        bridge._startup_grace_expired = True
+        bridge._state = BridgeState.FAILED
 
         result = await bridge.send("test", {})
 
         assert result["ok"] is True
-        # latch should be cleared now
-        assert bridge._startup_grace_expired is False
+        # state cleared to CONNECTED on reconnect success
+        assert bridge._state == BridgeState.CONNECTED
 
 
 async def test_p2_startup_grace_expired_raises_if_reconnect_fails():
     """send() raises ConnectionError if reconnect fails when grace expired."""
+    from unity_mcp.bridge import BridgeState
     with patch("asyncio.open_connection", side_effect=ConnectionRefusedError("refused")):
         bridge = UnityBridge()
-        bridge._startup_grace_expired = True
+        bridge._state = BridgeState.FAILED
 
         with pytest.raises(ConnectionError):
             await bridge.send("test", {})
+
+
+# ── Fix 4: CancelledError zombie writer ─────────────────────────────────────
+
+async def test_cancelled_error_closes_writer(mock_connection):
+    """CancelledError during send() must close writer (no zombie socket)."""
+    mock_reader, mock_writer = mock_connection
+
+    async def hang(n):
+        await asyncio.Future()  # never resolves — simulates blocked _read_response
+
+    mock_reader.readexactly = AsyncMock(side_effect=hang)
+
+    idle_probe = make_idle_probe()
+    with patch("asyncio.open_connection", return_value=mock_connection):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+
+        task = asyncio.ensure_future(bridge.send("test", {}, timeout=60.0))
+        await asyncio.sleep(0)   # let task reach the await inside lock
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    # Writer must be closed (bridge.close() nulls _writer)
+    assert bridge._writer is None
+
+
+async def test_cancelled_error_reraises(mock_connection):
+    """CancelledError is not swallowed — it propagates to the caller."""
+    mock_reader, mock_writer = mock_connection
+
+    async def hang(n):
+        await asyncio.Future()
+
+    mock_reader.readexactly = AsyncMock(side_effect=hang)
+
+    idle_probe = make_idle_probe()
+    with patch("asyncio.open_connection", return_value=mock_connection):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+
+        task = asyncio.ensure_future(bridge.send("test", {}, timeout=60.0))
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        task.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
+# ── Fix 5: _reader/_writer atomic assignment in _reconnect() ─────────────────
+
+async def test_reconnect_atomic_assignment():
+    """During reconnect ping read, neither _reader nor _writer is partially set.
+
+    The desync window is: self._reader = reader (line 241) ... await _read_response()
+    ... self._writer = writer (line 253). We intercept readexactly to snapshot mid-flight.
+    """
+    snapshots: list[tuple] = []
+
+    ping_hdr, ping_pay = ping_response()
+    reader = AsyncMock()
+    writer = make_writer()
+
+    call_count = [0]
+
+    async def capturing_readexactly(n: int) -> bytes:
+        call_count[0] += 1
+        # First readexactly(4) = header, second readexactly(len) = payload
+        # Both happen INSIDE await _read_response() which is called AFTER self._reader=reader
+        # but BEFORE self._writer=writer — capture state here
+        snapshots.append((bridge._reader, bridge._writer))
+        if call_count[0] == 1:
+            return ping_hdr
+        return ping_pay
+
+    reader.readexactly = AsyncMock(side_effect=capturing_readexactly)
+
+    with patch("asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge._reconnect(fire_callbacks=False)
+
+    # During ping read: _reader is set but _writer is NOT yet (desync window)
+    # After fix: both should be None (or both set atomically AFTER ping)
+    assert len(snapshots) >= 1
+    for mid_reader, mid_writer in snapshots:
+        # After fix: _reader should NOT be set during ping read (still None until atomic assign)
+        assert mid_reader is None, f"_reader set during ping read (desync window): {mid_reader}"
+        assert mid_writer is None, f"_writer set during ping read: {mid_writer}"
+
+    # After success — both must be set atomically
+    assert bridge._reader is reader
+    assert bridge._writer is writer
+
+
+async def test_reader_null_on_ping_failure():
+    """If ping fails, _reader must be None (not left in temp state)."""
+    new_reader = AsyncMock()
+    new_reader.readexactly = AsyncMock(
+        side_effect=asyncio.TimeoutError("ping timed out")
+    )
+    new_writer = make_writer()
+
+    with patch("asyncio.open_connection", return_value=(new_reader, new_writer)):
+        bridge = UnityBridge()
+        with pytest.raises((asyncio.TimeoutError, ConnectionError, Exception)):
+            await bridge._reconnect(fire_callbacks=False)
+
+    assert bridge._reader is None
+    assert bridge._writer is None

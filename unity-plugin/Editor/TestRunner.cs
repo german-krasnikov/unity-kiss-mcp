@@ -19,6 +19,8 @@ namespace UnityMCP.Editor
         private const string KeyPending = "UnityMCP_tests_pending";
         private const string KeyResults = "UnityMCP_test_results";
         private const string KeyStartTime = "UnityMCP_tests_start";
+        private const string KeyTestCount = "UnityMCP_test_count";
+        private const string KeyCountDiscovering = "UnityMCP_count_discovering";
         private const double StaleTimeoutSec = 600.0; // 10 min max test run
 
         // Testable seam — override in tests to avoid Editor-uptime dependency
@@ -28,6 +30,12 @@ namespace UnityMCP.Editor
         private static void ResetOnReload()
         {
             _isRunning = 0;
+            // Clear stale results from previous run — after domain reload (e.g. added new test),
+            // old result string would be returned by get_test_results until next run completes.
+            SessionState.SetString(KeyResults, "");
+            // Clear cached count — new assemblies may have been compiled.
+            SessionState.SetString(KeyTestCount, "");
+            SessionState.SetBool(KeyCountDiscovering, false);
 #if UNITY_INCLUDE_TESTS
             // Re-register callbacks if tests were running when domain reload occurred.
             // Unity Test Framework preserves execution state; only our callbacks are lost.
@@ -194,11 +202,47 @@ namespace UnityMCP.Editor
                 return sb.ToString();
             }
         }
+        /// <summary>Discovery-only: returns total|edit=N|play=M. First call returns "discovering", subsequent calls return cached result.</summary>
+        public static string GetTestCount()
+        {
+            var cached = SessionState.GetString(KeyTestCount, "");
+            if (!string.IsNullOrEmpty(cached)) return cached;
+
+            if (SessionState.GetBool(KeyCountDiscovering, false)) return "discovering";
+
+            SessionState.SetBool(KeyCountDiscovering, true);
+            int editCount = 0, playCount = 0;
+            int pending = 2;
+
+            var api = ScriptableObject.CreateInstance<TestRunnerApi>();
+            api.RetrieveTestList(TestMode.EditMode, root =>
+            {
+                editCount = root.TestCaseCount;
+                if (--pending == 0) StoreCount(api, editCount, playCount);
+            });
+            api.RetrieveTestList(TestMode.PlayMode, root =>
+            {
+                playCount = root.TestCaseCount;
+                if (--pending == 0) StoreCount(api, editCount, playCount);
+            });
+            return "discovering";
+        }
+
+        private static void StoreCount(TestRunnerApi api, int editCount, int playCount)
+        {
+            UnityEngine.Object.DestroyImmediate(api);
+            var total = editCount + playCount;
+            var result = $"{total}|edit={editCount}|play={playCount}";
+            SessionState.SetString(KeyTestCount, result);
+            SessionState.SetBool(KeyCountDiscovering, false);
+        }
 #else
         public static void Execute(string mode, Action<string> onComplete, string group = null, string filter = null)
         {
             onComplete("Error: com.unity.test-framework package not installed");
         }
+
+        public static string GetTestCount() => "0|edit=0|play=0";
 #endif
     }
 }

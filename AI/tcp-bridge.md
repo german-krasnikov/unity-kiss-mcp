@@ -50,18 +50,22 @@ Max message size: 10MB.
 
 ## Implementation Notes (для Developer)
 
-### Python Client (bridge.py)
+### Python Client (bridge.py + bridge_heartbeat.py + bridge_reload_state.py)
 
 **UnityBridge** — single TCP connection to one Unity instance.
 
 Key features:
+- **BridgeState enum** (v0.36.0): DISCONNECTED | CONNECTED | DOMAIN_RELOADING | FAILED (startup grace expired). Tracks connection lifecycle state explicitly.
+- **DomainReloadTracker** (v0.36.0, `bridge_reload_state.py`): Dataclass with 30s expiry tracking domain reload state independently from compile probe. Three methods: `mark()` (called on DomainReloadError), `clear()` (on successful send), `is_active()` (checks expiry + elapsed). Shared between `send()` retry logic and heartbeat.
+- **should_retry()** (v0.36.0): Pure decision function extracting retry logic from _send_with_retry. Signature: `(error: Exception, attempt: int, session_deadline: float) → (bool, float, str)` returning (retry yes/no, delay_s, reason). On DomainReloadError: marks reload + state→DOMAIN_RELOADING. On any error: checks reload.is_active() or probe_busy(), backoff 2^(attempt+1) sequence: 2s→4s→8s (restored in v0.37.0, was regressed to 1s→2s→4s). Testable without mocking networking.
 - Socket options: `TCP_NODELAY`, `SO_KEEPALIVE` (macOS: idle=60s, interval=10s, count=3; detects dead peers within ~90s)
 - Heartbeat: 15s interval `_raw_ping()` (bypasses retry machinery), 3 consecutive failures OR `is_process_dead()` → close. Disconnected polling: 5s if probe busy, 2s otherwise.
 - `_raw_ping()`: lightweight ping (default timeout=10s, heartbeat calls with 20s) that acquires lock, sends framed message directly on socket, validates response ID match. Prevents heartbeat from consuming RPC responses.
 - Reconnect: cooldown `MIN_RECONNECT_INTERVAL=2.0s` gates frequency; `_reconnect_cooldown_ok()` check prevents thundering herd. Heartbeat uses probe for TIMING only, not as gate for reconnect.
-- `DomainReloadError`: raised when Unity sends `going_away` event frame → immediate close (no wait), triggers `mark_recompile_issued()` state probe update, fast reconnect
+- `DomainReloadError`: raised when Unity sends `going_away` event frame → immediate close (no wait), triggers `mark_recompile_issued()` state probe update, fast reconnect. **v0.36.0**: heartbeat now calls `_reload.mark()` to extend retry window (30s).
+- **Atomic reader/writer close** (v0.36.0): Both reader and writer closed atomically within lock during _reconnect() to prevent zombie reads after close.
 - `_ensure_heartbeat()`: called on every `send()`, auto-restarts heartbeat task if it died (safety net)
-- `send()` retry logic: idle errors get 1 grace attempt; busy (domain reload / probe) gets full retries with exponential backoff (capped at 8s). Session deadline `SESSION_TIMEOUT=120s` prevents infinite retries. **v0.31.1 Fix**: When `DomainReloadError` is caught, `domain_reload_in_progress` flag is pinned to True for all subsequent retries within that send() call, preventing `_probe_busy()` re-evaluation from returning False too early (Editor.log may clear "compiling" status before TCP 9700 is restored). Non-DomainReloadError exceptions still allow probe re-evaluation per attempt.
+- `send()` retry logic: idle errors get 1 grace attempt; busy (domain reload / probe) gets full retries with exponential backoff (capped at 8s). Session deadline `SESSION_TIMEOUT=120s` prevents infinite retries (overridable via env UNITY_MCP_SESSION_TIMEOUT for reasoning models like Codex o3/o3-pro; chat backend sets 300s). **v0.31.1 Fix**: When `DomainReloadError` is caught, `domain_reload_in_progress` flag is pinned to True for all subsequent retries within that send() call, preventing `_probe_busy()` re-evaluation from returning False too early (Editor.log may clear "compiling" status before TCP 9700 is restored). Non-DomainReloadError exceptions still allow probe re-evaluation per attempt. **v0.36.0: SESSION_TIMEOUT env override** — CliBackendBase injects UNITY_MCP_SESSION_TIMEOUT=300 so Python bridge allows longer think time for reasoning models without timeout.
 - Lock per connection for thread safety
 
 **P0 (Cycle 17+) Fix — Domain Reload Sticky Flag**
@@ -89,9 +93,11 @@ Single-connection manager (replaces former multi-connection BridgeManager):
 - `connected` property — shortcut for bridge.connected
 - No `reconnect()` method — reconnection handled by UnityBridge heartbeat loop
 
-### Port Discovery & TCP Probe (server_filtering.py) — v0.23.0
+### Port Discovery & TCP Probe (server_filtering.py) — v0.23.0, v0.36.0
 
 Port discovery reads `~/.unity-mcp/ports/{pid}.port` files. **v0.23.0:** Adds `_tcp_probe(port, timeout=0.2)` — quick TCP handshake to verify port actually listens before returning. Filters out stale discovery files (port written but server not yet bound, or server crashed leaving orphan file). Candidates prioritized: env UNITY_MCP_PORT → CWD project path match → newest mtime → default 9500.
+
+**v0.36.0 Chat-Port Fallback:** When subprocess sets `UNITY_MCP_CHAT=1` env var, `read_unity_port()` switches glob pattern from `*.port` to `*.chat-port`. Windows chat subprocess fallback when UNITY_MCP_PORT env propagation fails (edge case with cross-user process inheritance). C# MCPServer writes both {pid}.port and {pid}.chat-port discovery files. `_is_pid_alive(pid)` cross-platform check (Windows: OpenProcess/CloseHandle, Unix: os.kill(pid,0)) replaces naive kill check.
 
 ### CompileStateProbe (compile_state.py)
 
@@ -196,7 +202,9 @@ Append-only JSONL crash log for unhandled exceptions:
 
 ## Code Locations
 
-- Python bridge: `server/src/unity_mcp/bridge.py`
+- Python bridge: `server/src/unity_mcp/bridge.py` (UnityBridge TCP client, BridgeState enum, should_retry() v0.36.0)
+- Python bridge heartbeat: `server/src/unity_mcp/bridge_heartbeat.py` (HeartbeatMixin, 15s ping loop, startup grace deadline)
+- Python domain reload tracker: `server/src/unity_mcp/bridge_reload_state.py` (DomainReloadTracker v0.36.0, 30s expiry)
 - Python connection slot: `server/src/unity_mcp/connection_slot.py`
 - Python compile probe: `server/src/unity_mcp/compile_state.py`
 - Python unity state: `server/src/unity_mcp/unity_state.py`
@@ -205,7 +213,7 @@ Append-only JSONL crash log for unhandled exceptions:
 - Python server filtering: `server/src/unity_mcp/server_filtering.py` (with v0.23.0 TCP probe)
 - Python server wrapper: `server/src/unity_mcp/server.py` (main() crash handler)
 - C#: `unity-plugin/Editor/CommandRouter.cs`, `unity-plugin/Editor/MCPServer.cs`
-- Tests: `server/tests/test_bridge.py` (37), `server/tests/test_bridge_edge_cases.py` (6 new P0+P2 tests), `server/tests/test_heartbeat.py` (4 new P3+P5 tests: double-check + graceful stop), `server/tests/test_connection_slot.py` (8), `server/tests/test_lockfile.py` (17), `server/tests/test_crash_log.py` (10), `server/tests/test_server.py` (4 new main() crash tests), `server/tests/test_parent_death.py` (updated for P3+P5)
+- Tests: `server/tests/test_bridge.py` (37 base + new tests v0.36.0), `server/tests/test_bridge_edge_cases.py` (6 new P0+P2 tests), `server/tests/test_bridge_reload_state.py` (8 new DomainReloadTracker tests, v0.36.0), `server/tests/test_bridge_should_retry.py` (8 new should_retry() tests, v0.36.0), `server/tests/test_heartbeat.py` (4 new P3+P5 tests: double-check + graceful stop), `server/tests/test_connection_slot.py` (8), `server/tests/test_lockfile.py` (17), `server/tests/test_crash_log.py` (10), `server/tests/test_server.py` (4 new main() crash tests), `server/tests/test_parent_death.py` (updated for P3+P5)
 
 ## Reconnection Strategy
 
@@ -249,7 +257,7 @@ On TimeoutError / ConnectionError:
 
 ## TDD Scenarios (для Developer)
 
-### Python Client (37 tests in test_bridge.py)
+### Python Client (37 tests in test_bridge.py + 16 new tests in v0.36.0)
 
 **Protocol / framing:**
 - `test_send_encodes_header_as_big_endian_uint32`, `test_send_encodes_payload_as_utf8_json`
@@ -298,6 +306,28 @@ On TimeoutError / ConnectionError:
 
 **Failure description:**
 - `test_describe_failure_reports_crash_when_pid_dead`
+
+### v0.36.0 Refactoring (16 new tests across 2 files)
+
+**test_bridge_reload_state.py (8 tests for DomainReloadTracker):**
+- `test_tracker_not_active_initially` — new instance has is_active()=False
+- `test_tracker_mark_activates` — mark() sets _active=True
+- `test_tracker_elapsed_increases` — elapsed() returns monotonic delta from mark time
+- `test_tracker_is_active_true_while_within_expiry` — is_active()=True while < 30s
+- `test_tracker_is_active_false_after_expiry` — is_active()=False after 30s+ elapsed
+- `test_tracker_clear_deactivates` — clear() sets _active=False, _since=None
+- `test_tracker_clear_without_mark_safe` — clear() on unmarked tracker is safe
+- `test_tracker_elapsed_zero_when_unmarked` — elapsed()=0.0 when _since is None
+
+**test_bridge_should_retry.py (8 tests for should_retry() decision logic):**
+- `test_should_retry_max_retries_gate` — attempt >= MAX_RETRIES returns (False, 0.0, "max_retries")
+- `test_should_retry_deadline_gate` — time.monotonic() >= deadline returns (False, 0.0, "deadline")
+- `test_should_retry_domain_reload_error_marks_reload` — DomainReloadError sets state→DOMAIN_RELOADING
+- `test_should_retry_domain_reload_gets_backoff` — DomainReloadError attempt<MAX_RETRIES returns (True, 2^attempt≤8, "domain_reload")
+- `test_should_retry_reload_active_retries` — reload.is_active()=True gets backoff, attempt < MAX_RETRIES
+- `test_should_retry_probe_busy_retries` — probe_busy()=True gets backoff
+- `test_should_retry_transient_attempt_0` — attempt < 1 with no busy returns (True, 1.0, "transient")
+- `test_should_retry_grace_expired_attempt_1_plus` — attempt ≥ 1 with no busy returns (False, 0.0, "grace_expired")
 
 ### C# Server
 

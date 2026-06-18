@@ -20,7 +20,7 @@ def _run(code: str, seed: int) -> str:
     }
     out = subprocess.run(
         [sys.executable, "-c", code],
-        env=env, capture_output=True, text=True, check=True, timeout=10,
+        env=env, capture_output=True, text=True, encoding="utf-8", check=True, timeout=10,
     )
     return out.stdout
 

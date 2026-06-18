@@ -477,3 +477,35 @@ async def test_send_raw_bridge_none_raises_tool_error(mock_bridge):
             await _send("ping", {})
     finally:
         srv.slot = original
+
+
+# --- get_console additional edge cases ---
+
+async def test_get_console_empty_response_is_valid(mock_bridge):
+    """get_console with empty data string is valid (not ToolError)."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+    result = await get_console()
+    assert result == ""
+
+
+async def test_get_console_warning_level(mock_bridge):
+    """get_console passes level=Warning to bridge."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "warn"})
+    await get_console(level="Warning")
+    args = mock_bridge.send.call_args[0][1]
+    assert args["level"] == "Warning"
+
+
+async def test_get_console_missing_data_key(mock_bridge):
+    """get_console returns empty string when data key absent."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True})
+    result = await get_console()
+    assert result == ""
+
+
+async def test_get_console_count_minus_one(mock_bridge):
+    """get_console passes count=-1 to bridge."""
+    mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "all logs"})
+    await get_console(count=-1)
+    args = mock_bridge.send.call_args[0][1]
+    assert args["count"] == -1

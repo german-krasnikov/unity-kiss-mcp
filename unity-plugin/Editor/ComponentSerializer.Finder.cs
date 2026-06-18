@@ -98,6 +98,7 @@ namespace UnityMCP.Editor
             GameObject found = null;
             string foundScene = null;
             var ambiguous = new List<string>();
+            var ambiguousScenes = new System.Collections.Generic.HashSet<string>();
 
             for (int s = 0; s < UnityEngine.SceneManagement.SceneManager.sceneCount; s++)
             {
@@ -115,15 +116,25 @@ namespace UnityMCP.Editor
                         else
                         {
                             if (ambiguous.Count == 0)
+                            {
                                 ambiguous.Add($"{foundScene}:/{name} (#{found.GetInstanceID()})");
+                                ambiguousScenes.Add(foundScene);
+                            }
                             ambiguous.Add($"{scene.name}:/{name} (#{root.GetInstanceID()})");
+                            ambiguousScenes.Add(scene.name);
                         }
                     }
                 }
             }
             if (ambiguous.Count > 0)
+            {
+                bool multiScene = ambiguousScenes.Count > 1;
+                string desc = multiScene
+                    ? $"found in {ambiguousScenes.Count} scenes"
+                    : $"matches {ambiguous.Count} objects";
                 throw new System.ArgumentException(
-                    $"Ambiguous: '{name}' matches {ambiguous.Count} objects. Use instance ID: " + string.Join(" or ", ambiguous));
+                    $"Ambiguous: '{name}' {desc}. Use instance ID: " + string.Join(" or ", ambiguous));
+            }
             return found;
         }
 

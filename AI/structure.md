@@ -7,7 +7,7 @@ unity-kiss-mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
-│   │   ├── server_filtering.py # Port discovery + TCP probe (v0.23.0), catalog push, tool filtering
+│   │   ├── server_filtering.py # Port discovery + TCP probe (v0.23.0), chat-port fallback (v0.36.0), catalog push, tool filtering
 │   │   ├── lockfile.py         # Cross-platform exclusive locking + zombie detection (v0.23.0)
 │   │   ├── diagnose.py         # Shared diagnose parser + verdict logic (_parse_diagnose, _verdict, _DiagnoseFields)
 │   │   ├── compile_state.py    # CompileStateProbe (heuristic Unity compile detection)

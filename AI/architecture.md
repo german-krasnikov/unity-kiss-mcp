@@ -53,17 +53,21 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - Tool annotations: readOnlyHint, destructiveHint for MCP compliance
    - Dynamic tool filtering: patches `mcp._mcp_server.request_handlers[ListToolsRequest]` with gating + disabled-set subtraction (hide-disabled-set model, not allowlist)
 
-2. **TCP Bridge** (Python: `bridge.py` + `connection_slot.py` + `lockfile.py` + `compile_state.py` + `server_filtering.py`)
+2. **TCP Bridge** (Python: `bridge.py` + `bridge_heartbeat.py` + `bridge_reload_state.py` + `connection_slot.py` + `lockfile.py` + `compile_state.py` + `server_filtering.py`)
    - **ConnectionSlot**: dual per-project connections (CLI main + Chat agent-only) with project-based discovery
-   - **Port Discovery** (`server_filtering.py:read_unity_port`, v0.23.0): CWD-based project matching → ~/.unity-mcp/ports/*.port files → env UNITY_MCP_PORT → default 9500. **v0.23.0: TCP probe** filters stale discovery files (port written but not listening). Candidates ranked by project path match (CWD), then mtime. PermissionError (cross-user processes) skipped gracefully, live .port files preserved.
-   - **Port Persistence (v0.35.0)** — PortResolver discovery chain: env UNITY_MCP_PORT → ProjectSettings/MCPSettings.json (user intent, survives Library purge) → Library/MCP_Port.json (cache) → FindFreePort. MCPServer.cs calls SaveProjectSettings() to persist both main + chat port assignments at startup. Backward compatible: nil ProjectSettings falls through to Library cache.
+   - **Port Discovery** (`server_filtering.py:read_unity_port`, v0.23.0, v0.36.0 chat-port fallback): CWD-based project matching → ~/.unity-mcp/ports/*.port files (or *.chat-port when UNITY_MCP_CHAT=1) → env UNITY_MCP_PORT → default 9500. **v0.23.0: TCP probe** filters stale discovery files (port written but not listening). **v0.36.0: Windows chat-port fallback** — when chat subprocess sets UNITY_MCP_CHAT=1 env var, reads *.chat-port files (written by C# MCPServer) instead of *.port. Candidates ranked by project path match (CWD), then mtime. PermissionError (cross-user processes) skipped gracefully, live .port files preserved.
+   - **Port Persistence (v0.35.0, v0.36.0 chat-port)** — PortResolver discovery chain: env UNITY_MCP_PORT → ProjectSettings/MCPSettings.json (user intent, survives Library purge) → Library/MCP_Port.json (cache) → FindFreePort. MCPServer.cs calls SaveProjectSettings() to persist both main + chat port assignments at startup. **v0.36.0: MCPServer.WritePortFile()** now writes both {pid}.port (main) and {pid}.chat-port (chat) when dual ports active. DeletePortFile() cleans both. Backward compatible: nil ProjectSettings falls through to Library cache.
    - **Fail-Fast Lockfile** (`lockfile.py`): RuntimeError raised on live process (instead of SIGTERM) to let Python server handle reconnection logic cleanly. **v0.23.0: Zombie detection** — `_is_zombie(pid)` check prevents treating defunct processes as "live", allowing fast server startup without waiting for cleanup.
-   - **UnityBridge**: AsyncIO TCP client, 4-byte BE length prefix JSON
+   - **UnityBridge (v0.36.0)**: AsyncIO TCP client, 4-byte BE length prefix JSON
+     * **BridgeState enum**: DISCONNECTED | CONNECTED | DOMAIN_RELOADING | FAILED (startup grace expired)
+     * **DomainReloadTracker** (`bridge_reload_state.py`, v0.36.0): Tracks domain reload state independently from compile probe (30s expiry). Shared between bridge.send() and heartbeat via `_reload` instance. Three methods: `mark()` (on DomainReloadError), `clear()` (on success), `is_active()` (checks expiry). Decouples reload window from compile heuristics.
+     * **should_retry()** (`bridge.py`, v0.36.0): Pure decision function invoked by _send_with_retry on error. Returns (should_retry: bool, delay_s: float, reason: str). Logic: (1) check attempt count/deadline, (2) on DomainReloadError mark reload + state→DOMAIN_RELOADING, (3) on any error check reload.is_active() or probe_busy(), backoff 2^attempt ≤ 8s. Extracted from inline retry logic for testability + clarity.
+     * **Atomic reader/writer swap** (v0.36.0): In _reconnect(), both reader and writer closed atomically within lock to prevent zombie reads after close. Fixed CancelledError cleanup.
    - Socket: TCP_NODELAY, SO_KEEPALIVE (idle=60s, interval=10s, count=3 on macOS/Linux)
    - **Heartbeat**: 15s interval, raw ping, 3 consecutive failures → close, 2s polling when disconnected (5s when busy). Sole reconnect mechanism.
    - **Port Re-Discovery on Reconnect (v0.24.1)** — `UnityBridge` accepts optional `port_discoverer` callable (typically `read_unity_port`), invoked during `_reconnect()` before TCP connect to detect if Unity moved to a new port. If discoverer returns different port, bridge updates `_port` and recreates CompileStateProbe. Gracefully handles discoverer exceptions (falls back to current port). ConnectionSlot threads discoverer through and adds `_sync_port()` callback to sync port back to slot + trigger server-side lockfile swap (`_on_port_change`). Backward-compatible: no discoverer → normal reconnect.
    - **CompileStateProbe**: heuristic compile/domain-reload detector (state file, PID check)
-   - **DomainReloadError**: on Unity `going_away` event → immediate close + busy flag
+   - **DomainReloadError**: on Unity `going_away` event → immediate close + busy flag. Heartbeat now calls `_reload.mark()` on DomainReloadError (v0.36.0) to extend retry window in send()
    - **PID Lockfile**: `~/.unity-mcp/server-{port}.lock`, **cross-platform locking**:
      * **macOS/Linux**: `fcntl.flock` (advisory, whole-file lock)
      * **Windows**: `msvcrt.locking` on sentinel byte at offset 1024 (non-blocking, avoids mandatory lock of PID data at bytes 0-31)
@@ -74,16 +78,16 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - Max message: 10MB, timeouts: 30s default, 60s compile_preflight/batch, 120s run_tests/run_playtest/fuzz_playtest
 
 3. **Unity Plugin** (C#: 130+ files, ~14000 LOC)
-   - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, **v0.23.0: SO_REUSEPORT** (macOS/Linux) for rapid reconnect recovery, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections
+   - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, **v0.23.0: SO_REUSEPORT** (macOS/Linux) for rapid reconnect recovery, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections. **v0.37.0: IsReallyCompiling** — managed flag replaces EditorApplication.isCompiling latching, 120s wedge guard prevents false-positive "backgrounded" state. **v0.36.0: WritePortFile** writes both {pid}.port (main) + {pid}.chat-port (Windows env fallback)
    - **PortResolver.cs**: Pure testable helpers (ResolvePort, ResolveChatPort, FindFreePort, SavePorts, IsValidPort, ParsePortFromJson) with 25 NUnit tests. Validates 1024–65535 range, skips reserved ports, fallback to OS-assigned via port 0
-   - **CommandRouter.cs**: RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutatingCommand/IsRuntimeCommand
+   - **CommandRouter.cs**: RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutatingCommand/IsRuntimeCommand. **v0.37.0: DefaultIsCompiling** — two-layer check (IsReallyCompiling + 120s wedge guard) prevents false-positive compile blocks.
    - **PluginRegistry.cs**: Static registry for IMCPPlugin implementations. Plugins register via `[InitializeOnLoad]`. One-way asmdef dependency: external → public.
    - **IMCPPlugin.cs**: Interface — Name, CommandPrefix, RegisterCommands(), OnDomainReload(), AdditionalCommands
    - **CommandRegistry.cs**: Func<string,string> handlers, mutating + runtime flags
    - **CommandSchema.cs**: parameter validation with fuzzy did-you-mean suggestions (79 schemas)
    - **ValueParser.cs**: vectors, quaternions, colors, arrays, 100+ types (Rect/Bounds/RectInt/BoundsInt/LayerMask + Int64/Double precision), type-aware SetPropertyValue
    - **InputNormalizer.cs**: component/property/value normalization
-   - **BatchHelper.cs**: multi-command text parser + executor (on_error=continue/stop)
+   - **BatchHelper.cs**: multi-command text parser + executor (on_error=continue/stop). **v0.37.0:** testable IsCompiling seam via CommandRouter (supports reload-latch testing)
    - **7 Serializers**: HierarchySerializer (tree, MAX_NODES=3000, incremental, summary), ComponentSerializer (key-value, UnityEvent expansion, PrefabStage-aware, **v0.23.0: #instanceID in all path tools**), AnimationSerializer, TimelineSerializer, AnimatorControllerSerializer, ParticleSerializer, ShaderSerializer
    - **ScenePathParser (v0.31.0)**: Shared struct for multi-scene path parsing (`"SceneName:/"` prefix extraction). Used by SceneObjectFinder + ComponentSerializer.Finder. Replaces inline string parsing, prevents multi-scene reference bugs.
    - **ObjectManager (v0.23.0 fixes)**: Properties.cs auto-redirects `set_property("active")` to SetActive. Lookup.cs adds FindType + short-name fallback for custom components.
@@ -114,8 +118,10 @@ for _ in range(24):  # 2min @ 5s intervals
 
 6. **Post-mutation features**: console error capture, SuggestNext (recommends verification tool), auto-return parent subtree after create/delete
 
-7. **In-Unity Chat Session Control (v0.19.0, F20–F30)**
+7. **In-Unity Chat Session Control (v0.19.0, F20–F30, v0.36.0 timeout messaging)**
    - **Stop button (F20)**: CancelTurn() method in MCPChatWindow + backend handlers. Sends `{ "stop_reason": "end_turn" }` to Claude stdin or terminates Codex process. Esc hotkey also triggers cancel. Button UI swaps from Send→Stop during streaming.
+   - **Timeout Context Hints (v0.36.0)**: When turn exceeds InactivityTimeoutSec (300s for Codex, 90s for Claude), failure message now includes last tool name: `[Timed out: no response for 300s (last tool: set_property)]`. Helps debug what operation was in-flight. Tracked via `_lastToolName` in EventHandlers.cs.
+   - **Dead-Process Guard Message (v0.36.0)**: When backend process unexpectedly exits mid-turn, appends `[Process exited]` to transcript before finalizing. Surfaces connection loss (vs. timeout) as distinct error state. Clears turn flags to unlock reload.
    - **Transcript reload survival (F21)**: TranscriptSerializer.cs persists chat history to plain-text format at Library/MCP_ChatTranscript.txt (alongside PendingTurnState). On domain reload, history restored, preserving user/assistant/tool-call entries + styling. `_entries` tracking + SessionState persistence gate.
    - **Settings persistence (F22–F24)**: AutoScroll toggle persisted in EditorPrefs, dropdown selections (Backend, Model) cached, all restore on domain reload / window reopen.
    - **Chip correctness (F24–F26)**: @Object duplicate fix via global forward search instead of narrow offset window. Direct Clear dialog (no submenu). Drag-drop MonoScript creates dual-chip (@Object + @Script).
@@ -222,7 +228,7 @@ for _ in range(24):  # 2min @ 5s intervals
 
 ## Tool Categories
 
-**Update v0.30.4**: validate_move added to asset category (6 tools total). Test marker `live_haiku` → `live_cli` (semantic only, backward compatible).
+**Update v0.30.4**: validate_move added to asset category (6 tools total). Test marker `live_haiku` → `live_cli` (v0.8.2+).
 
 ### TIER1 (always visible, 38 core)
 
@@ -532,11 +538,11 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 ## Test Infrastructure
 
-### Python Tests: 1588 unit tests + 52 live tests
-- Default: `pytest -m "not live"` — unit tests, $0 cost (1588 tests, includes test_catalog.py = 19)
-- With Unity: `pytest -m "live"` — adds 52 live integration tests, $0 cost (sampling disabled)
-- Real Haiku: `pytest -m "live and live_haiku"` — ~$0.001/run (visual regression, opt-in)
-- Test order: unit → C# → live (live always last, occupies TCP)
+### Python Tests: 2450 unit tests + 78 live integration tests + 4 live CLI tests
+- Default: `PYTHONWARNDEFAULTENCODING=1 pytest -m "not live" -q` — unit tests, $0 cost (2450 tests, includes test_llm_config.py + test_ask.py + intent tests)
+- With Unity: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> pytest -m "live and not live_cli" -q` — 78 live integration tests, $0 cost (requires Unity running, sampling disabled)
+- Real CLI: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> UNITY_MCP_VISUAL_VERIFY=1 pytest -m "live_cli" -v` — 4 real CLI tests, ~$0.001/call (requires Unity + claude CLI, visual verification enabled)
+- Test order: unit → C# EditMode → C# PlayMode → live integration → live_cli (live/live_cli always last, occupy TCP)
 
 ### Live Test Isolation (server/tests/live/)
 - **Session-scoped PlayMode**: `_play_mode_session` fixture enters PlayMode once, reuses across 16+ tests
@@ -562,7 +568,9 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 **Python** (80+ modules):
 - `server/src/unity_mcp/server.py` — MCP server setup, lifespan, dynamic filtering
-- `server/src/unity_mcp/bridge.py` — UnityBridge TCP client, heartbeat
+- `server/src/unity_mcp/bridge.py` — UnityBridge TCP client, should_retry() decision logic, BridgeState enum (DISCONNECTED|CONNECTED|DOMAIN_RELOADING|FAILED)
+- `server/src/unity_mcp/bridge_heartbeat.py` — HeartbeatMixin loop (15s ping, 2–5s reconnect polling, startup grace deadline)
+- `server/src/unity_mcp/bridge_reload_state.py` — DomainReloadTracker dataclass (30s expiry, marks domain reload state shared with send())
 - `server/src/unity_mcp/connection_slot.py` — ConnectionSlot: single connection management
 - `server/src/unity_mcp/lockfile.py` — PID lockfile with fcntl.flock
 - `server/src/unity_mcp/compile_state.py` — CompileStateProbe heuristic

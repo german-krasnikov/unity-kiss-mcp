@@ -61,6 +61,7 @@ namespace UnityMCP.Editor
                 ValueParser.SetPropertyValue(property, value);
             }
             so.ApplyModifiedProperties();
+            ApplyNativePhysicsProperty(comp, prop, value);
             if (comp is Transform && !EditorApplication.isPlaying && !BatchHelper.InBatch)
             {
                 Physics.SyncTransforms();
@@ -68,6 +69,21 @@ namespace UnityMCP.Editor
             }
             var readProp = so.FindProperty(prop);
             return readProp != null ? ComponentSerializer.GetPropertyValueString(readProp) : value;
+        }
+
+        // Unity 6: Rigidbody damping properties don't auto-sync to the native PhysX body
+        // via SerializedObject alone — must also set via C# API.
+        private static void ApplyNativePhysicsProperty(Component comp, string prop, string value)
+        {
+            if (comp is not Rigidbody rb) return;
+            if (!float.TryParse(value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var f)) return;
+            switch (prop)
+            {
+                case "m_Drag":           rb.linearDamping  = f; break;
+                case "m_AngularDrag":    rb.angularDamping = f; break;
+                case "m_Mass":           rb.mass           = f; break;
+            }
         }
 
         public static string SetPropertyDelta(string path, string component, string prop, string delta)

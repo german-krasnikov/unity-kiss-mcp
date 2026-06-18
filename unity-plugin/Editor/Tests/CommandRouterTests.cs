@@ -405,27 +405,26 @@ namespace UnityMCP.Editor.Tests
             => Assert.IsFalse(CommandRouter.IsAllowedDuringCompile("recompile"),
                 "G11: recompile (AssetDatabase.Refresh no-op) must NOT be in the allowlist");
 
-        // ── WIN-1: post-reload stale isCompiling — EditorApplication.isCompiling true but
+        // ── WIN-1: post-reload stale isCompiling — MCPServer.IsReallyCompiling=false because
         //           compilationStarted never fired in this domain (Windows domain-reload artifact) ──
 
         [Test]
         public void IsCompiling_StaleReloadArtifact_EditorCompilingTrueButNoDomainStart_ReturnsFalse()
         {
-            // Uses production DefaultIsCompiling with:
-            //   - EditorIsCompiling injected to true (simulates Windows stale tick after reload)
-            //   - MCPServer state reset so CompileStartedThisDomain=false (fresh domain)
-            // Guard 2 should block → returns false even though EditorApplication says "compiling".
-            CommandRouter.EditorIsCompiling = () => true;  // Windows stale artifact
+            // Uses production DefaultIsCompiling with MCPServer state reset:
+            //   - ResetDomainStateForTests sets _isCompiling=false (IsReallyCompiling=false)
+            //   - DefaultIsCompiling Layer 1 returns false immediately
+            // Simulates Windows post-reload stale EditorApplication.isCompiling tick:
+            // MCPServer never saw compilationStarted so IsReallyCompiling=false unblocks commands.
             CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
-            MCPServer.ResetDomainStateForTests();  // CompileStartedThisDomain=false
+            MCPServer.ResetDomainStateForTests();  // _isCompiling=false → IsReallyCompiling=false
             try
             {
                 Assert.IsFalse(CommandRouter.IsCompiling(),
-                    "WIN-1: stale post-reload isCompiling must not block commands");
+                    "WIN-1: IsReallyCompiling=false must unblock commands even if EditorApplication.isCompiling=true");
             }
             finally
             {
-                CommandRouter.EditorIsCompiling = () => UnityEditor.EditorApplication.isCompiling;
                 CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
             }
         }
@@ -433,12 +432,11 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Process_StaleReloadArtifact_UnblocksCommand()
         {
-            // End-to-end: stale Windows isCompiling (EditorIsCompiling=true, CompileStartedThisDomain=false)
-            // must not block commands — DefaultIsCompiling Guard 2 returns false.
-            CommandRouter.EditorIsCompiling = () => true;  // Windows stale artifact
+            // End-to-end: MCPServer.IsReallyCompiling=false (no compilationStarted this domain)
+            // must not block commands — DefaultIsCompiling Layer 1 returns false.
             CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
             CommandRouter.IsPlayMode = () => false;
-            MCPServer.ResetDomainStateForTests();  // CompileStartedThisDomain=false
+            MCPServer.ResetDomainStateForTests();  // _isCompiling=false → IsReallyCompiling=false
             try
             {
                 var json = "{\"id\":\"win1\",\"cmd\":\"ping\",\"args\":{}}";
@@ -447,9 +445,32 @@ namespace UnityMCP.Editor.Tests
             }
             finally
             {
-                CommandRouter.EditorIsCompiling = () => UnityEditor.EditorApplication.isCompiling;
                 CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
                 CommandRouter.IsPlayMode = () => UnityEditor.EditorApplication.isPlaying;
+            }
+        }
+
+        // ── Scenario 2: Batch must NOT be blocked when IsReallyCompiling=false ──
+        // Before fix: BatchHelper.IsCompiling used EditorApplication.isCompiling → latched.
+        // After fix: BatchHelper.IsCompiling delegates to CommandRouter.IsCompiling()
+        //            → MCPServer.IsReallyCompiling → false → batch passes.
+        [Test]
+        public void LatchFix_BatchCommandPassesDuringFalseLatch()
+        {
+            // Simulate false latch: compilationFinished fired → _isCompiling=false
+            // but EditorApplication.isCompiling could still be true (ignored).
+            CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
+            BatchHelper.IsCompiling = () => CommandRouter.IsCompiling();
+            MCPServer.ResetDomainStateForTests();  // _isCompiling=false → IsReallyCompiling=false
+            try
+            {
+                var result = BatchHelper.Execute("ping", "continue", 25000);
+                Assert.IsFalse(result.Contains("BLOCKED"), $"Batch must not be blocked when IsReallyCompiling=false. Got: {result}");
+            }
+            finally
+            {
+                CommandRouter.IsCompiling = CommandRouter.DefaultIsCompiling;
+                BatchHelper.IsCompiling = () => CommandRouter.IsCompiling();
             }
         }
 

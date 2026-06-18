@@ -110,23 +110,33 @@ async def test_sync_unity_noop_when_stamp_unchanged():
 
 @pytest.mark.asyncio
 async def test_sync_unity_noop_stamp_match():
-    """E2E-2b: sync_unity returns 'sync clean (no-op, domain unchanged)' when
-    will_compile=True but stamp_post == stamp_pre (real same-domain scenario).
+    """E2E-2b: sync_unity handles will_compile=True but stamp_post == stamp_pre.
+
+    Same MVID after compile = recovery attempted (force_refresh), then healed.
+    Result: 'sync clean' (recovery succeeded).
     """
-    stamp = "abc123:99999"
+    stamp_pre  = "abc123:99999"
+    stamp_post = "def456:99999"  # force_refresh changes MVID → healed
     call_log = []
     epoch_counter = {"n": 0}
+    force_refreshed = {"done": False}
 
     async def fake_send(cmd: str, args: dict) -> str:
         call_log.append(cmd)
         if cmd == "sync_status":
             epoch_counter["n"] += 1
             if epoch_counter["n"] == 1:
-                return f"epoch=0|state=idle|stamp={stamp}"  # pre-sync read
-            # post-sync: epoch=5, ready, SAME stamp
-            return f"epoch=5|state=ready|stamp={stamp}"
+                return f"epoch=0|state=idle|stamp={stamp_pre}"  # pre-sync read
+            if not force_refreshed["done"]:
+                # post-sync poll: same stamp (MVID frozen, triggers recovery)
+                return f"epoch=5|state=ready|stamp={stamp_pre}"
+            # after force_refresh: new MVID → healed
+            return f"epoch=5|state=ready|stamp={stamp_post}"
         if cmd == "sync":
             return "sync_ack|epoch=5|will_compile=true"
+        if cmd == "force_refresh":
+            force_refreshed["done"] = True
+            return "ok"
         if cmd == "get_compile_errors":
             return "No compilation errors"
         raise ConnectionError(f"unexpected: {cmd}")
@@ -138,8 +148,8 @@ async def test_sync_unity_noop_stamp_match():
     finally:
         _sync_mod._send = old_send
 
-    assert "no-op" in result, f"Expected no-op verdict: {result!r}"
-    assert "domain unchanged" in result, f"Expected 'domain unchanged': {result!r}"
+    assert "sync clean" in result, f"Expected 'sync clean' after recovery: {result!r}"
+    assert "force_refresh" in call_log, "Recovery should have called force_refresh"
 
 
 # ---------------------------------------------------------------------------

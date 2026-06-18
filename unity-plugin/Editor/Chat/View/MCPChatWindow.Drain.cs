@@ -183,6 +183,9 @@ namespace UnityMCP.Editor.Chat
                     ResetTurnFlags(); // P0-2: dead-process guard must also clear stale flags
                     // F6: dead process — treat as failed turn.
                     _undoTracker.OnTurnFailed();
+                    // M2: surface that the process exited unexpectedly.
+                    _transcript?.AppendOrExtendAssistant("\n[Process exited]");
+                    _transcript?.FinalizeAssistant();
                     if (_activity.Fail()) OnActivityChanged();
                     return;
                 }
@@ -195,7 +198,8 @@ namespace UnityMCP.Editor.Chat
                     ReloadGuard.OnTurnFinished();
                     ResetTurnFlags();
                     _undoTracker.OnTurnFailed();
-                    _transcript?.AppendOrExtendAssistant($"\n[Timed out: no response for {(int)InactivityTimeoutSec}s]");
+                    var hint = !string.IsNullOrEmpty(_lastToolName) ? $" (last tool: {_lastToolName})" : "";
+                    _transcript?.AppendOrExtendAssistant($"\n[Timed out: no response for {(int)InactivityTimeoutSec}s{hint}]");
                     _transcript?.FinalizeAssistant();
                     if (_activity.Fail()) OnActivityChanged();
                 }

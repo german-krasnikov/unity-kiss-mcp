@@ -16,7 +16,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _log(name: str) -> str:
-    return (FIXTURES / name).read_text()
+    return (FIXTURES / name).read_text(encoding="utf-8")
 
 
 # --- parse_log ---
@@ -67,7 +67,7 @@ def test_is_pid_alive_dead_pid():
 def test_discover_ports_finds_alive_port():
     pid = os.getpid()
     with tempfile.TemporaryDirectory() as d:
-        Path(d, f"{pid}.port").write_text("9500")
+        Path(d, f"{pid}.port").write_text("9500", encoding="utf-8")
         main, reload = cu._discover_ports(d)
     assert main == 9500
     assert reload is None
@@ -76,7 +76,7 @@ def test_discover_ports_finds_alive_port():
 def test_discover_ports_finds_reload_port():
     pid = os.getpid()
     with tempfile.TemporaryDirectory() as d:
-        Path(d, f"{pid}.reload-port").write_text("9600")
+        Path(d, f"{pid}.reload-port").write_text("9600", encoding="utf-8")
         main, reload = cu._discover_ports(d)
     assert main is None
     assert reload == 9600
@@ -84,7 +84,7 @@ def test_discover_ports_finds_reload_port():
 
 def test_discover_ports_ignores_dead_pid():
     with tempfile.TemporaryDirectory() as d:
-        Path(d, "99999.port").write_text("9500")
+        Path(d, "99999.port").write_text("9500", encoding="utf-8")
         main, reload = cu._discover_ports(d)
     assert main is None
     assert reload is None
@@ -314,3 +314,101 @@ def test_verdict_unreachable_exits_0():
     out, code = _make_verdict("ok", None, None)
     assert code == 0
     assert "UNREACHABLE" in out
+
+
+# --- _parse_stale_dlls ---
+
+def test_parse_stale_dlls_all_fresh():
+    probe = {"dlls": "UnityMCP.Editor:638000:fresh,UnityMCP.Editor.Chat:638001:fresh"}
+    assert cu._parse_stale_dlls(probe) == []
+
+
+def test_parse_stale_dlls_one_stale():
+    probe = {"dlls": "UnityMCP.Editor:638000:fresh,UnityMCP.Editor.Chat.View:638001:stale"}
+    result = cu._parse_stale_dlls(probe)
+    assert result == ["UnityMCP.Editor.Chat.View"]
+
+
+def test_parse_stale_dlls_multiple_stale():
+    probe = {"dlls": "A:638000:stale,B:638001:fresh,C:638002:stale"}
+    result = cu._parse_stale_dlls(probe)
+    assert result == ["A", "C"]
+
+
+def test_parse_stale_dlls_empty_field():
+    probe = {"dlls": ""}
+    assert cu._parse_stale_dlls(probe) == []
+
+
+def test_parse_stale_dlls_missing_field():
+    probe = {}
+    assert cu._parse_stale_dlls(probe) == []
+
+
+def test_parse_stale_dlls_unknown_no_src_ignored():
+    """unknown(no-src) = Unity built-in assemblies, not stale."""
+    probe = {"dlls": "UnityEngine:638000:unknown(no-src),UnityEditor:638001:unknown(missing)"}
+    assert cu._parse_stale_dlls(probe) == []
+
+
+def test_parse_stale_dlls_mixed_unknown_and_stale():
+    probe = {"dlls": "UnityEngine:638000:unknown(no-src),MyPlugin:638001:stale"}
+    result = cu._parse_stale_dlls(probe)
+    assert result == ["MyPlugin"]
+
+
+# --- verdict routing with stale assemblies ---
+
+def _make_verdict_with_dlls(dlls_value: str | None):
+    """Like _make_verdict but probe returns dlls= field."""
+    import io
+    from contextlib import redirect_stdout
+
+    probe_result: dict = {"main_mvid": "deadbeef"}
+    if dlls_value is not None:
+        probe_result["dlls"] = dlls_value
+
+    buf = io.StringIO()
+    exit_code = None
+
+    with patch.object(cu, "parse_log", lambda t: {"status": "ok"}), \
+         patch.object(cu, "tcp_probe", lambda p, timeout=2: probe_result), \
+         patch.object(cu, "_discover_ports", lambda d: (9500, None)), \
+         patch.object(cu, "_read_log", lambda p: ""), \
+         redirect_stdout(buf):
+        try:
+            cu.main()
+        except SystemExit as e:
+            exit_code = e.code
+
+    return buf.getvalue().strip(), exit_code
+
+
+def test_verdict_stale_exits_2():
+    out, code = _make_verdict_with_dlls("A:638000:stale")
+    assert code == 2
+    assert out.startswith("STALE")
+    assert "assemblies=A" in out
+
+
+def test_verdict_stale_multiple_names():
+    out, code = _make_verdict_with_dlls("A:638000:stale,B:638001:fresh,C:638002:stale")
+    assert code == 2
+    assert "assemblies=A,C" in out
+
+
+def test_verdict_stale_includes_port():
+    out, code = _make_verdict_with_dlls("X:638000:stale")
+    assert "port=9500" in out
+
+
+def test_verdict_fresh_dlls_healthy():
+    out, code = _make_verdict_with_dlls("A:638000:fresh,B:638001:fresh")
+    assert code == 0
+    assert "HEALTHY" in out
+
+
+def test_verdict_no_dlls_field_healthy():
+    out, code = _make_verdict_with_dlls(None)
+    assert code == 0
+    assert "HEALTHY" in out

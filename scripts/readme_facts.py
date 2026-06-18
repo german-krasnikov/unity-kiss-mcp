@@ -5,7 +5,7 @@ Reproduce commands (run from repo root):
   tools:         python3 -c "import scripts.readme_facts as f; print(f.count_mcp_tools(...))"
   tests_python:  source server/.venv/bin/activate && python -m pytest server/tests/ --collect-only -q -m "not live" 2>&1 | tail -1
   tests_live:    source server/.venv/bin/activate && python -m pytest server/tests/ --collect-only -q -m "live" 2>&1 | tail -1
-  tests_unity:   grep -rn "\\[Test\\]\\|\\[UnityTest\\]" unity-plugin/ --include="*.cs" | wc -l
+  tests_unity:   TCP get_test_results (accurate) or grep fallback
   server_ver:    grep -m1 '^version' server/pyproject.toml
   plugin_ver:    python3 -c "import json; print(json.load(open('unity-plugin/package.json'))['version'])"
 
@@ -108,21 +108,60 @@ def count_pytest_live(tests_dir: pathlib.Path) -> int:
         return 0
 
 
-def count_unity_tests(plugin_dir: pathlib.Path) -> int:
-    """Count [Test] + [UnityTest] attributes in unity-plugin/ C# files.
+def _count_unity_tests_tcp() -> Optional[int]:
+    """Try to get NUnit count from running Unity via TCP (discovery, no test run)."""
+    import asyncio, struct, time
+    async def _ask(port: int) -> Optional[str]:
+        r, w = await asyncio.open_connection("127.0.0.1", port)
+        msg = json.dumps({"cmd": "get_test_count", "args": {}}).encode()
+        w.write(struct.pack(">I", len(msg)) + msg)
+        await w.drain()
+        raw = await asyncio.wait_for(r.readexactly(
+            struct.unpack(">I", await asyncio.wait_for(r.readexactly(4), 3))[0]), 3)
+        w.close()
+        return json.loads(raw).get("data", "")
+    async def _query():
+        for port_file in pathlib.Path.home().glob(".unity-mcp/ports/*.port"):
+            try:
+                port = int(port_file.read_text().split("\n")[0])
+            except Exception:
+                continue
+            for _ in range(5):
+                try:
+                    data = await _ask(port)
+                    if data == "discovering":
+                        await asyncio.sleep(1)
+                        continue
+                    m = re.match(r"(\d+)\|", data or "")
+                    if m:
+                        return int(m.group(1))
+                except Exception:
+                    break
+        return None
+    try:
+        return asyncio.run(_query())
+    except Exception:
+        return None
 
-    Reproduce:
-      grep -rn "\\[Test\\]\\|\\[UnityTest\\]" unity-plugin/ --include="*.cs" | wc -l
-    Note: does NOT count unity-test-project/ (gitignored).
+
+def count_unity_tests(plugin_dir: pathlib.Path) -> int:
+    """Get NUnit test count from Unity TCP (accurate) or static grep (fallback).
+
+    TCP reads the actual last-run result (handles TestCaseSource, Values, etc.).
+    Static grep counts [Test], [UnityTest], [TestCase(] attributes.
     """
+    tcp_count = _count_unity_tests_tcp()
+    if tcp_count is not None and tcp_count > 0:
+        return tcp_count
     if not plugin_dir.exists():
         return 0
     count = 0
-    pattern = re.compile(r"\[(?:Test|UnityTest)\]")
+    bare = re.compile(r"\[(?:Test|UnityTest)\]")
+    case_attr = re.compile(r"\[TestCase\(")
     for cs_file in plugin_dir.rglob("*.cs"):
         try:
             text = cs_file.read_text(encoding="utf-8")
-            count += len(pattern.findall(text))
+            count += len(case_attr.findall(text)) + len(bare.findall(text))
         except Exception:
             continue
     return count

@@ -33,6 +33,10 @@ def _make_bridge_mixin():
             self._startup_grace_expired = False
             self._ppid_mismatch_count = 0
             self._connected = True
+            from unity_mcp.bridge_reload_state import DomainReloadTracker
+            from unity_mcp.bridge import BridgeState
+            self._reload = DomainReloadTracker()
+            self._state = BridgeState.DISCONNECTED
 
         @property
         def connected(self):

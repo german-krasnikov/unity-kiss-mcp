@@ -15,23 +15,17 @@ namespace UnityMCP.Editor
         // Fired when ask_user command arrives; MCPChatWindow subscribes to show AskUserCard.
         public static event System.Action<string, string> OnAskUser;  // (requestId, questionsJson)
 
-        // Testable compilation state (defaults to real EditorApplication state).
-        // Three-layer check:
-        //   1. EditorApplication.isCompiling — fast exit if not compiling at all.
-        //   2. MCPServer.CompileStartedThisDomain — rejects post-reload stale isCompiling on
-        //      Windows where isCompiling stays true for 1-3 ticks after domain load completes.
-        //   3. Elapsed < 120s — wedge guard: treat >120s latched compiling as done.
-
-        // Test seam for EditorApplication.isCompiling — allows WIN-1 tests to inject true
-        // without replacing the entire IsCompiling lambda.
-        internal static Func<bool> EditorIsCompiling = () => UnityEditor.EditorApplication.isCompiling;
+        // Testable compilation state (defaults to real MCPServer state).
+        // Two-layer check:
+        //   1. MCPServer.IsReallyCompiling — authoritative flag set by compilationStarted/Finished events.
+        //      Never stays latched after domain reload (unlike EditorApplication.isCompiling on Windows).
+        //   2. CompileElapsedSeconds < 120s — wedge guard: treat >120s latched compiling as done.
 
         // Production lambda — saved separately so tests can restore it via DefaultIsCompiling
         // instead of reconstructing the lambda by hand.
         internal static readonly Func<bool> DefaultIsCompiling = () =>
         {
-            if (!EditorIsCompiling()) return false;
-            if (!MCPServer.CompileStartedThisDomain) return false;  // stale reload artifact
+            if (!MCPServer.IsReallyCompiling) return false;
             return MCPServer.CompileElapsedSeconds < 120.0;
         };
 
@@ -378,6 +372,7 @@ namespace UnityMCP.Editor
             // ask_user is intercepted by ProcessAsync; entry exists for IsRegistered/IsAllowedDuringCompile only
             CommandRegistry.Register("ask_user", _ => throw new InvalidOperationException("ask_user requires async dispatch via ProcessAsync"));
             CommandRegistry.Register("get_test_results", _ => TestRunner.GetResults());
+            CommandRegistry.Register("get_test_count", _ => TestRunner.GetTestCount());
 
             // Runtime (Play Mode only)
             CommandRegistry.Register("invoke_method", args => RuntimeHelper.InvokeMethod(
@@ -495,7 +490,8 @@ namespace UnityMCP.Editor
             cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "sync_status" ||
             cmd == "get_compile_errors" || cmd == "diagnose" ||  // C4: escape-hatch + diagnose reachable while wedged
             cmd == "force_refresh" ||  // G11: real force-recompile must work when wedged
-            cmd == "get_test_results";  // P1: reads SessionState only — safe during compile
+            cmd == "get_test_results" ||  // P1: reads SessionState only — safe during compile
+            cmd == "get_test_count";  // discovery-only, no test run
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {

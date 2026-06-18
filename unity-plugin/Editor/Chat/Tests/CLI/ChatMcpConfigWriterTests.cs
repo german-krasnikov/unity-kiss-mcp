@@ -236,5 +236,27 @@ namespace UnityMCP.Editor.Chat.Tests
             var argsArr = JsonHelper.ExtractArray(unity, "args");
             Assert.AreNotEqual("[]", argsArr, "args array must exist and be non-empty");
         }
+
+        [Test]
+        public void BuildClaudeConfigJson_WithPort_ContainsEnvUnityMcpPort()
+        {
+            var json = ChatMcpConfigWriter.BuildClaudeConfigJson(
+                "/bin/uv", new[] { "run", "--directory", "/srv", "unity-mcp" }, port: 9501);
+
+            var mcpServers = JsonHelper.ExtractObject(json, "mcpServers");
+            var unity      = JsonHelper.ExtractObject(mcpServers, "unity");
+            var env        = JsonHelper.ExtractObject(unity, "env");
+            var portVal    = JsonHelper.ExtractString(env, "UNITY_MCP_PORT");
+            Assert.AreEqual("9501", portVal);
+        }
+
+        [Test]
+        public void BuildClaudeConfigJson_NoPort_NoEnvField()
+        {
+            var json = ChatMcpConfigWriter.BuildClaudeConfigJson(
+                "/bin/uv", new[] { "run", "--directory", "/srv", "unity-mcp" });
+
+            StringAssert.DoesNotContain("\"env\"", json);
+        }
     }
 }

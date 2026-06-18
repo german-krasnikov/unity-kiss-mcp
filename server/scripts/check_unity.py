@@ -106,11 +106,11 @@ def _discover_ports(ports_dir: str | Path) -> tuple[int | None, int | None]:
             if name.endswith(".port") and not name.endswith(".reload-port"):
                 pid = int(name[: -len(".port")])
                 if _is_pid_alive(pid):
-                    main_port = int(f.read_text().splitlines()[0].strip())
+                    main_port = int(f.read_text(encoding="utf-8").splitlines()[0].strip())
             elif name.endswith(".reload-port"):
                 pid = int(name[: -len(".reload-port")])
                 if _is_pid_alive(pid):
-                    reload_port = int(f.read_text().splitlines()[0].strip())
+                    reload_port = int(f.read_text(encoding="utf-8").splitlines()[0].strip())
         except (ValueError, OSError, IndexError):
             pass
     return main_port, reload_port
@@ -174,6 +174,26 @@ def _recvexactly(s: socket.socket, n: int) -> bytes | None:
     return buf
 
 
+def _parse_stale_dlls(probe: dict) -> list[str]:
+    """Parse dlls= field from diagnose probe. Returns names of stale assemblies.
+
+    Known gap: UnityMCP.Editor.Tests.dll is NOT tracked here.
+    diagnose only reports UnityMCP.Editor (main_mvid). Tests assembly compiles
+    separately — a test-only compile failure returns clean main_mvid but 0 tests run.
+    Real proof of test assembly health = run_tests() returning a non-zero test count,
+    NOT this MVID check. See: feedback_compile_verify_test_assembly.md
+    """
+    raw = probe.get("dlls", "")
+    if not raw:
+        return []
+    stale = []
+    for entry in raw.split(","):
+        parts = entry.split(":")
+        if len(parts) >= 3 and parts[-1] == "stale":
+            stale.append(parts[0])
+    return stale
+
+
 def main() -> None:
     try:
         log_text = _read_log(_editor_log_path())
@@ -194,6 +214,10 @@ def main() -> None:
             if probe is not None:
                 mvid = probe.get("main_mvid")
                 if mvid:
+                    stale = _parse_stale_dlls(probe)
+                    if stale:
+                        print(f"STALE  assemblies={','.join(stale)}  port={main_port}")
+                        raise SystemExit(2)
                     print(f"HEALTHY  mvid={mvid}  port={main_port}")
                 else:
                     print(f"BUSY  port={main_port}  (another client connected)")

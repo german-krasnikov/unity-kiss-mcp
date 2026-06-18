@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using UnityEditor;
 using UnityEditor.Compilation;
+using UnityEngine;
 
 namespace UnityMCP.Editor
 {
@@ -121,7 +122,7 @@ namespace UnityMCP.Editor
                 var elapsed = NowSeconds() - SessionState.GetFloat(TriggerTimeKey, 0f);
                 // RC-2 fix: self-heal only on genuine no-compile path (grace=3s).
                 // If compile started, we wait for reload/failed — never force-green.
-                if (!started && !Ops.IsCompiling && !Ops.IsUpdating
+                if (!started && !MCPServer.IsReallyCompiling && !Ops.IsUpdating
                     && elapsed > SelfHealGraceSeconds
                     && !Ops.ScriptCompilationFailed)
                 {
@@ -255,28 +256,30 @@ namespace UnityMCP.Editor
         // Anti-runaway: unsubscribe after this many editor ticks if compile never starts.
         public const int TickBudget = 300;
 
-        // CLASS-A fix: force-reimport all .cs in the file: package via targeted ImportAsset.
-        // Bypasses the dead directory-monitor that symlinked packages trigger in Unity 6.
-        // ForceUpdate defeats Bee "inputs unchanged"; ForceSynchronousImport blocks until done.
+        // Bee mvfrm nuke: delete .mvfrm marker files so Bee unconditionally recompiles.
+        // API approaches (ImportAsset, CleanBuildCache) don't propagate to Bee's dirty-tracking.
         public void ImportPackageSources()
         {
-            const string pkgRoot = "Packages/com.unity-mcp.editor/Editor";
-            try
-            {
-                var guids = AssetDatabase.FindAssets("t:MonoScript", new[] { pkgRoot });
-                foreach (var guid in guids)
-                {
-                    var path = AssetDatabase.GUIDToAssetPath(guid);
-                    if (path.EndsWith(".cs", System.StringComparison.OrdinalIgnoreCase))
-                        AssetDatabase.ImportAsset(path,
-                            ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
-                }
-            }
-            catch (System.Exception) { /* best-effort: don't block force_refresh on import errors */ }
+            var beePath = Path.Combine(Application.dataPath, "../Library/Bee");
+
+            // Step 1: Delete UnityMCP .mvfrm files → Bee unconditionally re-runs Csc
+            var artifactsPath = Path.Combine(beePath, "artifacts");
+            if (Directory.Exists(artifactsPath))
+                foreach (var dag in Directory.GetDirectories(artifactsPath))
+                    foreach (var f in Directory.GetFiles(dag, "UnityMCP*.mvfrm"))
+                        File.Delete(f);
+
+            // Step 2: Delete digestcache → Bee re-hashes all inputs (handles new .cs files)
+            var digestCache = Path.Combine(beePath, "tundra.digestcache");
+            if (File.Exists(digestCache))
+                File.Delete(digestCache);
+
+            // Step 3: Refresh tells Unity to invoke Bee
+            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
         }
 
-        // Tier-0: ForceSynchronousImport ensures asset import completes before compile.
-        public void Refresh()                  => AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        // Tier-0: ForceUpdate defeats Bee "inputs unchanged" gate; ForceSynchronousImport blocks until done.
+        public void Refresh()                  => AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
         public void Resolve()                  => UnityEditor.PackageManager.Client.Resolve();
         // None instead of CleanBuildCache: Unity 6.x regression — CleanBuildCache fires
         // assemblyCompilationNotRequired instead of recompiling. Per-file ForceUpdate

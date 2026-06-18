@@ -105,8 +105,12 @@ namespace UnityMCP.Editor
             // Ordered by preference — Mono 32-bit compatible (PE32) paths first.
             // DotNetSdkRoslyn ships PE32+ (.NET 5+) which Mono runtime can't load.
             var candidates = new[] {
+                // Unity 6 ARM/x64: MonoBleedingEdge ships PE32 Roslyn (Mono-compatible)
+                Path.Combine(base_, "MonoBleedingEdge", "lib", "mono", "msbuild", "Current", "bin", "Roslyn"),
+                // Older Unity layout
                 Path.Combine(base_, "Resources", "Scripting", "MonoBleedingEdge", "lib", "mono", "msbuild", "Current", "bin", "Roslyn"),
                 Path.Combine(base_, "Resources", "Scripting", "DotNetSdkRoslyn"),
+                // Last resort: PE32+ — fails on Mono runtime
                 Path.Combine(base_, "DotNetSdkRoslyn"),
             };
 

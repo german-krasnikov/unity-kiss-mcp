@@ -13,6 +13,9 @@ namespace UnityMCP.Editor
         private static int _batchDepth;
         internal static bool InBatch => _batchDepth > 0;
 
+        // Testable seam — delegates to CommandRouter.IsCompiling so tests can inject false.
+        internal static Func<bool> IsCompiling = () => CommandRouter.IsCompiling();
+
         public static string Execute(string commandsText, string onError, int timeoutMs = 25000, bool atomic = false)
         {
             var commands = ParseLines(commandsText);
@@ -87,7 +90,7 @@ namespace UnityMCP.Editor
                 }
 
                 // Compile guard
-                if (EditorApplication.isCompiling && CommandRegistry.IsMutating(cmd)
+                if (IsCompiling() && CommandRegistry.IsMutating(cmd)
                     && !CommandRouter.IsAllowedDuringCompile(cmd))
                 {
                     sb.AppendLine($"[{i}] BLOCKED: '{cmd}' skipped during compilation");

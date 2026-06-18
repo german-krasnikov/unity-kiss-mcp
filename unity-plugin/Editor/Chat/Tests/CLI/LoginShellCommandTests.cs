@@ -49,10 +49,9 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void BuildArguments_ProducesCorrectShellString()
         {
-            // The Arguments string used by ProcessStartInfo (single string, shell-re-parsed by OS)
-            // must single-quote both script and arg so neither is re-interpreted
+            // -lic: login (-l) + interactive (-i) + command (-c); interactive needed for PATH resolution on macOS
             var s = LoginShellCommand.BuildArguments("\"$1\" auth status", "/usr/bin/claude");
-            Assert.AreEqual("-lc '\"$1\" auth status' zsh '/usr/bin/claude'", s);
+            Assert.AreEqual("-lic '\"$1\" auth status' zsh '/usr/bin/claude'", s);
         }
 
         [Test]

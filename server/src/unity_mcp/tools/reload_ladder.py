@@ -31,18 +31,27 @@ def _tier_result(label: str, baseline: str, new_mvid: "str | None") -> "str | No
 
 
 async def _poll_mvid_delta(send, baseline: str, timeout_s: float,
-                           max_polls: "int | None" = None) -> "str | None":
-    """Poll diagnose until main_mvid changes. Returns new MVID, _BROKEN_DOMAIN, or None."""
+                           max_polls: "int | None" = None,
+                           cs_grace: int = 1) -> "str | None":
+    """Poll diagnose until main_mvid changes. Returns new MVID, _BROKEN_DOMAIN, or None.
+
+    cs_grace: number of CS-error polls to tolerate before early-exit (default 1).
+    """
     deadline = time.monotonic() + timeout_s
     polls = 0
+    cs_seen = 0
     while True:
         try:
             raw = await send("diagnose", {})
             f = _parse_diagnose(raw)
             mvid = _extract_main_mvid(f)
             if mvid == baseline and "error CS" in (f.errors or ""):
-                log.debug("early-exit: compile error with frozen MVID — domain will never reload")
-                return _BROKEN_DOMAIN
+                cs_seen += 1
+                if cs_seen > cs_grace:
+                    log.debug("early-exit: compile error with frozen MVID — domain will never reload")
+                    return _BROKEN_DOMAIN
+            else:
+                cs_seen = 0
             if mvid and mvid != baseline:
                 v = _verdict(f)
                 if v.startswith("CLEAN-LIVE") or v.startswith("NO-OP"):

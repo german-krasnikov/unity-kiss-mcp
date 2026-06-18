@@ -47,39 +47,148 @@ namespace UnityMCP.Editor
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-            var templatePath = FindTemplate(preset);
-            if (templatePath == null)
-                throw new InvalidOperationException(
-                    $"Template not found for preset '{preset}'. Available: unlit_graph, lit_graph");
-
-            File.Copy(templatePath, path, overwrite: true);
-            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+            var content = BuildTemplate(preset);
+            File.WriteAllText(path, content, Encoding.UTF8);
+            try { AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate); }
+            catch (Exception ex) { Debug.LogWarning($"ShaderGraph import warning for '{path}': {ex.Message}"); }
 
             return Get(path);
         }
 
-        static string FindTemplate(string preset)
+        static string BuildTemplate(string preset)
         {
-            var fileName = preset switch
-            {
-                "unlit_graph" => "Unlit Simple.shadergraph",
-                "lit_graph"   => "0_Lit Basic.shadergraph",
-                _ => throw new ArgumentException($"Unknown preset '{preset}'. Available: unlit_graph, lit_graph")
-            };
-            var pkg = ResolvePackage("com.unity.shadergraph");
-            if (pkg == null) return null;
-            var files = Directory.GetFiles(pkg, fileName, SearchOption.AllDirectories);
-            return files.Length > 0 ? files[0] : null;
-        }
+            if (preset != "unlit_graph" && preset != "lit_graph")
+                throw new ArgumentException($"Unknown preset '{preset}'. Available: unlit_graph, lit_graph");
 
-        static string ResolvePackage(string id)
-        {
-            var direct = Path.GetFullPath($"Packages/{id}");
-            if (Directory.Exists(direct)) return direct;
-            var cache = "Library/PackageCache";
-            if (!Directory.Exists(cache)) return null;
-            foreach (var dir in Directory.GetDirectories(cache, $"{id}*")) return dir;
-            return null;
+            bool isLit = preset == "lit_graph";
+            var graphId    = Guid.NewGuid().ToString("N");
+            var posNodeId  = Guid.NewGuid().ToString("N");
+            var normNodeId = Guid.NewGuid().ToString("N");
+            var colNodeId  = Guid.NewGuid().ToString("N");
+            var targetId   = Guid.NewGuid().ToString("N");
+            var subTargetId = Guid.NewGuid().ToString("N");
+
+            // sub-target type differs between unlit and lit
+            var subTargetType = isLit
+                ? "UnityEditor.Rendering.Universal.ShaderGraph.UniversalLitSubTarget"
+                : "UnityEditor.Rendering.Universal.ShaderGraph.UniversalUnlitSubTarget";
+            var surfaceBlock = isLit ? "SurfaceDescription.BaseColor" : "SurfaceDescription.BaseColor";
+            var path = isLit ? "Lit" : "Unlit";
+
+            return $@"{{
+    ""m_SGVersion"": 3,
+    ""m_Type"": ""UnityEditor.ShaderGraph.GraphData"",
+    ""m_ObjectId"": ""{graphId}"",
+    ""m_Properties"": [],
+    ""m_Keywords"": [],
+    ""m_Dropdowns"": [],
+    ""m_CategoryData"": [],
+    ""m_Nodes"": [
+        {{ ""m_Id"": ""{posNodeId}"" }},
+        {{ ""m_Id"": ""{normNodeId}"" }},
+        {{ ""m_Id"": ""{colNodeId}"" }}
+    ],
+    ""m_GroupDatas"": [],
+    ""m_StickyNoteDatas"": [],
+    ""m_Edges"": [],
+    ""m_VertexContext"": {{
+        ""m_Position"": {{ ""x"": 0.0, ""y"": 0.0 }},
+        ""m_Blocks"": [
+            {{ ""m_Id"": ""{posNodeId}"" }},
+            {{ ""m_Id"": ""{normNodeId}"" }}
+        ]
+    }},
+    ""m_FragmentContext"": {{
+        ""m_Position"": {{ ""x"": 0.0, ""y"": 200.0 }},
+        ""m_Blocks"": [
+            {{ ""m_Id"": ""{colNodeId}"" }}
+        ]
+    }},
+    ""m_PreviewData"": {{ ""serializedMesh"": {{ ""m_SerializedMesh"": ""{{\""mesh\"":{{\""instanceID\"":0}}}}"", ""m_Guid"": """" }}, ""preventRotation"": false }},
+    ""m_Path"": ""{path}"",
+    ""m_GraphPrecision"": 1,
+    ""m_PreviewMode"": 2,
+    ""m_OutputNode"": {{ ""m_Id"": """" }},
+    ""m_SubDatas"": [],
+    ""m_ActiveTargets"": [{{ ""m_Id"": ""{targetId}"" }}]
+}}
+
+{{
+    ""m_SGVersion"": 1,
+    ""m_Type"": ""UnityEditor.Rendering.Universal.ShaderGraph.UniversalTarget"",
+    ""m_ObjectId"": ""{targetId}"",
+    ""m_Datas"": [],
+    ""m_ActiveSubTarget"": {{ ""m_Id"": ""{subTargetId}"" }},
+    ""m_AllowMaterialOverride"": false,
+    ""m_SurfaceType"": 0,
+    ""m_ZTestMode"": 4,
+    ""m_ZWriteControl"": 0,
+    ""m_AlphaMode"": 0,
+    ""m_RenderFace"": 2,
+    ""m_AlphaClip"": false,
+    ""m_CastShadows"": true,
+    ""m_ReceiveShadows"": true,
+    ""m_CustomEditorGUI"": """",
+    ""m_SupportVFX"": false
+}}
+
+{{
+    ""m_SGVersion"": 0,
+    ""m_Type"": ""{subTargetType}"",
+    ""m_ObjectId"": ""{subTargetId}""
+}}
+
+{{
+    ""m_SGVersion"": 0,
+    ""m_Type"": ""UnityEditor.ShaderGraph.BlockNode"",
+    ""m_ObjectId"": ""{posNodeId}"",
+    ""m_Group"": {{ ""m_Id"": """" }},
+    ""m_Name"": ""VertexDescription.Position"",
+    ""m_DrawState"": {{ ""m_Expanded"": true, ""m_Position"": {{ ""serializedVersion"": ""2"", ""x"": 0.0, ""y"": 0.0, ""width"": 0.0, ""height"": 0.0 }} }},
+    ""m_Slots"": [],
+    ""synonyms"": [],
+    ""m_Precision"": 0,
+    ""m_PreviewExpanded"": true,
+    ""m_DismissedVersion"": 0,
+    ""m_PreviewMode"": 0,
+    ""m_CustomColors"": {{ ""m_SerializableColors"": [] }},
+    ""m_SerializedDescriptor"": ""VertexDescription.Position""
+}}
+
+{{
+    ""m_SGVersion"": 0,
+    ""m_Type"": ""UnityEditor.ShaderGraph.BlockNode"",
+    ""m_ObjectId"": ""{normNodeId}"",
+    ""m_Group"": {{ ""m_Id"": """" }},
+    ""m_Name"": ""VertexDescription.Normal"",
+    ""m_DrawState"": {{ ""m_Expanded"": true, ""m_Position"": {{ ""serializedVersion"": ""2"", ""x"": 0.0, ""y"": 0.0, ""width"": 0.0, ""height"": 0.0 }} }},
+    ""m_Slots"": [],
+    ""synonyms"": [],
+    ""m_Precision"": 0,
+    ""m_PreviewExpanded"": true,
+    ""m_DismissedVersion"": 0,
+    ""m_PreviewMode"": 0,
+    ""m_CustomColors"": {{ ""m_SerializableColors"": [] }},
+    ""m_SerializedDescriptor"": ""VertexDescription.Normal""
+}}
+
+{{
+    ""m_SGVersion"": 0,
+    ""m_Type"": ""UnityEditor.ShaderGraph.BlockNode"",
+    ""m_ObjectId"": ""{colNodeId}"",
+    ""m_Group"": {{ ""m_Id"": """" }},
+    ""m_Name"": ""{surfaceBlock}"",
+    ""m_DrawState"": {{ ""m_Expanded"": true, ""m_Position"": {{ ""serializedVersion"": ""2"", ""x"": 0.0, ""y"": 0.0, ""width"": 0.0, ""height"": 0.0 }} }},
+    ""m_Slots"": [],
+    ""synonyms"": [],
+    ""m_Precision"": 0,
+    ""m_PreviewExpanded"": true,
+    ""m_DismissedVersion"": 0,
+    ""m_PreviewMode"": 0,
+    ""m_CustomColors"": {{ ""m_SerializableColors"": [] }},
+    ""m_SerializedDescriptor"": ""SurfaceDescription.BaseColor""
+}}
+";
         }
 
         static void AppendGraphStructure(StringBuilder sb, string root, Dictionary<string, string> byId)

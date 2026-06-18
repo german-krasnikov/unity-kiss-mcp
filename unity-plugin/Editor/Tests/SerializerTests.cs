@@ -13,6 +13,7 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.TestTools;
 using UnityEngine.Timeline;
 
 namespace UnityMCP.Editor.Tests
@@ -331,27 +332,48 @@ namespace UnityMCP.Editor.Tests
         public void Serialize_ShaderWithIntProperty_DoesNotThrow()
         {
             // Exercises the GetPropertyDefaultIntValue branch in ShaderSerializer (line 110)
-            const string assetPath = "Assets/TestShaders/AllTypes.shader";
-            var loaded = AssetDatabase.LoadAssetAtPath<Shader>(assetPath);
-            if (loaded == null)
-                Assert.Inconclusive("AllTypes.shader not found — expected at Assets/TestShaders/AllTypes.shader");
+            // Creates its own minimal shader so the test is order-independent.
+            var folder = TestPaths.ForFixture("ShaderSerializerTests");
+            var assetPath = folder + "/IntProp.shader";
+            const string shaderSrc =
+                "Shader \"Test/IntProp\" {\n" +
+                "    Properties { _IntProp (\"Int\", Int) = 42 }\n" +
+                "    SubShader { Pass { CGPROGRAM\n" +
+                "    #pragma vertex vert\n" +
+                "    #pragma fragment frag\n" +
+                "    float4 vert(float4 v:POSITION):SV_POSITION{return v;}\n" +
+                "    float4 frag():SV_TARGET{return 0;}\n" +
+                "    ENDCG } }\n" +
+                "}\n";
 
-            // Verify the shader actually has an Int property
-            bool hasInt = false;
-            for (int i = 0; i < loaded.GetPropertyCount(); i++)
+            try
             {
-                if (loaded.GetPropertyType(i) == ShaderPropertyType.Int)
-                { hasInt = true; break; }
-            }
-            if (!hasInt)
-                Assert.Inconclusive("AllTypes.shader has no Int property — add _IntProp");
+                TestPaths.EnsureFolder(folder);
 
-            // Serialize as shader asset path → mat==null path → GetDefaultValue Int branch
-            string result = null;
-            Assert.DoesNotThrow(() => result = ShaderSerializer.Serialize(assetPath, "shader"));
-            Assert.IsNotNull(result);
-            StringAssert.Contains("_IntProp", result);
-            StringAssert.Contains("42", result);
+                System.IO.File.WriteAllText(
+                    System.IO.Path.Combine(UnityEngine.Application.dataPath, "../" + assetPath),
+                    shaderSrc);
+
+                LogAssert.ignoreFailingMessages = true;
+                AssetDatabase.Refresh();
+                LogAssert.ignoreFailingMessages = false;
+
+                var loaded = AssetDatabase.LoadAssetAtPath<Shader>(assetPath);
+                Assert.IsNotNull(loaded, "Shader asset not created at " + assetPath);
+
+                string result = null;
+                Assert.DoesNotThrow(() => result = ShaderSerializer.Serialize(assetPath, "shader"));
+                Assert.IsNotNull(result);
+                StringAssert.Contains("_IntProp", result);
+                StringAssert.Contains("42", result);
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = true;
+                if (AssetDatabase.IsValidFolder(folder))
+                    AssetDatabase.DeleteAsset(folder);
+                LogAssert.ignoreFailingMessages = false;
+            }
         }
     }
 
@@ -363,12 +385,13 @@ namespace UnityMCP.Editor.Tests
     public class TimelineSerializerTests
     {
         private TimelineAsset _timeline;
-        private const string AssetPath = "Assets/TestsTemp/Tests_TimelineTemp.playable";
+        private static readonly string AssetFolder = TestPaths.ForFixture("TimelineSerializerTests");
+        private static readonly string AssetPath = AssetFolder + "/Tests_TimelineTemp.playable";
 
         [SetUp]
         public void SetUp()
         {
-            TestPaths.EnsureFolder();
+            TestPaths.EnsureFolder(AssetFolder);
             _timeline = ScriptableObject.CreateInstance<TimelineAsset>();
             AssetDatabase.CreateAsset(_timeline, AssetPath);
             AssetDatabase.SaveAssets();
@@ -379,7 +402,6 @@ namespace UnityMCP.Editor.Tests
         public void TearDown()
         {
             AssetDatabase.DeleteAsset(AssetPath);
-            AssetDatabase.Refresh();
         }
 
         // ── TrackTypeName ─────────────────────────────────────────────────────
@@ -458,12 +480,13 @@ namespace UnityMCP.Editor.Tests
         // For pure operator parsing, ctrl can be null since we don't hit that branch.
 
         private AnimatorController _ctrl;
-        private const string CtrlPath = "Assets/TestsTemp/Tests_AnimCtrlTemp.controller";
+        private static readonly string CtrlFolder = TestPaths.ForFixture("AnimatorControllerTests");
+        private static readonly string CtrlPath = CtrlFolder + "/Tests_AnimCtrlTemp.controller";
 
         [SetUp]
         public void SetUp()
         {
-            TestPaths.EnsureFolder();
+            TestPaths.EnsureFolder(CtrlFolder);
             _ctrl = AnimatorController.CreateAnimatorControllerAtPath(CtrlPath);
         }
 
@@ -550,12 +573,13 @@ namespace UnityMCP.Editor.Tests
     public class AnimatorControllerHelperFindStateTests
     {
         private AnimatorController _ctrl;
-        private const string CtrlPath = "Assets/TestsTemp/Tests_AnimCtrlFindState.controller";
+        private static readonly string CtrlFolder = TestPaths.ForFixture("AnimControllerFindStateTests");
+        private static readonly string CtrlPath = CtrlFolder + "/Tests_AnimCtrlFindState.controller";
 
         [SetUp]
         public void SetUp()
         {
-            TestPaths.EnsureFolder();
+            TestPaths.EnsureFolder(CtrlFolder);
             _ctrl = AnimatorController.CreateAnimatorControllerAtPath(CtrlPath);
         }
 

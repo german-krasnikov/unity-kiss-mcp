@@ -157,7 +157,9 @@ namespace UnityMCP.Editor.Chat
             _proc = new ChatProcess();
             var envVars = new Dictionary<string, string>
             {
-                { "UNITY_MCP_PORT", MCPServer.ServerChatPort.ToString() },
+                { "UNITY_MCP_PORT",            MCPServer.ServerChatPort.ToString() },
+                { "UNITY_MCP_CHAT",            "1" },
+                { "UNITY_MCP_SESSION_TIMEOUT", "300" },
             };
             _proc.Spawn(binary, args, strip, envVars);
         }

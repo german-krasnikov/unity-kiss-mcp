@@ -22,7 +22,7 @@ from readme_facts import load_meta, collect_facts  # noqa: E402
 def test_load_meta_returns_dict(tmp_path):
     meta = {"tools": 10, "tests_total": 100}
     (tmp_path / "docs" / "assets").mkdir(parents=True)
-    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(meta))
+    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(meta), encoding="utf-8")
     assert load_meta(tmp_path) == meta
 
 
@@ -36,7 +36,7 @@ def test_load_meta_returns_all_keys(tmp_path):
             "server_version": "1.0.0", "plugin_version": "1.0.0",
             "batch_savings": "80–95%"}
     (tmp_path / "docs" / "assets").mkdir(parents=True)
-    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(meta))
+    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(meta), encoding="utf-8")
     result = load_meta(tmp_path)
     assert result["tests_unity"] == 2649
     assert result["batch_savings"] == "80–95%"
@@ -51,7 +51,7 @@ def test_check_facts_detects_drift(tmp_path, monkeypatch):
     """When stored _meta.json differs from fresh collect, exit code should be 1."""
     stored = {"tests_unity": 50, "tools": 10}
     (tmp_path / "docs" / "assets").mkdir(parents=True)
-    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(stored))
+    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(stored), encoding="utf-8")
 
     # Monkeypatch collect_facts to return different values
     import readme_facts as rf
@@ -70,7 +70,7 @@ def test_check_facts_no_drift(tmp_path, monkeypatch):
     """When stored matches fresh, drifted dict is empty."""
     stored = {"tests_unity": 100, "tools": 10}
     (tmp_path / "docs" / "assets").mkdir(parents=True)
-    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(stored))
+    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(stored), encoding="utf-8")
 
     import readme_facts as rf
     monkeypatch.setattr(rf, "collect_facts", lambda root: {"tests_unity": 100, "tools": 10})
@@ -90,7 +90,7 @@ def test_check_facts_cli_exits_1_on_drift(tmp_path):
              "tests_unity": 0, "tests_live": 0,
              "server_version": "0.0.0", "plugin_version": "0.0.0",
              "batch_savings": "80–95%"}
-    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(stale))
+    (tmp_path / "docs" / "assets" / "_meta.json").write_text(json.dumps(stale), encoding="utf-8")
     # Copy server/ and unity-plugin/ symlinks so collect_facts can run
     # Instead: just test that the CLI flag exists and exits 1 on real stale data
     # by patching via a tiny wrapper script
@@ -108,7 +108,7 @@ if drifted:
         print(f"DRIFT {{k}}: stored={{was}} actual={{now}}")
     sys.exit(1)
 print("facts OK")
-""")
-    result = subprocess.run([sys.executable, str(wrapper)], capture_output=True, text=True)
+""", encoding="utf-8")
+    result = subprocess.run([sys.executable, str(wrapper)], capture_output=True, encoding="utf-8")
     assert result.returncode == 1
     assert "DRIFT" in result.stdout

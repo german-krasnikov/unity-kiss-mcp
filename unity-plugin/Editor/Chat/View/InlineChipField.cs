@@ -22,6 +22,7 @@ namespace UnityMCP.Editor.Chat
         private readonly TextField       _textField;
         private int _lastCursorPos;
         private bool _suppressOffsetUpdate;
+        private bool _isFocused;
 
         internal InlineChipModel Model => _model;
         internal int LastCursorPos => _lastCursorPos;
@@ -62,9 +63,10 @@ namespace UnityMCP.Editor.Chat
 
             _textField.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
 
-            _textField.RegisterCallback<FocusInEvent>(_ => AddToClassList(FocusedClass));
+            _textField.RegisterCallback<FocusInEvent>(_ => { _isFocused = true; AddToClassList(FocusedClass); });
             _textField.RegisterCallback<FocusOutEvent>(_ =>
             {
+                _isFocused = false;
                 _lastCursorPos = System.Math.Clamp(
                     _textField.cursorIndex, 0, (_textField.value ?? "").Length);
                 RemoveFromClassList(FocusedClass);
@@ -93,11 +95,14 @@ namespace UnityMCP.Editor.Chat
         internal void AddChip(ChipData chip)
         {
             var tf     = _textField;
-            int raw    = tf.cursorIndex;
             int len    = (tf.value ?? "").Length;
-            int cursor = (raw == 0 && len > 0)
-                ? System.Math.Clamp(_lastCursorPos, 0, len)
-                : System.Math.Clamp(raw, 0, len);
+            // When focused, tf.cursorIndex reflects live user input. Otherwise use _lastCursorPos
+            // which is explicitly maintained by AddChip, FocusOut, and SetCursor in tests.
+            // tf.cursorIndex is unreliable in unfocused/headless contexts (UI Toolkit retains
+            // stale internal position that bypasses the raw==0 fallback guard).
+            int cursor = _isFocused
+                ? System.Math.Clamp(tf.cursorIndex, 0, len)
+                : System.Math.Clamp(_lastCursorPos, 0, len);
 
             string val = tf.value ?? "";
             bool needsLeadingSpace = cursor > 0 && val.Length > 0 && val[cursor - 1] != ' ';

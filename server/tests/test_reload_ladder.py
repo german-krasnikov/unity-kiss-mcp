@@ -803,9 +803,8 @@ def _diag_compile_latch(mvid: str, cs_error: str = "error CS1739") -> str:
 
 @pytest.mark.asyncio
 async def test_stress_f1_scenario_1_poll_exits_not_none_on_compile_error():
-    """F1: _poll_mvid_delta with MVID frozen + CS error in errors= must return
-    a compile-error sentinel (not loop endlessly). Discriminating: if the ladder
-    returns None and the caller escalates through all tiers, the bug is present.
+    """F1: _poll_mvid_delta with MVID frozen + CS error must return _BROKEN_DOMAIN.
+    cs_grace=1 (default): exit after 2nd consecutive CS-error poll, not the 1st.
     """
     cs_diag = _diag_compile_latch(MVID_A, "error CS1739")
     call_count = 0
@@ -818,9 +817,9 @@ async def test_stress_f1_scenario_1_poll_exits_not_none_on_compile_error():
         return "ok"
 
     result = await _ladder._poll_mvid_delta(mock_send, MVID_A, timeout_s=60.0, max_polls=3)
-    # P3: early-exit on compile error — must return _BROKEN_DOMAIN after 1 poll, not loop.
+    # cs_grace=1 default: exit after 2 consecutive CS-error polls (1 grace poll allowed).
     assert result == _ladder._BROKEN_DOMAIN, f"F1: poll must return _BROKEN_DOMAIN on CS error, got: {result!r}"
-    assert call_count == 1, f"F1: early-exit must happen on 1st poll, got: {call_count} calls"
+    assert call_count == 2, f"F1: early-exit must happen after 2nd CS-error poll (cs_grace=1), got: {call_count} calls"
 
 
 @pytest.mark.asyncio
@@ -864,16 +863,59 @@ async def test_stress_f1_scenario_3_compile_error_not_mistaken_for_latch():
             return diag_with_error
         return "ok"
 
-    # P3: early-exit on compile error — exits on 1st poll regardless of max_polls.
+    # cs_grace=1 default: exit after 2nd consecutive CS-error poll.
     result = await _ladder._poll_mvid_delta(
         counting_send, MVID_A, timeout_s=999.0, max_polls=5
     )
     assert result == _ladder._BROKEN_DOMAIN, (
         f"F1: must return _BROKEN_DOMAIN on CS error, got: {result!r}"
     )
-    assert diagnose_call_count == 1, (
-        f"F1: early-exit on 1st poll expected, got: {diagnose_call_count} calls"
+    assert diagnose_call_count == 2, (
+        f"F1: early-exit after 2nd poll expected (cs_grace=1), got: {diagnose_call_count} calls"
     )
+
+
+@pytest.mark.asyncio
+async def test_poll_mvid_delta_cs_grace_zero_exits_on_first_poll():
+    """cs_grace=0: early-exit on FIRST CS-error poll (legacy behavior)."""
+    cs_diag = _diag_compile_latch(MVID_A, "error CS1739")
+    call_count = 0
+
+    async def mock_send(cmd, args=None):
+        nonlocal call_count
+        if cmd == "diagnose":
+            call_count += 1
+            return cs_diag
+        return "ok"
+
+    result = await _ladder._poll_mvid_delta(
+        mock_send, MVID_A, timeout_s=60.0, max_polls=3, cs_grace=0
+    )
+    assert result == _ladder._BROKEN_DOMAIN
+    assert call_count == 1, f"cs_grace=0: must exit on 1st poll, got {call_count}"
+
+
+@pytest.mark.asyncio
+async def test_poll_mvid_delta_cs_grace_resets_on_clean_poll():
+    """cs_grace=1: a clean poll resets the grace counter."""
+    cs_diag = _diag_compile_latch(MVID_A, "error CS1739")
+    clean_diag = _diag_clean(MVID_A)  # same MVID but no error — frozen but clean
+    call_count = 0
+    responses = [cs_diag, clean_diag, cs_diag, cs_diag]  # CS, clean, CS, CS → exit after 4th
+
+    async def mock_send(cmd, args=None):
+        nonlocal call_count
+        if cmd == "diagnose":
+            idx = call_count
+            call_count += 1
+            return responses[idx] if idx < len(responses) else cs_diag
+        return "ok"
+
+    result = await _ladder._poll_mvid_delta(
+        mock_send, MVID_A, timeout_s=60.0, max_polls=10, cs_grace=1
+    )
+    assert result == _ladder._BROKEN_DOMAIN
+    assert call_count == 4, f"grace reset on clean poll: expected 4 calls, got {call_count}"
 
 
 # ── F8 stress tests ───────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ lives in server.py so tests can mutate srv._disabled_tools_cache directly.
 import logging
 import os
 import socket
+import sys
 from pathlib import Path
 
 from .tools.gating import filter_by_tier, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
@@ -76,6 +77,28 @@ def filter_tools(tools: list, disabled: set | None) -> list:
     return _strip_deferred_schemas(result)
 
 
+def _is_pid_alive(pid: int) -> bool:
+    """Cross-platform PID liveness check.
+
+    os.kill(pid, 0) raises PermissionError on Windows for ALL same-user processes
+    (not just cross-user), so we use OpenProcess/CloseHandle on win32.
+    """
+    if sys.platform == "win32":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if handle:
+            ctypes.windll.kernel32.CloseHandle(handle)
+            return True
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True  # alive, no permission (cross-user on Unix)
+    except OSError:
+        return False
+
+
 def cleanup_stale_port_files() -> int:
     """Delete *.reload-port files whose PID is no longer alive. Returns count cleaned."""
     ports_dir = Path.home() / ".unity-mcp" / "ports"
@@ -87,16 +110,12 @@ def cleanup_stale_port_files() -> int:
             pid = int(f.stem)
         except ValueError:
             continue
-        try:
-            os.kill(pid, 0)
-        except (OSError, ProcessLookupError):
+        if not _is_pid_alive(pid):
             try:
                 f.unlink()
                 cleaned += 1
             except OSError:
                 pass
-        except PermissionError:
-            pass  # alive but owned by another user
     return cleaned
 
 
@@ -113,6 +132,8 @@ def read_unity_port(skip_probe: bool = False) -> int:
     """Discover Unity MCP port from discovery files, env var, or default 9500.
 
     Priority: env var → CWD project match → newest mtime → 9500.
+    When UNITY_MCP_CHAT=1 (set by C# chat backend), scans *.chat-port files
+    as a Windows fallback when UNITY_MCP_PORT env propagation fails.
     skip_probe: if True, skip TCP connectivity check (useful during reconnect
                 when port may be transiently down due to domain reload).
     """
@@ -125,35 +146,29 @@ def read_unity_port(skip_probe: bool = False) -> int:
     if not ports_dir.exists():
         return 9500
 
+    # Windows fallback: UNITY_MCP_CHAT=1 means we're the chat MCP instance.
+    # Scan *.chat-port files (written by C# with the chat port) instead of *.port.
+    is_chat = os.environ.get("UNITY_MCP_CHAT") == "1"
+    glob_pattern = "*.chat-port" if is_chat else "*.port"
+
     candidates = []
-    for f in ports_dir.glob("*.port"):
+    for f in ports_dir.glob(glob_pattern):
         try:
             lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
             port = int(lines[0])
             pid = int(f.stem)
-            os.kill(pid, 0)
+            if not _is_pid_alive(pid):
+                try: f.unlink()
+                except OSError: pass
+                continue
             if not skip_probe and not _tcp_probe(port):
                 continue
             project_path = lines[1] if len(lines) > 1 else ""
             project = lines[2] if len(lines) > 2 else "?"
             candidates.append((f.stat().st_mtime, port, project, pid, project_path))
-        except PermissionError:
-            # Process alive but owned by another user — keep as candidate
-            try:
-                lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
-                port = int(lines[0])
-                if not skip_probe and not _tcp_probe(port):
-                    continue
-                project_path = lines[1] if len(lines) > 1 else ""
-                project = lines[2] if len(lines) > 2 else "?"
-                candidates.append((f.stat().st_mtime, port, project, int(f.stem), project_path))
-            except (ValueError, OSError):
-                pass
-        except (ValueError, ProcessLookupError, OSError):
-            try:
-                f.unlink()
-            except OSError:
-                pass
+        except (ValueError, OSError):
+            try: f.unlink()
+            except OSError: pass
 
     if not candidates:
         return 9500

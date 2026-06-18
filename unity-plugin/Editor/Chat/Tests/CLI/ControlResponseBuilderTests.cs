@@ -108,7 +108,8 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var json = ControlResponseBuilder.ElicitationHook("req-7", "[]", answersJson: "{\"q\":\"a\"}");
             StringAssert.Contains("\"answers\":{\"q\":\"a\"}", json);
-            StringAssert.DoesNotContain("\"response\"", json);
+            // "response" appears as the envelope key in BuildResponse — only "freeResponse" field must be absent
+            StringAssert.DoesNotContain("\"response\":\"", json);
         }
 
         [Test]

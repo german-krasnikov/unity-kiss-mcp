@@ -17,10 +17,6 @@ namespace UnityMCP.Editor.Tests
             typeof(TestRunner).GetField("_isRunning",
                 BindingFlags.Static | BindingFlags.NonPublic);
 
-        private static FieldInfo RunStartedAtField() =>
-            typeof(TestRunner).GetField("_runStartedAt",
-                BindingFlags.Static | BindingFlags.NonPublic);
-
         private const string KeyPending   = "UnityMCP_tests_pending";
         private const string KeyResults   = "UnityMCP_test_results";
         private const string KeyStartTime = "UnityMCP_tests_start";
@@ -153,5 +149,18 @@ namespace UnityMCP.Editor.Tests
 
             Assert.AreEqual(fakeResult, TestRunner.GetResults());
         }
+
+        // ── 6. get_test_count registration ───────────────────────────────────
+
+        [Test]
+        public void GetTestCount_IsRegistered()
+            => Assert.IsTrue(CommandRegistry.IsRegistered("get_test_count"),
+                "get_test_count must be registered in CommandRegistry");
+
+        [Test]
+        public void GetTestCount_IsAllowedDuringCompile()
+            => Assert.IsTrue(CommandRouter.IsAllowedDuringCompile("get_test_count"),
+                "get_test_count must be allowed during compile");
+
     }
 }

@@ -20,7 +20,7 @@ namespace UnityMCP.Editor.Chat
             Path.GetFullPath(Path.Combine(packageRoot.TrimEnd('/', '\\'), "..", "server"));
 
         /// <summary>Formats the MCP config JSON blob expected by --mcp-config.</summary>
-        public static string BuildClaudeConfigJson(string command, string[] args)
+        public static string BuildClaudeConfigJson(string command, string[] args, int port = 0)
         {
             var sb = new StringBuilder();
             sb.Append("{\"mcpServers\":{\"unity\":{\"command\":\"");
@@ -33,7 +33,14 @@ namespace UnityMCP.Editor.Chat
                 sb.Append(JsonHelper.EscapeJson(args[i]));
                 sb.Append('"');
             }
-            sb.Append("]}}}");
+            sb.Append(']');
+            if (port > 0)
+            {
+                sb.Append(",\"env\":{\"UNITY_MCP_PORT\":\"");
+                sb.Append(port);
+                sb.Append("\"}");
+            }
+            sb.Append("}}}");
             return sb.ToString();
         }
 
@@ -106,7 +113,7 @@ namespace UnityMCP.Editor.Chat
 
             var uvPath        = ResolveUvPath();
             var (cmd, args)   = ResolvePythonCommand(serverDir, uvPath);
-            var json          = BuildClaudeConfigJson(cmd, args);
+            var json          = BuildClaudeConfigJson(cmd, args, MCPServer.ServerChatPort);
             var configPath    = Path.Combine(Path.GetTempPath(), ConfigFile);
             File.WriteAllText(configPath, json, JsonHelper.Utf8NoBom);
             return configPath;

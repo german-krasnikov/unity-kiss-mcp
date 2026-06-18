@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from unity_mcp.bridge import UnityBridge
-from helpers import make_writer, make_idle_probe
+from helpers import make_writer, make_idle_probe, ping_response
 
 
 def test_bridge_default_port():
@@ -303,6 +303,9 @@ class TestUnityBridge:
         def create_timeout_mock():
             reader = AsyncMock()
             writer = make_writer()
+            # reconnect reads ping directly from reader — provide valid ping response
+            ping_hdr, ping_pay = ping_response()
+            reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
             return (reader, writer)
 
         async def open_connection_side_effect(*args, **kwargs):
@@ -316,7 +319,7 @@ class TestUnityBridge:
             with patch("unity_mcp.bridge.asyncio.sleep", new_callable=AsyncMock):
                 bridge = UnityBridge(probe=idle_probe)
                 await bridge.connect()
-                # Patch _read_response to raise TimeoutError (avoids affecting wait_for in _reconnect)
+                # Patch _read_response to raise TimeoutError for normal sends
                 with patch.object(bridge, "_read_response", side_effect=asyncio.TimeoutError):
                     with pytest.raises((TimeoutError, ConnectionError), match="Unity not responding"):
                         await bridge.send("test", {})
@@ -363,6 +366,9 @@ async def test_idle_retry_gets_one_grace_attempt():
         call_count += 1
         reader = AsyncMock()
         writer = make_writer()
+        # reconnect reads ping directly from reader — provide valid ping response
+        ping_hdr, ping_pay = ping_response()
+        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
         return reader, writer
 
     with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=failing_open):
@@ -436,6 +442,9 @@ async def test_non_domain_reload_does_not_pin_busy():
         call_count += 1
         reader = AsyncMock()
         writer = make_writer()
+        # reconnect reads ping directly from reader — provide valid ping response
+        ping_hdr, ping_pay = ping_response()
+        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
         return reader, writer
 
     with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=fake_open):
@@ -1060,3 +1069,125 @@ async def test_heartbeat_hard_deadline_latches_grace_expired():
             _bh.HARD_DEADLINE_S = original
 
     assert bridge._startup_grace_expired is True
+
+
+# ── BridgeState enum tests (Fix 3) ──────────────────────────────────────────
+
+def test_bridge_state_initial_disconnected():
+    from unity_mcp.bridge import BridgeState
+    bridge = UnityBridge()
+    assert bridge._state == BridgeState.DISCONNECTED
+
+
+async def test_bridge_state_connected_after_reconnect():
+    from unity_mcp.bridge import BridgeState
+    ping_hdr, ping_pay = ping_response()
+    reader = AsyncMock()
+    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    writer = make_writer()
+    with patch("asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        await bridge._reconnect(fire_callbacks=False)
+    assert bridge._state == BridgeState.CONNECTED
+
+
+async def test_bridge_state_domain_reloading(monkeypatch):
+    """DomainReloadError in send() sets state to DOMAIN_RELOADING."""
+    import unity_mcp.bridge as bmod
+    from unity_mcp.bridge import BridgeState
+    monkeypatch.setattr(bmod, "SESSION_TIMEOUT", 0.1)
+    monkeypatch.setattr(bmod, "MAX_RETRIES", 0)
+    idle_probe = make_idle_probe()
+
+    going_away = json.dumps({"ev": "going_away", "reason": "reload"}).encode()
+    ga_hdr = struct.pack("!I", len(going_away))
+    reader = AsyncMock()
+    reader.readexactly = AsyncMock(side_effect=[ga_hdr, going_away])
+    writer = make_writer()
+
+    with patch("asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+        with pytest.raises((ConnectionError, TimeoutError)):
+            await bridge.send("test", {})
+
+    assert bridge._state == BridgeState.DOMAIN_RELOADING
+
+
+async def test_bridge_state_failed_on_grace_expired():
+    """_startup_grace_expired=True maps to FAILED state."""
+    from unity_mcp.bridge import BridgeState
+    bridge = UnityBridge()
+    bridge._state = BridgeState.FAILED
+    assert bridge._state == BridgeState.FAILED
+
+
+async def test_bridge_state_connected_clears_failed():
+    """Successful _reconnect() transitions from FAILED → CONNECTED."""
+    from unity_mcp.bridge import BridgeState
+    ping_hdr, ping_pay = ping_response()
+    reader = AsyncMock()
+    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    writer = make_writer()
+    with patch("asyncio.open_connection", return_value=(reader, writer)):
+        bridge = UnityBridge()
+        bridge._state = BridgeState.FAILED
+        await bridge._reconnect(fire_callbacks=False)
+    assert bridge._state == BridgeState.CONNECTED
+
+
+# ── Fix 2 regression: heartbeat DomainReloadError must mark _reload ──────────
+
+async def test_heartbeat_domain_reload_sets_reload_tracker():
+    """REGRESSION: DomainReloadError in heartbeat must mark _reload so
+    send() gets extended retry window (was: only set _domain_reload_in_progress
+    in send() path, heartbeat path was missing the mark)."""
+    import time as _time
+    from unity_mcp.bridge import UnityBridge
+    from unittest.mock import AsyncMock as _AsyncMock
+
+    idle_probe = make_idle_probe()
+
+    with patch("unity_mcp.bridge.asyncio.open_connection",
+               return_value=(_AsyncMock(), make_writer())):
+        bridge = UnityBridge(probe=idle_probe)
+        await bridge.connect()
+
+        # Simulate _raw_ping raising DomainReloadError
+        from unity_mcp.bridge_socket import DomainReloadError
+        with patch.object(bridge, "_raw_ping", side_effect=DomainReloadError("reload")):
+            await bridge._heartbeat_tick(interval=0.0)
+
+    # _reload tracker must be active after heartbeat catches DomainReloadError
+    assert bridge._reload.is_active() is True
+
+
+# ── Fix 1: retry delays must be 2s→4s→8s (not 1s→2s→4s) ────────────────────
+
+def test_should_retry_domain_reload_delay_sequence():
+    """DomainReloadError: delay must be 2**( attempt+1) → 2s, 4s, 8s."""
+    from unity_mcp.bridge import DomainReloadError
+    import time
+    bridge = UnityBridge(probe=make_idle_probe())
+    deadline = time.monotonic() + 999.0
+    err = DomainReloadError("reload")
+    expected = [2.0, 4.0, 8.0]
+    for attempt, exp_delay in enumerate(expected):
+        ok, delay, reason = bridge.should_retry(err, attempt, deadline)
+        assert ok is True, f"attempt {attempt}: expected retry=True"
+        assert delay == exp_delay, f"attempt {attempt}: expected delay={exp_delay}, got {delay}"
+
+
+def test_should_retry_busy_delay_sequence():
+    """Busy path: delay must be 2**(attempt+1) → 2s, 4s, 8s."""
+    import time
+    probe = make_idle_probe()
+    probe.has_strong_busy_signal.return_value = True
+    bridge = UnityBridge(probe=probe)
+    deadline = time.monotonic() + 999.0
+    err = ConnectionError("transient")
+    expected = [2.0, 4.0, 8.0]
+    for attempt, exp_delay in enumerate(expected):
+        ok, delay, reason = bridge.should_retry(err, attempt, deadline)
+        assert ok is True, f"attempt {attempt}: expected retry=True"
+        assert delay == exp_delay, f"attempt {attempt}: expected delay={exp_delay}, got {delay}"
