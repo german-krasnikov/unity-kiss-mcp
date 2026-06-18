@@ -4,6 +4,7 @@
 // Tests 14-15: BuildChipDisplayForm registry-driven form.
 using NUnit.Framework;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
@@ -193,7 +194,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void BuildChipDisplayForm_CreatesRowPerRegisteredKind()
         {
-            // 8 built-ins + 2 fakes = 10 rows
+            // 12 built-ins + 2 fakes = 14 rows
             ChipKindRegistry.Register(new FakeProvider("fake_alpha", "path"));
             ChipKindRegistry.Register(new FakeProvider("fake_beta",  "path"));
 
@@ -202,8 +203,10 @@ namespace UnityMCP.Editor.Chat.Tests
             BackendSettingsForm.BuildChipDisplayForm(parent, config, () => { });
 
             int registeredCount = ChipKindRegistry.AllKeys.Count;
-            Assert.AreEqual(registeredCount, parent.childCount,
-                $"Expected {registeredCount} rows, got {parent.childCount}");
+            // Rows contain a depth dropdown; header/toggles/separator do not.
+            int rowCount = parent.Children().Count(c => c.Q<DropdownField>() != null);
+            Assert.AreEqual(registeredCount, rowCount,
+                $"Expected {registeredCount} rows, got {rowCount}");
         }
 
         // ── 15: 3rd-party kind appears in form automatically ──────────────────
@@ -278,10 +281,13 @@ namespace UnityMCP.Editor.Chat.Tests
             public string IconName     => "";
             public string HexColor     => "#abcdef";
             public string DefaultDepth => _defaultDepth;
+            public string[] BarePathExtensions => System.Array.Empty<string>();
             public bool   CanHandle(UnityEngine.Object o, string p) => false;
             public ChipData Create(UnityEngine.Object o, string p)  => default;
             public string FormatPayload(ChipData c, ChipPayloadContext x) => "";
             public void   Navigate(string r) { }
+            public void   Ping(string r) { }
+            public void   AppendContextMenuItems(UnityEngine.UIElements.DropdownMenu menu, string r) { }
         }
     }
 }

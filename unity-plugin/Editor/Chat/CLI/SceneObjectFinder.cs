@@ -27,11 +27,22 @@ namespace UnityMCP.Editor.Chat
 
             for (int i = 1; i < parts.Length; i++)
             {
-                var child = current.transform.Find(parts[i]);
+                var child = FindChild(current.transform, parts[i]);
                 if (child == null) return null;
                 current = child.gameObject;
             }
             return current;
+        }
+
+        // Transform.Find() interprets brackets as selectors — use manual traversal instead.
+        private static Transform FindChild(Transform parent, string name)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                var c = parent.GetChild(i);
+                if (c.name == name) return c;
+            }
+            return null;
         }
 
         private static IEnumerable<GameObject> GetAllRoots(string sceneNameFilter = null)

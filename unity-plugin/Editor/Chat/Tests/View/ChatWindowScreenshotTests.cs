@@ -18,6 +18,12 @@ namespace UnityMCP.Editor.Chat.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            if (Application.isBatchMode)
+            {
+                Assert.Ignore("Screenshot tests require a GUI; skipping in batch mode.");
+                yield break;
+            }
+
             _window = EditorWindow.GetWindow<MCPChatWindow>("MCP Chat Test");
             _window.minSize = new Vector2(400, 600);
             _window.position = new Rect(100, 100, 400, 600);

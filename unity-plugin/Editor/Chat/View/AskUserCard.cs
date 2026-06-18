@@ -134,7 +134,7 @@ namespace UnityMCP.Editor.Chat
                 responseJson = ControlResponseBuilder.CodexUserInputResponse(requestId, answersArray);
             }
             else if (_directAnswer)
-                responseJson = !string.IsNullOrEmpty(otherText) ? BuildOtherAnswerJson(otherText) : BuildAnswersMapJson();
+                responseJson = !string.IsNullOrEmpty(otherText) ? otherText : BuildAnswersMapJson();
             else
             {
                 if (!string.IsNullOrEmpty(otherText))

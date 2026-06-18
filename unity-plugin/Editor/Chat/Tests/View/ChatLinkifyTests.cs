@@ -211,5 +211,52 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(result.Contains("<link=\"script:Assets/Scripts/Foo.cs\">"), $"Got: {result}");
             Assert.IsFalse(result.Contains("asset:"), $"Got: {result}");
         }
+
+        // ── ApplyPlainPaths ───────────────────────────────────────────────────
+
+        [Test]
+        public void ApplyPlainPaths_BareAssetPath_Linkified()
+        {
+            var input  = "Use Assets/Materials/Sky.mat in your scene";
+            var result = ChatLinkify.ApplyPlainPaths(input, ResolveAsset);
+
+            Assert.IsTrue(result.Contains("<link=\"asset:Assets/Materials/Sky.mat\">"), $"Got: {result}");
+            Assert.IsTrue(result.Contains("<u>Assets/Materials/Sky.mat</u>"),           $"Got: {result}");
+        }
+
+        [Test]
+        public void ApplyPlainPaths_AlreadyLinked_NotDoubled()
+        {
+            var input  = "<link=\"asset:Assets/Foo.mat\"><u>Assets/Foo.mat</u></link>";
+            var result = ChatLinkify.ApplyPlainPaths(input, ResolveAsset);
+
+            var linkCount = System.Text.RegularExpressions.Regex.Matches(result, "<link=").Count;
+            Assert.AreEqual(1, linkCount, $"Got: {result}");
+        }
+
+        [Test]
+        public void ApplyPlainPaths_NonExistentPath_NotLinked()
+        {
+            // Resolver returns null for paths that don't exist
+            var input  = "See Assets/NotExist/Foo.mat for details";
+            var result = ChatLinkify.ApplyPlainPaths(input, _ => null);
+
+            Assert.AreEqual(input, result);
+        }
+
+        [Test]
+        public void ApplyPlainPaths_NoAssetPath_Unchanged()
+        {
+            var input  = "Just plain text with no asset references";
+            var result = ChatLinkify.ApplyPlainPaths(input, ResolveAsset);
+
+            Assert.AreEqual(input, result);
+        }
+
+        [Test]
+        public void ApplyPlainPaths_NullInput_ReturnsNull()
+        {
+            Assert.IsNull(ChatLinkify.ApplyPlainPaths(null, ResolveAsset));
+        }
     }
 }

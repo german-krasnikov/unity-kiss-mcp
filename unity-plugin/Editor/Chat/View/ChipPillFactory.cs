@@ -28,17 +28,34 @@ namespace UnityMCP.Editor.Chat
         /// </summary>
         internal static Action<ChipData> AddToContextAction;
 
-        /// <summary>Attach right-click menu to a pill: "Add to context" + optional "Preview".</summary>
-        internal static void AttachAddToContextMenu(VisualElement pill, ChipData chip,
-            Action onPreview = null)
+        /// <summary>
+        /// Attach right-click menu to a pill.
+        /// Items: per-kind items first, then "Add to context", then "Show Preview" (if onPreview set).
+        /// </summary>
+        internal static void AttachContextMenu(VisualElement pill, ChipData chip,
+            Action onPreview = null, Action onNavigate = null)
         {
             pill.AddManipulator(new ContextualMenuManipulator(evt =>
             {
+                ChipKindRegistry.ForKey(chip.KindKey)
+                    ?.AppendContextMenuItems(evt.menu, chip.Path);
                 evt.menu.AppendAction("Add to context", _ =>
                     AddToContextAction?.Invoke(chip));
                 if (onPreview != null)
-                    evt.menu.AppendAction("Preview", _ => onPreview());
+                    evt.menu.AppendAction("Show Preview", _ => onPreview());
             }));
+        }
+
+        /// <summary>
+        /// Attach full read-only behaviour to a pill: left-click = navigate, right-click = Navigate +
+        /// "Add to context" + per-kind items. Use for ALL pills in user and assistant bubbles.
+        /// Does not include a preview panel — that's assistant-only via MixedParagraphRenderer.BuildPill.
+        /// </summary>
+        internal static void AttachReadOnlyBehavior(VisualElement pill, ChipData chip)
+        {
+            Action navigateAction = () => ChipKindRegistry.ForKey(chip.KindKey)?.Navigate(chip.Path);
+            ChipClickRouter.Register(pill, previewPanel: null, navigateAction);
+            AttachContextMenu(pill, chip, onPreview: null, onNavigate: navigateAction);
         }
 
         /// <summary>Build from explicit kindKey and display name.</summary>

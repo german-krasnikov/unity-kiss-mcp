@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -15,6 +16,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public string IconName    => "d_SceneViewFx";
         public string HexColor    => "#ff00ff";
         public string DefaultDepth => "path";
+        public string[] BarePathExtensions => System.Array.Empty<string>();
 
         public bool CanHandle(Object obj, string assetPath) => obj is Mesh;
 
@@ -31,6 +33,8 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         public void Navigate(string reference) { /* no-op */ }
+        public void Ping(string reference) { /* no-op */ }
+        public void AppendContextMenuItems(UnityEngine.UIElements.DropdownMenu menu, string reference) { }
     }
 
     [TestFixture]

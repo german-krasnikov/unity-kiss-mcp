@@ -1,11 +1,13 @@
 // 10 built-in IChipKindProvider implementations.
 // All internal — registered by ChipKindRegistry.EnsureBuiltIns().
 // AssetChipProviderBase: shared FormatPayload + Navigate(PingAsset) + DefaultDepth + Create.
-// HierarchyChipProvider: fully custom (instance ID, depth/summary, SceneObjectFinder).
+// HierarchyChipProvider: fully custom (instance ID, GlobalObjectId, HierarchyResolver).
+// Preview building moved to ChipPreviewBridge (temporary) until the preview registry (Dev 2).
 using System;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
 
 namespace UnityMCP.Editor.Chat
@@ -21,6 +23,7 @@ namespace UnityMCP.Editor.Chat
         public abstract string IconName { get; }
         public abstract string HexColor { get; }
         public virtual  string DefaultDepth => "path";
+        public virtual  string[] BarePathExtensions => Array.Empty<string>();
 
         public abstract bool CanHandle(Object obj, string assetPath);
 
@@ -35,11 +38,30 @@ namespace UnityMCP.Editor.Chat
 
         public virtual void Navigate(string reference)
         {
-            if (ViewerLauncher?.Invoke(reference) == true) return;
+            var handled = ViewerLauncher?.Invoke(reference) == true;
             var obj = AssetDatabase.LoadAssetAtPath<Object>(reference);
-            if (obj == null) { Debug.LogWarning("[MCP Chat] Asset not found: " + reference); return; }
+            if (obj == null)
+            {
+                if (!handled)
+                    Debug.LogWarning("[MCP Chat] Asset not found: " + reference);
+                return;
+            }
             EditorGUIUtility.PingObject(obj);
             Selection.activeObject = obj;
+        }
+
+        public virtual void Ping(string reference)
+        {
+            var obj = AssetDatabase.LoadAssetAtPath<Object>(reference);
+            if (obj == null) return;
+            EditorGUIUtility.PingObject(obj);
+            Selection.activeObject = obj;
+        }
+
+        public virtual void AppendContextMenuItems(DropdownMenu menu, string reference)
+        {
+            menu.AppendAction("Ping in Project", _ => Ping(reference));
+            menu.AppendAction("Open",            _ => Navigate(reference));
         }
     }
 
@@ -50,6 +72,7 @@ namespace UnityMCP.Editor.Chat
         public string IconName => "d_UnityEditor.SceneHierarchyWindow";
         public string HexColor => "#4a9eff";
         public string DefaultDepth => "path";
+        public string[] BarePathExtensions => Array.Empty<string>();
 
         public bool CanHandle(Object obj, string assetPath)
             => obj is GameObject go && !AssetDatabase.Contains(go);
@@ -58,7 +81,8 @@ namespace UnityMCP.Editor.Chat
         {
             var go = (GameObject)obj;
             var path = ComponentSerializer.GetPath(go);
-            return new ChipData(Key, path, FormatHierarchyDisplay(path, go.name), go.GetInstanceID());
+            var goid = GlobalObjectId.GetGlobalObjectIdSlow(go);
+            return new ChipData(Key, path, FormatHierarchyDisplay(path, go.name), go.GetInstanceID(), goid);
         }
 
         internal static string FormatHierarchyDisplay(string path, string leafName)
@@ -70,8 +94,10 @@ namespace UnityMCP.Editor.Chat
         public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
         {
             var bracket = chip.InstanceID != 0
-                ? $"[{Key}:{chip.Path} #{chip.InstanceID}]"
+                ? $"[{Key}:{chip.Path}#{chip.InstanceID}]"
                 : $"[{Key}:{chip.Path}]";
+            if (chip.GlobalObjectId.targetObjectId != 0)
+                bracket = bracket.Insert(bracket.Length - 1, $"@{chip.GlobalObjectId}");
             return ctx.Depth == "none" ? "" :
                    (ctx.Depth == "summary" || ctx.Depth == "full") && !string.IsNullOrEmpty(ctx.ResolvedSummary)
                        ? bracket + "\n" + ctx.ResolvedSummary
@@ -80,11 +106,36 @@ namespace UnityMCP.Editor.Chat
 
         public void Navigate(string reference)
         {
-            // RefParser strips " #id" so FindGameObject matches by clean path (bug fix P7).
-            var go = SceneObjectFinder.FindGameObject(RefParser.Parse(Key, reference).Path);
+            var go = Resolve(reference);
             if (go == null) { Debug.LogWarning("[MCP Chat] Reference stale: " + reference); return; }
             EditorGUIUtility.PingObject(go);
             Selection.activeObject = go;
+        }
+
+        public void Ping(string reference)
+        {
+            var go = Resolve(reference);
+            if (go == null) return;
+            EditorGUIUtility.PingObject(go);
+            Selection.activeObject = go;
+        }
+
+        public void AppendContextMenuItems(DropdownMenu menu, string reference)
+        {
+            menu.AppendAction("Select in Hierarchy", _ => Navigate(reference));
+            menu.AppendAction("Frame in Scene View",  _ =>
+            {
+                Navigate(reference);
+                if (UnityEditor.SceneView.lastActiveSceneView != null)
+                    UnityEditor.SceneView.lastActiveSceneView.FrameSelected();
+            });
+        }
+
+        static GameObject Resolve(string reference)
+        {
+            var href = HierarchyReference.Parse(reference);
+            var resolver = new HierarchyResolver();
+            return resolver.Resolve(href);
         }
     }
 
@@ -113,6 +164,12 @@ namespace UnityMCP.Editor.Chat
             var ms = AssetDatabase.LoadAssetAtPath<MonoScript>(reference);
             if (ms == null) { Debug.LogWarning("[MCP Chat] Script not found: " + reference); return; }
             AssetDatabase.OpenAsset(ms);
+        }
+
+        public override void AppendContextMenuItems(DropdownMenu menu, string reference)
+        {
+            menu.AppendAction("Ping in Project", _ => Ping(reference));
+            menu.AppendAction("Open in IDE",     _ => Navigate(reference));
         }
     }
 
@@ -171,6 +228,11 @@ namespace UnityMCP.Editor.Chat
         public override bool CanHandle(Object obj, string assetPath)
             => obj is DefaultAsset && !string.IsNullOrEmpty(assetPath)
                && AssetDatabase.IsValidFolder(assetPath);
+
+        public override void AppendContextMenuItems(DropdownMenu menu, string reference)
+        {
+            menu.AppendAction("Open in Project", _ => Navigate(reference));
+        }
     }
 
     internal sealed class AssetChipProvider : AssetChipProviderBase
@@ -202,8 +264,12 @@ namespace UnityMCP.Editor.Chat
         {
             if (string.IsNullOrEmpty(assetPath)) return false;
             var ext = Path.GetExtension(assetPath).ToLowerInvariant();
-            foreach (var e in _exts) if (ext == e) return true;
-            return false;
+            var matches = false;
+            foreach (var e in _exts) if (ext == e) { matches = true; break; }
+            if (!matches) return false;
+            // Only claim the root model GameObject (or path-only detection where obj is null).
+            // A Mesh sub-asset of an FBX should fall back to the generic Asset provider.
+            return obj == null || obj is GameObject;
         }
     }
 
@@ -243,6 +309,7 @@ namespace UnityMCP.Editor.Chat
         public string IconName   => "d_Texture Icon";
         public string HexColor   => "#f472b6";
         public string DefaultDepth => "path";
+        public string[] BarePathExtensions => _exts;
 
         public bool CanHandle(Object obj, string assetPath)
         {
@@ -262,6 +329,18 @@ namespace UnityMCP.Editor.Chat
         {
             if (AssetChipProviderBase.ViewerLauncher?.Invoke(reference) == true) return;
             ImageFallbackViewer?.Invoke(reference);
+        }
+
+        public void Ping(string reference)
+        {
+            // Images have no project asset to ping; reuse the viewer fallback.
+            Navigate(reference);
+        }
+
+        public void AppendContextMenuItems(DropdownMenu menu, string reference)
+        {
+            menu.AppendAction("Ping in Project", _ => Ping(reference));
+            menu.AppendAction("Open in Viewer",  _ => Navigate(reference));
         }
     }
 }

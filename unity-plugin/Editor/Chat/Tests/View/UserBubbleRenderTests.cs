@@ -182,7 +182,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         [Test] public void TagPillsAndChipStrip_BothPresent_NoDuplication() {
             var t = MakeTranscript(out var c);
-            t.AppendUserBubble("[hierarchy:/A #1]", new List<ChipData> { S("S.cs","S") });
+            t.AppendUserBubble("[hierarchy:/A#1]", new List<ChipData> { S("S.cs","S") });
             var b = Bubble(c);
             Assert.AreEqual(1, b.Q(className:"user-chip-strip").Query(className:"inline-chip-pill").ToList().Count);
             Assert.AreEqual(1, b.Q(className:"msg-text").Query(className:"inline-chip-pill").ToList().Count);
@@ -190,7 +190,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         [Test] public void TagPillsAndChipStrip_SameKindBothPlaces() {
             var t = MakeTranscript(out var c);
-            t.AppendUserBubble("[hierarchy:/A #1]", new List<ChipData> { H("/B","B") });
+            t.AppendUserBubble("[hierarchy:/A#1]", new List<ChipData> { H("/B","B") });
             var b = Bubble(c);
             string KindText(string stripClass) => b.Q(className:stripClass).Q(className:"inline-chip-pill").Q<Label>(className:"inline-chip-kind").text;
             Assert.AreEqual("hierarchy:", KindText("user-chip-strip"));

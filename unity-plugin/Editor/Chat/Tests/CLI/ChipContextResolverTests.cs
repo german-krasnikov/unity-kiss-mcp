@@ -166,10 +166,10 @@ namespace UnityMCP.Editor.Chat.Tests
             var go = MakeGo("SceneObj");
             ChipContextResolver.FindObjectOverride = _ => go;
             var result = ChipContextResolver.ResolveOne("/SceneObj", ChipDepth.PathOnly);
-            StringAssert.Contains("/SceneObj #", result);
+            StringAssert.Contains("/SceneObj#", result);
             var parts = result.Split('#');
             Assert.AreEqual(2, parts.Length);
-            Assert.IsTrue(int.TryParse(parts[1].Trim(), out _));
+            Assert.IsTrue(int.TryParse(parts[1], out _));
         }
 
         [Test]
@@ -206,7 +206,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void FormatChipRef_Hierarchy_BracketFormatWithInstanceID()
         {
             var result = ChipContextResolver.FormatChipRef(ChipKindKeys.Hierarchy, "/World/Player", 12345);
-            Assert.AreEqual("[hierarchy:/World/Player #12345]", result);
+            Assert.AreEqual("[hierarchy:/World/Player#12345]", result);
         }
 
         [Test]
@@ -264,7 +264,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void EmitTyped_DepthPath_Hierarchy_IncludesInstanceID()
         {
             var result = ChipContextResolver.EmitTyped(ChipKindKeys.Hierarchy, "/Player", 123, "path", (p, d) => "RESOLVED");
-            Assert.AreEqual("[hierarchy:/Player #123]", result);
+            Assert.AreEqual("[hierarchy:/Player#123]", result);
         }
 
         [Test]
@@ -272,7 +272,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var result = ChipContextResolver.EmitTyped(ChipKindKeys.Hierarchy, "/Player", 123, "summary",
                 (p, d) => "summary-text");
-            StringAssert.StartsWith("[hierarchy:/Player #123]", result);
+            StringAssert.StartsWith("[hierarchy:/Player#123]", result);
             StringAssert.Contains("summary-text", result);
         }
 
@@ -322,11 +322,14 @@ namespace UnityMCP.Editor.Chat.Tests
             public string IconName     => "";
             public string HexColor     => "#000000";
             public string DefaultDepth => "path";
+            public string[] BarePathExtensions => System.Array.Empty<string>();
             public bool   CanHandle(UnityEngine.Object obj, string assetPath) => false;
             public ChipData Create(UnityEngine.Object obj, string assetPath) => default;
             public string FormatPayload(ChipData chip, ChipPayloadContext ctx)
                 => ctx.Depth == "none" ? "" : $"[{Key}:{chip.Path}]";
             public void Navigate(string reference) { }
+            public void Ping(string reference) { }
+            public void AppendContextMenuItems(UnityEngine.UIElements.DropdownMenu menu, string reference) { }
         }
     }
 }

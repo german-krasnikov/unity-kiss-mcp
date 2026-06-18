@@ -142,7 +142,7 @@ namespace UnityMCP.Editor.Chat.Tests
                 ReloadGuard.ResetForTest();
 
                 // Set _sentLlmCache to known LLM payload via reflection
-                const string llmPayload = "@/Env/Player\n[hierarchy:/Env/Player #1]";
+                const string llmPayload = "@/Env/Player\n[hierarchy:/Env/Player#1]";
                 var llmCacheField = typeof(MCPChatWindow)
                     .GetField("_sentLlmCache", BindingFlags.NonPublic | BindingFlags.Instance);
                 var cache = (SentTextCache)llmCacheField.GetValue(w);

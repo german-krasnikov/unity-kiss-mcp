@@ -1,7 +1,9 @@
 // TDD — ChatSettingsSection plugin injection via SettingsProviderRegistry.
 // Tests that registered providers produce foldout children in the settings panel.
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
 
@@ -54,6 +56,8 @@ namespace UnityMCP.Editor.Chat.Tests
             SettingsProviderRegistry.Register(new FakeSettingsProvider("good_plugin",   "Good Plugin", order: 200));
 
             var parent = new VisualElement();
+            // Debug.LogException is emitted for the failing provider.
+            LogAssert.Expect(LogType.Exception, new Regex("provider error"));
             // Must not throw
             Assert.DoesNotThrow(() => ChatSettingsSection.BuildContent(parent));
 

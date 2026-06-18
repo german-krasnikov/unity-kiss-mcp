@@ -8,6 +8,11 @@ namespace UnityMCP.Editor.Chat
     {
         internal delegate string Resolver(string name);
 
+        // Matches bare asset paths in plain prose (must have extension, outside existing <link> tags).
+        private static readonly Regex _plainPath = new Regex(
+            @"Assets/[A-Za-z0-9_.\-/]+\.[A-Za-z0-9]+",
+            RegexOptions.Compiled);
+
         // Matches <color=CODECOLOR>CONTENT</color> — non-greedy, handles nested tags.
         // Pattern is built from MarkdownInline.CodeColor (single source) so a colour change
         // there can't silently break linkification.
@@ -56,6 +61,31 @@ namespace UnityMCP.Editor.Chat
                     return WrapLink("asset:" + payload, m.Value);
 
                 return m.Value; // unresolved — pass through unchanged
+            });
+        }
+
+        /// <summary>
+        /// Second pass: wraps bare <c>Assets/...</c> paths in prose (outside existing link tags)
+        /// in &lt;link&gt; + &lt;u&gt; tags. Resolver must return non-null for the path to be linkified.
+        /// </summary>
+        internal static string ApplyPlainPaths(string richText, Resolver resolveAsset)
+        {
+            if (richText == null) return null;
+            if (richText == "") return "";
+
+            return _plainPath.Replace(richText, m =>
+            {
+                // Skip paths already inside a <link> tag.
+                var before     = richText.Substring(0, m.Index);
+                var openCount  = _linkOpen.Matches(before).Count;
+                var closeCount = _linkClose.Matches(before).Count;
+                if (openCount > closeCount) return m.Value;
+
+                var path = m.Value;
+                var resolved = resolveAsset?.Invoke(path);
+                if (resolved == null) return m.Value;
+
+                return "<link=\"asset:" + resolved + "\"><u>" + path + "</u></link>";
             });
         }
 

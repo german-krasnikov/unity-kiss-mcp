@@ -30,7 +30,7 @@ namespace UnityMCP.Editor.Chat
         internal static string FormatChipRef(string kindKey, string path, int instanceID)
         {
             if (kindKey == ChipKindKeys.Hierarchy && instanceID != 0)
-                return $"[{kindKey}:{path} #{instanceID}]";
+                return $"[{kindKey}:{path}#{instanceID}]";
             return $"[{kindKey}:{path}]";
         }
 
@@ -110,7 +110,7 @@ namespace UnityMCP.Editor.Chat
             {
                 var goForId = FindGo(chipPath);
                 if (goForId != null && goForId)
-                    return chipPath + " #" + goForId.GetInstanceID();
+                    return chipPath + "#" + goForId.GetInstanceID();
                 return chipPath;
             }
 

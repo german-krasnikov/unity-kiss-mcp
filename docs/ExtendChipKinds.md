@@ -77,6 +77,11 @@ namespace MyPlugin.Chat
         // "full" = path + all serialized state (expensive)
         public string DefaultDepth => "path";
 
+        // File extensions that should be recognized as bare-path references of this kind
+        // in assistant responses (e.g., "img.png" -> [image:img/png]).
+        // Return System.Array.Empty<string>() if this kind has no bare-path form.
+        public string[] BarePathExtensions => new[] { ".myasset" };
+
         // Format the AI-facing payload
         // Called with resolved summary (if depth includes it)
         // Return empty string to omit from context entirely
@@ -115,6 +120,30 @@ namespace MyPlugin.Chat
             }
             AssetDatabase.OpenAsset(asset);
         }
+
+        // Highlight/ping the referenced object when an inline preview is first shown.
+        // Usually the same as Navigate, but without opening a dedicated editor window.
+        public void Ping(string reference)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<Object>(reference);
+            if (asset == null) return;
+            EditorGUIUtility.PingObject(asset);
+            Selection.activeObject = asset;
+        }
+
+        // Build an inline preview VisualElement for the given path.
+        // Return null if this provider has no visual preview.
+        // Called lazily when the preview panel is opened (not on every render).
+        public VisualElement BuildPreview(string path)
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<Object>(path);
+            if (asset == null)
+                return null;
+
+            // Example: display asset name in a Label
+            var label = new UnityEngine.UIElements.Label($"Preview: {asset.name}");
+            return label;
+        }
     }
 }
 ```
@@ -138,8 +167,11 @@ Your plugin will auto-register on domain load and appear in chip detection.
 | `IconName` | `string` (property) | EditorGUIUtility.IconContent key (e.g., `"d_Prefab Icon"`) |
 | `HexColor` | `string` (property) | RGB hex color for pill, e.g. `"#4a9eff"` |
 | `DefaultDepth` | `string` (property) | Fallback context depth: `"none"`, `"path"`, `"summary"`, or `"full"` |
+| `BarePathExtensions` | `string[]` (property) | Extensions recognized as bare-path refs in responses (e.g., `{ ".png" }`) |
 | `FormatPayload(chip, ctx)` | `string` (method) | Render AI-facing bracket text. Return `""` to omit. |
 | `Navigate(reference)` | `void` (method) | Handle click on a chip link (e.g., open asset, select object) |
+| `Ping(reference)` | `void` (method) | Highlight/ping object when inline preview first shown |
+| `BuildPreview(path)` | `VisualElement` (method) | Build inline preview element for lazy-load panel. Return null if no preview. |
 
 ### ChipKindRegistry Public API
 
@@ -188,8 +220,8 @@ public struct ChipPayloadContext
 
 Use priority to control detection order:
 
-- **<100:** Plugin overrides a built-in (e.g., provide a better detector for prefabs)
-- **100–800:** Built-in kinds (hierarchy=100, scene=200, script=300, prefab=400, material=500, texture=600, scriptable-object=700, asset=800)
+- **<100:** Plugin overrides a built-in (e.g., provide a better detector for prefabs). The built-in `Image` kind uses priority 50 for external image files that have no Unity object.
+- **100–800:** Built-in kinds (hierarchy=100, scene=200, script=300, prefab=400, material=500, texture=600, scriptable-object=700, asset=int.MaxValue)
 - **>800:** Plugin extensions (new kinds not overlapping built-ins)
 
 Example: If you want to extend asset detection, use `Priority = 900`. If you want to override the built-in script handler, use `Priority = 250`.
@@ -297,6 +329,20 @@ namespace MyGame.Chat
                 EditorGUIUtility.PingObject(asset);
                 Selection.activeObject = asset;
             }
+        }
+
+        public void Ping(string reference) => Navigate(reference);
+
+        public UnityEngine.UIElements.VisualElement BuildPreview(string path)
+        {
+            var config = AssetDatabase.LoadAssetAtPath<GameConfig>(path);
+            if (config == null)
+                return null;
+
+            var container = new UnityEngine.UIElements.Box();
+            container.Add(new UnityEngine.UIElements.Label($"Difficulty: {config.difficultyLevel}"));
+            container.Add(new UnityEngine.UIElements.Label($"Max Players: {config.maxPlayers}"));
+            return container;
         }
     }
 }

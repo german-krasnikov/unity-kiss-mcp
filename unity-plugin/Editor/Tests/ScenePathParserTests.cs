@@ -60,5 +60,33 @@ namespace UnityMCP.Editor.Tests
             Assert.AreEqual("Scene", result.SceneName);
             Assert.AreEqual("Root", result.LocalPath);
         }
+
+        // Bracket-name paths must NOT be misread as scene-qualified.
+        // "[GAMEPLAY]/[PLACEMENTS]/Repair" — root starts with '[', no scene prefix.
+        [Test]
+        public void Parse_BracketRootPath_NullScene()
+        {
+            var result = ScenePathParser.Parse("[GAMEPLAY]/[PLACEMENTS]/Repair");
+            Assert.IsNull(result.SceneName);
+            Assert.AreEqual("[GAMEPLAY]/[PLACEMENTS]/Repair", result.LocalPath);
+        }
+
+        // "[GAMEPLAY:COMBAT]/Child" — has ":/" inside bracket, must NOT extract "GAMEPLAY" as scene.
+        [Test]
+        public void Parse_BracketRootWithColon_NullScene()
+        {
+            var result = ScenePathParser.Parse("[GAMEPLAY:COMBAT]/Child");
+            Assert.IsNull(result.SceneName);
+            Assert.AreEqual("[GAMEPLAY:COMBAT]/Child", result.LocalPath);
+        }
+
+        // Plain "[PLACEMENTS]" root with no children — still not scene-qualified.
+        [Test]
+        public void Parse_BracketRootOnly_NullScene()
+        {
+            var result = ScenePathParser.Parse("[PLACEMENTS]");
+            Assert.IsNull(result.SceneName);
+            Assert.AreEqual("[PLACEMENTS]", result.LocalPath);
+        }
     }
 }

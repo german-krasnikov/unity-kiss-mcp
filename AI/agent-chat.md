@@ -417,14 +417,16 @@ Verified: BackendConfigStoreTests 10/10, BackendSettingsFormTests integration pa
 - Chips display left-side color-coded kind prefix (visual feedback)
 
 **Receive-side (response):**
-- `ResponseTagInliner.Apply()` parses ONLY `[kind:ref]` format (conservative regex, no false positives on markdown/code/bare brackets)
-- Renders compact colored pills with `<link>` click-nav (symmetric with input chips)
+- `ResponseTagTokenizer.Tokenize()` parses `[kind:ref]`, `⟦kind:ref⟧` fences, and bare file paths registered via `IChipKindProvider.BarePathExtensions` (no hardcoded image regex)
+- `MixedParagraphRenderer` renders text runs as Labels and tags/bare-paths as colored pills
+- Pills support single-click inline preview and double-click navigation via the provider registry
 - Wired into `MarkdownInline` between escape and bold/italic
 
 **Classes:**
 - `ChipKindDetector.Detect()` → ChipKind (pure, reflection-based hierarchy vs scene discrimination)
 - `ChipContextResolver.EmitTyped()` + `ResolveAllTyped()` — send-time API
-- `ResponseTagInliner` — response-time parser + renderer
+- `ResponseTagTokenizer` — response-time tokenizer
+- `MixedParagraphRenderer` / `ChipClickRouter` / `ChipInlinePreviewPanel` — rendering + interaction
 
 Verified: ChipKindDetector 13/13, ResponseTagInliner 17/17 (false-positive guards), EmitTyped 7/7, ChipConfig 3/3.
 
@@ -446,7 +448,10 @@ public interface IChipKindProvider
     string HexColor { get; }               // Pill + response tag color
     string FormatPayload(ChipData chip, ChipPayloadContext ctx);
     string DefaultDepth { get; }           // Fallback when no config entry
-    void Navigate(string reference);       // Handle click on chip link
+    string[] BarePathExtensions { get; }   // Extensions for bare-path recognition in responses (e.g., [".png"])
+    void Navigate(string reference);       // Handle click on chip link (open, select)
+    void Ping(string reference);           // Highlight/ping object (inline preview trigger)
+    VisualElement BuildPreview(string path); // Build inline preview element (return null if none)
 }
 ```
 
@@ -470,6 +475,11 @@ public static class ChipKindRegistry
 - TextureChipProvider (600): .png/.jpg image files
 - ScriptableObjectChipProvider (700): .asset SO files
 - AssetChipProvider (800): generic fallback for unlisted asset types
+
+**New Methods (v0.36.0+):**
+- **`BarePathExtensions`** — Array of file extensions recognized as bare-path references in assistant responses (e.g., `[".png", ".jpg"]`). Used by `ResponseTagTokenizer` to link bare file paths like "image.png" without markup.
+- **`Ping(reference)`** — Highlight/ping the referenced object (flash in Hierarchy, select in Inspector). Called when inline preview panel first opens. Distinct from `Navigate` which may open a dedicated viewer.
+- **`BuildPreview(string path)`** — Build a `VisualElement` for inline preview display. Return null if this kind has no visual preview. Called lazily when the preview panel opens; preview builders are wired via seam in `AssetChipProviderBase`.
 
 **Priority Convention:**
 - <100: Plugin providers override a built-in type
@@ -549,11 +559,13 @@ Registry-driven settings form enumerates all registered kinds (built-in + 3rd-pa
 Response-side `[kind:ref]` tags now render as graphical pills (leaf name, click→ping/select, tooltip=full ref) in paragraphs and lists — identical to input pills.
 
 **Classes:**
-- `ResponseTagInliner.Split()` — Returns ordered segments (text runs + parsed tags). Reuses existing registry-driven regex.
-- `RefParser` — Inverse of `ChipContextResolver.FormatChipRef`. Strips ` #id` from hierarchy refs (`/Root/Child #123` → path="/Root/Child"), extracts leaf name, parses InstanceID.
-- `MixedParagraphRenderer.Render()` — Flex-row container with Labels (text runs via MarkdownInline.ToRichText) + ChipPillFactory pills (response mode: no remove button, click-to-navigate). Tooltip = full ref.
+- `ResponseTagTokenizer.Tokenize()` — Returns ordered tokens (text / `[kind:ref]` / bare paths). Uses `IChipKindProvider.BarePathExtensions` for extension detection; no hardcoded image regex.
+- `RefParser` — Inverse of `ChipContextResolver.FormatChipRef`. Delegates hierarchy identity parsing to `HierarchyReference` (` #id`, ` @globalObjectId`, path).
+- `HierarchyReference` + `HierarchyResolver` — Value object + resolver for scene object refs (survives reparent/rename via GlobalObjectId).
+- `MixedParagraphRenderer.Render()` — Flex-row container with Labels (text runs via MarkdownInline.ToRichText) + ChipPillFactory pills (response mode: no remove button, single-click preview, double-click navigate). Tooltip = full ref.
+- `ChipInlinePreviewPanel` + `PreviewBuilderRegistry` — Lazy inline previews per kind with cancellation.
 
-**Side benefit:** Fixed pre-existing bug where `HierarchyChipProvider.Navigate` received full ref WITH `#id` suffix and couldn't match paths.
+**Side benefit:** Hierarchy refs now preserve ` #id` / ` @globalObjectId`; `HierarchyChipProvider.Navigate` resolves via `HierarchyResolver` instead of naive path matching.
 
 #### P6: New-Session / Clear Button
 
@@ -611,19 +623,20 @@ User-sent messages now render `[kind:ref]` tags as clickable pills — identical
 
 #### P3: Unified Chat Reference Rendering (v0.20.0 Phase 1 consolidation)
 
-AI responses can now mention scene object names (e.g., "see Player1 here") and they route through ONE unified rendering path: bare name → BareNameNormalizer → `[kind:ref]` tag → ResponseTagInliner → MixedParagraph → ChipPillFactory pill.
+AI responses can now mention scene object names (e.g., "see Player1 here") and bare file paths (e.g., "saved to img.png"). They route through ONE unified rendering path: bare name / bare path → normalization → `ResponseTagTokenizer` → `MixedParagraphRenderer` → `ChipPillFactory` pill.
 
 **Legacy path deleted (v0.20.0):** Removed the secondary SceneNameLinker.Linkify path which was wrapping refs as `<link><u>Name</u></link>` at the static mutable `MarkdownInline.Linker` seam. This divergence caused dual rendering and inconsistent state. The unified path is now enforced:
 
-1. **Normalization stage (BareNameNormalizer):** Scans LLM output text and converts bare scene object names to `[kind:ref]` bracket tags. Filters aggressively (length ≥3, skips generics, requires signature traits: digits/underscores/consecutive uppercase). Protects existing `[kind:ref]` tags and triple-backtick fenced code blocks.
+1. **Normalization stage (BareNameNormalizer):** Scans LLM output text and converts bare scene object names to `[kind:ref]` bracket tags. Filters aggressively (length ≥3, skips generics, requires signature traits: digits/underscores/consecutive uppercase). Protects existing `[kind:ref]` tags and triple-backtick fenced code blocks. **Bare file paths are not normalized here** — they are recognized later by the tokenizer via `IChipKindProvider.BarePathExtensions`.
 
-2. **Response rendering stage (ResponseTagInliner → MixedParagraph → ChipPillFactory):** Parses all `[kind:ref]` tags (conservative regex, no false positives) and renders as graphical pills with click→ping/select, tooltips, colors per kind.
+2. **Response rendering stage (ResponseTagTokenizer → MixedParagraph → ChipPillFactory):** Tokenizes text, `[kind:ref]` tags, `⟦kind:ref⟧` fences, and bare file paths into a shared model, then renders graphical pills with single-click preview, double-click navigate, tooltips, and colors per kind.
 
 **Kill-switch:** `MCPChat.DisableSceneNameNorm` allows disabling normalization if needed (e.g., for custom name-linking logic in plugins).
 
 **Integration:**
-- `BareNameNormalizer.cs` — Converts bare names to `[kind:ref]` format
-- `ResponseTagInliner.cs` — Parses `[kind:ref]` tags and injects pills
+- `BareNameNormalizer.cs` — Converts bare scene object names to `[kind:ref]` format
+- `ResponseTagTokenizer.cs` — Tokenizes `[kind:ref]`, `⟦kind:ref⟧` fences, and bare file paths
+- `MixedParagraphRenderer.cs` — Renders tokens as labels/pills
 - `ChatRefResolver.cs` — Exposed `Objects` property (read-only dict) for name lookup
 - `MCPChatWindow.cs` — Calls RefreshResolver (renamed from RefreshLinker) before FinalizeAssistant in Drain TurnDone
 

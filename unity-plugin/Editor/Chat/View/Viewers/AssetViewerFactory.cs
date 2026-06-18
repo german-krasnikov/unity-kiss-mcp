@@ -1,5 +1,5 @@
 // Extension → IAssetViewer registry. Dispatches asset chip navigation to the right viewer.
-// [InitializeOnLoad] registers built-in viewers and wires the ViewerLauncher seam.
+// [InitializeOnLoad] registers built-in viewers and preview builders.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -16,12 +16,13 @@ namespace UnityMCP.Editor.Chat
         static AssetViewerFactory()
         {
             RegisterBuiltIns();
-            AssetChipProviderBase.ViewerLauncher = TryShow;
+            AssetChipProviderBase.ViewerLauncher  = TryShow;
             ImageChipProvider.ImageFallbackViewer = path => ImageViewerWindow.Show(path);
         }
 
         private static void RegisterBuiltIns()
         {
+            // ── IAssetViewer window dispatch ────────────────────────────────────
             var model = new ModelViewerWindow.ViewerAdapter();
             Register(".fbx",   model);
             Register(".obj",   model);
@@ -43,8 +44,15 @@ namespace UnityMCP.Editor.Chat
             Register(".ogg",  audio);
             Register(".aiff", audio);
 
-            // C9: register prefab viewer via factory (fixes C9 + C10)
             Register(".prefab", new PrefabViewerWindow.ViewerAdapter());
+
+            // ── Inline preview builders (Dev 2 registry) ────────────────────────
+            PreviewBuilderRegistry.Register(new ImagePreviewBuilder(),      priority: 100);
+            PreviewBuilderRegistry.Register(new AudioPreviewBuilder(),      priority: 100);
+            PreviewBuilderRegistry.Register(new HierarchyPreviewBuilder(),  priority: 100);
+            PreviewBuilderRegistry.Register(new ModelPreviewBuilder(),      priority: 100);
+            PreviewBuilderRegistry.Register(new PrefabPreviewBuilder(),     priority: 100);
+            PreviewBuilderRegistry.Register(new AssetPreviewBuilder(),      priority: int.MaxValue);
         }
 
         internal static void Register(string ext, IAssetViewer viewer)
@@ -80,14 +88,16 @@ namespace UnityMCP.Editor.Chat
         internal static void Reset()
         {
             _registry.Clear();
-            AssetChipProviderBase.ViewerLauncher = null;
+            AssetChipProviderBase.ViewerLauncher  = null;
             ImageChipProvider.ImageFallbackViewer = null;
+            PreviewBuilderRegistry.Reset();
         }
 
         // Test seam: re-run built-in registration on a clean registry.
         internal static void ReRegisterBuiltIns()
         {
             _registry.Clear();
+            PreviewBuilderRegistry.Reset();
             RegisterBuiltIns();
         }
     }

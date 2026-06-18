@@ -1,6 +1,7 @@
 // Public interface for extensible chip kind providers.
 // Third-party assemblies implement this and call ChipKindRegistry.Register().
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -37,7 +38,26 @@ namespace UnityMCP.Editor.Chat
         /// <summary>Fallback depth when ChipConfig has no explicit entry for this key.</summary>
         string DefaultDepth { get; }
 
+        /// <summary>
+        /// File extensions (with or without leading dot) that should be recognized as bare-path
+        /// references of this kind, e.g. { "png", "jpg" } for image chips.
+        /// Default is empty — no bare-path detection for this kind.
+        /// </summary>
+        string[] BarePathExtensions { get; }
+
         /// <summary>Handle a click on a chip link. Called with the reference string from the linkId.</summary>
         void Navigate(string reference);
+
+        /// <summary>
+        /// Highlight/ping the referenced object without opening a dedicated viewer/editor.
+        /// Called when an inline preview is first shown.
+        /// </summary>
+        void Ping(string reference);
+
+        /// <summary>
+        /// Append per-kind items to a right-click context menu on a chip pill or inline link.
+        /// Called with the reference string (asset path or hierarchy path).
+        /// </summary>
+        void AppendContextMenuItems(DropdownMenu menu, string reference);
     }
 }

@@ -114,7 +114,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var chip = new ChipData(ChipKindKeys.Hierarchy, "/Env/Player", "Player", 1);
             var pos  = new List<PositionedChip> { new PositionedChip(chip, 0) };
             var msg  = ChipTextInterleaver.BuildFromRaw("@Player fix", pos);
-            const string llm = "@/Env/Player fix\n[hierarchy:/Env/Player #1]";
+            const string llm = "@/Env/Player fix\n[hierarchy:/Env/Player#1]";
 
             _transcript.AppendUserBubble(msg, llm);
             var serialized = _transcript.SerializeForReload();
@@ -127,7 +127,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsInstanceOf<UserBubbleData>(restored.userData,
                 "Restored bubble must have UserBubbleData when LlmPayload was persisted");
             var data = (UserBubbleData)restored.userData;
-            StringAssert.Contains("[hierarchy:/Env/Player #1]", data.Llm,
+            StringAssert.Contains("[hierarchy:/Env/Player#1]", data.Llm,
                 "Restored Llm must contain bracket payload");
             StringAssert.DoesNotContain("[hierarchy:", data.Display,
                 "Restored Display must not contain bracket payload");
@@ -175,7 +175,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void G3d_LlmPayload_Idempotent_DoubleRoundTrip()
         {
             var msg = ChipTextInterleaver.Build("hello", new List<PositionedChip>());
-            const string llm = "hello\n[hierarchy:/A #1]";
+            const string llm = "hello\n[hierarchy:/A#1]";
             _transcript.AppendUserBubble(msg, llm);
             var data1 = _transcript.SerializeForReload();
 

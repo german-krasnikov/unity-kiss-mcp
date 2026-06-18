@@ -23,9 +23,10 @@ namespace UnityMCP.Editor.Chat.Tests
             int count = 0;
             foreach (var child in container.Children())
             {
-                // Break element: not a Label and not a pill (no inline-chip-pill class)
+                // Break element: not a Label and not a pill/wrapper
                 if (child is Label) continue;
                 if (child.ClassListContains("inline-chip-pill")) continue;
+                if (child.ClassListContains("chip-pill-wrapper")) continue;
                 count++;
             }
             return count;
@@ -37,8 +38,8 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MP1_TextNewlineTag_HasBreakBetweenLines()
         {
-            // "line1\nline2 [hierarchy:/X #1]"
-            var ve = MixedParagraphRenderer.Render("line1\nline2 [hierarchy:/X #1]");
+            // "line1\nline2 [hierarchy:/X#1]"
+            var ve = MixedParagraphRenderer.Render("line1\nline2 [hierarchy:/X#1]");
             // Should contain break element(s) for the newline
             Assert.Greater(CountBreaks(ve), 0, "Expected at least one break element for \\n");
         }
@@ -47,7 +48,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MP2_ThreeLinesWithTags_TwoBreaks()
         {
-            var raw = "line1 [hierarchy:/A #1]\nline2 [hierarchy:/B #2]\nline3";
+            var raw = "line1 [hierarchy:/A#1]\nline2 [hierarchy:/B#2]\nline3";
             var ve = MixedParagraphRenderer.Render(raw);
             Assert.AreEqual(2, CountBreaks(ve), "3 lines → 2 break elements");
         }
@@ -56,7 +57,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MP3_TagFirstLineThenText_BreakBetween()
         {
-            var ve = MixedParagraphRenderer.Render("[hierarchy:/X #1]\nsecond line");
+            var ve = MixedParagraphRenderer.Render("[hierarchy:/X#1]\nsecond line");
             Assert.AreEqual(1, CountBreaks(ve), "Expected exactly 1 break for 1 \\n");
             // Must have the pill and the second-line label
             var pill = ve.Q(className: "inline-chip-pill");
@@ -69,7 +70,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MP4_SingleLineWithTag_NoBreaks()
         {
-            var ve = MixedParagraphRenderer.Render("hello [hierarchy:/X #1] world");
+            var ve = MixedParagraphRenderer.Render("hello [hierarchy:/X#1] world");
             Assert.AreEqual(0, CountBreaks(ve), "Single line must have no break elements");
         }
 
@@ -87,7 +88,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MP6_DoubleNewline_TwoBreaks()
         {
-            var ve = MixedParagraphRenderer.Render("[hierarchy:/A #1]\n\n[hierarchy:/B #2]");
+            var ve = MixedParagraphRenderer.Render("[hierarchy:/A#1]\n\n[hierarchy:/B#2]");
             // Two \n chars → 2 breaks
             Assert.AreEqual(2, CountBreaks(ve), "\\n\\n must produce 2 break elements");
         }
@@ -96,7 +97,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MP7_TagOnly_NoBreaks()
         {
-            var ve = MixedParagraphRenderer.Render("[hierarchy:/X #1]");
+            var ve = MixedParagraphRenderer.Render("[hierarchy:/X#1]");
             Assert.AreEqual(0, CountBreaks(ve), "Tag-only content must have no breaks");
             var pill = ve.Q(className: "inline-chip-pill");
             Assert.IsNotNull(pill, "Pill must be present");
@@ -114,11 +115,32 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(ve.ClassListContains("md-para"));
         }
 
+        // ── InlineElement with bare image paths ───────────────────────────────
+
+        // MP14: text with relative screenshot path → InlineElement returns mixed container, not Label
+        [Test]
+        public void InlineElement_TextWithImagePath_ReturnsMixedContainer()
+        {
+            var ve = MixedParagraphRenderer.InlineElement("saved to ScreenShots/2026-06-17.png", "md-para");
+            // Must be a container (md-para--mixed), not a plain Label
+            Assert.IsNotInstanceOf<Label>(ve, "Text with image path must go through Render(), not plain Label");
+            Assert.IsTrue(ve.ClassListContains("md-para--mixed"), "Mixed container must have md-para--mixed class");
+            Assert.IsTrue(ve.ClassListContains("md-para"), "cssClass must be added");
+        }
+
+        // MP15: plain text without image path → still returns Label (regression guard)
+        [Test]
+        public void InlineElement_PlainText_StillReturnsLabel()
+        {
+            var ve = MixedParagraphRenderer.InlineElement("no images here", "md-para");
+            Assert.IsInstanceOf<Label>(ve, "Plain text must remain a Label");
+        }
+
         // MP10: triple newline in tagged content → 3 break elements
         [Test]
         public void MP10_TripleNewline_ThreeBreaks()
         {
-            var ve = MixedParagraphRenderer.Render("[hierarchy:/A #1]\n\n\n[hierarchy:/B #2]");
+            var ve = MixedParagraphRenderer.Render("[hierarchy:/A#1]\n\n\n[hierarchy:/B#2]");
             Assert.AreEqual(3, CountBreaks(ve), "\\n\\n\\n must produce 3 break elements");
         }
 
@@ -128,8 +150,8 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void F22a_OrphanBoldMarkers_StrippedFromTextSegments()
         {
-            // LLM output: "**[hierarchy:/Name #1]**" → text "**" + pill + text "**"
-            var ve = MixedParagraphRenderer.Render("** [hierarchy:/Name #1] **");
+            // LLM output: "**[hierarchy:/Name#1]**" → text "**" + pill + text "**"
+            var ve = MixedParagraphRenderer.Render("** [hierarchy:/Name#1] **");
             // No label should contain bare "**"
             foreach (var lbl in ve.Query<Label>().ToList())
                 StringAssert.DoesNotContain("**", lbl.text,
@@ -158,16 +180,16 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MP8_NewlineBeforeTag_BreakBeforePill()
         {
-            var ve = MixedParagraphRenderer.Render("text\n[hierarchy:/X #1]");
+            var ve = MixedParagraphRenderer.Render("text\n[hierarchy:/X#1]");
             Assert.AreEqual(1, CountBreaks(ve), "Newline before tag must produce 1 break");
             // Break must appear before the pill in child order
             int breakIdx = -1, pillIdx = -1;
             for (int i = 0; i < ve.childCount; i++)
             {
                 var child = ve[i];
-                if (!child.ClassListContains("inline-chip-pill") && !(child is Label))
+                if (!child.ClassListContains("inline-chip-pill") && !(child is Label) && child.Q(className: "inline-chip-pill") == null)
                     breakIdx = i;
-                else if (child.ClassListContains("inline-chip-pill"))
+                else if (child.ClassListContains("inline-chip-pill") || child.Q(className: "inline-chip-pill") != null)
                     pillIdx = i;
             }
             Assert.Greater(pillIdx, breakIdx, "Break must precede pill in DOM order");

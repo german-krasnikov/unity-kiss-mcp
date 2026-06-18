@@ -40,7 +40,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var chip = new ChipData(ChipKindKeys.Hierarchy, "/Env/Player", "Player", 1);
             var pos  = new List<PositionedChip> { new PositionedChip(chip, 0) };
             var msg  = ChipTextInterleaver.BuildFromRaw("@Player что", pos);
-            const string llmPayload = "@/Env/Player что\n[hierarchy:/Env/Player #1]";
+            const string llmPayload = "@/Env/Player что\n[hierarchy:/Env/Player#1]";
 
             _transcript.AppendUserBubble(msg, llmPayload);
 
@@ -57,7 +57,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void CopyableText_ReadText_UserBubbleData_ReturnsDisplay()
         {
-            var ud = new UserBubbleData("@Player x", "@/Env/Player x\n[hierarchy:/Env/Player #1]");
+            var ud = new UserBubbleData("@Player x", "@/Env/Player x\n[hierarchy:/Env/Player#1]");
             var ve = new VisualElement();
             ve.userData = ud;
 
@@ -65,7 +65,7 @@ namespace UnityMCP.Editor.Chat.Tests
             // The integration path (Copy action) is covered by AppendUserBubble round-trip tests.
             // Expose via the same pattern used by ContextMenu tests: verify userData.Display
             Assert.AreEqual("@Player x", ud.Display);
-            Assert.AreEqual("@/Env/Player x\n[hierarchy:/Env/Player #1]", ud.Llm);
+            Assert.AreEqual("@/Env/Player x\n[hierarchy:/Env/Player#1]", ud.Llm);
         }
 
         // T3: null llmPayload falls back — Llm == Display.
@@ -121,7 +121,7 @@ namespace UnityMCP.Editor.Chat.Tests
             var chip = new ChipData(ChipKindKeys.Hierarchy, "/Env/Player", "Player", 1);
             var pos  = new List<PositionedChip> { new PositionedChip(chip, 0) };
             var msg  = ChipTextInterleaver.BuildFromRaw("@Player что", pos);
-            const string llmPayload = "@/Env/Player что\n[hierarchy:/Env/Player #1]";
+            const string llmPayload = "@/Env/Player что\n[hierarchy:/Env/Player#1]";
 
             _transcript.AppendUserBubble(msg, llmPayload);
 

@@ -1,5 +1,8 @@
 // TDD — PanelProviderRegistry: registration, ShowPanel, key validation, test seam.
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -92,6 +95,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var throwingProvider = new FakePanelProvider("bad_panel", throws: true);
             PanelProviderRegistry.Register(throwingProvider);
+            LogAssert.Expect(LogType.Exception, new Regex("show error"));
             Assert.DoesNotThrow(() => PanelProviderRegistry.ShowPanel("bad_panel"));
         }
 

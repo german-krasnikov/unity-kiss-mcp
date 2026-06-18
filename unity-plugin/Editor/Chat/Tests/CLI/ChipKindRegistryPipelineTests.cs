@@ -149,10 +149,13 @@ namespace UnityMCP.Editor.Chat.Tests
             public string IconName     => "";
             public string HexColor     => "#000";
             public string DefaultDepth => "path";
+            public string[] BarePathExtensions => System.Array.Empty<string>();
             public bool   CanHandle(UnityEngine.Object o, string p) => false;
             public ChipData Create(UnityEngine.Object o, string p) => default;
             public string FormatPayload(ChipData c, ChipPayloadContext x) => "";
             public void   Navigate(string r) { }
+            public void   Ping(string r) { }
+            public void   AppendContextMenuItems(UnityEngine.UIElements.DropdownMenu menu, string r) { }
         }
     }
 }

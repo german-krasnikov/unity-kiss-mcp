@@ -62,6 +62,20 @@ namespace UnityMCP.Editor.Chat.Tests
         public void FindGameObject_Empty_ReturnsNull()
             => Assert.IsNull(SceneObjectFinder.FindGameObject(""));
 
+        // Bracket-name paths: FindGameObject must not throw (Transform.Find selector crash).
+        // Returns null when no scene is loaded — that's the correct safe behavior.
+        [Test]
+        public void FindGameObject_BracketNameChild_DoesNotThrow()
+            => Assert.DoesNotThrow(() => SceneObjectFinder.FindGameObject("[PLACEMENTS]"));
+
+        [Test]
+        public void FindGameObject_BracketNameDepth2_DoesNotThrow()
+            => Assert.DoesNotThrow(() => SceneObjectFinder.FindGameObject("[GAMEPLAY]/[PLACEMENTS]/Repair"));
+
+        [Test]
+        public void FindGameObject_BracketRootOnly_DoesNotThrow()
+            => Assert.DoesNotThrow(() => SceneObjectFinder.FindGameObject("[GAMEPLAY]"));
+
         // ── HierarchyChipProvider display ────────────────────────────────────
 
         [Test]

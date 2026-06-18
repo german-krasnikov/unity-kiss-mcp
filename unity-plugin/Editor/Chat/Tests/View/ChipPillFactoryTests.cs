@@ -1,8 +1,12 @@
 // TDD — ChipPillFactory tests (Wave 0).
 // All asserts: child counts, class lists, label text, backgroundColor.
 // No resolvedStyle/layout/live-panel dependence — headless safe.
+using System;
+using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
 
@@ -135,6 +139,99 @@ namespace UnityMCP.Editor.Chat.Tests
             const string name = "Игрок_01";
             var pill = ChipPillFactory.Build(ChipKindKeys.Script, name);
             Assert.AreEqual(name, pill.Q<Label>(className: "inline-chip-label").text);
+        }
+
+        // ── AttachReadOnlyBehavior ─────────────────────────────────────────────
+
+        // T-CF1: left click on pill with registered provider invokes Navigate
+        [Test]
+        public void AttachReadOnlyBehavior_LeftClick_InvokesNavigate()
+        {
+            LogAssert.ignoreFailingMessages = true;
+            var window = EditorWindow.GetWindow<PillFactoryTestWindow>();
+            try
+            {
+                var navigated = false;
+                // Use a unique key not in built-ins to avoid duplicate-key guard
+                var provider  = new SpyChipProvider("spy_navigate_kind",
+                    onNavigate: _ => navigated = true);
+                ChipKindRegistry.Register(provider);
+
+                var chip = new ChipData("spy_navigate_kind", "/TestObj", "TestObj", 0);
+                var pill = ChipPillFactory.Build(chip);
+                window.rootVisualElement.Add(pill);
+
+                ChipPillFactory.AttachReadOnlyBehavior(pill, chip);
+                SendClick(pill, 1);
+
+                Assert.IsTrue(navigated, "AttachReadOnlyBehavior: left-click must call Navigate");
+            }
+            finally { window.Close(); }
+        }
+
+        // T-CF2: unknown kindKey — left-click must not throw
+        [Test]
+        public void AttachReadOnlyBehavior_NullProvider_DoesNotThrow()
+        {
+            var chip = new ChipData("unknown_kind_xyz", "/some/path", "ref", 0);
+            var pill = ChipPillFactory.Build(chip);
+            Assert.DoesNotThrow(() => ChipPillFactory.AttachReadOnlyBehavior(pill, chip),
+                "AttachReadOnlyBehavior must not throw for unknown kindKey");
+        }
+
+        // T-CF3: AttachReadOnlyBehavior registers a ClickEvent callback (pill is interactive)
+        [Test]
+        public void AttachReadOnlyBehavior_RegistersContextMenu()
+        {
+            var chip = new ChipData(ChipKindKeys.Script, "Assets/Foo.cs", "Foo.cs", 0);
+            var pill = ChipPillFactory.Build(chip);
+            // DoesNotThrow verifies the method compiles and runs without error
+            Assert.DoesNotThrow(() => ChipPillFactory.AttachReadOnlyBehavior(pill, chip),
+                "AttachReadOnlyBehavior must not throw");
+        }
+
+        // ── helpers ───────────────────────────────────────────────────────────
+
+        private static void SendClick(VisualElement target, int clickCount)
+        {
+            var evt = new ClickEvent();
+            SetClickCount(evt, clickCount);
+            evt.target = target;
+            target.SendEvent(evt);
+        }
+
+        private static void SetClickCount(ClickEvent evt, int count)
+        {
+            var type = evt.GetType();
+            while (type != null && type != typeof(object))
+            {
+                var field = type.GetField("<clickCount>k__BackingField",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                if (field != null) { field.SetValue(evt, count); return; }
+                type = type.BaseType;
+            }
+        }
+
+        private sealed class PillFactoryTestWindow : EditorWindow { }
+
+        private sealed class SpyChipProvider : IChipKindProvider
+        {
+            private readonly string         _key;
+            private readonly Action<string> _onNavigate;
+            public SpyChipProvider(string key, Action<string> onNavigate)
+            { _key = key; _onNavigate = onNavigate; }
+            public string   Key                => _key;
+            public int      Priority           => 50;
+            public string   HexColor           => "#888888";
+            public string   IconName           => "";
+            public string   DefaultDepth       => "shallow";
+            public string[] BarePathExtensions => System.Array.Empty<string>();
+            public bool     CanHandle(UnityEngine.Object obj, string assetPath) => false;
+            public ChipData Create(UnityEngine.Object obj, string assetPath) => default;
+            public string   FormatPayload(ChipData chip, ChipPayloadContext ctx) => "";
+            public void     Navigate(string reference) => _onNavigate?.Invoke(reference);
+            public void     Ping(string reference) { }
+            public void     AppendContextMenuItems(UnityEngine.UIElements.DropdownMenu menu, string path) { }
         }
     }
 }

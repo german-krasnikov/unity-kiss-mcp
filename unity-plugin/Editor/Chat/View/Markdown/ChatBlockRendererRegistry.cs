@@ -61,6 +61,7 @@ namespace UnityMCP.Editor.Chat
                 // F20: scene-object resolver removed — bare object names in code spans are not
                 // underline-linked; they reach BareNameNormalizer as pills instead (Path A).
                 var linkified = ChatLinkify.Apply(lbl.text, null, _resolver.ResolveScript, ResolveAssetPath);
+                linkified = ChatLinkify.ApplyPlainPaths(linkified, ResolveAssetPath);
                 if (linkified != lbl.text)
                 {
                     lbl.text = linkified;

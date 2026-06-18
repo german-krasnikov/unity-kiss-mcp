@@ -42,7 +42,7 @@ namespace UnityMCP.Editor
                 GameObject current = sceneRoot;
                 for (int i = 1; i < sceneParts.Length; i++)
                 {
-                    Transform child = current.transform.Find(sceneParts[i]);
+                    Transform child = FindChildByName(current.transform, sceneParts[i]);
                     if (child == null) return null;  // strict scene boundary — no fuzzy cross-scene
                     current = child.gameObject;
                 }
@@ -65,11 +65,22 @@ namespace UnityMCP.Editor
             GameObject cur = root;
             for (int i = 1; i < parts.Length; i++)
             {
-                Transform child = cur.transform.Find(parts[i]);
+                Transform child = FindChildByName(cur.transform, parts[i]);
                 if (child == null) return strict ? null : TryFuzzyFind(path, parts);
                 cur = child.gameObject;
             }
             return cur;
+        }
+
+        // Transform.Find() interprets brackets as selectors — manual traversal avoids that.
+        private static Transform FindChildByName(Transform parent, string name)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                var c = parent.GetChild(i);
+                if (c.name == name) return c;
+            }
+            return null;
         }
 
         internal static GameObject FindObjectById(int instanceId)
@@ -220,7 +231,10 @@ namespace UnityMCP.Editor
         {
             if (string.IsNullOrEmpty(path)) return new ScenePathParser(null, path);
             int sep = path.IndexOf(":/", System.StringComparison.Ordinal);
-            if (sep <= 0) return new ScenePathParser(null, path);
+            // Reject if no separator, or the "scene" part starts with '[' (bracket object name),
+            // or contains '/' (already a path segment, not a scene name).
+            if (sep <= 0 || path[0] == '[' || path.Substring(0, sep).Contains('/'))
+                return new ScenePathParser(null, path);
             var scene = path.Substring(0, sep);
             var local = path.Substring(sep + 2);  // skip ":/"
             if (local.StartsWith("/")) local = local.Substring(1);

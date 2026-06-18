@@ -42,7 +42,7 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains("@Assets/Tests/Editor/CommandRouterTests.cs", payload);
 
             // Bare short-name standalone mention must NOT be present as an inline token.
-            // (The bracket line [hierarchy:/GridPlayer #42] also contains "GridPlayer" — exclude it.)
+            // (The bracket line [hierarchy:/GridPlayer#42] also contains "GridPlayer" — exclude it.)
             // We check that "@GridPlayer " (name + space) doesn't appear before the bracket block.
             var textPart = payload.Split('\n')[0]; // first line = plain text portion
             StringAssert.DoesNotContain("@GridPlayer ", textPart);

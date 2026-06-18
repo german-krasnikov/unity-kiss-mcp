@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.36.0] — 2026-06-18 <!-- Media preview redesign, chip click UX, asset navigation -->
+
+- **Media Preview Redesign:**
+  * New `ResponseTagTokenizer` — single-pass tokenizer for `[kind:ref]`, `⟦kind:ref⟧` fences, and bare file paths; extensions come from `IChipKindProvider.BarePathExtensions`
+  * `HierarchyReference` + `HierarchyResolver` — robust scene-object identity via path, InstanceID, and GlobalObjectId
+  * `ChipExistenceService` — instance-based existence cache with disposable subscriptions and EditorApplication hook cleanup
+  * `PreviewBuilderRegistry` + kind-specific `IPreviewBuilder`s (`Image`, `Audio`, `Model`, `Prefab`, `Hierarchy`, `Asset`) — extensible inline preview pipeline
+  * `AssetPreviewService` — cancellable async preview queue with in-flight deduplication
+  * `MixedParagraphRenderer` refactor — tokenized rendering, `StaleStateDecorator`, `ChipClickRouter`, and `ChipInlinePreviewPanel` wired to registry/cancellation
+  * `IChipKindProvider` adds three new members: `BarePathExtensions[]`, `Ping(reference)`, `BuildPreview(path)` — enables plugins to provide bare-path recognition + navigation + custom preview UI
+  * `MixedParagraphRenderer` no longer hard-codes hierarchy vs asset ping logic (delegates to provider `Ping()`)
+  * Removed legacy static preview seams (old `AssetPreviewCache` facade, `InlineImageThumbnail.cs`)
+
 ## [v0.35.0] — 2026-06-17 <!-- Media preview bubbles, asset export/import, port persistence, README facts auto-sync -->
 
 **Major Features:**

@@ -1,7 +1,9 @@
-// Renders a paragraph containing [kind:ref] tags as a flex-wrap container.
-// Text runs -> Labels via MarkdownInline.ToRichText. Image path tokens -> thumbnails.
-// Tag runs -> ChipPillFactory pills (response mode: no remove button, click-to-navigate).
+// Renders a paragraph containing [kind:ref] tags, ⟦kind:ref⟧ fences and bare paths as a flex-wrap container.
+// Text runs -> Labels via MarkdownInline.ToRichText.
+// Tag/BarePath runs -> ChipPillFactory pills (response mode: no remove button, click-to-navigate).
+using System;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace UnityMCP.Editor.Chat
@@ -9,11 +11,20 @@ namespace UnityMCP.Editor.Chat
     public static class MixedParagraphRenderer
     {
         /// <summary>
-        /// Render a paragraph with mixed text+tag content.
+        /// Seam: overrides the preview context used by Render/InlineElement.
+        /// Tests can inject a fake context to avoid AssetDatabase/SceneObjectFinder calls.
+        /// </summary>
+        internal static IPreviewContext ContextOverride;
+
+        /// <summary>
+        /// Render a paragraph with mixed text+tag+bare-path content.
         /// Returns a flex-row/wrap VisualElement container marked with md-para--mixed;
         /// caller adds the contextual class (md-para / md-list-content).
         /// </summary>
-        internal static VisualElement Render(string rawText)
+        internal static VisualElement Render(string rawText, IPreviewContext context = null)
+            => Render(ResponseTagTokenizer.Tokenize(rawText), context);
+
+        internal static VisualElement Render(IReadOnlyList<TagToken> tokens, IPreviewContext context = null)
         {
             var container = new VisualElement();
             container.AddToClassList("md-para--mixed");
@@ -21,12 +32,11 @@ namespace UnityMCP.Editor.Chat
             container.style.flexWrap      = Wrap.Wrap;
             container.style.alignItems    = Align.Center;
 
-            var segments = ResponseTagInliner.Split(rawText);
-            foreach (var seg in segments)
+            foreach (var token in tokens)
             {
-                if (!seg.IsTag)
+                if (token.Kind == TokenKind.Text)
                 {
-                    var lines = seg.Text.Split('\n');
+                    var lines = token.Raw.Split('\n');
                     for (int i = 0; i < lines.Length; i++)
                     {
                         if (i > 0)
@@ -37,13 +47,13 @@ namespace UnityMCP.Editor.Chat
                             container.Add(br);
                         }
                         var stripped = StripOrphanBold(lines[i]);
-                        foreach (var ve in SplitLineWithThumbs(stripped))
-                            container.Add(ve);
+                        if (!string.IsNullOrEmpty(stripped))
+                            container.Add(ChatLabel.Selectable(MarkdownInline.ToRichText(stripped), richText: true));
                     }
                 }
                 else
                 {
-                    container.Add(BuildPill(seg.KindKey, seg.Text));
+                    container.Add(BuildPill(token.KindKey, token.Ref, context));
                 }
             }
             return container;
@@ -51,12 +61,17 @@ namespace UnityMCP.Editor.Chat
 
         /// <summary>
         /// Returns either a mixed-pill container or a plain selectable label, then adds cssClass.
-        /// Used by both RenderParagraph and RenderList so the HasTags branch isn't duplicated.
+        /// Tokenizes once — reuses tokens for both the hasTags check and the Render call.
         /// </summary>
-        internal static VisualElement InlineElement(string text, string cssClass)
+        internal static VisualElement InlineElement(string text, string cssClass, IPreviewContext context = null)
         {
-            VisualElement ve = ResponseTagInliner.HasTags(text)
-                ? Render(text)
+            var tokens = ResponseTagTokenizer.Tokenize(text);
+            bool hasTags = false;
+            foreach (var t in tokens)
+                if (t.Kind != TokenKind.Text) { hasTags = true; break; }
+
+            VisualElement ve = hasTags
+                ? Render(tokens, context)
                 : ChatLabel.Selectable(MarkdownInline.ToRichText(text), richText: true);
             ve.AddToClassList(cssClass);
             return ve;
@@ -75,70 +90,38 @@ namespace UnityMCP.Editor.Chat
             return t;
         }
 
-        /// <summary>
-        /// Splits a line on whitespace. Image-path tokens become InlineImageThumbnail elements;
-        /// remaining tokens are joined into a single Label each run. Returns empty if line is empty.
-        /// </summary>
-        internal static IEnumerable<VisualElement> SplitLineWithThumbs(string line)
+        private static VisualElement BuildPill(string kindKey, string rawRef, IPreviewContext context)
         {
-            if (string.IsNullOrEmpty(line)) yield break;
+            context ??= ContextOverride ?? PreviewLifetimeScope.Current;
 
-            var tokens = line.Split(new[] { ' ', '\t' }, System.StringSplitOptions.RemoveEmptyEntries);
-            var textRun = new List<string>();
-
-            foreach (var token in tokens)
-            {
-                if (InlineImageThumbnail.IsImagePath(token))
-                {
-                    if (textRun.Count > 0)
-                    {
-                        yield return ChatLabel.Selectable(
-                            MarkdownInline.ToRichText(string.Join(" ", textRun)), richText: true);
-                        textRun.Clear();
-                    }
-                    var resolved = ImageBlockRenderer.ResolvePath(token.Trim('`'));
-                    yield return InlineImageThumbnail.Build(resolved);
-                }
-                else
-                {
-                    textRun.Add(token);
-                }
-            }
-
-            if (textRun.Count > 0)
-                yield return ChatLabel.Selectable(
-                    MarkdownInline.ToRichText(string.Join(" ", textRun)), richText: true);
-        }
-
-        private static VisualElement BuildPill(string kindKey, string rawRef)
-        {
             var chip = RefParser.Parse(kindKey, rawRef);
             var pill = ChipPillFactory.Build(chip.KindKey, chip.DisplayName);
             pill.tooltip = rawRef; // full ref for "reveal"
 
-            var capturedRef = rawRef;
-            var capturedKey = kindKey;
+            var existenceService = context?.ExistenceService;
+            if (existenceService != null)
+                StaleStateDecorator.Attach(pill, chip.KindKey, chip.Path, existenceService);
 
-            var previewPanel = new ChipInlinePreviewPanel(capturedKey, capturedRef,
-                () =>
-                {
-                    var provider = ChipKindRegistry.ForKey(capturedKey);
-                    provider?.Navigate(capturedRef);
-                });
-
-            pill.RegisterCallback<ClickEvent>(evt =>
+            Action navigateAction = () =>
             {
-                if (evt.clickCount == 1)
-                    previewPanel.Toggle();
-                else if (evt.clickCount >= 2)
-                {
-                    var provider = ChipKindRegistry.ForKey(capturedKey);
-                    provider?.Navigate(capturedRef);
-                }
-            });
+                var provider = ChipKindRegistry.ForKey(kindKey);
+                provider?.Navigate(rawRef);
+            };
+            Action pingAction = () =>
+            {
+                var provider = ChipKindRegistry.ForKey(kindKey);
+                provider?.Ping(rawRef);
+            };
 
-            ChipPillFactory.AttachAddToContextMenu(pill, chip,
-                () => previewPanel.Toggle());
+            var previewPanel = new ChipInlinePreviewPanel(kindKey, rawRef,
+                navigateFallback: navigateAction,
+                pingAction: pingAction,
+                context: context);
+
+            ChipClickRouter.Register(pill, previewPanel, navigateAction);
+            ChipPillFactory.AttachContextMenu(pill, chip,
+                onPreview: () => previewPanel.Toggle(),
+                onNavigate: navigateAction);
 
             // Wrap pill + panel in a column container so panel sits below pill
             var wrapper = new VisualElement();
@@ -148,5 +131,6 @@ namespace UnityMCP.Editor.Chat
             wrapper.Add(previewPanel);
             return wrapper;
         }
+
     }
 }

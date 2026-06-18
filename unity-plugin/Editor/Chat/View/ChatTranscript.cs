@@ -50,7 +50,7 @@ namespace UnityMCP.Editor.Chat
                 if (seg.IsChip)
                 {
                     var pill = ChipPillFactory.Build(seg.Chip);
-                    ChipPillFactory.AttachAddToContextMenu(pill, seg.Chip);
+                    ChipPillFactory.AttachReadOnlyBehavior(pill, seg.Chip);
                     wrap.Add(pill);
                     any = true;
                 }
@@ -95,7 +95,7 @@ namespace UnityMCP.Editor.Chat
                 foreach (var c in chips)
                 {
                     var p = ChipPillFactory.Build(c);
-                    ChipPillFactory.AttachAddToContextMenu(p, c);
+                    ChipPillFactory.AttachReadOnlyBehavior(p, c);
                     strip.Add(p);
                 }
                 bubble.Add(strip);
@@ -137,7 +137,7 @@ namespace UnityMCP.Editor.Chat
                 foreach (var c in chips)
                 {
                     var p = ChipPillFactory.Build(c);
-                    ChipPillFactory.AttachAddToContextMenu(p, c);
+                    ChipPillFactory.AttachReadOnlyBehavior(p, c);
                     strip.Add(p);
                 }
                 bubble.Add(strip);

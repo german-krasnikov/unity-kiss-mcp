@@ -21,6 +21,10 @@ namespace UnityMCP.Editor.Chat.Tests
             int clamped = System.Math.Min(pos, (field.Text ?? "").Length);
             field.TextField.cursorIndex = clamped;
             field.TextField.selectIndex = clamped;
+            // UI Toolkit cursorIndex may report 0 when the field is not attached/focused;
+            // InlineChipField.AddChip falls back to _lastCursorPos in that case, so keep it in sync.
+            var lastPosField = typeof(InlineChipField).GetField("_lastCursorPos", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            lastPosField?.SetValue(field, clamped);
         }
 
         internal static void Type(InlineChipField field, string text)

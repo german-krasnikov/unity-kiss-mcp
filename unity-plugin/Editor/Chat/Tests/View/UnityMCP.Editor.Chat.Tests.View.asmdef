@@ -7,7 +7,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": ["nunit.framework.dll"],
-    "autoReferenced": false,
+    "autoReferenced": true,
     "defineConstraints": ["UNITY_MCP_CHAT", "UNITY_INCLUDE_TESTS"],
     "versionDefines": [],
     "noEngineReferences": false

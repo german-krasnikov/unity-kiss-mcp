@@ -11,7 +11,12 @@ namespace UnityMCP.Editor.Chat.Tests
     public class ResponseTagPillTests
     {
         [SetUp]    public void SetUp()    => ChipKindRegistry.ResetToBuiltIns();
-        [TearDown] public void TearDown() { ChipKindRegistry.ResetToBuiltIns(); ChipPillFactory.ColorResolver = null; }
+        [TearDown] public void TearDown()
+        {
+            ChipKindRegistry.ResetToBuiltIns();
+            ChipPillFactory.ColorResolver = null;
+            MixedParagraphRenderer.ContextOverride = null;
+        }
 
         // ── HasTags ───────────────────────────────────────────────────────────
 
@@ -21,7 +26,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
         [Test]
         public void HasTags_WithHierarchyTag_ReturnsTrue()
-            => Assert.IsTrue(ResponseTagInliner.HasTags("see [hierarchy:/Player #1]"));
+            => Assert.IsTrue(ResponseTagInliner.HasTags("see [hierarchy:/Player#1]"));
 
         // ── Split ─────────────────────────────────────────────────────────────
 
@@ -37,11 +42,11 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Split_TagOnly_SingleTagSegment()
         {
-            var segs = ResponseTagInliner.Split("[hierarchy:/X #1]");
+            var segs = ResponseTagInliner.Split("[hierarchy:/X#1]");
             Assert.AreEqual(1, segs.Count);
             Assert.IsTrue(segs[0].IsTag);
             Assert.AreEqual("hierarchy", segs[0].KindKey);
-            Assert.AreEqual("/X #1",     segs[0].Text);
+            Assert.AreEqual("/X#1",     segs[0].Text);
         }
 
         [Test]
@@ -57,9 +62,9 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Split_MultipleTags_CorrectCount()
         {
-            // "[hierarchy:/A #1] and [script:B]" → tag, literal, tag  (3)
+            // "[hierarchy:/A#1] and [script:B]" → tag, literal, tag  (3)
             // First char is '[' so no leading text segment.
-            var segs = ResponseTagInliner.Split("[hierarchy:/A #1] and [script:B]");
+            var segs = ResponseTagInliner.Split("[hierarchy:/A#1] and [script:B]");
             Assert.AreEqual(3, segs.Count);
             Assert.IsTrue (segs[0].IsTag);   // hierarchy tag
             Assert.IsFalse(segs[1].IsTag);   // " and "
@@ -69,7 +74,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Split_AdjacentTags_NoEmptyTextBetween()
         {
-            var segs = ResponseTagInliner.Split("[hierarchy:/A #1][script:B]");
+            var segs = ResponseTagInliner.Split("[hierarchy:/A#1][script:B]");
             Assert.AreEqual(2, segs.Count);
             Assert.IsTrue(segs[0].IsTag);
             Assert.IsTrue(segs[1].IsTag);
@@ -144,7 +149,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void MixedParagraphRenderer_TextAndTag_ProducesLabelAndPill()
         {
-            var ve = MixedParagraphRenderer.Render("hello [hierarchy:/Player #1] world");
+            var ve = MixedParagraphRenderer.Render("hello [hierarchy:/Player#1] world");
 
             // Container must have 3 children: Label, wrapper(pill+panel), Label
             Assert.AreEqual(3, ve.childCount,
@@ -172,7 +177,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void InlineElement_ListItemWithTag_ContainsPillChild()
         {
             // A bullet-list line with a [kind:ref] tag must render a pill, not literal text.
-            var ve = MixedParagraphRenderer.InlineElement("[hierarchy:/X #1]", "md-list-content");
+            var ve = MixedParagraphRenderer.InlineElement("[hierarchy:/X#1]", "md-list-content");
             Assert.IsTrue(ve.ClassListContains("md-list-content"),
                 "InlineElement must add the supplied cssClass");
             // The VE is a mixed container — find the pill by its class
@@ -192,6 +197,48 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNull(pill, "Plain text list item must not contain a pill");
         }
 
+        // ── Stale pill detection (Bug 4) ──────────────────────────────────────
+
+        [Test]
+        public void BuildPill_MissingAsset_PillIsStale()
+        {
+            MixedParagraphRenderer.ContextOverride = new PreviewContextStub(
+                new FakeChipExistenceService { ExistsImpl = (_, __) => false });
+            var ve = MixedParagraphRenderer.Render("[script:Assets/Missing.cs]");
+            var pill = ve.Q(className: "inline-chip-pill");
+            Assert.IsNotNull(pill);
+            Assert.AreEqual(0.4f, pill.style.opacity.value, 0.001f,
+                "stale pill must have opacity 0.4");
+            Assert.IsTrue(pill.tooltip.StartsWith("[NOT FOUND]"),
+                "stale pill tooltip must start with [NOT FOUND]");
+        }
+
+        [Test]
+        public void BuildPill_ValidAsset_PillIsNormal()
+        {
+            MixedParagraphRenderer.ContextOverride = new PreviewContextStub(
+                new FakeChipExistenceService { ExistsImpl = (_, __) => true });
+            var ve = MixedParagraphRenderer.Render("[script:Assets/Foo.cs]");
+            var pill = ve.Q(className: "inline-chip-pill");
+            Assert.IsNotNull(pill);
+            // opacity keyword = Null/Undefined when not explicitly set (default = 1)
+            var opacity = pill.style.opacity;
+            Assert.IsTrue(opacity.keyword == StyleKeyword.Null || opacity.keyword == StyleKeyword.Undefined || opacity.value >= 0.99f,
+                "valid pill must not be faded");
+        }
+
+        [Test]
+        public void BuildPill_HierarchyNotInScene_PillIsStale()
+        {
+            MixedParagraphRenderer.ContextOverride = new PreviewContextStub(
+                new FakeChipExistenceService { ExistsImpl = (key, _) => key != ChipKindKeys.Hierarchy });
+            var ve = MixedParagraphRenderer.Render("[hierarchy:/Player#1]");
+            var pill = ve.Q(className: "inline-chip-pill");
+            Assert.IsNotNull(pill);
+            Assert.AreEqual(0.4f, pill.style.opacity.value, 0.001f,
+                "missing hierarchy pill must be stale");
+        }
+
         // ── HierarchyChipProvider.Navigate regression ─────────────────────────
 
         [Test]
@@ -206,6 +253,16 @@ namespace UnityMCP.Editor.Chat.Tests
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
+        private sealed class PreviewContextStub : IPreviewContext
+        {
+            public IAssetPreviewService PreviewService => null;
+            public IChipExistenceService ExistenceService { get; }
+            public System.Threading.CancellationToken CancellationToken => default;
+
+            public PreviewContextStub(IChipExistenceService existenceService)
+                => ExistenceService = existenceService;
+        }
+
         private sealed class MinimalTestProvider : IChipKindProvider
         {
             public MinimalTestProvider(string key) => Key = key;
@@ -214,10 +271,13 @@ namespace UnityMCP.Editor.Chat.Tests
             public string IconName     => "";
             public string HexColor     => "#aabbcc";
             public string DefaultDepth => "path";
+            public string[] BarePathExtensions => System.Array.Empty<string>();
             public bool   CanHandle(UnityEngine.Object o, string p) => false;
             public ChipData Create(UnityEngine.Object o, string p) => default;
             public string FormatPayload(ChipData c, ChipPayloadContext x) => $"[{Key}:{c.Path}]";
             public void   Navigate(string r) { }
+            public void   Ping(string r) { }
+            public void   AppendContextMenuItems(UnityEngine.UIElements.DropdownMenu menu, string r) { }
         }
     }
 }

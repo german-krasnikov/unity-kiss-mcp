@@ -50,8 +50,20 @@ namespace UnityMCP.Editor.Chat
             {
                 var linkId = lastHoveredLink;
                 if (string.IsNullOrEmpty(linkId)) return;
-                evt.menu.AppendAction("Navigate", _ => Navigate(linkId));
+                evt.menu.AppendAction("Navigate",       _ => Navigate(linkId));
                 evt.menu.AppendAction("Add to context", _ => AddToContext(linkId, addToContext));
+
+                // Append per-kind items for chip: links
+                if (linkId.StartsWith("chip:"))
+                {
+                    int secondColon = linkId.IndexOf(':', 5);
+                    if (secondColon >= 0)
+                    {
+                        var key       = linkId.Substring(5, secondColon - 5);
+                        var reference = linkId.Substring(secondColon + 1);
+                        ChipKindRegistry.ForKey(key)?.AppendContextMenuItems(evt.menu, reference);
+                    }
+                }
             }));
         }
 
