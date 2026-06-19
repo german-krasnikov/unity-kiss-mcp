@@ -47,12 +47,21 @@ namespace UnityMCP.Editor.Chat
         {
             // resumeId is irrelevant here — thread resume goes via JSON-RPC, not argv
             var args = new List<string> { "app-server" };
+            // Disable any statically-configured unity MCP entries (global ~/.codex and project .codex)
+            // that lack UNITY_MCP_PORT — they'd connect to the wrong port (CLI instead of Chat).
+            args.Add("-c"); args.Add("mcp_servers.unity.enabled=false");
+            args.Add("-c"); args.Add("mcp_servers.unity-mcp.enabled=false");
+            // Register the Chat-aware server under a dedicated key with the correct port.
             args.Add("-c");
-            args.Add($"mcp_servers.unity.command=\"{CodexArgBuilder.TomlEscapeString(_pythonCommand ?? CodexArgBuilder.PythonFallback)}\"");
+            args.Add($"mcp_servers.unity_chat.command=\"{CodexArgBuilder.TomlEscapeString(_pythonCommand ?? CodexArgBuilder.PythonFallback)}\"");
             args.Add("-c");
-            args.Add($"mcp_servers.unity.args=[{CodexArgBuilder.BuildTomlStringArray(_pythonArgs)}]");
+            args.Add($"mcp_servers.unity_chat.args=[{CodexArgBuilder.BuildTomlStringArray(_pythonArgs)}]");
             args.Add("-c");
-            args.Add($"mcp_servers.unity.startup_timeout_sec={_startupTimeoutSec}");
+            args.Add($"mcp_servers.unity_chat.startup_timeout_sec={_startupTimeoutSec}");
+            args.Add("-c");
+            args.Add($"mcp_servers.unity_chat.env.UNITY_MCP_PORT=\"{MCPServer.ServerChatPort}\"");
+            args.Add("-c");
+            args.Add("mcp_servers.unity_chat.env.UNITY_MCP_CHAT=\"1\"");
 
             if (!string.IsNullOrEmpty(_model))
             {
