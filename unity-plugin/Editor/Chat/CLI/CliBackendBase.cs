@@ -155,10 +155,12 @@ namespace UnityMCP.Editor.Chat
         protected virtual void SpawnNewProcess(string binary, string[] args, string[] strip)
         {
             _proc = new ChatProcess();
+            // UNITY_MCP_PORT and UNITY_MCP_CHAT are NOT set here — if set on the CLI process,
+            // ALL MCP servers inherit them (both "unity" from --mcp-config AND "unity-mcp" from
+            // ~/.mcp.json), causing duplicate TCP connections to the chat port.
+            // Both vars are already in --mcp-config env, scoped to "unity" server only.
             var envVars = new Dictionary<string, string>
             {
-                { "UNITY_MCP_PORT",            MCPServer.ServerChatPort.ToString() },
-                { "UNITY_MCP_CHAT",            "1" },
                 { "UNITY_MCP_SESSION_TIMEOUT", "300" },
             };
             _proc.Spawn(binary, args, strip, envVars);

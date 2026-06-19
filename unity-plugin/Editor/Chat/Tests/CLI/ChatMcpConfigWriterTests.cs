@@ -251,6 +251,19 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
+        public void BuildClaudeConfigJson_WithPort_ContainsUnityMcpChatEnv()
+        {
+            // UNITY_MCP_CHAT must be in --mcp-config env (not CLI process env) so that
+            // only "unity" server gets it, not "unity-mcp" from ~/.mcp.json.
+            var json = ChatMcpConfigWriter.BuildClaudeConfigJson(
+                "/bin/uv", new[] { "run", "--directory", "/srv", "unity-mcp" }, port: 9501);
+
+            var env      = JsonHelper.ExtractObject(JsonHelper.ExtractObject(json, "mcpServers"), "unity");
+            var chatFlag = JsonHelper.ExtractString(JsonHelper.ExtractObject(env, "env"), "UNITY_MCP_CHAT");
+            Assert.AreEqual("1", chatFlag);
+        }
+
+        [Test]
         public void BuildClaudeConfigJson_NoPort_NoEnvField()
         {
             var json = ChatMcpConfigWriter.BuildClaudeConfigJson(

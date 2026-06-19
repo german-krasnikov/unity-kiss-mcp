@@ -36,9 +36,11 @@ namespace UnityMCP.Editor.Chat
             sb.Append(']');
             if (port > 0)
             {
+                // UNITY_MCP_CHAT=1 here (not in CLI process env) ensures only THIS server
+                // gets it — prevents "unity-mcp" from ~/.mcp.json connecting to chat port.
                 sb.Append(",\"env\":{\"UNITY_MCP_PORT\":\"");
                 sb.Append(port);
-                sb.Append("\"}");
+                sb.Append("\",\"UNITY_MCP_CHAT\":\"1\"}");
             }
             sb.Append("}}}");
             return sb.ToString();
