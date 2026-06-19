@@ -38,7 +38,6 @@ namespace UnityMCP.Editor.Chat
                 "--include-partial-messages",
                 "--input-format",  "stream-json",
                 "--mcp-config",    mcpConfigPath,
-                "--strict-mcp-config",
                 "--permission-mode", permissionMode,
                 "--permission-prompt-tool", PermissionConfig.MCP_BLANKET + "__permission_prompt",
             };

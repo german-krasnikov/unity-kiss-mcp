@@ -1,10 +1,10 @@
 {
   "tools": 98,
-  "tests_total": 6251,
+  "tests_total": 6253,
   "tests_python": 2472,
-  "tests_unity": 3699,
+  "tests_unity": 3701,
   "tests_live": 80,
   "server_version": "0.8.2",
-  "plugin_version": "0.37.0",
+  "plugin_version": "0.38.0",
   "batch_savings": "80\u201395%"
 }

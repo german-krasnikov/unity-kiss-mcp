@@ -1,6 +1,7 @@
 // TDD tests for GeminiArgBuilder.
 // Pure unit tests — no real FS writes (settingsDir injectable seam), no Unity API.
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
 
@@ -209,6 +210,8 @@ namespace UnityMCP.Editor.Chat.Tests
                 "Stale port must be updated to current port");
             StringAssert.DoesNotContain("9501", content,
                 "Old port must not remain in settings");
+            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
+                "Brace count must be balanced");
         }
 
         [Test]
@@ -222,6 +225,33 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains("\"security\"", content,
                 "Other settings must be preserved during port update");
             StringAssert.Contains("\"UNITY_MCP_PORT\": \"9900\"", content);
+            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
+                "Brace count must be balanced");
+        }
+
+        [Test]
+        public void Build_SettingsJson_StalePort_PreservesExternalServers()
+        {
+            var path = Path.Combine(_tempDir, "settings.json");
+            var stale =
+                "{\n" +
+                "  \"mcpServers\": {\n" +
+                "    \"blender\": { \"command\": \"blender-mcp\", \"args\": [] },\n" +
+                "    \"unity-mcp\": { \"command\": \"python3\", \"args\": [\"-m\",\"unity_mcp.server\"], \"env\": { \"UNITY_MCP_PORT\": \"9501\" }, \"trust\": true }\n" +
+                "  }\n" +
+                "}\n";
+            File.WriteAllText(path, stale);
+
+            GeminiArgBuilder.Build("test", settingsDir: _tempDir, port: 9900);
+
+            var content = File.ReadAllText(path);
+            StringAssert.Contains("\"blender\"", content,
+                "External blender-mcp server must be preserved after port update");
+            StringAssert.Contains("blender-mcp", content);
+            StringAssert.Contains("\"UNITY_MCP_PORT\": \"9900\"", content);
+            StringAssert.DoesNotContain("9501", content);
+            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
+                "Brace count must be balanced");
         }
 
         // ── BuildMcpBlock ─────────────────────────────────────────────────────

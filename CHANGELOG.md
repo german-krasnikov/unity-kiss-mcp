@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.38.0] — 2026-06-19 <!-- External MCP server support in Chat -->
+
+**Major Features:**
+
+- **External MCP Server Support in Chat:**
+  * **Claude Backend**: Removed `--strict-mcp-config` flag to allow Claude CLI to merge our `--mcp-config` with user's `~/.claude/` MCP servers (Blender MCP, luna-kiss-mcp, etc.)
+  * **Gemini Backend**: Fixed `RewriteWithFreshMcp()` to only replace the "unity-mcp" entry, preserving other MCP servers configured by user
+  * **Kimi Backend**: Fixed `WriteMcpConfig()` to merge instead of full-overwrite — preserves user's other MCP servers in kimi config
+  * **Codex & OpenCode**: Already supported external servers (no changes needed)
+  * **JsonMergeHelper.cs** (~35 lines): New DRY utility for brace-depth JSON merge, used by Gemini and Kimi arg builders
+
+**Test Summary (v0.38.0):**
+
+- **C# Tests (3709 NUnit, all green):**
+  * New: JsonMergeHelperTests (8 tests: basic replace, preserve others, brace balance, nested braces, null/empty)
+  * Extended: GeminiArgBuilderTests (+1), KimiArgBuilderTests (+2 for merge verification, brace balance assertions)
+  * Changed: ClaudeArgBuilderTests (−1, removed strict-mcp-config assertions, added negative assertion that flag is absent)
+  * Previous: 3699 → 3709 NUnit
+
 ## [v0.37.0] — 2026-06-18 <!-- Bridge stability, reload/recompile hardening, test infrastructure -->
 
 **Major Fixes:**

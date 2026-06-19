@@ -171,7 +171,7 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 6251 Tests (2472 Python · 3699 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 6253 Tests (2472 Python · 3701 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -230,6 +230,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.38.0</b> — 2026-06-19 — **External MCP Server Support in Chat:**</summary>
+
+**External MCP Server Support in Chat:**
+
+</details>
+
+<details>
 <summary><b>v0.37.0</b> — 2026-06-18 — **Bridge Stability & Reload Recovery (v0.36.0):**</summary>
 
 **Bridge Stability & Reload Recovery (v0.36.0):**
@@ -258,15 +265,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.34.0</b> — 2026-06-17 — **Plugin Extensibility API** — New public interfaces for plugins to extend chat …</summary>
-
-**Plugin Extensibility API** — New public interfaces for plugins to extend chat UI without core edits:
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.34.0** — 2026-06-17 — **Plugin Extensibility API** — New public interfaces for plugins to extend chat …
 - **v0.33.0** — 2026-06-16 — **Codex Silent Abort Fix (Plugin v0.33.0)** — Fixes hung turns when Codex tools …
 - **v0.32.0** — 2026-06-16 — **run_tests Fire-and-Forget Protocol (Server v0.32.0)** — `run_tests(mode)` now …
 - **v0.31.1** — 2026-06-16 — **run_tests Domain Reload Disconnect Recovery (Server v0.31.1)** — Fixes silent …

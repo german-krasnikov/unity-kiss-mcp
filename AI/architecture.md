@@ -374,7 +374,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 
 ### Agent Chat Backends (C#: CliBackendBase + subclasses, v0.14.0+)
 - **CliBackendBase** (abstract): Shared lifecycle host for CLI-based backends. 4 variation axes: (a) `BuildArgs` (spawn/resume argv + env-key-strip), (b) `ParseLine` (NDJSON line → ChatEvent[]), (c) `BinaryName` (CLI executable), (d) `IsPersistentProcess` (stdin loop vs spawn-per-turn). Injects `UNITY_MCP_PORT` env var when spawning child process (reads MCPServer.ServerChatPort from parent). Owns spawn, drain, accumulate, SessionId, Stop, Dispose — subclasses override only the 4 axes.
-- **ClaudeBackend** (ported onto base): Zero behavior change (−65 lines net). Persistent stdin loop (IsPersistentProcess=true), Claude NDJSON parser, `--resume <sessionId>` argv builder. Uses `ChatMcpConfigWriter.GetOrCreateConfigPath()` to generate temporary JSON config + `--mcp-config <path> --strict-mcp-config` flags for isolated MCP server isolation.
+- **ClaudeBackend** (ported onto base): Zero behavior change (−65 lines net). Persistent stdin loop (IsPersistentProcess=true), Claude NDJSON parser, `--resume <sessionId>` argv builder. Uses `ChatMcpConfigWriter.GetOrCreateConfigPath()` to generate temporary JSON config + `--mcp-config <path>` flag. No `--strict-mcp-config` (v0.38.0) — Claude CLI automatically merges our MCP config with user's `~/.claude/` servers (Blender MCP, luna-kiss-mcp, etc.).
 - **CodexAppServerBackend** (only Codex option, v0.14.0+): Persistent Codex session via `codex app-server` (direct stdio, JSON-RPC 2.0). One process per chat session (IsPersistentProcess=true). Protocol: `initialize` → `thread/start` → repeated `turn/start` with `mcpToolCall` items + real token streaming via `item/agentMessage/delta` (240+ deltas/turn). MCP injection via `-c mcp_servers.*` flags at session init. Spike-verified with codex 0.137.0.
 - **CodexAppServerParser**: JSON-RPC 2.0 notification/response parser → ChatEvent (notification item types: mcpToolCall camelCase, agentMessage/delta token stream, turn/completed with usage; thread_id at result.thread.id).
 - **CodexArgBuilder**: Constructs `codex app-server` argv + session init args. Re-passes three `-c mcp_servers.*` flags at initialization.
@@ -391,8 +391,10 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **BackendConfig.cs** — [Serializable] per-backend configs (model, permission_mode, timeout, extra_args)
 - **BackendConfigStore.cs** — Loads/saves to `Library/MCP_ChatBackendConfig.json` (project-local, NOT global ~/.codex/config.toml)
 - **BackendSettingsForm.cs** — UIToolkit foldout per backend with model/permission/timeout/extra-args dropdowns
-- **Wiring:** `ClaudeArgBuilder` + `CodexArgBuilder` read from store, inject into argv construction
-  - **ClaudeArgBuilder.cs** — builds `claude` subprocess argv with stdin pipe + MCP config path + `--strict-mcp-config` flag (prevents secondary MCP server registration from `~/.mcp.json`, keeping only the in-editor config)
+- **Wiring:** `ClaudeArgBuilder` + `CodexArgBuilder` + `GeminiArgBuilder` + `KimiArgBuilder` read from store, inject into argv construction
+  - **ClaudeArgBuilder.cs** (v0.38.0) — builds `claude` subprocess argv with stdin pipe + MCP config path. No `--strict-mcp-config` — allows Claude to merge with user's `~/.claude/` MCP servers
+  - **GeminiArgBuilder.cs** (v0.38.0) — builds `gcloud` argv; `RewriteWithFreshMcp()` merges config by replacing only the "unity-mcp" entry, preserving other user servers
+  - **KimiArgBuilder.cs** (v0.38.0) — builds `kimi` argv; `WriteMcpConfig()` merges instead of full-overwrite, preserving user's other MCP servers
 - **ArgTokenizer.cs** — Shell-style quote-aware split (double+single quotes, unbalanced trailing tolerated); centralizes whitespace+quote parsing for both builders; fixes silent corruption of quoted multi-word ExtraArgs values (e.g., `--append-system-prompt "be terse"`); +11 tests
 
 ### Typed Context Tags (C#: ChipKind + ResponseTagInliner, v0.15.0 F10)

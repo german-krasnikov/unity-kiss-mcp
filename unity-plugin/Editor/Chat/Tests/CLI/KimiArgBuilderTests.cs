@@ -1,6 +1,7 @@
 // TDD tests for KimiArgBuilder.
 // Pure unit tests — no real FS writes (mcpConfigDir injectable seam), no Unity API.
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
 
@@ -194,6 +195,53 @@ namespace UnityMCP.Editor.Chat.Tests
             var content = File.ReadAllText(path);
             StringAssert.Contains("9900", content);
             StringAssert.DoesNotContain("9501", content);
+            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
+                "Brace count must be balanced");
+        }
+
+        [Test]
+        public void Build_StalePort_PreservesExternalServers()
+        {
+            var path = Path.Combine(_tempDir, "mcp.json");
+            var stale =
+                "{\n" +
+                "  \"mcpServers\": {\n" +
+                "    \"blender\": { \"command\": \"blender-mcp\", \"args\": [] },\n" +
+                "    \"unity-mcp\": { \"command\": \"python3\", \"args\": [\"-m\",\"unity_mcp.server\"], \"env\": { \"UNITY_MCP_PORT\": \"9501\" } }\n" +
+                "  }\n" +
+                "}\n";
+            File.WriteAllText(path, stale);
+
+            KimiArgBuilder.Build("test", mcpConfigDir: _tempDir, port: 9900);
+
+            var content = File.ReadAllText(path);
+            StringAssert.Contains("\"blender\"", content,
+                "External blender-mcp server must be preserved after port update");
+            StringAssert.Contains("blender-mcp", content);
+            StringAssert.Contains("9900", content);
+            StringAssert.DoesNotContain("9501", content);
+            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
+                "Brace count must be balanced");
+        }
+
+        [Test]
+        public void Build_NewFile_WithExternalServers_PreservedAfterUpdate()
+        {
+            var path = Path.Combine(_tempDir, "mcp.json");
+            // Simulate a file that has external servers but no unity-mcp yet
+            var existing =
+                "{\n" +
+                "  \"mcpServers\": {\n" +
+                "    \"blender\": { \"command\": \"blender-mcp\", \"args\": [] }\n" +
+                "  }\n" +
+                "}\n";
+            File.WriteAllText(path, existing);
+
+            KimiArgBuilder.Build("test", mcpConfigDir: _tempDir, port: 9500);
+
+            var content = File.ReadAllText(path);
+            StringAssert.Contains("\"blender\"", content, "blender must survive injection of unity-mcp");
+            StringAssert.Contains("unity-mcp", content);
         }
 
         // ── Models config ─────────────────────────────────────────────────────

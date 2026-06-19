@@ -103,19 +103,89 @@ namespace UnityMCP.Editor.Chat
 
             var path = Path.Combine(dir, "mcp.json");
 
-            // Port-skip-if-unchanged optimization: avoid unnecessary FS writes.
-            if (File.Exists(path))
+            if (!File.Exists(path))
             {
-                var existing = File.ReadAllText(path, Encoding.UTF8);
-                if (existing.Contains($"\"UNITY_MCP_PORT\": \"{port}\"")
-                    || existing.Contains($"\"UNITY_MCP_PORT\":\"{port}\""))
-                    return; // already correct
+                File.WriteAllText(path, BuildMcpBlock(port), new UTF8Encoding(false));
+                return;
             }
 
-            File.WriteAllText(path, BuildMcpBlock(port), new UTF8Encoding(false));
+            var existing = File.ReadAllText(path, Encoding.UTF8);
+
+            // Port-skip-if-unchanged: avoid unnecessary FS writes.
+            if (existing.Contains($"\"UNITY_MCP_PORT\": \"{port}\"")
+                || existing.Contains($"\"UNITY_MCP_PORT\":\"{port}\""))
+                return;
+
+            // Merge: update only the unity-mcp entry, preserve all other servers.
+            string result;
+            if (existing.Contains("\"unity-mcp\""))
+            {
+                result = ReplaceUnityMcpEntry(existing, port);
+            }
+            else if (existing.Contains("\"mcpServers\""))
+            {
+                // Inject unity-mcp into existing mcpServers block.
+                var insertTarget = "\"mcpServers\"";
+                var idx = existing.IndexOf(insertTarget, StringComparison.Ordinal);
+                var braceIdx = existing.IndexOf('{', idx + insertTarget.Length);
+                if (braceIdx >= 0)
+                {
+                    var unityEntry = BuildUnityMcpEntry(port);
+                    var afterBrace = existing.Substring(braceIdx + 1).TrimStart();
+                    var sep = afterBrace.StartsWith("}") ? "" : ",";
+                    result = existing.Substring(0, braceIdx + 1)
+                           + "\n    " + unityEntry + sep
+                           + existing.Substring(braceIdx + 1);
+                }
+                else
+                {
+                    result = BuildMcpBlock(port);
+                }
+            }
+            else
+            {
+                // No mcpServers at all: merge at root level.
+                var lastBrace = existing.LastIndexOf('}');
+                if (lastBrace >= 0)
+                {
+                    var comma = existing.Substring(0, lastBrace).TrimEnd().EndsWith("{") ? "" : ",";
+                    result = existing.Substring(0, lastBrace)
+                           + comma
+                           + "\n  \"mcpServers\": {\n    " + BuildUnityMcpEntry(port) + "\n  }\n}";
+                }
+                else
+                {
+                    result = BuildMcpBlock(port);
+                }
+            }
+
+            File.WriteAllText(path, result, new UTF8Encoding(false));
+        }
+
+        /// <summary>
+        /// Replace only the "unity-mcp" entry value inside mcpServers, preserving all other entries.
+        /// </summary>
+        private static string ReplaceUnityMcpEntry(string existing, int port)
+        {
+            return JsonMergeHelper.ReplaceEntry(existing, "unity-mcp", BuildUnityMcpEntryValue(port)) ?? existing;
         }
 
         internal static string BuildMcpBlock(int port = 9500)
+        {
+            return
+                "{\n" +
+                "  \"mcpServers\": {\n" +
+                "    " + BuildUnityMcpEntry(port) + "\n" +
+                "  }\n" +
+                "}\n";
+        }
+
+        private static string BuildUnityMcpEntry(int port)
+        {
+            return "\"unity-mcp\": " + BuildUnityMcpEntryValue(port);
+        }
+
+        private static string BuildUnityMcpEntryValue(int port)
         {
             var packageRoot = Path.GetFullPath("Packages/com.unity-mcp.editor");
             var serverDir   = ChatMcpConfigWriter.ResolveServerDir(packageRoot);
@@ -140,14 +210,10 @@ namespace UnityMCP.Editor.Chat
 
             return
                 "{\n" +
-                "  \"mcpServers\": {\n" +
-                "    \"unity-mcp\": {\n" +
                 $"      \"command\": \"{command}\",\n" +
                 $"      \"args\": {argsJson},\n" +
                 $"      \"env\": {{ \"UNITY_MCP_PORT\": \"{port}\" }}\n" +
-                "    }\n" +
-                "  }\n" +
-                "}\n";
+                "    }";
         }
 
         private static string DefaultKimiDir()

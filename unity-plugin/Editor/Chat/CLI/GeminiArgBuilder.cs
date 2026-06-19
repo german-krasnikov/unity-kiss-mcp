@@ -183,30 +183,15 @@ namespace UnityMCP.Editor.Chat
         }
 
         /// <summary>
-        /// Rebuild settings.json keeping non-mcpServers content, replacing mcpServers entirely.
+        /// Update settings.json replacing only the "unity-mcp" entry inside mcpServers,
+        /// preserving all other entries (blender-mcp, etc.).
         /// </summary>
         private static string RewriteWithFreshMcp(string existing, int port)
         {
-            var mcpIdx = existing.IndexOf("\"mcpServers\"", StringComparison.Ordinal);
-            if (mcpIdx < 0) return BuildMcpBlock(port); // shouldn't happen
-
-            // Find the opening '{' of mcpServers value
-            var braceStart = existing.IndexOf('{', mcpIdx + 12);
-            if (braceStart < 0) return BuildMcpBlock(port);
-
-            // Find matching closing '}' by counting depth
-            int depth = 1, braceEnd = braceStart + 1;
-            while (braceEnd < existing.Length && depth > 0)
-            {
-                if (existing[braceEnd] == '{') depth++;
-                else if (existing[braceEnd] == '}') depth--;
-                braceEnd++;
-            }
-
-            // Replace mcpServers value with fresh entry
-            var before = existing.Substring(0, braceStart + 1);
-            var after = existing.Substring(braceEnd - 1); // includes closing '}'
-            return before + "\n    " + BuildUnityMcpEntry(port) + "\n  " + after;
+            var fullEntry = BuildUnityMcpEntry(port); // "unity-mcp": {...}
+            var valueStart = fullEntry.IndexOf('{');
+            var freshValue = fullEntry.Substring(valueStart);
+            return JsonMergeHelper.ReplaceEntry(existing, "unity-mcp", freshValue) ?? existing;
         }
 
         private static string BuildJsonStringArray(string[] items)
