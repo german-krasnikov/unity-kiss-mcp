@@ -47,6 +47,21 @@ def ping_response():
     return struct.pack("!I", len(p)), p
 
 
+def version_response(proto: int = 3):
+    """Returns (header, payload) for a get_version response — needed by _reconnect."""
+    import json, struct
+    r = {"id": "ver", "ok": True, "data": f"proto:{proto}|plugin:test|stamp:test"}
+    p = json.dumps(r).encode()
+    return struct.pack("!I", len(p)), p
+
+
+def reconnect_preamble(proto: int = 3):
+    """Returns flat list of bytes chunks for _reconnect: ping_hdr, ping_pay, ver_hdr, ver_pay."""
+    ph, pp = ping_response()
+    vh, vp = version_response(proto)
+    return [ph, pp, vh, vp]
+
+
 def csharp_created(path: str) -> str:
     """Returns 'Created {path}' (no-parent form).
 

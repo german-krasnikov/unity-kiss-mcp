@@ -794,3 +794,22 @@
 .mermaid-expand-btn:hover {
     opacity: 1.0;
 }
+
+.copy-flash {
+    position: absolute;
+    bottom: 48px;
+    right: 8px;
+    background-color: rgba(60, 180, 60, 0.85);
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    opacity: 1;
+    transition-property: opacity;
+    transition-duration: 0.3s;
+}
+
+.copy-flash--hidden {
+    opacity: 0;
+    visibility: hidden;
+}

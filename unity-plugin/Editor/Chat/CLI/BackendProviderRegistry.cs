@@ -45,7 +45,7 @@ namespace UnityMCP.Editor.Chat
             switch (kind)
             {
                 case BackendKind.Codex:    return "codex";
-                case BackendKind.Gemini:   return "gemini";
+                case BackendKind.Antigravity: return "antigravity";
                 case BackendKind.Kimi:     return "kimi";
                 case BackendKind.OpenCode: return "opencode";
                 default:                   return "claude";

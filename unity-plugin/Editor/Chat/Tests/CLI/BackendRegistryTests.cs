@@ -50,7 +50,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void Discover_OpenCodeIsLast()
         {
             var result = BackendRegistry.Discover(new string[0]);
-            Assert.AreEqual(5, result.Count); // Claude + Codex + Gemini + Kimi + OpenCode
+            Assert.AreEqual(5, result.Count); // Claude + Codex + Antigravity + Kimi + OpenCode
             var last = result[result.Count - 1];
             Assert.AreEqual("OpenCode",             last.DisplayName);
             Assert.AreEqual(BackendKind.OpenCode,   last.Kind);
@@ -68,13 +68,13 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void Discover_GeminiIsThirdToLast()
+        public void Discover_AntigravityIsThirdToLast()
         {
             var result = BackendRegistry.Discover(new string[0]);
-            var gemini = result[result.Count - 3];
-            Assert.AreEqual("Gemini",           gemini.DisplayName);
-            Assert.AreEqual(BackendKind.Gemini, gemini.Kind);
-            Assert.IsTrue(gemini.Enabled);
+            var agy = result[result.Count - 3];
+            Assert.AreEqual("Antigravity",           agy.DisplayName);
+            Assert.AreEqual(BackendKind.Antigravity, agy.Kind);
+            Assert.IsTrue(agy.Enabled);
         }
 
         // ── Agent files are discovered ────────────────────────────────────────
@@ -87,7 +87,7 @@ namespace UnityMCP.Editor.Chat.Tests
 
             var result = BackendRegistry.Discover(new[] { projDir });
 
-            Assert.AreEqual(6, result.Count); // Claude + code-reviewer + Codex + Gemini + Kimi + OpenCode
+            Assert.AreEqual(6, result.Count); // Claude + code-reviewer + Codex + Antigravity + Kimi + OpenCode
             Assert.AreEqual("code-reviewer", result[1].DisplayName);
             Assert.AreEqual("code-reviewer", result[1].AgentName);
             Assert.IsTrue(result[1].Enabled);
@@ -132,7 +132,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(5, result.Count);
             Assert.AreEqual("Claude",   result[0].DisplayName);
             Assert.AreEqual("Codex",    result[1].DisplayName);
-            Assert.AreEqual("Gemini",   result[2].DisplayName);
+            Assert.AreEqual("Antigravity", result[2].DisplayName);
             Assert.AreEqual("Kimi",     result[3].DisplayName);
             Assert.AreEqual("OpenCode", result[4].DisplayName);
         }

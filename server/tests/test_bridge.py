@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from unity_mcp.bridge import UnityBridge
-from helpers import make_writer, make_idle_probe, ping_response
+from helpers import make_writer, make_idle_probe, ping_response, reconnect_preamble
 
 
 def test_bridge_default_port():
@@ -305,7 +305,7 @@ class TestUnityBridge:
             writer = make_writer()
             # reconnect reads ping directly from reader — provide valid ping response
             ping_hdr, ping_pay = ping_response()
-            reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+            reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
             return (reader, writer)
 
         async def open_connection_side_effect(*args, **kwargs):
@@ -368,7 +368,7 @@ async def test_idle_retry_gets_one_grace_attempt():
         writer = make_writer()
         # reconnect reads ping directly from reader — provide valid ping response
         ping_hdr, ping_pay = ping_response()
-        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+        reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
         return reader, writer
 
     with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=failing_open):
@@ -444,7 +444,7 @@ async def test_non_domain_reload_does_not_pin_busy():
         writer = make_writer()
         # reconnect reads ping directly from reader — provide valid ping response
         ping_hdr, ping_pay = ping_response()
-        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+        reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
         return reader, writer
 
     with patch("unity_mcp.bridge.asyncio.open_connection", side_effect=fake_open):
@@ -1083,7 +1083,7 @@ async def test_bridge_state_connected_after_reconnect():
     from unity_mcp.bridge import BridgeState
     ping_hdr, ping_pay = ping_response()
     reader = AsyncMock()
-    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
     writer = make_writer()
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()
@@ -1127,7 +1127,7 @@ async def test_bridge_state_connected_clears_failed():
     from unity_mcp.bridge import BridgeState
     ping_hdr, ping_pay = ping_response()
     reader = AsyncMock()
-    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
     writer = make_writer()
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()

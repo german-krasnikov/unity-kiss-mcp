@@ -48,7 +48,7 @@
 
 🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 98 MCP tools with 80–95% token compression.
 
-💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Gemini, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
+💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Antigravity, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
 **Before / after — creating and configuring 3 objects:**
 
@@ -103,7 +103,7 @@ iex (iwr https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/maste
 3. Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. It will:
    - Verify Python 3.10+ is available
    - Test the MCP server connection
-   - Configure your AI tool (Claude Code, Claude Desktop, Cursor, Windsurf, + Gemini, Kimi, Codex, OpenCode in Unity Chat)
+   - Configure your AI tool (Claude Code, Claude Desktop, Cursor, Windsurf, + Antigravity, Kimi, Codex, OpenCode in Unity Chat)
    - Display your TCP port
 
 **Configure an AI tool manually:**
@@ -143,7 +143,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 ## Features
 
 - **Token Optimization** — `batch` compresses 5–20 calls into one (80–95% savings), deferred tool schemas, per-session cost analytics
-- **In-Unity Chat** — 5 CLI backends (Claude, Gemini, Kimi, Codex, OpenCode), no API key needed, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
+- **In-Unity Chat** — 5 CLI backends (Claude, Antigravity, Kimi, Codex, OpenCode), no API key needed, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
 - **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at`
 - **PlayTest DSL** — 21 commands: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
 - **Multi-Scene Management** — Load multiple scenes, inspect/edit across scenes, move/copy objects between loaded scenes, unified `object_diff` for cross-scene comparison

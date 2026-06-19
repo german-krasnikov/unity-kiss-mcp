@@ -27,10 +27,10 @@ namespace UnityMCP.Editor.Chat
     }
 
     [Serializable]
-    internal sealed class GeminiBackendConfig
+    internal sealed class AntigravityBackendConfig
     {
-        public string Model        = "gemini-2.5-flash"; // default model
-        public string ApprovalMode = "";                 // "" | "yolo"
+        public string Model        = ""; // empty = agy default
+        public string ApprovalMode = ""; // "" | "yolo" (mapped to --dangerously-skip-permissions)
         public bool   Sandbox      = false;
         public string ExtraArgs    = "";
     }

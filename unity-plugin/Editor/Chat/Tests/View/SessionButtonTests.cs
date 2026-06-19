@@ -11,9 +11,7 @@ namespace UnityMCP.Editor.Chat.Tests
     [TestFixture]
     public class SessionButtonTests
     {
-        // RED: tooltip should be "New session / Clear" after F25 fix.
-        // Current code has tooltip = "Session commands" → this test FAILS until fix is applied.
-
+        // Phase 3: tooltip updated to "Session menu" (now a dropdown with New Session + Resume CLI).
         [Test]
         public void BuildSessionMenuButton_HasCorrectTooltip()
         {
@@ -21,7 +19,7 @@ namespace UnityMCP.Editor.Chat.Tests
             try
             {
                 var btn = window.BuildSessionMenuButton();
-                Assert.AreEqual("New session / Clear", btn.tooltip);
+                Assert.AreEqual("Session menu", btn.tooltip);
             }
             finally
             {

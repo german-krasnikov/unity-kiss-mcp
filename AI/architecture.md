@@ -59,11 +59,12 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support)
    - **89 core MCP tools registered**. Gating: TIER1=38 core (hardcoded). External plugins can add more tools dynamically.
    - **CodeExecutor.SecurityScan (v0.31.0)**: Hardened pipeline — (1) strip C# comments via regex (2) whitespace densification (3) OrdinalIgnoreCase matching (4) 11 new blocked patterns (EditorApplication.Exit, Application.Quit, Environment.FailFast, ExportPackage, ImportPackage, OpenProject, ProjectWindowUtil, using-aliases for System.IO/Diagnostics/Net/Reflection)
-   - **In-Unity Chat Backends** (v0.29.2+): Four CLI providers with auto-discovery via TypeCache:
+   - **In-Unity Chat Backends** (v0.29.2+): Five CLI providers with auto-discovery via TypeCache:
      * **ClaudeBackend** — Claude CLI with --permission-prompt-tool, MCP elicitation, stream-json protocol
      * **CodexBackend** — Codex CLI (no permission prompts), experimentalApi: true, tool/requestUserInput support
-     * **GeminiBackend** (v0.30.1) — Gemini gcloud-cli with .gemini/settings.json smart-merge, stream-json 6-event protocol (init/message/tool_use/tool_result/error/result), filters prompt echo + internal tools (no --permission-prompt-tool support)
+     * **AntigravityBackend** (v0.41.0) — Antigravity LLM service with plain-text output, EofSentinel injection on process finish
      * **KimiBackend** (v0.34.0) — Kimi K2 CLI with role-based NDJSON protocol (system→user→assistant), model autoconfig via ~/.kimi-code/models.json, binary resolver sources kimi PATH via zsh -lic
+     * **OpenCodeBackend** (v0.34.0) — OpenCode CLI with multi-provider model selection, stream-json protocol
    - Transport: stdio (default) or streamable-http (`UNITY_MCP_TRANSPORT=http`)
    - FastMCP("UnityMCP", lifespan=lifespan)
    - Lifespan: auto-discover Unity port from `~/.unity-mcp/ports/*.port`, acquire exclusive PID lockfile, create ConnectionSlot, connect bridge, fetch disabled tools cache (`get_disabled_tools`), push Python-authoritative catalog (`_push_catalog`), start heartbeat, register reconnect callbacks, load_plugins()

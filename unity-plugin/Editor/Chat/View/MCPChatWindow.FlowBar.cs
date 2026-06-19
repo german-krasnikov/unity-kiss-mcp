@@ -12,7 +12,7 @@ namespace UnityMCP.Editor.Chat
         private VisualElement _flowBar;
         private VisualElement _flowFill;
         private bool _sweepPhase;
-        private Button _sendBtn, _stopBtn;
+        private Button _sendBtn, _stopBtn, _cliBtn;
 
         private VisualElement BuildFlowBar()
         {
@@ -108,6 +108,11 @@ namespace UnityMCP.Editor.Chat
             _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
             bar.Add(_tokenReadout);
 
+            _cliBtn = new Button(OnCopyCliResume) { text = "→ CLI" };
+            _cliBtn.AddToClassList("chat-btn");
+            _cliBtn.tooltip = "Copy resume command for CLI";
+            bar.Add(_cliBtn);
+
             var attachBtn = new Button(OnAttachImage) { text = "+" };
             attachBtn.AddToClassList("chat-btn");
             attachBtn.tooltip = "Attach image";
@@ -136,6 +141,21 @@ namespace UnityMCP.Editor.Chat
                 "Attach image", "", new[] { "Image files", "png,jpg,jpeg,gif,webp", "All files", "*" });
             if (!string.IsNullOrEmpty(path))
                 ProcessExternalPath(path, InsertInlineChip);
+        }
+
+        private void OnCopyCliResume()
+        {
+            var projectDir = SessionScanner.ProjectDir();
+            var cmd = SessionHandoff.GetResumeCommand(_selectedKind, _backend?.SessionId, projectDir);
+            if (cmd == null) return;
+            EditorGUIUtility.systemCopyBuffer = cmd;
+            CopyFlash.Show();
+        }
+
+        internal void RefreshCliButton()
+        {
+            if (_cliBtn == null) return;
+            _cliBtn.SetEnabled(!string.IsNullOrEmpty(_backend?.SessionId));
         }
     }
 }

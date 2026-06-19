@@ -9,6 +9,7 @@ import socket
 import sys
 from pathlib import Path
 
+from .paths import ports_dir as _ports_dir
 from .tools.gating import filter_by_tier, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
 from .tools.schema_registry import _registry as _schema_registry, STUB_SCHEMA
 
@@ -101,7 +102,7 @@ def _is_pid_alive(pid: int) -> bool:
 
 def cleanup_stale_port_files() -> int:
     """Delete *.reload-port files whose PID is no longer alive. Returns count cleaned."""
-    ports_dir = Path.home() / ".unity-mcp" / "ports"
+    ports_dir = _ports_dir()
     if not ports_dir.exists():
         return 0
     cleaned = 0
@@ -142,7 +143,7 @@ def read_unity_port(skip_probe: bool = False) -> int:
             return int(os.environ["UNITY_MCP_PORT"])
         except ValueError:
             pass
-    ports_dir = Path.home() / ".unity-mcp" / "ports"
+    ports_dir = _ports_dir()
     if not ports_dir.exists():
         return 9500
 

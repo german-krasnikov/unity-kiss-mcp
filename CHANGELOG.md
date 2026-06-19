@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.41.0] — 2026-06-20 <!-- session-handoff-copy-antigravity -->
+
+- **Session Handoff (Chat↔CLI)** — Button "→ CLI" in Chat copies resume command to clipboard. Format per-backend: `--resume {sessionId}` (Claude/Codex), `--conversation {sessionId}` (Antigravity), `-s {sessionId}` (OpenCode), `-S {sessionId}` (Kimi). SessionScanner reads CLI history files to populate session picker popup for resuming old sessions in Chat.
+- **Copy Message UX** — Right-click "Copy as sent to LLM" on messages and input field. CopyFlash shows "Copied!" notification via View seam.
+- **Gemini→Antigravity Migration** — Complete backend replacement. Old Gemini (gcloud CLI, NDJSON protocol) removed. New Antigravity backend: plain-text output (no NDJSON), EofSentinel injection on process finish. Files: AgyArgBuilder, AgyParser, AntigravityBackend, AntigravityProvider, +4 test files.
+- **Exit-Code Race Fix (macOS)** — stderr-thread race on process termination eliminated via explicit WaitForExit before reading exit code. Prevents false -1 code on noisy stderr.
+
+**Test Summary (v0.41.0):**
+- **Python Tests (2540 unit + 76 live + 4 live_cli = 2620 total)**
+- **C# Tests (3791 NUnit + session/copy/Antigravity tests = 3800+ total)**
+- **Total: 6407+ test assertions, 100% pass rate**
+
 ## [v0.40.1] — 2026-06-19 <!-- chat-tcp-fix -->
 
 - **Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns parasitic MCP servers from `~/.mcp.json`; env vars (`UNITY_MCP_PORT`, `UNITY_MCP_CHAT`) scoped per-backend via `--mcp-config` env block (Claude) and TOML `-c` flags (Codex)

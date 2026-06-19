@@ -37,10 +37,10 @@ namespace UnityMCP.Editor.Chat
         }
 
         // Pure formatter — terse (token economy).
-        internal static string BuildExitErrorMessage(int exitCode, IEnumerable<string> lastStderr)
+        internal static string BuildExitErrorMessage(int exitCode, IEnumerable<string> lastStderr, string binaryName = "claude")
         {
             var sb = new StringBuilder();
-            sb.Append($"claude exited (code {exitCode})");
+            sb.Append($"{binaryName} exited (code {exitCode})");
             bool hasLines = false;
             foreach (var line in lastStderr)
             {

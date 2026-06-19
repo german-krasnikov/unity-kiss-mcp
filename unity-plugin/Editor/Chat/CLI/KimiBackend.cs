@@ -16,6 +16,7 @@ namespace UnityMCP.Editor.Chat
             _model        = model;
             _approvalMode = approvalMode;
             _extraArgs    = extraArgs;
+            SessionId     = resumeSessionId;
             // Note: kimi -p mode doesn't emit session_id — resumeSessionId unused.
         }
 

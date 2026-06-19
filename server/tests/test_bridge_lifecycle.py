@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, Mock, MagicMock, patch, call
 import pytest
 
 from unity_mcp.bridge import UnityBridge
-from helpers import make_writer, make_idle_probe, ping_response
+from helpers import make_writer, make_idle_probe, ping_response, reconnect_preamble
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ async def test_reconnect_assigns_after_success():
     """After successful ping, self._writer must be the new writer."""
     ping_hdr, ping_pay = ping_response()
     new_reader = AsyncMock()
-    new_reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    new_reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
     new_writer = make_writer()
     new_writer.get_extra_info = Mock(return_value=Mock())
 

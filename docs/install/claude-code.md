@@ -1,6 +1,6 @@
 # Claude Code Setup
 
-Since v0.14.0 the in-Unity Chat window supports Claude Code as the primary backend. The plugin generates a temporary `--mcp-config` JSON file and invokes `claude` with `--strict-mcp-config` to isolate to only Unity's MCP tools. Works on **Windows, macOS, and Linux**.
+Since v0.14.0 the in-Unity Chat window supports Claude Code as the primary backend. The plugin generates a temporary `--mcp-config` JSON file and invokes `claude` to isolate to only Unity's MCP tools. Works on **Windows, macOS, and Linux**.
 
 ## Prerequisites
 
@@ -104,7 +104,7 @@ This adds the unity-mcp server to your Claude Code `mcp_settings.json` file:
 3. Select **Claude** from the backend dropdown.
 4. Type a prompt and press Enter.
 
-The plugin generates a temporary MCP config on each turn, passes it via `--mcp-config`, and spawns `claude` with `--strict-mcp-config` for isolation.
+The plugin generates a temporary MCP config on each turn, passes it via `--mcp-config`, and spawns `claude` with `--mcp-config` for isolation.
 
 ## 5. How the Plugin Wires MCP
 
@@ -131,10 +131,9 @@ For each turn, the plugin:
 
 3. **Spawns Claude Code:**
    ```bash
-   claude --mcp-config <tempfile.json> --strict-mcp-config "<prompt>"
+   claude --mcp-config <tempfile.json> "<prompt>"
    ```
 
-The `--strict-mcp-config` flag ensures Claude uses **only** the temporary config, ignoring `~/.claude/mcp_settings.json`. This isolation guarantees access to only Unity tools.
 
 ## 6. Verify Installation
 
@@ -156,7 +155,7 @@ This checks:
 | `claude: command not found` | Ensure Claude Code is installed and in PATH. Check `which claude` or `where.exe claude`. |
 | `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or `uvx unity-mcp --help` to verify the package is installed. |
 | Setup Wizard doesn't open in Unity | (1) Verify plugin is in Package Manager. (2) Close and reopen Unity. (3) Check Console for errors. |
-| MCP tools don't appear in Claude Code | (1) Confirm Setup Wizard configured Claude Code. (2) Restart Claude Code. (3) Check that `--strict-mcp-config` is being used (visible in `claude --version` debug). |
+| MCP tools don't appear in Claude Code | (1) Confirm Setup Wizard configured Claude Code. (2) Restart Claude Code. (3) Check Console for MCP connection errors. |
 | Tools fail with "Connection refused" | (1) Ensure Unity is open with the plugin. (2) Check TCP port with `python install.py doctor`. (3) Restart Unity. |
 | Python path resolution fails in Chat Settings | Override manually: **Settings > Agent Chat > Claude Binary Path** — enter absolute path to `claude` binary. |
 | macOS quarantine error (`cannot open` libpydantic) | Remove quarantine attributes: `xattr -dr com.apple.quarantine <project_root>/server/.venv/lib` |

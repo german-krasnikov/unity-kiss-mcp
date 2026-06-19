@@ -1,12 +1,17 @@
 import asyncio
 import enum
 import json
+import logging
 import os
+import re
 import select
 import socket
 import struct
 import time
+from dataclasses import dataclass
 from typing import Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 from unity_mcp.bridge_socket import (
     DomainReloadError,
@@ -26,7 +31,49 @@ __all__ = [
     "MIN_RECONNECT_INTERVAL", "DOMAIN_RELOAD_EXPIRY_S",
     "_apply_socket_options",
     "_TCP_KEEPALIVE_DARWIN", "_TCP_KEEPINTVL_DARWIN",
+    "PROTOCOL_VERSION", "VersionInfo", "parse_version_string", "check_protocol_version",
 ]
+
+PROTOCOL_VERSION = 3
+
+_NEW_FMT = re.compile(r"proto:(\d+)(?:\|plugin:([^|]*))?(?:\|stamp:(.*))?")
+_OLD_FMT = re.compile(r"[\d.]+(?:\|stamp:(.*))?")
+
+
+@dataclass
+class VersionInfo:
+    proto: int = 0
+    plugin: str = ""
+    stamp: str = ""
+
+
+def parse_version_string(s: str) -> VersionInfo:
+    """Parse both `proto:3|plugin:X|stamp:Y` (new) and `1.0|stamp:Y` (old)."""
+    m = _NEW_FMT.fullmatch(s)
+    if m:
+        return VersionInfo(
+            proto=int(m.group(1)),
+            plugin=m.group(2) or "",
+            stamp=m.group(3) or "",
+        )
+    m = _OLD_FMT.fullmatch(s)
+    if m:
+        return VersionInfo(proto=1, stamp=m.group(1) or "")
+    return VersionInfo()
+
+
+def check_protocol_version(python_proto: int, unity_proto: int) -> None:
+    """Warn or raise on proto mismatch."""
+    if python_proto > unity_proto:
+        logger.warning(
+            "Unity plugin is outdated (proto %d < %d). "
+            "Upgrade the Unity MCP plugin package.", unity_proto, python_proto
+        )
+    elif python_proto < unity_proto:
+        raise ConnectionError(
+            f"Python MCP server must upgrade: Unity proto {unity_proto} > Python proto {python_proto}. "
+            "Run: pip install --upgrade unity-mcp"
+        )
 
 CONNECT_TIMEOUT = float(os.environ.get("UNITY_MCP_CONNECT_TIMEOUT", "5.0"))
 SESSION_TIMEOUT = float(os.environ.get("UNITY_MCP_SESSION_TIMEOUT", "120.0"))
@@ -296,6 +343,24 @@ class UnityBridge(HeartbeatMixin):
             except Exception:
                 pass
             raise
+        # Protocol version check (non-fatal except Python < Unity proto)
+        try:
+            ver_msg = json.dumps({"id": "ver", "cmd": "get_version", "args": {}},
+                                 ensure_ascii=False).encode("utf-8")
+            writer.write(struct.pack("!I", len(ver_msg)) + ver_msg)
+            await writer.drain()
+            ver_hdr = await asyncio.wait_for(reader.readexactly(4), timeout=CONNECT_TIMEOUT)
+            ver_ln = struct.unpack("!I", ver_hdr)[0]
+            ver_pay = await asyncio.wait_for(reader.readexactly(ver_ln), timeout=CONNECT_TIMEOUT)
+            ver_resp = json.loads(ver_pay.decode("utf-8"))
+            if ver_resp.get("ok") and ver_resp.get("data"):
+                info = parse_version_string(ver_resp["data"])
+                check_protocol_version(PROTOCOL_VERSION, info.proto)
+        except ConnectionError:
+            raise  # Python < Unity proto — hard error per spec
+        except Exception as e:
+            logger.warning("Protocol version check failed (non-fatal): %s", e)
+
         # Atomic: assign both only after ping succeeds, no await between them.
         self._reader = reader
         self._writer = writer

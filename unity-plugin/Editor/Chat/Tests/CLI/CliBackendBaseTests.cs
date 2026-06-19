@@ -277,5 +277,39 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(final.IsOk,         "IsOk must be true for successful result");
             Assert.IsTrue(final.HasResult,     "HasResult must be true after result event");
         }
+
+        // DRY is_error guard in base class — all parsers protected automatically
+        [Test]
+        public void DrainEvents_IsErrorEnvelope_EmitsError()
+        {
+            var line = "{\"type\":\"result\",\"is_error\":true,\"error\":\"Exit code 1\"}";
+            bool parseLineCalled = false;
+            _b.ParseLineFunc = (_, s) => { parseLineCalled = true; return true; };
+            _b.LinesToDrain.Enqueue(line);
+            _b._proc = new ChatProcess();
+
+            var out_ = new List<ChatEvent>();
+            _b.DrainEvents(out_);
+
+            Assert.AreEqual(1, out_.Count);
+            Assert.AreEqual(ChatEventKind.Error, out_[0].Kind);
+            StringAssert.Contains("Exit code 1", out_[0].Text);
+            Assert.IsFalse(parseLineCalled, "ParseLine must be skipped for is_error envelope");
+        }
+
+        [Test]
+        public void DrainEvents_NormalLine_DelegatesToParseLine()
+        {
+            bool parseLineCalled = false;
+            _b.ParseLineFunc = (_, s) => { parseLineCalled = true; s.Add(ChatEvent.TextDelta("hi")); return true; };
+            _b.LinesToDrain.Enqueue("{\"type\":\"assistant\",\"text\":\"hi\"}");
+            _b._proc = new ChatProcess();
+
+            var out_ = new List<ChatEvent>();
+            _b.DrainEvents(out_);
+
+            Assert.IsTrue(parseLineCalled, "ParseLine must be called for non-error lines");
+            Assert.AreEqual(1, out_.Count);
+        }
     }
 }

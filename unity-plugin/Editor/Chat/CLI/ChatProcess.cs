@@ -46,6 +46,7 @@ namespace UnityMCP.Editor.Chat
         private Thread _readerThread;
         private volatile bool _running;
         private volatile bool _disposing;
+        private string _binaryName = "cli";
         // Bounded ring buffer for last N stderr lines — surfaced on unexpected exit.
         private readonly StderrRingBuffer _stderrRing = new StderrRingBuffer(5);
 
@@ -55,6 +56,7 @@ namespace UnityMCP.Editor.Chat
             Dictionary<string, string> setEnvKeys = null)
         {
             if (IsRunning) return;
+            _binaryName = Path.GetFileNameWithoutExtension(binaryPath);
 
             // Windows: .cmd/.bat shims (npm installs) cannot be executed by CreateProcess directly
             // under Unity Mono (Win32Exception 193). Route through cmd.exe /c instead.
@@ -93,6 +95,8 @@ namespace UnityMCP.Editor.Chat
                     Arguments              = string.Join(" ", QuoteArgs(args)),
                 };
             }
+
+            psi.WorkingDirectory = SessionScanner.ProjectDir();
 
             // Strip env keys that would override subscription auth
             foreach (var key in stripEnvKeys)
@@ -135,13 +139,16 @@ namespace UnityMCP.Editor.Chat
                 catch { }
                 finally
                 {
-                    var exitCode = -1;
-                    try { exitCode = capturedProc.ExitCode; } catch { }
-                    // Surface only genuine failures: not an intentional Dispose, and a non-zero/unknown exit.
-                    // (Clean exit 0 = normal completion; do NOT depend on the racy _running flag here.)
+                    var exitCode = 0;
+                    try
+                    {
+                        if (capturedProc.WaitForExit(3000))
+                            exitCode = capturedProc.ExitCode;
+                    }
+                    catch { }
                     if (!_disposing && exitCode != 0)
                     {
-                        var msg = StderrRingBuffer.BuildExitErrorMessage(exitCode, stderrRing.Lines);
+                        var msg = StderrRingBuffer.BuildExitErrorMessage(exitCode, stderrRing.Lines, _binaryName);
                         linesQueue.Enqueue(
                             $"{{\"type\":\"result\",\"is_error\":true,\"error\":\"{JsonHelper.EscapeJson(msg)}\"}}");
                     }

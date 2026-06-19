@@ -242,7 +242,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ModelPresetDefaults_AllKinds_HaveDefaultAndCustom()
         {
-            foreach (var kind in new[] { BackendKind.Claude, BackendKind.Codex, BackendKind.Gemini })
+            foreach (var kind in new[] { BackendKind.Claude, BackendKind.Codex, BackendKind.Antigravity })
             {
                 var p = ModelPresetDefaults.For(kind);
                 Assert.AreEqual("Default",   p[0].label,              $"{kind}: first must be Default");

@@ -185,6 +185,17 @@ async def lifespan(app):
         except Exception as exc:
             log.warning("Failed to acquire lock for new port %d: %s", new_port, exc)
 
+    import threading
+    def _bg_update_check():
+        try:
+            from unity_mcp._update_check import check_for_update, format_update_banner
+            new = check_for_update()
+            if new:
+                log.info(format_update_banner(new))
+        except Exception:
+            pass
+    threading.Thread(target=_bg_update_check, daemon=True).start()
+
     try:
         slot = ConnectionSlot(port_discoverer=_read_unity_port, on_port_change=_on_port_change)
         manager = slot  # backward-compat alias
@@ -260,6 +271,14 @@ async def discover_tools(category: str | None = None, enable: bool = True, ctx: 
 
 from .resources import register as register_resources
 register_resources(mcp, _send, _args)
+
+
+@mcp.tool()
+async def doctor(fix: bool = False) -> str:
+    """Run health diagnostics. Use fix=True to auto-repair safe issues."""
+    from .doctor import run_doctor, format_report
+    results = await run_doctor(fix=fix)
+    return format_report(results)
 
 
 @mcp.tool()

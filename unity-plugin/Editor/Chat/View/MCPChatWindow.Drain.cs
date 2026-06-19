@@ -151,7 +151,7 @@ namespace UnityMCP.Editor.Chat
                     ? new System.Collections.Generic.List<ChipData>(c) : null;
                 _transcript?.SetLastTurnChips(chipList);          // P0-1: ALWAYS — normalization context for resumed response
                 if (!transcriptRestored)
-                    _transcript?.AppendUserBubble(displayText, chipList, llmPayload: sentText); // P0-1: skip when transcript restore already rendered it; llmPayload=sentText so "Show LLM payload" reveals snapshot
+                    _transcript?.AppendUserBubble(displayText, chipList, llmPayload: sentText); // P0-1: skip when transcript restore already rendered it; llmPayload=sentText so "Copy as sent to LLM" reveals snapshot
                 // (no field reset here — already cleared at entry)
                 // task#10 RESOLVED: sentText now carries the full-path payload (paths + [kind:path]
                 // block) from PendingLlmPayload, matching the fresh-send payload exactly.
@@ -216,6 +216,7 @@ namespace UnityMCP.Editor.Chat
             foreach (var ev in _evBuf) HandleEvent(ev);
             foreach (var rec in _toolBuf) HandleToolRecord(rec);
             _transcript.FlushStreaming();
+            RefreshCliButton();
             // _needsRefresh is now debounced to TurnDone (HandleEvent case TurnDone).
             // Do NOT act on it here — mid-stream partial compiles cause phantom CS errors.
             if (EditorPrefs.GetBool("MCPChat.AutoScroll", true))

@@ -1,5 +1,6 @@
-// Build gemini CLI argv. Pure static — no process spawning, fully NUnit-testable.
-// MCP config is passed via .gemini/settings.json (no --mcp-config flag in Gemini CLI).
+// Build agy (Antigravity CLI) argv. Pure static — no process spawning, fully NUnit-testable.
+// MCP config is passed via ~/.gemini/settings.json (same as old Gemini CLI).
+// agy outputs plain text — no --output-format flag needed.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,13 +8,13 @@ using System.Text;
 
 namespace UnityMCP.Editor.Chat
 {
-    public static class GeminiArgBuilder
+    public static class AgyArgBuilder
     {
         private static readonly string[] StripKeys = { "GEMINI_API_KEY" };
 
         /// <summary>
-        /// Build gemini exec argv and env keys to strip.
-        /// Writes .gemini/settings.json with MCP config before spawn.
+        /// Build agy exec argv and env keys to strip.
+        /// Writes ~/.gemini/settings.json with MCP config before spawn.
         /// </summary>
         public static (string[] args, string[] stripEnvKeys) Build(
             string prompt,
@@ -24,7 +25,6 @@ namespace UnityMCP.Editor.Chat
             string settingsDir   = null,  // injectable for tests (avoids real FS writes)
             int    port          = 0)     // 0 = read from MCPServer.ServerChatPort
         {
-            // Write MCP config to .gemini/settings.json
             var dir = settingsDir ?? DefaultGeminiDir();
 #if UNITY_EDITOR
             if (port == 0) port = MCPServer.ServerChatPort;
@@ -32,11 +32,8 @@ namespace UnityMCP.Editor.Chat
             if (port == 0) port = 9500; // fallback for test context
             WriteMcpSettings(dir, port);
 
-            var args = new List<string>
-            {
-                "-p", prompt,
-                "--output-format", "stream-json",
-            };
+            // agy does NOT support --output-format; outputs plain text
+            var args = new List<string> { "-p", prompt };
 
             if (!string.IsNullOrEmpty(model))
             {
@@ -45,7 +42,7 @@ namespace UnityMCP.Editor.Chat
             }
 
             if (string.Equals(approvalMode, "yolo", StringComparison.OrdinalIgnoreCase))
-                args.Add("--yolo");
+                args.Add("--dangerously-skip-permissions");
 
             if (sandbox)
                 args.Add("--sandbox");
@@ -60,7 +57,7 @@ namespace UnityMCP.Editor.Chat
         // ── MCP settings ──────────────────────────────────────────────────────
 
         /// <summary>
-        /// Writes .gemini/settings.json with the MCP unity-mcp server config.
+        /// Writes ~/.gemini/settings.json with the MCP unity-mcp server config.
         /// If the file already exists, injects unity-mcp into the existing mcpServers block
         /// to avoid clobbering other user settings.
         /// </summary>
@@ -81,32 +78,25 @@ namespace UnityMCP.Editor.Chat
 
             var existing = File.ReadAllText(path, Encoding.UTF8);
 
-            // Already configured — always rewrite to guarantee fresh port.
-            // JsonHelper can't reach nested "env" at depth 3, and string-surgery
-            // is fragile. Full rewrite is safe: we preserve non-MCP settings below.
             if (existing.Contains("\"unity-mcp\""))
             {
                 if (existing.Contains($"\"UNITY_MCP_PORT\": \"{port}\"")
                     || existing.Contains($"\"UNITY_MCP_PORT\":\"{port}\""))
                     return; // port already correct — skip IO
-                // Rebuild entire file preserving non-mcpServers keys
                 var fresh = RewriteWithFreshMcp(existing, port);
                 File.WriteAllText(path, fresh, new UTF8Encoding(false));
                 return;
             }
 
-            // File exists but lacks unity-mcp: inject into existing mcpServers or create one.
             string merged;
             if (existing.Contains("\"mcpServers\""))
             {
-                // Insert unity-mcp entry after the opening brace of mcpServers value.
                 var insertTarget = "\"mcpServers\"";
                 var idx = existing.IndexOf(insertTarget, StringComparison.Ordinal);
                 var braceIdx = existing.IndexOf('{', idx + insertTarget.Length);
                 if (braceIdx >= 0)
                 {
                     var unityEntry = BuildUnityMcpEntry(port);
-                    // Peek whether there are already entries (non-empty object).
                     var afterBrace = existing.Substring(braceIdx + 1).TrimStart();
                     var sep = afterBrace.StartsWith("}") ? "" : ",";
                     merged = existing.Substring(0, braceIdx + 1)
@@ -115,14 +105,11 @@ namespace UnityMCP.Editor.Chat
                 }
                 else
                 {
-                    // Malformed — overwrite with fresh block.
                     merged = mcpBlock;
                 }
             }
             else
             {
-                // No mcpServers at all in an existing file: merge at root level.
-                // Strip closing brace, append mcpServers key.
                 var lastBrace = existing.LastIndexOf('}');
                 if (lastBrace >= 0)
                 {
@@ -182,13 +169,9 @@ namespace UnityMCP.Editor.Chat
                 "    }";
         }
 
-        /// <summary>
-        /// Update settings.json replacing only the "unity-mcp" entry inside mcpServers,
-        /// preserving all other entries (blender-mcp, etc.).
-        /// </summary>
         private static string RewriteWithFreshMcp(string existing, int port)
         {
-            var fullEntry = BuildUnityMcpEntry(port); // "unity-mcp": {...}
+            var fullEntry = BuildUnityMcpEntry(port);
             var valueStart = fullEntry.IndexOf('{');
             var freshValue = fullEntry.Substring(valueStart);
             return JsonMergeHelper.ReplaceEntry(existing, "unity-mcp", freshValue) ?? existing;

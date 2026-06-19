@@ -132,7 +132,7 @@ namespace UnityMCP.Editor.Chat
 
         /// <summary>
         /// Shared: "Auto: path" hint + optional install hint + binary path EditorPrefs field.
-        /// Used by Gemini, Kimi, and OpenCode forms.
+        /// Used by Antigravity, Kimi, and OpenCode forms.
         /// </summary>
         private static void BuildBinarySection(
             VisualElement parent,
@@ -168,14 +168,14 @@ namespace UnityMCP.Editor.Chat
             parent.Add(pathField);
         }
 
-        internal static void BuildGeminiForm(
+        internal static void BuildAntigravityForm(
             VisualElement parent,
-            GeminiBackendConfig config,
+            AntigravityBackendConfig config,
             Action onSave)
         {
-            BuildBinarySection(parent, "gemini",
-                ChatBinaryResolver.GeminiPrefKey,
-                "Install: npm install -g @google/gemini-cli");
+            BuildBinarySection(parent, "agy",
+                ChatBinaryResolver.AgyPrefKey,
+                "Install: https://github.com/google/antigravity-cli");
 
             var modelField = new TextField("Model") { value = config.Model };
             modelField.RegisterValueChangedCallback(e => { config.Model = e.newValue; onSave(); });

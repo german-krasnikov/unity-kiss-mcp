@@ -199,23 +199,16 @@ def test_server_filtering_read_utf8(tmp_path):
     content = f"19999\n/home/user/Проект\n{CYR}\n"
     port_file.write_bytes(content.encode("utf-8"))
 
-    # Patch Path.home so the ports_dir resolves to tmp_path
-    # Patch os.kill so pid=99999 is "alive" (no exception)
-    # Patch _tcp_probe so port 19999 appears open
-    with mock.patch("unity_mcp.server_filtering.Path") as MockPath, \
+    # Patch _ports_dir seam so read_unity_port resolves to tmp ports_dir.
+    # Patch os.kill so pid=99999 is "alive" (no exception).
+    # Patch _tcp_probe so port 19999 appears open.
+    with mock.patch("unity_mcp.server_filtering._ports_dir", return_value=ports_dir), \
          mock.patch("unity_mcp.server_filtering.os.kill"), \
          mock.patch("unity_mcp.server_filtering._tcp_probe", return_value=True), \
          mock.patch.dict("os.environ", {}, clear=False):
 
         # Remove UNITY_MCP_PORT so env-var fast-path is skipped
         os.environ.pop("UNITY_MCP_PORT", None)
-
-        # Wire Path.home() / ".unity-mcp" / "ports" → ports_dir (a real Path)
-        # We keep Path(...) calls working for f.stat() etc by using real Path for
-        # glob results, only patching .home()
-        MockPath.home.return_value = tmp_path
-        # Path() constructor and division must still work — delegate to real Path
-        MockPath.side_effect = lambda *a, **kw: Path(*a, **kw)
 
         result = server_filtering.read_unity_port()
 

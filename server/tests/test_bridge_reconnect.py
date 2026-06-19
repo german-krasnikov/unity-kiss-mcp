@@ -14,7 +14,7 @@ import pytest
 
 import unity_mcp.bridge as bridge_mod
 from unity_mcp.bridge import UnityBridge, DomainReloadError
-from helpers import make_writer, make_idle_probe, ping_response
+from helpers import make_writer, make_idle_probe, ping_response, reconnect_preamble
 
 _ORIG_CONNECT = bridge_mod.CONNECT_TIMEOUT
 _ORIG_SESSION = bridge_mod.SESSION_TIMEOUT
@@ -64,11 +64,10 @@ async def test_domain_reload_retry_succeeds():
         call_count += 1
         if call_count == 1:
             raise ConnectionRefusedError("server down during reload")
-        ping_hdr, ping_pay = ping_response()
         hdr, pay = _make_ok_response("0001")
         reader = AsyncMock()
         reader.readexactly = AsyncMock(side_effect=[
-            ping_hdr, ping_pay, hdr, pay,
+            *reconnect_preamble(), hdr, pay,
         ])
         return reader, make_writer()
 
@@ -95,11 +94,10 @@ async def test_domain_reload_retry_3rd_attempt():
         call_count += 1
         if call_count <= 2:
             raise ConnectionRefusedError("still reloading")
-        ping_hdr, ping_pay = ping_response()
         hdr, pay = _make_ok_response("0001")
         reader = AsyncMock()
         reader.readexactly = AsyncMock(side_effect=[
-            ping_hdr, ping_pay, hdr, pay,
+            *reconnect_preamble(), hdr, pay,
         ])
         return reader, make_writer()
 
@@ -166,11 +164,10 @@ async def test_successful_reconnect_resets_state():
         call_count += 1
         if call_count == 1:
             raise ConnectionRefusedError("reload")
-        ping_hdr, ping_pay = ping_response()
         hdr, pay = _make_ok_response("0001")
         reader = AsyncMock()
         reader.readexactly = AsyncMock(side_effect=[
-            ping_hdr, ping_pay, hdr, pay,
+            *reconnect_preamble(), hdr, pay,
         ])
         return reader, make_writer()
 
@@ -225,10 +222,9 @@ async def test_domain_reload_forces_retry():
             reader = AsyncMock()
             reader.readexactly = AsyncMock(side_effect=[ga_hdr, ga_pay])
             return reader, make_writer()
-        ping_hdr, ping_pay = ping_response()
         hdr, pay = _make_ok_response("0001")
         reader = AsyncMock()
-        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, hdr, pay])
+        reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble(), hdr, pay])
         return reader, make_writer()
 
     with patch.object(bridge_mod.asyncio, "open_connection", side_effect=mock_open):
@@ -273,11 +269,10 @@ async def test_send_auto_reconnects_transparently():
     async def mock_open(host, port):
         nonlocal call_count
         call_count += 1
-        ping_hdr, ping_pay = ping_response()
         hdr, pay = _make_ok_response("0001")
         reader = AsyncMock()
         reader.readexactly = AsyncMock(side_effect=[
-            ping_hdr, ping_pay, hdr, pay,
+            *reconnect_preamble(), hdr, pay,
         ])
         return reader, make_writer()
 
@@ -406,10 +401,9 @@ async def test_send_reconnect_does_not_fire_callbacks():
     calls_to_reconnect = []
 
     async def mock_open(host, port):
-        ping_hdr, ping_pay = ping_response()
         hdr, pay = _make_ok_response("0001")
         reader = AsyncMock()
-        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, hdr, pay])
+        reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble(), hdr, pay])
         return reader, make_writer()
 
     bridge = UnityBridge("127.0.0.1", 9999, probe=probe)
@@ -442,9 +436,8 @@ async def test_heartbeat_reconnect_fires_callbacks():
     calls_to_reconnect = []
 
     async def mock_open(host, port):
-        ping_hdr, ping_pay = ping_response()
         reader = AsyncMock()
-        reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+        reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
         return reader, make_writer()
 
     bridge = UnityBridge("127.0.0.1", 9999, probe=probe)

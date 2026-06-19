@@ -16,7 +16,7 @@ namespace UnityMCP.Editor.Chat
     {
         public ModelPresetEntry[] Claude   = new ModelPresetEntry[0];
         public ModelPresetEntry[] Codex    = new ModelPresetEntry[0];
-        public ModelPresetEntry[] Gemini   = new ModelPresetEntry[0];
+        public ModelPresetEntry[] Antigravity = new ModelPresetEntry[0];
         public ModelPresetEntry[] Kimi     = new ModelPresetEntry[0];
         public ModelPresetEntry[] OpenCode = new ModelPresetEntry[0];
 
@@ -26,7 +26,7 @@ namespace UnityMCP.Editor.Chat
             {
                 case BackendKind.Claude:   return Claude;
                 case BackendKind.Codex:    return Codex;
-                case BackendKind.Gemini:   return Gemini;
+                case BackendKind.Antigravity: return Antigravity;
                 case BackendKind.Kimi:     return Kimi;
                 case BackendKind.OpenCode: return OpenCode;
                 default: return new ModelPresetEntry[0];
@@ -66,17 +66,10 @@ namespace UnityMCP.Editor.Chat
                 ("GPT-4o",       "gpt-4o"),
                 ("Custom...",    CustomSentinel),
             },
-            [BackendKind.Gemini] = new[]
+            [BackendKind.Antigravity] = new[]
             {
-                ("Default",          ""),
-                ("3.5 Flash",        "gemini-3.5-flash"),
-                ("3.1 Pro Preview",  "gemini-3.1-pro-preview"),
-                ("3 Pro Preview",    "gemini-3-pro-preview"),
-                ("3 Flash Preview",  "gemini-3-flash-preview"),
-                ("2.5 Pro",          "gemini-2.5-pro"),
-                ("2.5 Flash",        "gemini-2.5-flash"),
-                ("2.5 Flash Lite",   "gemini-2.5-flash-lite"),
-                ("Custom...",        CustomSentinel),
+                ("Default",   ""),
+                ("Custom...", CustomSentinel),
             },
             [BackendKind.Kimi] = new[]
             {

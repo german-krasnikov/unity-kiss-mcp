@@ -7,7 +7,7 @@ import time
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from unity_mcp.bridge import UnityBridge
-from helpers import ping_response
+from helpers import ping_response, reconnect_preamble
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ async def test_reconnect_invokes_callback(monkeypatch):
 
     ping_hdr, ping_pay = ping_response()
     mock_reader = MagicMock()
-    mock_reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    mock_reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
     mock_writer = MagicMock()
     mock_writer.is_closing.return_value = False
     mock_writer.close = MagicMock()
@@ -136,7 +136,7 @@ async def test_reconnect_callback_resets_middleware(monkeypatch):
 
     ping_hdr, ping_pay = ping_response()
     mock_reader = MagicMock()
-    mock_reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    mock_reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
     mock_writer = MagicMock()
     mock_writer.is_closing.return_value = False
     mock_writer.close = MagicMock()

@@ -13,7 +13,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             EditorPrefs.DeleteKey("MCPChat.SelectedModel.Claude");
             EditorPrefs.DeleteKey("MCPChat.SelectedModel.Codex");
-            EditorPrefs.DeleteKey("MCPChat.SelectedModel.Gemini");
+            EditorPrefs.DeleteKey("MCPChat.SelectedModel.Antigravity");
         }
 
         [TearDown]
@@ -21,10 +21,10 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             EditorPrefs.DeleteKey("MCPChat.SelectedModel.Claude");
             EditorPrefs.DeleteKey("MCPChat.SelectedModel.Codex");
-            EditorPrefs.DeleteKey("MCPChat.SelectedModel.Gemini");
+            EditorPrefs.DeleteKey("MCPChat.SelectedModel.Antigravity");
             EditorPrefs.DeleteKey("MCPChat.SelectedModel.Claude.custom");
             EditorPrefs.DeleteKey("MCPChat.SelectedModel.Codex.custom");
-            EditorPrefs.DeleteKey("MCPChat.SelectedModel.Gemini.custom");
+            EditorPrefs.DeleteKey("MCPChat.SelectedModel.Antigravity.custom");
         }
 
         // ── ModelPresets backward-compat alias ────────────────────────────────
@@ -72,7 +72,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             Assert.IsTrue(MCPChatWindow.ModelPresetsPerKind.ContainsKey(BackendKind.Claude));
             Assert.IsTrue(MCPChatWindow.ModelPresetsPerKind.ContainsKey(BackendKind.Codex));
-            Assert.IsTrue(MCPChatWindow.ModelPresetsPerKind.ContainsKey(BackendKind.Gemini));
+            Assert.IsTrue(MCPChatWindow.ModelPresetsPerKind.ContainsKey(BackendKind.Antigravity));
         }
 
         [Test]
@@ -92,11 +92,11 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void ModelPresetsPerKind_Gemini_HasFlashAndPro()
+        public void ModelPresetsPerKind_Antigravity_HasDefaultAndCustom()
         {
-            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Gemini];
-            Assert.IsNotNull(System.Array.Find(presets, p => p.label == "2.5 Flash" && p.modelId == "gemini-2.5-flash"));
-            Assert.IsNotNull(System.Array.Find(presets, p => p.label == "2.5 Pro"   && p.modelId == "gemini-2.5-pro"));
+            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Antigravity];
+            Assert.IsNotNull(System.Array.Find(presets, p => p.label == "Default" && p.modelId == ""));
+            Assert.IsNotNull(System.Array.Find(presets, p => p.label == "Custom..." && p.modelId == "__custom__"));
         }
 
         // ── PresetsForKind (private static via reflection) ────────────────────
@@ -131,8 +131,8 @@ namespace UnityMCP.Editor.Chat.Tests
             var result = MCPChatWindow.ApplySelectedModel(store, BackendKind.Claude, "claude-opus-4-8");
             Assert.AreEqual("claude-opus-4-8", result.Claude.Model);
             // other backends unchanged
-            Assert.AreEqual(store.Codex.Model,  result.Codex.Model);
-            Assert.AreEqual(store.Gemini.Model, result.Gemini.Model);
+            Assert.AreEqual(store.Codex.Model,       result.Codex.Model);
+            Assert.AreEqual(store.Antigravity.Model, result.Antigravity.Model);
         }
 
         [Test]
@@ -145,11 +145,11 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void ApplySelectedModel_Gemini_PatchesGemini()
+        public void ApplySelectedModel_Antigravity_PatchesAntigravity()
         {
             var store  = new BackendConfigStore();
-            var result = MCPChatWindow.ApplySelectedModel(store, BackendKind.Gemini, "gemini-2.5-pro");
-            Assert.AreEqual("gemini-2.5-pro", result.Gemini.Model);
+            var result = MCPChatWindow.ApplySelectedModel(store, BackendKind.Antigravity, "some-agy-model");
+            Assert.AreEqual("some-agy-model", result.Antigravity.Model);
             Assert.AreEqual(store.Claude.Model, result.Claude.Model);
         }
 
@@ -167,7 +167,7 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ModelPresetsPerKind_AllKinds_HaveCustomEntry()
         {
-            foreach (var kind in new[] { BackendKind.Claude, BackendKind.Codex, BackendKind.Gemini })
+            foreach (var kind in new[] { BackendKind.Claude, BackendKind.Codex, BackendKind.Antigravity })
             {
                 var presets = MCPChatWindow.ModelPresetsPerKind[kind];
                 var last    = presets[presets.Length - 1];
@@ -229,20 +229,13 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         // ── Regression: backend-switch model leak ─────────────────────────────
-        // Bug: switching Claude→Codex with _selectedModel="claude-sonnet-4-6" caused
-        // ApplySelectedModel(store, Codex, "claude-sonnet-4-6") to set Codex.Model
-        // to a Claude model ID → Codex API 400 error.
-        // Fix: _selectedModel reset to "" before CreateBackend on backend switch.
-        // The empty-string early-return in ApplySelectedModel prevents the leak.
         [Test]
         public void ApplySelectedModel_EmptyModel_CodexKind_DoesNotLeakClaudeModelId()
         {
             var store = new BackendConfigStore();
-            // Simulate: after backend switch, _selectedModel was reset to ""
             var result = MCPChatWindow.ApplySelectedModel(store, BackendKind.Codex, "");
             Assert.AreSame(store, result, "empty selectedModel must return same store");
-            Assert.AreNotEqual("claude-sonnet-4-6", result.Codex.Model,
-                "Codex must never receive a Claude model ID via leaked _selectedModel");
+            Assert.AreNotEqual("claude-sonnet-4-6", result.Codex.Model);
         }
 
         // ── Codex extended model list ─────────────────────────────────────────
@@ -271,7 +264,6 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void ModelPresetsPerKind_Codex_Gpt55IsFirstNamed()
         {
-            // Default is [0], GPT-5.5 (most powerful) must be [1]
             var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Codex];
             Assert.AreEqual("gpt-5.5", presets[1].modelId, "GPT-5.5 must be first named Codex model");
         }
@@ -305,53 +297,6 @@ namespace UnityMCP.Editor.Chat.Tests
             var last    = presets[presets.Length - 1];
             Assert.AreEqual("Custom...", last.label);
             Assert.AreEqual("__custom__", last.modelId);
-        }
-
-        // ── Gemini expanded model list ────────────────────────────────────────
-
-        [Test]
-        public void ModelPresetsPerKind_Gemini_Has35Flash()
-        {
-            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Gemini];
-            Assert.IsNotNull(System.Array.Find(presets, p => p.label == "3.5 Flash" && p.modelId == "gemini-3.5-flash"));
-        }
-
-        [Test]
-        public void ModelPresetsPerKind_Gemini_Has3ProPreview()
-        {
-            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Gemini];
-            Assert.IsNotNull(System.Array.Find(presets, p => p.modelId == "gemini-3-pro-preview"));
-        }
-
-        [Test]
-        public void ModelPresetsPerKind_Gemini_Has25FlashLite()
-        {
-            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Gemini];
-            Assert.IsNotNull(System.Array.Find(presets, p => p.modelId == "gemini-2.5-flash-lite"));
-        }
-
-        [Test]
-        public void ModelPresetsPerKind_Gemini_HasAtLeast7Entries()
-        {
-            // Default + 7 models + Custom = 9 minimum
-            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Gemini];
-            Assert.GreaterOrEqual(presets.Length, 9);
-        }
-
-        [Test]
-        public void ModelPresetsPerKind_Gemini_NoDeadModel_20Flash()
-        {
-            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Gemini];
-            Assert.IsFalse(System.Array.Exists(presets, p => p.modelId == "gemini-2.0-flash"),
-                "gemini-2.0-flash was shutdown June 1, 2026 — must not appear in presets");
-        }
-
-        [Test]
-        public void ModelPresetsPerKind_Gemini_35FlashIsFirstNamed()
-        {
-            // Default is [0], 3.5 Flash (most powerful GA) must be [1]
-            var presets = MCPChatWindow.ModelPresetsPerKind[BackendKind.Gemini];
-            Assert.AreEqual("gemini-3.5-flash", presets[1].modelId, "3.5 Flash must be first named Gemini model");
         }
 
         // ── CloneWithModel backward-compat ────────────────────────────────────

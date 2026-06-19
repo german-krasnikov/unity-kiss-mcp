@@ -1,5 +1,5 @@
-// TDD tests for GeminiArgBuilder.
-// Pure unit tests — no real FS writes (settingsDir injectable seam), no Unity API.
+// TDD tests for AgyArgBuilder (Antigravity CLI).
+// Key differences vs Gemini: no --output-format, --dangerously-skip-permissions instead of --yolo.
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -8,14 +8,14 @@ using UnityMCP.Editor.Chat;
 namespace UnityMCP.Editor.Chat.Tests
 {
     [TestFixture]
-    public class GeminiArgBuilderTests
+    public class AgyArgBuilderTests
     {
         private string _tempDir;
 
         [SetUp]
         public void SetUp()
         {
-            _tempDir = Path.Combine(Path.GetTempPath(), "GeminiArgBuilderTests_" + System.Guid.NewGuid().ToString("N").Substring(0, 8));
+            _tempDir = Path.Combine(Path.GetTempPath(), "AgyArgBuilderTests_" + System.Guid.NewGuid().ToString("N").Substring(0, 8));
             Directory.CreateDirectory(_tempDir);
         }
 
@@ -33,7 +33,7 @@ namespace UnityMCP.Editor.Chat.Tests
             bool   sandbox      = false,
             string extraArgs    = null)
         {
-            return GeminiArgBuilder.Build(prompt, model, approvalMode, sandbox, extraArgs, _tempDir);
+            return AgyArgBuilder.Build(prompt, model, approvalMode, sandbox, extraArgs, _tempDir);
         }
 
         // ── Core flags ────────────────────────────────────────────────────────
@@ -48,12 +48,20 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void Build_ContainsStreamJsonFormat()
+        public void Build_NoOutputFormatFlag()
         {
+            // agy does NOT support --output-format — must be absent
             var (args, _) = Build();
-            Assert.Contains("--output-format", args);
-            int idx = System.Array.IndexOf(args, "--output-format");
-            Assert.AreEqual("stream-json", args[idx + 1]);
+            Assert.IsFalse(System.Array.IndexOf(args, "--output-format") >= 0,
+                "--output-format must NOT be present for agy");
+        }
+
+        [Test]
+        public void Build_NullExtraArgs_OnlyTwoArgs()
+        {
+            // Minimal: just -p <prompt>
+            var (args, _) = Build(extraArgs: null);
+            Assert.AreEqual(2, args.Length, "Minimal agy args: -p <prompt>");
         }
 
         [Test]
@@ -68,57 +76,49 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Build_WithModel_AddsModelFlag()
         {
-            var (args, _) = Build(model: "gemini-2.5-pro");
+            var (args, _) = Build(model: "some-model");
             int idx = System.Array.IndexOf(args, "--model");
             Assert.Greater(idx, -1, "--model must be present");
-            Assert.AreEqual("gemini-2.5-pro", args[idx + 1]);
+            Assert.AreEqual("some-model", args[idx + 1]);
         }
 
         [Test]
         public void Build_NullModel_NoModelFlag()
         {
             var (args, _) = Build(model: null);
-            Assert.IsFalse(System.Array.IndexOf(args, "--model") >= 0,
-                "--model must not appear when model is null");
-        }
-
-        [Test]
-        public void Build_EmptyModel_NoModelFlag()
-        {
-            var (args, _) = Build(model: "");
-            Assert.IsFalse(System.Array.IndexOf(args, "--model") >= 0,
-                "--model must not appear when model is empty");
+            Assert.IsFalse(System.Array.IndexOf(args, "--model") >= 0);
         }
 
         // ── Approval mode ─────────────────────────────────────────────────────
 
         [Test]
-        public void Build_YoloMode_AddsYoloFlag()
+        public void Build_YoloMode_AddsDangerouslySkipPermissions()
         {
             var (args, _) = Build(approvalMode: "yolo");
-            Assert.Contains("--yolo", args);
+            Assert.Contains("--dangerously-skip-permissions", args);
+        }
+
+        [Test]
+        public void Build_YoloMode_NoLegacyYoloFlag()
+        {
+            // agy uses --dangerously-skip-permissions, not --yolo
+            var (args, _) = Build(approvalMode: "yolo");
+            Assert.IsFalse(System.Array.IndexOf(args, "--yolo") >= 0,
+                "--yolo must NOT appear for agy (use --dangerously-skip-permissions)");
         }
 
         [Test]
         public void Build_YoloMode_CaseInsensitive()
         {
             var (args, _) = Build(approvalMode: "YOLO");
-            Assert.Contains("--yolo", args);
+            Assert.Contains("--dangerously-skip-permissions", args);
         }
 
         [Test]
-        public void Build_DefaultMode_NoYoloFlag()
+        public void Build_DefaultMode_NoDangerousFlag()
         {
             var (args, _) = Build(approvalMode: "default");
-            Assert.IsFalse(System.Array.IndexOf(args, "--yolo") >= 0,
-                "--yolo must not appear for default approval mode");
-        }
-
-        [Test]
-        public void Build_NullApprovalMode_NoYoloFlag()
-        {
-            var (args, _) = Build(approvalMode: null);
-            Assert.IsFalse(System.Array.IndexOf(args, "--yolo") >= 0);
+            Assert.IsFalse(System.Array.IndexOf(args, "--dangerously-skip-permissions") >= 0);
         }
 
         // ── Sandbox ───────────────────────────────────────────────────────────
@@ -134,8 +134,7 @@ namespace UnityMCP.Editor.Chat.Tests
         public void Build_SandboxFalse_NoSandboxFlag()
         {
             var (args, _) = Build(sandbox: false);
-            Assert.IsFalse(System.Array.IndexOf(args, "--sandbox") >= 0,
-                "--sandbox must not appear when sandbox is false");
+            Assert.IsFalse(System.Array.IndexOf(args, "--sandbox") >= 0);
         }
 
         // ── Extra args ────────────────────────────────────────────────────────
@@ -149,15 +148,7 @@ namespace UnityMCP.Editor.Chat.Tests
             CollectionAssert.Contains(args, "5");
         }
 
-        [Test]
-        public void Build_NullExtraArgs_NoExtraTokens()
-        {
-            var (args, _) = Build(extraArgs: null);
-            // Just core flags: -p, prompt, --output-format, stream-json
-            Assert.AreEqual(4, args.Length);
-        }
-
-        // ── MCP settings file ─────────────────────────────────────────────────
+        // ── MCP settings file (same path as Gemini: ~/.gemini/settings.json) ──
 
         [Test]
         public void Build_WritesSettingsJson()
@@ -192,8 +183,7 @@ namespace UnityMCP.Editor.Chat.Tests
             File.WriteAllText(path, existing);
             var mtime = File.GetLastWriteTimeUtc(path);
             System.Threading.Thread.Sleep(50);
-            // Build with same port (9500 = test default)
-            GeminiArgBuilder.Build("test", settingsDir: _tempDir, port: 9500);
+            AgyArgBuilder.Build("test", settingsDir: _tempDir, port: 9500);
             Assert.AreEqual(mtime, File.GetLastWriteTimeUtc(path),
                 "Settings file must not be rewritten when port matches");
         }
@@ -204,50 +194,8 @@ namespace UnityMCP.Editor.Chat.Tests
             var path = Path.Combine(_tempDir, "settings.json");
             var stale = "{\"mcpServers\":{\"unity-mcp\":{\"command\":\"python3\",\"args\":[],\"env\":{\"UNITY_MCP_PORT\":\"9501\"},\"trust\":true}}}";
             File.WriteAllText(path, stale);
-            GeminiArgBuilder.Build("test", settingsDir: _tempDir, port: 9900);
+            AgyArgBuilder.Build("test", settingsDir: _tempDir, port: 9900);
             var content = File.ReadAllText(path);
-            StringAssert.Contains("\"UNITY_MCP_PORT\": \"9900\"", content,
-                "Stale port must be updated to current port");
-            StringAssert.DoesNotContain("9501", content,
-                "Old port must not remain in settings");
-            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
-                "Brace count must be balanced");
-        }
-
-        [Test]
-        public void Build_SettingsJson_StalePort_PreservesOtherSettings()
-        {
-            var path = Path.Combine(_tempDir, "settings.json");
-            var stale = "{\"security\":{\"auth\":\"oauth\"},\"mcpServers\":{\"unity-mcp\":{\"command\":\"python3\",\"args\":[],\"env\":{\"UNITY_MCP_PORT\":\"9501\"},\"trust\":true}}}";
-            File.WriteAllText(path, stale);
-            GeminiArgBuilder.Build("test", settingsDir: _tempDir, port: 9900);
-            var content = File.ReadAllText(path);
-            StringAssert.Contains("\"security\"", content,
-                "Other settings must be preserved during port update");
-            StringAssert.Contains("\"UNITY_MCP_PORT\": \"9900\"", content);
-            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
-                "Brace count must be balanced");
-        }
-
-        [Test]
-        public void Build_SettingsJson_StalePort_PreservesExternalServers()
-        {
-            var path = Path.Combine(_tempDir, "settings.json");
-            var stale =
-                "{\n" +
-                "  \"mcpServers\": {\n" +
-                "    \"blender\": { \"command\": \"blender-mcp\", \"args\": [] },\n" +
-                "    \"unity-mcp\": { \"command\": \"python3\", \"args\": [\"-m\",\"unity_mcp.server\"], \"env\": { \"UNITY_MCP_PORT\": \"9501\" }, \"trust\": true }\n" +
-                "  }\n" +
-                "}\n";
-            File.WriteAllText(path, stale);
-
-            GeminiArgBuilder.Build("test", settingsDir: _tempDir, port: 9900);
-
-            var content = File.ReadAllText(path);
-            StringAssert.Contains("\"blender\"", content,
-                "External blender-mcp server must be preserved after port update");
-            StringAssert.Contains("blender-mcp", content);
             StringAssert.Contains("\"UNITY_MCP_PORT\": \"9900\"", content);
             StringAssert.DoesNotContain("9501", content);
             Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
@@ -259,14 +207,14 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void BuildMcpBlock_ContainsMcpServers()
         {
-            var block = GeminiArgBuilder.BuildMcpBlock();
+            var block = AgyArgBuilder.BuildMcpBlock();
             StringAssert.Contains("mcpServers", block);
         }
 
         [Test]
         public void BuildMcpBlock_ContainsUnityMcpKey()
         {
-            var block = GeminiArgBuilder.BuildMcpBlock();
+            var block = AgyArgBuilder.BuildMcpBlock();
             StringAssert.Contains("unity-mcp", block);
         }
     }

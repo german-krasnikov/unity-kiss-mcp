@@ -11,7 +11,7 @@ namespace UnityMCP.Editor.Chat
     {
         public ClaudeBackendConfig    Claude       = new ClaudeBackendConfig();
         public CodexBackendConfig     Codex        = new CodexBackendConfig();
-        public GeminiBackendConfig    Gemini       = new GeminiBackendConfig();
+        public AntigravityBackendConfig Antigravity  = new AntigravityBackendConfig();
         public KimiBackendConfig      Kimi         = new KimiBackendConfig();
         public OpenCodeBackendConfig  OpenCode     = new OpenCodeBackendConfig();
         public ChipConfig             Chips        = new ChipConfig();
@@ -31,7 +31,7 @@ namespace UnityMCP.Editor.Chat
                 var store = JsonUtility.FromJson<BackendConfigStore>(json);
                 store.Claude        = store.Claude        ?? new ClaudeBackendConfig();
                 store.Codex         = store.Codex         ?? new CodexBackendConfig();
-                store.Gemini        = store.Gemini        ?? new GeminiBackendConfig();
+                store.Antigravity   = store.Antigravity   ?? new AntigravityBackendConfig();
                 store.Kimi          = store.Kimi          ?? new KimiBackendConfig();
                 store.OpenCode      = store.OpenCode      ?? new OpenCodeBackendConfig();
                 store.Chips         = store.Chips         ?? new ChipConfig();

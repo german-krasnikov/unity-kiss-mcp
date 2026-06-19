@@ -17,7 +17,7 @@ import unity_mcp.bridge as _bridge_mod
 from unity_mcp.bridge import UnityBridge
 from unity_mcp.compile_state import CompileStateProbe
 from unity_mcp.metrics import METRICS
-from helpers import make_writer, ping_response
+from helpers import make_writer, ping_response, reconnect_preamble
 
 _ORIG_CONNECT = _bridge_mod.CONNECT_TIMEOUT
 _ORIG_SESSION = _bridge_mod.SESSION_TIMEOUT
@@ -192,7 +192,7 @@ async def test_reconnect_resets_failure_ts():
     mock_writer.drain = AsyncMock()
 
     ping_hdr, ping_pay = ping_response()
-    mock_reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    mock_reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
 
     async def mock_open(host, port):
         return mock_reader, mock_writer

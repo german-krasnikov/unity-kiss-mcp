@@ -86,7 +86,15 @@ namespace UnityMCP.Editor.Chat
             foreach (var line in _drainBuf)
             {
                 _parseBuf.Clear();
-                ParseLine(line, _parseBuf);
+                if (line.Contains("\"type\":\"result\"") && line.Contains("\"is_error\":true"))
+                {
+                    var errMsg = JsonHelper.ExtractString(line, "error") ?? "Process error";
+                    _parseBuf.Add(ChatEvent.Error(errMsg));
+                }
+                else
+                {
+                    ParseLine(line, _parseBuf);
+                }
 
                 foreach (var ev in _parseBuf)
                 {

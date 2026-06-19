@@ -163,7 +163,8 @@ def test_find_server_command_prefers_uvx(monkeypatch):
 def test_find_server_command_falls_back_to_python(monkeypatch):
     from unity_mcp.config import resolver
     monkeypatch.setattr(resolver, "_which", lambda name: None)
-    cmd = resolver.find_server_command()
+    with patch("pathlib.Path.exists", return_value=False):
+        cmd = resolver.find_server_command()
     assert cmd[0] == sys.executable
     assert "-m" in cmd
 

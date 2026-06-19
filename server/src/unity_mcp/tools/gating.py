@@ -20,6 +20,8 @@ _CORE_TOOLS: frozenset[str] = frozenset({
     "reconnect_unity", "list_connections",
     # F4: deferred schema resolution
     "resolve_tool_schema",
+    # Repair tool — must be reachable even when things are broken
+    "doctor",
 })
 
 # Themed categories (non-CORE tools only — each tool in exactly one)
@@ -128,6 +130,7 @@ FORCE_VISIBLE: set[str] = {
     "get_console", "get_compile_errors",
     "reconnect_unity", "list_connections",
     "resolve_tool_schema",
+    "doctor",
 }
 
 

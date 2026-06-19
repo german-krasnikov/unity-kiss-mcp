@@ -63,9 +63,9 @@ namespace UnityMCP.Editor.Chat
             BackendSettingsForm.BuildCodexForm(codexFoldout, store.Codex, () => store.Save());
             parent.Add(codexFoldout);
 
-            var geminiFoldout = new Foldout { text = "Gemini Settings", value = false };
-            BackendSettingsForm.BuildGeminiForm(geminiFoldout, store.Gemini, () => store.Save());
-            parent.Add(geminiFoldout);
+            var antigravityFoldout = new Foldout { text = "Antigravity Settings", value = false };
+            BackendSettingsForm.BuildAntigravityForm(antigravityFoldout, store.Antigravity, () => store.Save());
+            parent.Add(antigravityFoldout);
 
             var kimiFoldout = new Foldout { text = "Kimi Settings", value = false };
             BackendSettingsForm.BuildKimiForm(kimiFoldout, store.Kimi, () => store.Save());

@@ -861,5 +861,6 @@ namespace UnityMCP.Editor
             var compile = isCompiling ? "true" : "false";
             return $"{{\"id\":\"{msgId}\",\"ok\":true,\"data\":\"{state}\",\"compile\":{compile}}}";
         }
+
     }
 }

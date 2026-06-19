@@ -16,6 +16,7 @@ namespace UnityMCP.Editor.Chat
         internal const string PrefKey          = "UnityMCP_Chat_ClaudePath";
         internal const string CodexPrefKey    = "UnityMCP_Chat_Path_codex";
         internal const string GeminiPrefKey   = "UnityMCP_Chat_Path_gemini";
+        internal const string AgyPrefKey      = "UnityMCP_Chat_Path_agy";
         internal const string KimiPrefKey     = "UnityMCP_Chat_Path_kimi";
         internal const string OpenCodePrefKey = "UnityMCP_Chat_Path_opencode";
 

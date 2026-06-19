@@ -6,7 +6,7 @@ import time
 from unittest.mock import AsyncMock, Mock, patch, MagicMock
 import pytest
 from unity_mcp.bridge import UnityBridge, DOMAIN_RELOAD_EXPIRY_S
-from helpers import make_writer, make_idle_probe, ping_response
+from helpers import make_writer, make_idle_probe, ping_response, reconnect_preamble, version_response
 
 
 async def test_send_empty_args(mock_connection):
@@ -229,10 +229,10 @@ async def test_reconnect_preserves_counter(mock_connection):
     resp2_payload = json.dumps(response2).encode("utf-8")
     resp2_header = struct.pack("!I", len(resp2_payload))
 
-    ping_hdr, ping_pay = ping_response()
+    ver_hdr, ver_pay = version_response()
     mock_reader.readexactly = AsyncMock(side_effect=[
         resp1_header, resp1_payload,
-        ping_hdr, ping_pay,
+        *reconnect_preamble(),
         resp2_header, resp2_payload,
     ])
 
@@ -279,9 +279,8 @@ async def test_send_after_close_auto_reconnects():
     resp_payload = json.dumps(response).encode("utf-8")
     resp_header = struct.pack("!I", len(resp_payload))
 
-    ping_hdr, ping_pay = ping_response()
     new_reader = AsyncMock()
-    new_reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, resp_header, resp_payload])
+    new_reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble(), resp_header, resp_payload])
     new_writer = make_writer()
 
     first_reader = AsyncMock()
@@ -307,9 +306,8 @@ async def test_send_auto_reconnects_when_never_connected():
     resp_payload = json.dumps(response).encode("utf-8")
     resp_header = struct.pack("!I", len(resp_payload))
 
-    ping_hdr, ping_pay = ping_response()
     reader = AsyncMock()
-    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, resp_header, resp_payload])
+    reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble(), resp_header, resp_payload])
     writer = make_writer()
 
     with patch("asyncio.open_connection", return_value=(reader, writer)) as mock_open:
@@ -455,10 +453,9 @@ async def test_reconnect_inside_lock_prevents_writer_none():
     resp_payload = json.dumps(response).encode("utf-8")
     resp_header = struct.pack("!I", len(resp_payload))
 
-    ping_hdr, ping_pay = ping_response()
     reader = AsyncMock()
     writer = make_writer()
-    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, resp_header, resp_payload])
+    reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble(), resp_header, resp_payload])
 
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()
@@ -534,10 +531,9 @@ async def test_concurrent_sends_routes_per_caller(mock_unity_server):
 
 async def test_p0_domain_reload_flag_cleared_on_reconnect():
     """_reload tracker cleared when _reconnect() succeeds."""
-    ping_hdr, ping_pay = ping_response()
     reader = AsyncMock()
     writer = make_writer()
-    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay])
+    reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
 
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()
@@ -653,7 +649,7 @@ async def test_p2_startup_grace_expired_attempts_reconnect():
 
     reader = AsyncMock()
     writer = make_writer()
-    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, resp_hdr, resp_pay])
+    reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble(), resp_hdr, resp_pay])
 
     with patch("asyncio.open_connection", return_value=(reader, writer)):
         bridge = UnityBridge()
@@ -738,20 +734,18 @@ async def test_reconnect_atomic_assignment():
     snapshots: list[tuple] = []
 
     ping_hdr, ping_pay = ping_response()
+    ver_hdr, ver_pay = version_response()
     reader = AsyncMock()
     writer = make_writer()
 
+    preamble = [ping_hdr, ping_pay, ver_hdr, ver_pay]
     call_count = [0]
 
     async def capturing_readexactly(n: int) -> bytes:
         call_count[0] += 1
-        # First readexactly(4) = header, second readexactly(len) = payload
-        # Both happen INSIDE await _read_response() which is called AFTER self._reader=reader
-        # but BEFORE self._writer=writer — capture state here
         snapshots.append((bridge._reader, bridge._writer))
-        if call_count[0] == 1:
-            return ping_hdr
-        return ping_pay
+        idx = call_count[0] - 1
+        return preamble[idx] if idx < len(preamble) else ping_pay
 
     reader.readexactly = AsyncMock(side_effect=capturing_readexactly)
 

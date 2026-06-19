@@ -68,6 +68,13 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains("1", msg);
             Assert.IsNotNull(msg);
         }
+
+        [Test]
+        public void BuildExitErrorMessage_CustomBinaryName()
+        {
+            var msg = StderrRingBuffer.BuildExitErrorMessage(1, new[] { "err" }, "agy");
+            StringAssert.StartsWith("agy exited", msg);
+        }
     }
 }
 #endif

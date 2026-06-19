@@ -277,6 +277,9 @@ unity-kiss-mcp/
 │       │   │   ├── ClaudeArgBuilder.cs    # Build --mcp-config file + CLI args (--permission-prompt-tool wired, v0.29.37)
 │       │   │   ├── UserTurnBuilder.cs     # Encode user messages → stdin JSON
 │       │   │   ├── ToolVerbMap.cs             # Tool name → humanized action text
+│       │   │   ├── SessionHandoff.cs          # GetResumeCommand(), GetBinaryName() static helpers (v0.41.0)
+│       │   │   ├── SessionScanner.cs          # Scan ~/Library/Caches/<backend>/ for resume sessions (v0.41.0, 190 LOC)
+│       │   │   ├── CopyFlash.cs               # Static seam for showing "Copied!" notification (v0.41.0)
 │       │   │   ├── IChatBackend.cs            # Backend interface (future plugin seams)
 │       │   │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS /bin/zsh -lc)
 │       │   │   ├── ChatProcess.cs             # Process lifecycle manager
@@ -284,11 +287,10 @@ unity-kiss-mcp/
 │       │   │   ├── ClaudeBackend.cs           # Claude: CliBackendBase subclass (persistent stdin)
 │       │   │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions (experimentalApi, v0.29.38)
 │       │   │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC + tool/requestUserInput handler (v0.29.38)
-│       │   │   ├── GeminiBackend.cs           # Gemini: CliBackendBase subclass (gcloud CLI, v0.30.1)
-│       │   │   ├── GeminiArgBuilder.cs        # Build gcloud args + .gemini/settings.json (smart port merge, v0.30.1, merge-preserving v0.38.0)
-│       │   │   ├── GeminiParser.cs            # Parse stream-json: skip role:user + non-mcp_ tools, suppress ask_user (v0.30.1)
-│       │   │   ├── GeminiProvider.cs          # IBackendProvider Gemini implementation (auto-discovered via TypeCache, v0.30.1)
-│       │   │   ├── JsonMergeHelper.cs         # DRY JSON brace-depth merge utility (v0.38.0, 35 LOC): replace entry + preserve others
+│       │   │   ├── AntigravityBackend.cs      # Antigravity: CliBackendBase subclass (LLM service, v0.41.0)
+│       │   │   ├── AgyArgBuilder.cs           # Build Antigravity args + environment (v0.41.0)
+│       │   │   ├── AgyParser.cs               # Parse Antigravity stream-json output (v0.41.0)
+│       │   │   ├── AntigravityProvider.cs     # IBackendProvider Antigravity implementation (v0.41.0)
 │       │   │   ├── KimiBackend.cs             # Kimi: CliBackendBase subclass (Kimi K2 CLI, v0.34.0)
 │       │   │   ├── KimiArgBuilder.cs          # Build Kimi args + role-based NDJSON protocol (v0.34.0, 120 LOC, merge-preserving v0.38.0)
 │       │   │   ├── KimiParser.cs              # Parse Kimi NDJSON response stream (v0.34.0, 74 LOC)
@@ -297,7 +299,7 @@ unity-kiss-mcp/
 │       │   │   ├── OpenCodeArgBuilder.cs      # Build OpenCode args + model name mapping (v0.34.0, 132 LOC)
 │       │   │   ├── OpenCodeParser.cs          # Parse OpenCode stream-json (v0.34.0, 92 LOC)
 │       │   │   ├── OpenCodeProvider.cs        # IBackendProvider OpenCode implementation (v0.34.0)
-│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex, Gemini, Kimi, OpenCode)
+│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex, Antigravity, Kimi, OpenCode)
 │       │   │   ├── BackendConfig.cs           # [Serializable] configs per backend + KimiBackendConfig + OpenCodeBackendConfig (v0.34.0)
 │       │   │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (project-local Library/)
 │       │   │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (v0.30.1: redesigned with presets)
@@ -320,10 +322,10 @@ unity-kiss-mcp/
 │       │   │       ├── CodexAppServerParserTests.cs # Codex JSON-RPC + requestUserInput (v0.29.38)
 │       │   │       ├── CodexArgBuilderTests.cs # Codex CLI args + model wiring (v0.30.4, 33 tests)
 │       │   │       ├── ControlResponseBuilderTests.cs # Response serialization including CodexUserInputResponse (v0.29.38)
-│       │   │       ├── GeminiArgBuilderTests.cs # Gemini gcloud args + settings.json merge-preserving (v0.30.1, 25 tests v0.38.0)
-│       │   │       ├── GeminiParserTests.cs   # Gemini stream-json parsing: prompt echo filter, tool prefix, ask_user suppression (v0.30.1, 190 tests)
-│       │   │       ├── JsonMergeHelperTests.cs # JSON merge helper: replace + preserve + brace balance (v0.38.0, 8 tests)
-│       │   │       ├── GeminiTestFixtures.cs  # Shared Gemini test payloads (v0.30.1, 33 LOC)
+│       │   │       ├── AgyArgBuilderTests.cs  # Antigravity args building + environment (v0.41.0)
+│       │   │       ├── AgyParserTests.cs      # Antigravity stream-json parsing (v0.41.0)
+│       │   │       ├── SessionHandoffTests.cs # Resume command generation per-backend (v0.41.0)
+│       │   │       ├── SessionScannerTests.cs # CLI history scanning + session discovery (v0.41.0)
 │       │   │       ├── MultiSceneChipTests.cs # Scene-qualified object path parsing + display (v0.30.4, 74 tests)
 │       │   │       ├── TokenFormatTests.cs    # Token cost display + null-safe guards (v0.30.4, 12 tests)
 │       │   │       └── ... # 40+ total CLI tests
@@ -354,6 +356,7 @@ unity-kiss-mcp/
 │       │   │   ├── InlineChipData.cs          # ChipData + InlineChipTracker (F5)
 │       │   │   ├── InlineChipOverlay.cs       # Pill row UI (F5)
 │       │   │   ├── InlineChipKeyHandler.cs    # TextField event routing (F5)
+│       │   │   ├── SessionPickerPopup.cs      # UIToolkit popup for session selection (v0.41.0)
 │       │   │   ├── ChipKindDetector.cs        # Pure Detect() → ChipKind (F10)
 │       │   │   ├── ResponseTagInliner.cs      # [kind:ref] parser + renderer (F10)
 │       │   │   ├── RestoreButton.cs           # Undo per-turn + cascade restore (F2)
@@ -447,6 +450,7 @@ unity-kiss-mcp/
 │       │   │   │   ├── View/                  # View assembly tests (UI, cards, interactivity)
 │       │   │   │   │   ├── AskUserCardTests.cs     # User input dialog + Codex protocol (v0.29.38 addition)
 │       │   │   │   │   ├── ApproveFlowTests.cs     # Interactive approvals flow
+│       │   │   │   │   ├── CopyMessageUxTests.cs   # Right-click copy + CopyFlash notification (v0.41.0)
 │       │   │   │   │   ├── ChipSequenceTests.cs
 │       │   │   │   │   ├── ChipSendSequenceTests.cs
 │       │   │   │   │   ├── ModelSelectorTests.cs   # Per-backend model dropdown + preset selection (v0.30.4, 231 tests)

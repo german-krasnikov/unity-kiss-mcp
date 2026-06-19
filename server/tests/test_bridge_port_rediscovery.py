@@ -8,7 +8,7 @@ import pytest
 
 import unity_mcp.bridge as bridge_mod
 from unity_mcp.bridge import UnityBridge
-from helpers import make_writer, make_idle_probe, ping_response
+from helpers import make_writer, make_idle_probe, ping_response, reconnect_preamble
 
 
 @pytest.fixture(autouse=True)
@@ -25,7 +25,7 @@ def _make_ok_reader(msg_id="0001"):
     p = json.dumps(r).encode()
     hdr, pay = struct.pack("!I", len(p)), p
     reader = AsyncMock()
-    reader.readexactly = AsyncMock(side_effect=[ping_hdr, ping_pay, hdr, pay])
+    reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble(), hdr, pay])
     return reader
 
 

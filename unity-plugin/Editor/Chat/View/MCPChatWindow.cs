@@ -77,10 +77,13 @@ namespace UnityMCP.Editor.Chat
             ChipPillFactory.ColorResolver = BackendConfigStore.Load().Chips.ResolveColor;
         }
 
+        private Label _copyFlashLabel;
+
         private void OnEnable()
         {
             RefreshColorResolver();
             ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
+            CopyFlash.ShowAction = ShowCopyFlash;
             CreateBackend();
             ResetTokenCounters();
             ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
@@ -90,6 +93,14 @@ namespace UnityMCP.Editor.Chat
             _autoFix.OnErrorsDetected += InjectCompileErrors;
             _undoTracker.Invalidate();
             CommandRouter.OnAskUser += OnMcpAskUser;
+        }
+
+        private void ShowCopyFlash()
+        {
+            if (_copyFlashLabel == null) return;
+            _copyFlashLabel.RemoveFromClassList("copy-flash--hidden");
+            _copyFlashLabel.schedule.Execute(() =>
+                _copyFlashLabel?.AddToClassList("copy-flash--hidden")).ExecuteLater(1500);
         }
 
         internal void RefreshChipDisplay()
@@ -106,6 +117,7 @@ namespace UnityMCP.Editor.Chat
             _autoFix.OnErrorsDetected -= InjectCompileErrors;
             _autoFix.Unsubscribe();
             ChipPillFactory.AddToContextAction = null;
+            CopyFlash.ShowAction = null;
             ReloadGuard.OnTurnFinished();
             if (_activity.Phase != ActivityPhase.Idle)
                 _undoTracker.OnTurnFailed();
@@ -166,6 +178,12 @@ namespace UnityMCP.Editor.Chat
                     evt.StopPropagation();
                 }
             }, TrickleDown.TrickleDown);
+
+            _copyFlashLabel = new Label("✓ Copied!");
+            _copyFlashLabel.AddToClassList("copy-flash");
+            _copyFlashLabel.AddToClassList("copy-flash--hidden");
+            root.Add(_copyFlashLabel);
+
             TryResumePendingTurn();
         }
 
@@ -237,7 +255,7 @@ namespace UnityMCP.Editor.Chat
                     ExtraArgs      = src.Claude.ExtraArgs,
                 },
                 Codex    = src.Codex,
-                Gemini   = src.Gemini,
+                Antigravity = src.Antigravity,
                 Kimi     = src.Kimi,
                 OpenCode = src.OpenCode,
                 Chips  = src.Chips,
@@ -261,7 +279,7 @@ namespace UnityMCP.Editor.Chat
                             ExtraArgs      = src.Claude.ExtraArgs,
                         },
                         Codex    = src.Codex,
-                        Gemini   = src.Gemini,
+                        Antigravity = src.Antigravity,
                         Kimi     = src.Kimi,
                         OpenCode = src.OpenCode,
                         Chips    = src.Chips,
@@ -278,23 +296,23 @@ namespace UnityMCP.Editor.Chat
                             StartupTimeoutSec = src.Codex.StartupTimeoutSec,
                             ExtraArgs         = src.Codex.ExtraArgs,
                         },
-                        Gemini   = src.Gemini,
+                        Antigravity = src.Antigravity,
                         Kimi     = src.Kimi,
                         OpenCode = src.OpenCode,
                         Chips    = src.Chips,
                     };
-                case BackendKind.Gemini:
-                    if (src.Gemini.Model == selectedModel) return src;
+                case BackendKind.Antigravity:
+                    if (src.Antigravity.Model == selectedModel) return src;
                     return new BackendConfigStore
                     {
-                        Claude   = src.Claude,
-                        Codex    = src.Codex,
-                        Gemini   = new GeminiBackendConfig
+                        Claude      = src.Claude,
+                        Codex       = src.Codex,
+                        Antigravity = new AntigravityBackendConfig
                         {
                             Model        = selectedModel,
-                            ApprovalMode = src.Gemini.ApprovalMode,
-                            Sandbox      = src.Gemini.Sandbox,
-                            ExtraArgs    = src.Gemini.ExtraArgs,
+                            ApprovalMode = src.Antigravity.ApprovalMode,
+                            Sandbox      = src.Antigravity.Sandbox,
+                            ExtraArgs    = src.Antigravity.ExtraArgs,
                         },
                         Kimi     = src.Kimi,
                         OpenCode = src.OpenCode,
@@ -306,7 +324,7 @@ namespace UnityMCP.Editor.Chat
                     {
                         Claude   = src.Claude,
                         Codex    = src.Codex,
-                        Gemini   = src.Gemini,
+                        Antigravity = src.Antigravity,
                         Kimi     = new KimiBackendConfig
                         {
                             Model        = selectedModel,
@@ -322,7 +340,7 @@ namespace UnityMCP.Editor.Chat
                     {
                         Claude   = src.Claude,
                         Codex    = src.Codex,
-                        Gemini   = src.Gemini,
+                        Antigravity = src.Antigravity,
                         Kimi     = src.Kimi,
                         OpenCode = new OpenCodeBackendConfig
                         {

@@ -187,17 +187,17 @@ namespace UnityMCP.Editor.Chat.Tests
         // ── F28: backward compat — old int=2 (CodexAppServer) maps to Codex ──
 
         [Test]
-        public void Deserialize_BackendKind2_MapsToGemini()
+        public void Deserialize_BackendKind2_MapsToAntigravity()
         {
-            // int=2 was CodexAppServer (removed F28), now Gemini.
+            // int=2 was CodexAppServer (removed F28), then Gemini, now Antigravity (same int).
             var textB64  = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("do stuff"));
             var nameB64  = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("agent"));
             var phaseB64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Sending"));
             var header   = $"sess-old|{textB64}|1|{nameB64}|{phaseB64}|0|0|1000|2";
             var rt = PendingTurnState.Deserialize(header);
             Assert.IsNotNull(rt);
-            Assert.AreEqual(BackendKind.Gemini, rt.Value.BackendKind,
-                "int=2 now maps to BackendKind.Gemini");
+            Assert.AreEqual(BackendKind.Antigravity, rt.Value.BackendKind,
+                "int=2 now maps to BackendKind.Antigravity");
         }
     }
 }

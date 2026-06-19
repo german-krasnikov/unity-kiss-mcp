@@ -2,10 +2,6 @@
 """Unity MCP installer. stdlib only, Python 3.10+."""
 import argparse
 import json
-import platform
-import shutil
-import socket
-import subprocess
 import sys
 from pathlib import Path
 
@@ -14,155 +10,118 @@ SERVER_DIR = REPO_ROOT / "server"
 CODEX_DIR = REPO_ROOT / ".codex"
 MCP_JSON = REPO_ROOT / ".mcp.json"
 CODEX_CONFIG = CODEX_DIR / "config.toml"
+_UNITY_MCP_DATA_DIR = Path.home() / ".unity-mcp"
+
+# ── package imports ───────────────────────────────────────────────────────────
+sys.path.insert(0, str(REPO_ROOT))
+from install import ui  # noqa: E402
+from install.ui import prompt_yn  # noqa: E402
+import install.commands as _cmds  # noqa: E402
+
+# ── lazy server-package imports (patchable at module level) ───────────────────
+
+def _add_server_to_path() -> None:
+    src = str(SERVER_DIR / "src")
+    if src not in sys.path:
+        sys.path.insert(0, src)
 
 
-def _check_python() -> bool:
-    return sys.version_info >= (3, 10)
+try:
+    _add_server_to_path()
+    from unity_mcp.config.clients import CLIENT_REGISTRY, detect_installed
+    from unity_mcp.config.merger import merge_mcp_config
+    from unity_mcp.config.backup import backup
+    from unity_mcp.config.resolver import build_server_entry
+except ImportError:
+    CLIENT_REGISTRY = {}  # type: ignore[assignment]
+    detect_installed = lambda: []  # type: ignore[assignment]
+    merge_mcp_config = None  # type: ignore[assignment]
+    backup = None  # type: ignore[assignment]
+    build_server_entry = lambda port=0: {}  # type: ignore[assignment]
 
+
+# ── thin wrappers (read module globals at call time so tests can patch) ───────
 
 def _venv_python() -> Path:
-    if platform.system() == "Windows":
-        return SERVER_DIR / ".venv" / "Scripts" / "python.exe"
-    return SERVER_DIR / ".venv" / "bin" / "python"
-
-
-def _sync_uv() -> None:
-    subprocess.run(["uv", "sync"], cwd=SERVER_DIR, check=True)
-
-
-def _create_venv() -> None:
-    venv_dir = SERVER_DIR / ".venv"
-    subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
-    pip = venv_dir / ("Scripts" if platform.system() == "Windows" else "bin") / "pip"
-    subprocess.run([str(pip), "install", "-e", ".[dev]"], cwd=SERVER_DIR, check=True)
+    return _cmds.venv_python(SERVER_DIR)
 
 
 def _venv_stale() -> bool:
-    """True if venv python doesn't point into SERVER_DIR (moved folder)."""
-    py = _venv_python()
-    if not py.exists():
-        return False
-    try:
-        resolved = py.resolve()
-        return SERVER_DIR not in resolved.parents
-    except Exception:
-        return True
-
-
-def _write_codex_config() -> None:
-    py = _venv_python()
-    CODEX_DIR.mkdir(exist_ok=True)
-    CODEX_CONFIG.write_text(
-        "[mcp_servers.unity-mcp]\n"
-        f'command = "{py}"\n'
-        'args = ["-m", "unity_mcp.server"]\n'
-        "startup_timeout_sec = 10\n"
-        "tool_timeout_sec = 120\n"
-        "enabled = true\n"
-        "\n[mcp_servers.unity-mcp.env]\n"
-        'PYTHONUTF8 = "1"\n',
-        encoding="utf-8",
-    )
-    print(f"  Wrote {CODEX_CONFIG}")
+    return _cmds.venv_stale(SERVER_DIR)
 
 
 def _setup_env(force_recreate: bool = False) -> None:
-    if not _check_python():
-        sys.exit(f"Python 3.10+ required, got {sys.version}")
+    _cmds.setup_env(SERVER_DIR, CODEX_DIR, CODEX_CONFIG, ui, force_recreate=force_recreate)
 
-    has_uv = shutil.which("uv") is not None
 
-    if force_recreate and not has_uv:
-        venv_dir = SERVER_DIR / ".venv"
-        if venv_dir.exists():
-            print("  Removing stale .venv …")
-            shutil.rmtree(venv_dir)
-
-    if has_uv:
-        print("  uv found — running uv sync …")
-        _sync_uv()
-    else:
-        print("  uv not found — using venv + pip …")
-        _create_venv()
-
-    _write_codex_config()
-
+# ── subcommands ───────────────────────────────────────────────────────────────
 
 def cmd_setup(_args: argparse.Namespace) -> None:
-    print("=== Unity MCP setup ===")
+    ui.box(["Unity MCP setup"])
     _setup_env()
-    print("Done. Run 'python install.py doctor' to verify.")
+    ui.ok("Done. Run 'python install.py doctor' to verify.")
 
 
 def cmd_update(_args: argparse.Namespace) -> None:
-    print("=== Unity MCP update ===")
+    ui.box(["Unity MCP update"])
     stale = _venv_stale()
     if stale:
-        print("  Stale venv detected (folder moved).")
+        ui.info("Stale venv detected (folder moved).")
     _setup_env(force_recreate=stale)
-    print("Done.")
+    ui.ok("Done.")
 
 
 def cmd_doctor(_args: argparse.Namespace) -> None:
-    def ok(label: str, result: bool, info: str = "") -> None:
-        tag = "[OK]  " if result else "[FAIL]"
-        suffix = f" ({info})" if info else ""
-        print(f"  {tag} {label}{suffix}")
-
-    print("=== Unity MCP doctor ===")
-    ok("Python >= 3.10", _check_python(), sys.version.split()[0])
-    ok("uv found", shutil.which("uv") is not None)
-
-    py = _venv_python()
-    ok(".venv/python exists", py.exists(), str(py))
-
-    importable = False
-    if py.exists():
-        r = subprocess.run([str(py), "-c", "import unity_mcp"], capture_output=True)
-        importable = r.returncode == 0
-    ok("unity_mcp importable", importable)
-
-    paths_ok = False
-    if CODEX_CONFIG.exists():
-        content = CODEX_CONFIG.read_text(encoding="utf-8")
-        paths_ok = str(py) in content
-    ok(".codex/config.toml paths correct", paths_ok)
-
-    mcp_ok = False
-    if MCP_JSON.exists():
-        try:
-            data = json.loads(MCP_JSON.read_text(encoding="utf-8"))
-            mcp_ok = "unity" in data.get("mcpServers", {})
-        except Exception:
-            pass
-    ok(".mcp.json configured", mcp_ok)
-
-    # TCP :9500 probe
-    try:
-        with socket.create_connection(("127.0.0.1", 9500), timeout=1):
-            print("  [INFO] TCP :9500 — OPEN (Unity plugin listening)")
-    except OSError:
-        print("  [INFO] TCP :9500 — closed (Unity not running or plugin disabled)")
+    _cmds.cmd_doctor(SERVER_DIR, CODEX_CONFIG, MCP_JSON, ui, _args)
 
 
 def cmd_configure(args: argparse.Namespace) -> None:
+    """Configure AI tools (--tool) or write .mcp.json to Unity project (--project)."""
+    if merge_mcp_config is None:
+        ui.fail("unity_mcp not installed. Run: python install.py setup")
+        sys.exit(1)
+
+    if getattr(args, "project", None):
+        _cmd_configure_project(args)
+        return
+
+    entry = build_server_entry(port=getattr(args, "port", 0))
+    if getattr(args, "tool", None):
+        tools = [args.tool]
+    else:
+        installed = detect_installed()
+        ui.info(f"Detected: {', '.join(installed) or 'none'}")
+        tools = [t for t in installed if prompt_yn(f"Configure {t}?")]
+
+    for tool in tools:
+        client = CLIENT_REGISTRY[tool]
+        if client.stdout_only:
+            print(json.dumps({"mcpServers": {"unity-mcp": entry}}, indent=2, ensure_ascii=False))
+            continue
+        backup(client.config_path)
+        merge_mcp_config(client.config_path, entry)
+        ui.ok(f"{client.name} configured at {client.config_path}")
+
+
+def _cmd_configure_project(args: argparse.Namespace) -> None:
     project = Path(args.project).resolve()
     if not project.is_dir():
         sys.exit(f"Directory not found: {project}")
     target = project / ".mcp.json"
-    config = {
-        "mcpServers": {
-            "unity": {
-                "command": "uv",
-                "args": ["run", "--directory", str(SERVER_DIR), "unity-mcp"],
-                "env": {"PYTHONUTF8": "1"},
-            }
-        }
-    }
-    target.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n",
-                      encoding="utf-8")
-    print(f"Wrote {target}")
+    config = {"mcpServers": {"unity": {
+        "command": "uvx",
+        "args": ["unity-mcp"],
+        "env": {"PYTHONUTF8": "1"},
+    }}}
+    target.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    ui.ok(f"Wrote {target}")
 
+
+def cmd_uninstall(_args: argparse.Namespace) -> None:
+    _cmds.cmd_uninstall(SERVER_DIR, _UNITY_MCP_DATA_DIR, ui, prompt_yn, _args)
+
+
+# ── argparse ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Unity MCP installer")
@@ -171,12 +130,20 @@ def main() -> None:
     sub.add_parser("setup", help="First-time setup")
     sub.add_parser("update", help="Re-sync after folder move")
     sub.add_parser("doctor", help="Diagnose installation")
-    cfg = sub.add_parser("configure", help="Write .mcp.json into a Unity project")
-    cfg.add_argument("--project", required=True, help="Path to Unity project root")
+
+    cfg = sub.add_parser("configure", help="Configure AI tools or write .mcp.json")
+    cfg.add_argument("--project", help="Path to Unity project root (legacy)")
+    cfg.add_argument("--tool", choices=list(CLIENT_REGISTRY) or
+                     ["claude-desktop", "claude-code", "cursor", "windsurf", "generic"])
+    cfg.add_argument("--port", type=int, default=0)
+
+    sub.add_parser("uninstall", help="Remove Unity MCP")
 
     args = p.parse_args()
-    dispatch = {"setup": cmd_setup, "update": cmd_update,
-                "doctor": cmd_doctor, "configure": cmd_configure}
+    dispatch = {
+        "setup": cmd_setup, "update": cmd_update, "doctor": cmd_doctor,
+        "configure": cmd_configure, "uninstall": cmd_uninstall,
+    }
     dispatch[args.cmd](args)
 
 

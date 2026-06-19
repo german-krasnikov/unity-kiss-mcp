@@ -208,13 +208,17 @@ namespace UnityMCP.Editor.Chat
             {
                 int liveIndex = pill.userData is int idx ? idx : _pillRow.IndexOf(pill);
 
-                evt.menu.AppendAction("Show LLM payload", _ =>
+                evt.menu.AppendAction(CopyableText.LabelCopyAsSent, _ =>
                 {
                     if (liveIndex < 0 || liveIndex >= _model.Count) return;
                     var chip    = _model.Chips[liveIndex];
                     var cfg     = BackendConfigStore.Load().Chips;
                     var payload = ChipContextResolver.ResolveAllTyped(new List<ChipData> { chip }, cfg);
-                    Debug.Log($"[MCP Chat] LLM payload for chip [{chip.KindKey}:{chip.Path}]:\n{payload}");
+                    if (!string.IsNullOrEmpty(payload))
+                    {
+                        EditorGUIUtility.systemCopyBuffer = payload;
+                        CopyFlash.Show();
+                    }
                 });
 
                 evt.menu.AppendAction("Copy path", _ =>
