@@ -1,8 +1,8 @@
 {
-  "tools": 99,
-  "tests_total": 6388,
-  "tests_python": 2540,
-  "tests_unity": 3768,
+  "tools": 98,
+  "tests_total": 5561,
+  "tests_python": 2530,
+  "tests_unity": 2951,
   "tests_live": 80,
   "server_version": "0.40.1",
   "plugin_version": "0.40.1",

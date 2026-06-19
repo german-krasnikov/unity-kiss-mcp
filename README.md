@@ -46,7 +46,7 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 99 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 98 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Gemini, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -136,7 +136,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6388 Tests (2540 Python · 3768 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 5561 Tests (2530 Python · 2951 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -195,6 +195,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.40.1</b> — 2026-06-19 — **Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns …</summary>
+
+**Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns parasitic MCP servers from `~/.mcp.json`; env vars (`UNITY_MCP_PORT`, …
+
+</details>
+
+<details>
 <summary><b>v0.40.0</b> — 2026-06-19 — **One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` …</summary>
 
 **One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` (Windows) bootstraps everything: Python server via `uvx unity-mcp`, …
@@ -223,15 +230,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.35.0</b> — 2026-06-17 — **Inline Media Preview Bubbles** — Phase 2 lazy-load media panel in chat:</summary>
-
-**Inline Media Preview Bubbles** — Phase 2 lazy-load media panel in chat:
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.35.0** — 2026-06-17 — **Inline Media Preview Bubbles** — Phase 2 lazy-load media panel in chat:
 - **v0.34.6** — 2026-06-17 — **Binary Resolver — macOS zsh PATH sourcing** — Changed `bash -lc` to `zsh …
 - **v0.34.0** — 2026-06-17 — **Plugin Extensibility API** — New public interfaces for plugins to extend chat …
 - **v0.33.0** — 2026-06-16 — **Codex Silent Abort Fix (Plugin v0.33.0)** — Fixes hung turns when Codex tools …
