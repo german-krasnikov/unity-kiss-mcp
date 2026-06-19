@@ -2,14 +2,28 @@
 
 ```
 unity-kiss-mcp/
+├── install/                    # Installation & configuration CLI (v0.38.0+)
+│   ├── __init__.py
+│   ├── bootstrap.sh            # One-liner macOS/Linux: git clone + venv setup + config
+│   ├── bootstrap.ps1           # One-liner Windows: git clone + venv setup + config
+│   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
+│   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall)
+│   └── tests/                  # Bootstrap + UI tests
 ├── server/                     # Python MCP Server (2362 unit tests, 70 live = 2432 total Python, v0.30.4)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
+│   │   ├── config/             # Config module (v0.38.0+): client detection, MCP JSON merger, backup/restore
+│   │   │   ├── clients.py      # CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), detect_installed()
+│   │   │   ├── merger.py       # merge_mcp_config(path, entry) — idempotent MCP server entry addition
+│   │   │   ├── backup.py       # Backup/restore config files before modifications
+│   │   │   ├── resolver.py     # build_server_entry(port) — MCP server entry generator
+│   │   │   └── validator.py    # Config validation + path detection per tool
 │   │   ├── server_filtering.py # Port discovery + TCP probe (v0.23.0), chat-port fallback (v0.36.0), catalog push, tool filtering
 │   │   ├── lockfile.py         # Cross-platform exclusive locking + zombie detection (v0.23.0)
 │   │   ├── diagnose.py         # Shared diagnose parser + verdict logic (_parse_diagnose, _verdict, _DiagnoseFields)
+│   │   ├── _update_check.py    # Version checker — polls PyPI for new releases, displays banner in Unity (v0.38.0+)
 │   │   ├── compile_state.py    # CompileStateProbe (heuristic Unity compile detection)
 │   │   ├── middleware.py       # 23-layer middleware pipeline (env-gated UNITY_MCP_MIDDLEWARE=1)
 │   │   ├── middleware_paths.py # PathResolverMixin extracted from middleware.py
@@ -242,6 +256,20 @@ unity-kiss-mcp/
 │       │   ├── MultiSceneFinderTests.cs   # Object finding across scenes (updated v0.31.0)
 │       │   ├── SceneContextMultiSceneTests.cs # Scene context multi-scene behavior
 │       │   ├── ScenePathParserTests.cs    # Multi-scene path parsing: "SceneName:/" extraction (v0.31.0)
+│       │   ├── SetupWizardTests.cs        # Wizard screen navigation + completion flow
+│       │   ├── SetupDiagnosticsTests.cs   # Diagnostic checks (Python, imports, TCP)
+│       │   ├── DiagnoseCommandTests.cs    # Doctor command + result formatting
+│       │   ├── WizardAnimUtilsTests.cs    # Animation timing + interpolation
+│       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+)
+│       │   ├── SetupWizard.cs             # Auto-launch on first run, 4 screens (Python check, TCP test, AI tool config, complete)
+│       │   ├── SetupWizard.uss            # Wizard stylesheet (layout, animations)
+│       │   ├── WizardScreen.cs            # Base class for wizard screens (lifecycle, navigation)
+│       │   ├── WizardScreenHost.cs        # Screen container + animation orchestrator
+│       │   ├── WizardAnimUtils.cs         # Reusable animation helpers (slide, fade, bounce)
+│       │   └── WizardConfigWriter.cs      # Write .mcp.json to project after completion
+│       ├── DiagnoseCommand.cs             # MCP/Doctor command (entry point)
+│       ├── MCPDiagnosePanel.cs            # Unified diagnostics panel (Python, imports, TCP, config)
+│       ├── MCPDiagnoseWindow.cs           # Diagnostics UI window
 │       ├── Chat/                          # Optional in-Unity Agent Chat (v0.29.2: split into CLI + View, UNITY_MCP_CHAT define)
 │       │   ├── CLI/                        # Chat.CLI assembly (protocol, parsing, backends, independent compile)
 │       │   │   ├── ChatEvent.cs               # Normalized event struct

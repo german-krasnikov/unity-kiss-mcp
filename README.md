@@ -46,9 +46,9 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 98 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 99 MCP tools with 80–95% token compression.
 
-💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the Claude or Codex CLI directly. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
+💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Gemini, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
 **Before / after — creating and configuring 3 objects:**
 
@@ -79,83 +79,48 @@ batch([
 
 ## Quick Start
 
-**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 6000.0+</kbd> · <kbd>Claude Code</kbd> or <kbd>Codex CLI</kbd> · TCP port <kbd>9500</kbd> free
+**Prerequisites:** <kbd>Python 3.10+</kbd> · <kbd>Unity 6000.0+</kbd> · <kbd>TCP port 9500</kbd> free
 
-**1. Install the Python server**
+**One-liner (macOS/Linux):**
 
 ```bash
-git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
-cd unity-kiss-mcp/server && pip install -e ".[dev]"
+curl -fsSL https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/master/install/bootstrap.sh | bash
 ```
 
-**2. Install the Unity plugin**
+**One-liner (Windows PowerShell):**
 
-Add to your project's `Packages/manifest.json`:
-
-```json
-{
-  "dependencies": {
-    "com.unity-mcp.editor": "file:/absolute/path/to/unity-kiss-mcp/unity-plugin"
-  }
-}
+```powershell
+iex (iwr https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/master/install/bootstrap.ps1).Content
 ```
 
-Open Unity — wait for `[MCP] Server started on port 9500` in the Console.
+**Manual setup:**
 
-**3. Configure your MCP client**
+1. Python server: `uvx unity-mcp` — zero-install, runs on demand via PyPI (no separate install step).
+2. Add the Unity plugin via **Package Manager → Add package from git URL:**
+   ```
+   https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin
+   ```
+3. Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. It will:
+   - Verify Python 3.10+ is available
+   - Test the MCP server connection
+   - Configure your AI tool (Claude Code, Claude Desktop, Cursor, Windsurf, + Gemini, Kimi, Codex, OpenCode in Unity Chat)
+   - Display your TCP port
 
-<details open>
-<summary><b>Claude Code</b></summary>
+**Configure an AI tool manually:**
 
-Add to `~/.claude/mcp_settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "unity-mcp": {
-      "command": "python",
-      "args": ["-m", "unity_mcp.server"],
-      "cwd": "/absolute/path/to/unity-kiss-mcp/server"
-    }
-  }
-}
+```bash
+python install.py configure --tool claude-code
 ```
 
-Restart Claude Code. Call `get_hierarchy()` to verify.
+Supported tools: `claude-code`, `claude-desktop`, `cursor`, `windsurf`
 
-</details>
+**Verify installation:**
 
-<details>
-<summary><b>Codex CLI</b></summary>
-
-Add to `.codex/config.toml` in your project root:
-
-```toml
-[mcp_servers.unity-mcp]
-command = "python"
-args = ["-m", "unity_mcp.server"]
-cwd = "/absolute/path/to/unity-kiss-mcp/server"
+```bash
+python install.py doctor
 ```
 
-</details>
-
-<details>
-<summary><b>Other MCP clients</b></summary>
-
-Use the standard `mcpServers` JSON block — same structure as Claude Code but in your client's config file. The server uses stdio transport.
-
-</details>
-
-<details>
-<summary><b>Troubleshooting</b></summary>
-
-- **Port 9500 not listening** — Ensure plugin is in `manifest.json`. Click Unity window to recompile. Check Console.
-- **"Connection refused"** — Unity must be open with the plugin. Server auto-retries on reconnect.
-- **Tools don't appear** — Verify path in `mcp_settings.json`. Restart Claude Code. `pip show unity-mcp`.
-- **C# changes not reflected** — Click Unity window or `open -a Unity` (macOS) to trigger recompile.
-- **Security** — TCP server binds to `localhost` only. Do not expose port 9500 to the network.
-
-</details>
+Shows Python version, venv status, config validity, and TCP port connectivity.
 
 <details>
 <summary><b>Compatibility</b></summary>
@@ -171,14 +136,14 @@ Use the standard `mcpServers` JSON block — same structure as Claude Code but i
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="98 MCP Tools · 6253 Tests (2472 Python · 3701 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6388 Tests (2540 Python · 3768 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
 ## Features
 
 - **Token Optimization** — `batch` compresses 5–20 calls into one (80–95% savings), deferred tool schemas, per-session cost analytics
-- **In-Unity Chat** — Claude/Codex backends, no API key needed, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
+- **In-Unity Chat** — 5 CLI backends (Claude, Gemini, Kimi, Codex, OpenCode), no API key needed, typed context chips (`[hierarchy:/Player]`, `[script:Health.cs]`), per-turn undo, domain-reload safe
 - **Code Intelligence** — Roslyn-powered `find_references`, `compile_preflight`, `semantic_at`
 - **PlayTest DSL** — 21 commands: `MOVE`, `ASSERT`, `WAIT_UNTIL`, `INVOKE`, `SNAPSHOT`, `SIMULATE`
 - **Multi-Scene Management** — Load multiple scenes, inspect/edit across scenes, move/copy objects between loaded scenes, unified `object_diff` for cross-scene comparison
@@ -230,6 +195,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.40.0</b> — 2026-06-19 — **One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` …</summary>
+
+**One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` (Windows) bootstraps everything: Python server via `uvx unity-mcp`, …
+
+</details>
+
+<details>
 <summary><b>v0.38.0</b> — 2026-06-19 — **External MCP Server Support in Chat:**</summary>
 
 **External MCP Server Support in Chat:**
@@ -258,15 +230,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.34.6</b> — 2026-06-17 — **Binary Resolver — macOS zsh PATH sourcing** — Changed `bash -lc` to `zsh …</summary>
-
-**Binary Resolver — macOS zsh PATH sourcing** — Changed `bash -lc` to `zsh -lic` for macOS to correctly source `~/.zshrc` where kimi/opencode PATH is …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.34.6** — 2026-06-17 — **Binary Resolver — macOS zsh PATH sourcing** — Changed `bash -lc` to `zsh …
 - **v0.34.0** — 2026-06-17 — **Plugin Extensibility API** — New public interfaces for plugins to extend chat …
 - **v0.33.0** — 2026-06-16 — **Codex Silent Abort Fix (Plugin v0.33.0)** — Fixes hung turns when Codex tools …
 - **v0.32.0** — 2026-06-16 — **run_tests Fire-and-Forget Protocol (Server v0.32.0)** — `run_tests(mode)` now …

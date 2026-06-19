@@ -1,0 +1,163 @@
+/* ── General layout ─────────────────────────────────────────────────────── */
+
+.wiz-container {
+    padding: 20px;
+}
+
+.wiz-title {
+    font-size: 18px;
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+}
+
+.wiz-subtitle {
+    font-size: 13px;
+    color: var(--unity-colors-default-text);
+    margin-bottom: 16px;
+}
+
+/* ── Status rows ─────────────────────────────────────────────────────────── */
+
+.wiz-status-row {
+    flex-direction: row;
+    align-items: center;
+    margin: 4px 0;
+}
+
+.wiz-status-icon {
+    width: 16px;
+    -unity-text-align: middle-center;
+    margin-right: 8px;
+}
+
+.wiz-status-ok   { color: #3ad29f; }
+.wiz-status-fail { color: #c0392b; }
+.wiz-status-warn { color: #e8a23a; }
+
+/* ── Fade animations ─────────────────────────────────────────────────────── */
+
+.wiz-fade-hidden {
+    opacity: 0;
+    translate: 0 12px;
+}
+
+.wiz-fade-visible {
+    opacity: 1;
+    translate: 0 0;
+    transition-property: opacity, translate;
+    transition-duration: 0.4s;
+    transition-timing-function: ease-out;
+}
+
+/* ── Slide from right ────────────────────────────────────────────────────── */
+
+.wiz-slide-hidden {
+    translate: 20px 0;
+    opacity: 0;
+}
+
+.wiz-slide-visible {
+    translate: 0 0;
+    opacity: 1;
+    transition-property: translate, opacity;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out;
+}
+
+/* ── Pulse (border-width expansion — proven Unity 6 pattern) ─────────────── */
+
+.wiz-pulse {
+    border-width: 3px;
+    border-color: #3ad29f;
+    transition-property: border-width, border-color;
+    transition-duration: 0.4s;
+    transition-timing-function: ease-out;
+}
+
+/* ── Step dots ───────────────────────────────────────────────────────────── */
+
+.wiz-dots {
+    flex-direction: row;
+    justify-content: center;
+    margin: 12px 0;
+}
+
+.wiz-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background-color: var(--unity-colors-default-border);
+    margin: 0 4px;
+    transition-property: background-color, border-width;
+    transition-duration: 0.25s;
+}
+
+.wiz-dot--active {
+    background-color: #3ad29f;
+    border-width: 2px;
+}
+
+/* ── Scan dots ───────────────────────────────────────────────────────────── */
+
+.wiz-scan-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 3.5px;
+    background-color: #e8a23a;
+    opacity: 0.2;
+    margin: 0 3px;
+    transition-property: opacity;
+    transition-duration: 0.2s;
+}
+
+.wiz-scan-dot--lit {
+    opacity: 1.0;
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+
+.wiz-card {
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    padding: 14px 16px;
+    margin: 6px 0;
+    transition-property: border-color, background-color;
+    transition-duration: 0.2s;
+}
+
+.wiz-card:hover {
+    border-color: #3ad29f;
+    background-color: rgba(58, 210, 159, 0.06);
+}
+
+/* ── Copy button feedback ────────────────────────────────────────────────── */
+
+.wiz-btn-copied {
+    border-color: #3ad29f;
+    color: #3ad29f;
+    transition-property: border-color, color;
+    transition-duration: 0.15s;
+}
+
+/* ── Navigation ──────────────────────────────────────────────────────────── */
+
+.wiz-nav {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 16px;
+}
+
+@keyframes wiz-shake-frames {
+    0%   { translate: -6px 0; }
+    20%  { translate:  5px 0; }
+    40%  { translate: -4px 0; }
+    60%  { translate:  3px 0; }
+    100% { translate:  0px 0; }
+}
+
+.wiz-shake {
+    animation-name: wiz-shake-frames;
+    animation-duration: 275ms;
+    animation-timing-function: ease-out;
+}

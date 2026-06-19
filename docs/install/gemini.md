@@ -1,48 +1,84 @@
 # Gemini Setup
 
-Since v0.34.0. Spawns `gemini -p` per turn with stream-json output. MCP config auto-written to `~/.gemini/settings.json` (injected into the existing file without clobbering other settings). Works on **macOS and Linux**.
+Since v0.30.1. The in-Unity Chat window supports Gemini as a backend. The plugin spawns `gemini -p` per turn with stream-json output, auto-writing MCP config to `~/.gemini/settings.json` without clobbering other settings. Works on **macOS and Linux**.
 
 ## Prerequisites
 
 - Gemini CLI installed and authenticated
-- Unity project with the `unity-mcp` plugin installed
-- Python 3.10+ with `server/` dependencies installed (see main install guide)
+- Unity 6000.0+ with the `unity-mcp` plugin installed (via UPM git URL)
+- TCP port 9500 (or assigned by wizard) free
 
-## 1. Install Gemini CLI
+## 1. Quick Setup
 
-### macOS (Homebrew — recommended)
+Bootstrap script handles everything:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/master/install/bootstrap.sh | bash
+```
+
+Then open Unity and follow the Setup Wizard.
+
+## 2. Manual Setup
+
+### Install Gemini CLI
+
+**macOS (Homebrew — recommended):**
 
 ```bash
 brew install gemini-cli
 gemini --version
 ```
 
-### All Platforms (npm)
+**All platforms (npm):**
 
 ```bash
 npm install -g @google/gemini-cli
 gemini --version
 ```
 
-## 2. Authenticate
+### Install Python Server
+
+```bash
+git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
+cd unity-kiss-mcp
+python install.py setup
+```
+
+### Add Plugin to Unity
+
+1. Open Package Manager (Window → Package Manager)
+2. Click `+` → **Add package from git URL**
+3. Paste: `https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin`
+
+### Authenticate Gemini
 
 ```bash
 gemini
 ```
 
-On first launch, Gemini opens a browser for Google OAuth. After authentication, credentials are stored in `~/.gemini/oauth_creds.json`.
+Gemini opens a browser for Google OAuth. Credentials are stored in `~/.gemini/oauth_creds.json`.
+
+### Configure Gemini (Automatic)
+
+Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Select **Gemini** and follow the prompts.
+
+**Manual configuration:**
+
+```bash
+python install.py configure --tool gemini
+```
 
 ## 3. Use From the Editor (Primary Workflow)
 
-1. Open Unity and wait for `[MCP] Server started on port XXXX` in the Console.
-2. Open `Window > MCP Chat`.
+1. Open Unity and wait for `[MCP] Server started on port <XXXX>` in the Console.
+2. Open **Window → MCP Chat**.
 3. Select **Gemini** from the backend dropdown.
-4. Choose a model (optional — defaults to the Gemini CLI default).
+4. Optionally choose a model from the dropdown (defaults to Gemini CLI default).
 5. Type a prompt and press Send.
 
 ## 4. How the Plugin Wires MCP
 
-Before each turn, the plugin writes the `unity-mcp` entry into `~/.gemini/settings.json`:
+Before each turn, the plugin merges the `unity-mcp` entry into `~/.gemini/settings.json`:
 
 ```json
 {
@@ -57,36 +93,41 @@ Before each turn, the plugin writes the `unity-mcp` entry into `~/.gemini/settin
 }
 ```
 
-If the file already exists, the plugin merges the `unity-mcp` entry into the existing `mcpServers` block — it does **not** overwrite other settings. The port is always kept up to date.
+If the file already exists, only the `unity-mcp` entry is modified — other MCP servers are preserved.
 
-**Command shape:**
+The plugin spawns:
 
 ```bash
 gemini -p "<prompt>" --output-format stream-json [--model <id>] [--yolo] [--sandbox]
 ```
 
-`--yolo` maps to the `yolo` approval mode. `--sandbox` is passed when sandbox mode is enabled in the Chat settings.
-
-## 5. Verify Connectivity (Manual CLI Test)
-
-With Unity open:
+## 5. Verify Installation
 
 ```bash
+python install.py doctor
+```
+
+Or check manually:
+
+```bash
+gemini --version
+cat ~/.gemini/settings.json  # should contain unity-mcp entry
+
+# Test (with Unity running)
 gemini -p "Call the mcp tool get_hierarchy and return the result" --output-format stream-json
 ```
 
-Expected: NDJSON stream. Look for a `tool_use` line with `"tool_name": "mcp_unity-mcp_get_hierarchy"` followed by a `tool_result` line, then a `message` line with `"role": "assistant"`.
+## 6. Verify Connectivity (Manual CLI Test)
 
-## 6. Available Models
+Expected: NDJSON stream with `tool_use` line containing `"tool_name": "mcp_unity-mcp_get_hierarchy"`.
 
-The model dropdown passes the value directly to `--model`. Leave it empty to use the Gemini CLI default (currently `gemini-2.5-pro`). Any model ID accepted by `gemini --model` works.
-
-## 7. Common Problems
+## 7. Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
-| `gemini: command not found` | Check `which gemini`; if missing, re-run the installer. On macOS, `brew install gemini-cli`. |
-| MCP tools not available in session | Verify `~/.gemini/settings.json` contains the `unity-mcp` entry (the plugin writes it before each turn). Check that Unity is running and the port matches `UNITY_MCP_PORT`. |
-| `ModuleNotFoundError: unity_mcp` | `server/.venv` is missing or stale. Recreate: `cd server && python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"` |
-| Binary not found in Unity but works in terminal | Unity doesn't source `~/.zshrc`/shell profile. Set the full path in **Settings > Agent Chat > Gemini Binary Path**. |
-| Settings file clobbered other MCP servers | The plugin uses merge logic — it only touches the `unity-mcp` key. If other entries disappeared, they were likely in a `mcpServers` block with malformed JSON. |
+| `gemini: command not found` | Check `which gemini`. On macOS, run `brew install gemini-cli`. Restart terminal after install. |
+| Setup Wizard doesn't open | (1) Verify plugin is in Package Manager. (2) Close/reopen Unity. (3) Check Console for errors. |
+| MCP tools not available in Chat | Verify `~/.gemini/settings.json` contains `unity-mcp` entry. Check Unity Console shows `[MCP] Server started on port <XXXX>`. Restart Chat session. |
+| `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or clone and setup manually. |
+| Binary not found in Chat Settings but works in terminal | Terminal sources `~/.zshrc` but Unity doesn't. Override: **Settings > Agent Chat > Gemini Binary Path** — enter absolute path. |
+| Settings file broke other MCP servers | The plugin merges intelligently — it only modifies the `unity-mcp` entry. If other servers disappeared, they likely had malformed JSON. Restore from backup if needed. |

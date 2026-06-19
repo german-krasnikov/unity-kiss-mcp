@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.40.0] — 2026-06-19 <!-- install-ux-revolution -->
+
+- **One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` (Windows) bootstraps everything: Python server via `uvx unity-mcp`, Unity plugin via UPM git URL
+- **Setup Wizard** — 4-screen animated wizard (Python check → Server test → AI Config) accessible via MCP/Setup Wizard menu. 8 backend cards: Claude Code/Desktop, Cursor, Windsurf, Gemini, Kimi, Codex, OpenCode
+- **Doctor MCP Tool** — 5 async health checks (Python, ports, lockfile, TCP, Unity state) with 3 safe auto-fixes. Available as `doctor` MCP command
+- **Config Auto-Generation** — `python install.py configure --tool <name>` for Claude Code/Desktop, Cursor, Windsurf. JSON merge preserves existing MCP servers
+- **Update Checker** — manual "Check for Updates" button in MCPStatusWindow, PyPI + GitHub Releases with 24h cache
+- **CHANGELOG Viewer** — foldable changelog section in MCPStatusWindow, newer entries marked with ★
+- **Health Dashboard** — "Diagnose" button in MCPStatusWindow with animated scan + staggered results
+- **Version Unification** — Python server and Unity plugin share version 0.40.0. PROTOCOL_VERSION=3 with backward-compatible handshake
+- **Premium CLI UX** — braille spinners, ANSI colors, unicode box frames, NO_COLOR support, cross-platform degradation
+
 ## [v0.38.0] — 2026-06-19 <!-- External MCP server support in Chat -->
 
 **Major Features:**

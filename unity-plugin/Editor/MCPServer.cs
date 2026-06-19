@@ -579,7 +579,7 @@ namespace UnityMCP.Editor
                         {
                             // RC-5: include domain stamp so reconnect can detect stale DLL.
                             var stamp = SyncHelper.CurrentDomainStamp;
-                            var ver = string.IsNullOrEmpty(stamp) ? "1.0" : $"1.0|stamp:{stamp}";
+                            var ver = BuildVersionString(stamp, PluginVersion);
                             await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, ver, null), clientToken);
                             continue;
                         }
@@ -843,6 +843,17 @@ namespace UnityMCP.Editor
         }
 
         // ── Tier 4b: status response format ──────────────────────────────────
+
+        // synced by sync_versions.py — do not edit manually
+        internal static string PluginVersion => "0.40.0";
+
+        internal static string BuildVersionString(string stamp, string pluginVersion)
+        {
+            var result = $"proto:3|plugin:{pluginVersion}";
+            if (!string.IsNullOrEmpty(stamp))
+                result += $"|stamp:{stamp}";
+            return result;
+        }
 
         internal static string FormatStatusResponse(string msgId, bool isCompiling, double elapsed)
         {
