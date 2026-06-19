@@ -96,10 +96,10 @@ namespace UnityMCP.Editor.Chat.Tests
             backend.Stop();
         }
 
-        // ── BuildArgs must emit 3 -c flags for MCP config (no model) ────────
+        // ── BuildArgs: disables static unity/unity-mcp entries, registers unity_chat ─────
 
         [Test]
-        public void BuildArgs_HasThreeMcpConfigFlags()
+        public void BuildArgs_DisablesStaticEntries_AndRegistersUnityChatServer()
         {
             var backend = new CodexAppServerBackend();
             var method  = typeof(CodexAppServerBackend)
@@ -113,10 +113,15 @@ namespace UnityMCP.Editor.Chat.Tests
             for (int i = 0; i < args.Length - 1; i++)
                 if (args[i] == "-c") cValues.Add(args[i + 1]);
 
-            Assert.AreEqual(3, cValues.Count, "BuildArgs without model must emit exactly 3 -c flags");
-            Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity.command=")));
-            Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity.args=")));
-            Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity.startup_timeout_sec=")));
+            // 2 disable + 3 registration + 2 env = 7 -c flags (no model)
+            Assert.AreEqual(7, cValues.Count, $"BuildArgs without model must emit exactly 7 -c flags, got: {string.Join(", ", cValues)}");
+            Assert.IsTrue(cValues.Exists(v => v == "mcp_servers.unity.enabled=false"), "must disable global unity entry");
+            Assert.IsTrue(cValues.Exists(v => v == "mcp_servers.unity-mcp.enabled=false"), "must disable project unity-mcp entry");
+            Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity_chat.command=")));
+            Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity_chat.args=")));
+            Assert.IsTrue(cValues.Exists(v => v.StartsWith("mcp_servers.unity_chat.startup_timeout_sec=")));
+            Assert.IsTrue(cValues.Exists(v => v.Contains("unity_chat.env.UNITY_MCP_PORT=")));
+            Assert.IsTrue(cValues.Exists(v => v.Contains("unity_chat.env.UNITY_MCP_CHAT=")));
             backend.Stop();
         }
 
@@ -137,8 +142,8 @@ namespace UnityMCP.Editor.Chat.Tests
             for (int i = 0; i < args.Length - 1; i++)
                 if (args[i] == "-c") cValues.Add(args[i + 1]);
 
-            // 4 -c flags total: 3 MCP + 1 model
-            Assert.AreEqual(4, cValues.Count, "BuildArgs with model must emit 4 -c flags");
+            // 7 base flags + 1 model = 8 -c flags total
+            Assert.AreEqual(8, cValues.Count, $"BuildArgs with model must emit 8 -c flags, got: {string.Join(", ", cValues)}");
             Assert.IsTrue(cValues.Exists(v => v == "model=\"o3\""),
                 $"Expected -c model=\"o3\" but got: {string.Join(", ", cValues)}");
             CollectionAssert.DoesNotContain(args, "--model", "app-server does not accept --model");

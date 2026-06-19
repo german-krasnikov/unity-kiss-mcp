@@ -86,7 +86,9 @@ namespace UnityMCP.Editor.Chat
                 foreach (var token in ArgTokenizer.Split(extraArgs))
                     args.Add(token);
 
-            return (args.ToArray(), new[] { "ANTHROPIC_API_KEY", "CLAUDECODE" });
+            // Strip UNITY_MCP_PORT/CHAT so ~/.mcp.json "unity-mcp" won't inherit them
+            // (they're already in --mcp-config env block, scoped to "unity" server only).
+            return (args.ToArray(), new[] { "ANTHROPIC_API_KEY", "CLAUDECODE", "UNITY_MCP_PORT", "UNITY_MCP_CHAT" });
         }
     }
 }
