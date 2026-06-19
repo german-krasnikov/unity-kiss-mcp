@@ -4,7 +4,7 @@
   "tests_python": 2540,
   "tests_unity": 3768,
   "tests_live": 80,
-  "server_version": "0.40.0",
-  "plugin_version": "0.40.0",
+  "server_version": "0.40.1",
+  "plugin_version": "0.40.1",
   "batch_savings": "80\u201395%"
 }

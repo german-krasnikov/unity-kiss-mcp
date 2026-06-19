@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.40.1] — 2026-06-19 <!-- chat-tcp-fix -->
+
+- **Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns parasitic MCP servers from `~/.mcp.json`; env vars (`UNITY_MCP_PORT`, `UNITY_MCP_CHAT`) scoped per-backend via `--mcp-config` env block (Claude) and TOML `-c` flags (Codex)
+- **Fix: Codex Chat TCP routing** — Codex `app-server` disables static `unity`/`unity-mcp` MCP entries and registers `unity_chat` with correct chat port, preventing CLI-port fallback
+
 ## [v0.40.0] — 2026-06-19 <!-- install-ux-revolution -->
 
 - **One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` (Windows) bootstraps everything: Python server via `uvx unity-mcp`, Unity plugin via UPM git URL
