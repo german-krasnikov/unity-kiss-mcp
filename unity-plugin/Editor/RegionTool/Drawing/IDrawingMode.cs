@@ -1,0 +1,46 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace UnityMCP.Editor.RegionTool
+{
+    internal interface IDrawingMode
+    {
+        DrawingModeId Id { get; }
+
+        // Called on MouseDown to begin interaction
+        void Begin(Vector2 startXZ, bool gridSnap);
+
+        // Called on each relevant event. Returns true if consumed.
+        bool OnEvent(Event e, Vector2 currentXZ);
+
+        // Live preview vertices for rendering
+        IReadOnlyList<Vector2> PreviewVertices { get; }
+
+        // True when mode has enough data to finalize (e.g. MouseUp for lasso/rect/circle)
+        bool IsComplete { get; }
+
+        // False means auto-transition to Preview (PbP sets false when closed or 0 verts)
+        bool IsActive { get; }
+
+        // Produce final polygon. Returns null if < 3 valid vertices.
+        Polygon2D? Finalize();
+
+        void Reset();
+    }
+
+    internal enum DrawingModeId { Lasso, Rectangle, Circle, PointByPoint }
+
+    internal static class DrawingModeFactory
+    {
+        public static IDrawingMode Create(DrawingModeId id) => id switch
+        {
+            DrawingModeId.Lasso        => new LassoMode(),
+            DrawingModeId.Rectangle    => new RectangleMode(),
+            DrawingModeId.Circle       => new CircleMode(
+                PolygonDetailConfig.CircleVertices(PolygonDetailSettings.Default)),
+            DrawingModeId.PointByPoint => new PointByPointMode(),
+            _ => throw new ArgumentOutOfRangeException(nameof(id), id, null)
+        };
+    }
+}

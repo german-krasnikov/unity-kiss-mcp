@@ -122,6 +122,16 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **FileOutputHelper (v0.23.0)**: ScreenshotsDir now `<ProjectRoot>/ScreenShots/` (project-local, not shared cache)
    - **RefManager**: short refs $a-$zz (702 slots), invalidated on scene change
    - **ErrorHelper**: contextual errors with did-you-mean hints
+   - **RegionTool (v0.46.0, new)**: Interactive Scene View polygon region selection for level design
+     * **Polygon2D**: Immutable 2D polygon (XZ plane), winding-number PIP test, AABB bounds, CSV import/export, RDP simplification
+     * **SceneRegionTool**: EditorTool with multi-mode FSM (Lasso/Rectangle/Circle/PointByPoint), keyboard shortcuts (Shift+R activate, Q/W/E/R mode switch, G grid snap, Enter commit, Esc cancel)
+     * **SceneRegionQuery**: 3-stage spatial pipeline (AABB pre-filter → component filter → PIP test → cap+format), GameObject[] array result
+     * **SceneRegionState**: LRU registry (8 slots) + EditorPrefs persistence, CSV export for later use
+     * **Drawing Modes** (IDrawingMode interface): LassoMode (free-form), RectangleMode (orthogonal), CircleMode (radius), PointByPointMode (manual vertices). Each mode tracks active state, completion, grid snap tolerance. DrawingUtils shared snapping logic.
+     * **Rendering**: RegionRenderer (GL wireframe + fill), RenderStyle (color/alpha), RenderState (active/preview/committed). UIToolkit SceneRegionOverlay for UI elements.
+     * **PolygonDetail**: Detail level presets (High/Medium/Low), per-preset RDP threshold, EditorPrefs toggle
+     * **Chat Integration**: RegionChipProvider for region selection in chat (selectable from dropdown, persists across turns)
+     * **Tests**: 104 C# NUnit tests (Drawing modes, Rendering, state management)
 
 4. **Guards (C#)**
    - **Compile guard**: blocks all except ping, get_version, get_console, screenshot, get_enabled_tools, compile_status

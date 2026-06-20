@@ -28,9 +28,12 @@ namespace UnityMCP.Editor.Tests
         [TestCase("delete_object")]
         [TestCase("get_hierarchy")]
         [TestCase("batch")]
-        [TestCase("execute_code")]
         public void IsAllowedDuringCompile_BlockedCommands_ReturnFalse(string cmd)
             => Assert.IsFalse(CommandRouter.IsAllowedDuringCompile(cmd));
+
+        [Test]
+        public void IsAllowedDuringCompile_ExecuteCode_ReturnsTrue()
+            => Assert.IsTrue(CommandRouter.IsAllowedDuringCompile("execute_code"));
 
         // ── IsAlwaysAllowed ───────────────────────────────────────────────────
 

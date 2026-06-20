@@ -7,12 +7,12 @@ from unity_mcp.tools.diagnose import _parse_diagnose, _DiagnoseFields, _verdict
 
 log = logging.getLogger("unity_mcp.reload_ladder")
 
-_T1_POLL_S: float = 15.0
-_T4_POLL_S: float = 20.0
+_T1_POLL_S: float = 40.0
+_T4_POLL_S: float = 45.0
 _POLL_INTERVAL_S: float = 1.0
-_T2_SLEEP_S: float = 3.0
+_T2_SLEEP_S: float = 8.0
 _T5_PLAY_WAIT_S: float = 2.0
-_T1_MAX_POLLS: "int | None" = 30
+_T1_MAX_POLLS: "int | None" = None
 _T4_MAX_POLLS: "int | None" = None
 _BROKEN_DOMAIN = "_BROKEN_DOMAIN_"  # M2: delta but new domain is broken
 _DEAD_MSG   = "MANUAL-REQUIRED: both ports dead — Unity unreachable, Reimport All manually"
@@ -84,9 +84,14 @@ async def _t2(send, baseline: str) -> "str | None":
     return await _t1(send, baseline)
 
 async def _t3(send, baseline: str, bump_file: "Path | None") -> "str | None":
-    """Transient version bump. Always reverts bump_file."""
+    """Transient version bump. Always reverts bump_file.
+    When bump_file is None (production install), triggers sync resolve instead."""
     if bump_file is None:
-        return None
+        try:
+            await send("sync", {"resolve": "true"})
+            return await _poll_mvid_delta(send, baseline, _T1_POLL_S, _T1_MAX_POLLS)
+        except (ConnectionError, OSError):
+            return None
     try:
         orig = bump_file.read_bytes()
     except OSError:
@@ -117,6 +122,19 @@ async def _t4(send, baseline: str,
     if await runner("cmd-r") == 1002: return None, False
     return await _poll_mvid_delta(send, baseline, _T4_POLL_S, _T4_MAX_POLLS), True
 
+async def _t2_5_guard_check(send) -> "bool | None":
+    """Probe SessionState to detect ReloadGuard wedge. Returns True=wedged, False=clear, None=unknown."""
+    try:
+        code = 'UnityEditor.SessionState.GetBool("MCP_ReloadGuardLocked", false).ToString()'
+        result = await send("execute_code", {"code": code})
+        r = result.strip().lower()
+        if r == "true": return True
+        if r == "false": return False
+        return None
+    except (ConnectionError, OSError):
+        return None
+
+
 async def _t5(send, baseline: str) -> "str | None":
     try:
         await send("editor", {"action": "play"})
@@ -124,7 +142,7 @@ async def _t5(send, baseline: str) -> "str | None":
         await send("editor", {"action": "stop"})
     except (ConnectionError, OSError):
         return None
-    return await _poll_mvid_delta(send, baseline, _T4_POLL_S, max_polls=1)
+    return await _poll_mvid_delta(send, baseline, _T4_POLL_S, max_polls=None)
 
 
 def make_reload_send(port: int, host: str = "127.0.0.1"):
@@ -187,9 +205,18 @@ async def run_ladder(send, *, send_reload=None, bump_file: "Path | None" = None,
         if v: return v
     v = _tier_result("T2", baseline, await _t2(eff, baseline))
     if v: return v
-    if bump_file is not None:
-        v = _tier_result("T3", baseline, await _t3(eff, baseline, bump_file))
-        if v: return v
+
+    # T2.5: guard check — if wedged, skip T3/T4 (they can't break the lock)
+    guard_wedged = await _t2_5_guard_check(eff)
+    if guard_wedged is True:  # None = unknown → don't skip T3/T4
+        log.warning("T2.5: ReloadGuard wedged — skipping T3/T4, escalating to T5")
+        if not play_stop_consent:
+            return "GUARD-WEDGED: ReloadGuard is locked. T3/T4 cannot help. Set play_stop_consent=True or wait 120s for watchdog."
+        v = _tier_result("T5-guard", baseline, await _t5(eff, baseline))
+        return v or "MANUAL-REQUIRED: guard wedged and T5 failed"
+
+    v = _tier_result("T3", baseline, await _t3(eff, baseline, bump_file))
+    if v: return v
     if osascript_runner is not None:
         new_mvid, ok = await _t4(eff, baseline, osascript_runner)
         if not ok:

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.46.0] — 2026-06-21 <!-- region-selection -->
+
+**Region Selection for Level Design:**
+- **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number point-in-polygon test (nonzero fill rule), AABB bounds computation, CSV import/export, Ramer-Douglas-Peucker simplification
+- **SceneRegionTool** — EditorTool with multi-mode finite-state machine (Shift+R activate, Q/W/E/R mode switch, Enter commit, Esc cancel, G grid snap). Four drawing modes: Lasso (free-form), Rectangle (orthogonal), Circle (center+radius), PointByPoint (manual vertices)
+- **SceneRegionQuery** — 3-stage spatial query pipeline: AABB bounding-box pre-filter → component type filter → winding-number PIP test → result capped + formatted. Both direct GameObject[] return (for tool) and text response (for chat)
+- **SceneRegionState** — LRU registry (8 concurrent regions) with EditorPrefs persistence. Regions exportable as CSV for reuse in batch scripts
+- **Drawing Modes** — IDrawingMode interface shared by 4 mode implementations. DrawingUtils provides grid-snap + point-distance logic. Per-mode state tracking (active, complete, vertex list)
+- **Rendering** — RegionRenderer (GL wireframe + fill), RenderStyle (color/alpha/width), RenderState (active/preview/committed states). UIToolkit SceneRegionOverlay for UI elements
+- **PolygonDetail** — Detail level presets (High/Medium/Low) with per-preset RDP simplification thresholds. EditorPrefs toggle for user preference
+- **Chat Integration** — RegionChipProvider adds "Region" option to chat chip dropdown. Selected region persists across turns
+- **Python spatial_query extended** — `objects_in_polygon` action accepts `vertices` (CSV 'x1,z1;x2,z2;...', >=3 pairs) or `region_id` (references SceneRegionState). Validates polygon geometry (3-256 vertices, float range checks). Returns formatted text matching existing SpatialHelper patterns
+
+**Test Summary (v0.46.0):**
+- 104 new C# NUnit tests: Drawing modes (5 files), Rendering (1 file)
+- 20 new Python pytest tests: test_region.py (polygon validation, spatial queries, state management)
+- C# NUnit EditMode: 3966 → ~4070 tests (+104 RegionTool)
+- Python pytest: 2621 → ~2641 tests (+20 region)
+- Total: 0 regressions, all new tests green
+
 ## [v0.45.0] — 2026-06-20 <!-- install-source-detection -->
 
 **Install Source Detection & Connect/Disconnect:**

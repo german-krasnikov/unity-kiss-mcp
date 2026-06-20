@@ -89,7 +89,7 @@ unity-kiss-mcp/
 │   │   │   ├── batch.py        # batch, references, validate_references + _dsl_tools set
 │   │   │   ├── codegen.py      # execute_code, get_schema, auto_fix, smart_build
 │   │   │   ├── skills.py       # save/use/list_skill, apply/save/list_template + _skills_dir
-│   │   │   ├── spatial.py      # validate_layout, get_spatial_context, scan_scene, check_colliders, spatial_query
+│   │   │   ├── spatial.py      # validate_layout, get_spatial_context, scan_scene, check_colliders, spatial_query, objects_in_polygon (v0.46.0: polygon validation + vertices param)
 │   │   │   ├── ui.py           # create_ui, set_rect, menu, shader
 │   │   │   ├── animation.py    # animation, timeline, animator, particle
 │   │   │   ├── asset.py        # asset, material, prefab, scriptable_object, project_settings, validate_move (v0.30.4)
@@ -130,7 +130,8 @@ unity-kiss-mcp/
 │       ├── live/conftest.py            # Live test fixtures + _ok/_iid helpers (v0.26.0 DRY)
 │       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
 │       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
-│       └── ... + domain tests (182 files total, 1018 @pytest.mark.asyncio removed v0.26.0)
+│       ├── test_region.py               # Region Selection spatial queries + polygon validation (20 tests, v0.46.0)
+│       └── ... + domain tests (183 files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
 │   ├── Editor/
 │   │   ├── ReloadBinder.cs                   # SO_REUSEADDR bind-retry for port 9600+
@@ -289,6 +290,39 @@ unity-kiss-mcp/
 │       │   │   └── ... (6 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
+│       ├── RegionTool/                     # Region Selection for Level Design (v0.46.0, 104 C# tests)
+│       │   ├── Polygon2D.cs                 # Immutable 2D polygon, winding-number PIP, AABB bounds, CSV import/export, RDP simplify
+│       │   ├── SceneRegionTool.cs           # EditorTool: multi-mode FSM (Lasso/Rect/Circle/PbP), keyboard shortcuts, state machine
+│       │   ├── SceneRegionQuery.cs          # 3-stage spatial pipeline: AABB filter → component filter → PIP → cap
+│       │   ├── SceneRegionState.cs          # LRU registry (8 slots) + EditorPrefs persistence, ToPolygon2D() factory
+│       │   ├── RegionSnapshot.cs            # Data record: polygon vertices, region ID, matched GameObjects
+│       │   ├── SceneRegionOverlay.cs        # UIToolkit overlay for UI elements (mode display, settings)
+│       │   ├── PolygonDetail.cs             # Detail level enum (High/Medium/Low) + RDP thresholds
+│       │   ├── PolygonDetailSettings.cs     # EditorPrefs toggle for detail level
+│       │   ├── Drawing/                     # Drawing mode implementations (IDrawingMode interface)
+│       │   │   ├── IDrawingMode.cs          # Interface: Begin, Update, Finalize, IsActive, IsComplete, PreviewVertices
+│       │   │   ├── DrawingUtils.cs          # Grid snap, point distance calculation
+│       │   │   ├── LassoMode.cs             # Free-form drawing (mouse track on drag)
+│       │   │   ├── RectangleMode.cs         # Orthogonal box (mouse start → end)
+│       │   │   ├── CircleMode.cs            # Circle (center + radius via mouse distance)
+│       │   │   └── PointByPointMode.cs      # Manual vertex click (double-click or Enter to finish)
+│       │   ├── Rendering/                   # Rendering pipeline
+│       │   │   ├── RegionRenderer.cs        # GL wireframe + fill rendering, depth-tested display
+│       │   │   ├── RenderStyle.cs           # Color, alpha, line width configuration
+│       │   │   └── RenderState.cs           # Active/Preview/Committed polygon states
+│       │   └── Tests/                       # 104 NUnit tests
+│       │       ├── Drawing/
+│       │       │   ├── LassoModeTests.cs
+│       │       │   ├── RectangleModeTests.cs
+│       │       │   ├── CircleModeTests.cs
+│       │       │   ├── PointByPointModeTests.cs
+│       │       │   ├── PolygonDetailTests.cs
+│       │       │   └── DrawingModeFactoryTests.cs
+│       │       └── Rendering/
+│       │           └── RegionRendererTests.cs
+│       ├── Chat/CLI/RegionChipProvider.cs   # Region selection chip provider for chat (chip dropdown option)
+│       ├── Chat/Tests/CLI/RegionChipProviderTests.cs # Chip provider tests
+│       ├── Chat/Tests/CLI/SceneRegionStateTests.cs # State persistence tests
 │       ├── Updates/                       # Update checking + changelog display (v0.42.0, v0.44.0: LevelUp UX, v0.45.0: install-source detection)
 │       │   ├── ChangelogReader.cs         # Parse CHANGELOG.md entries (version, date, content)
 │       │   ├── UpdateBanner.cs            # Update notification banner UI (DRY RepoGitUrl constant, v0.44.0)

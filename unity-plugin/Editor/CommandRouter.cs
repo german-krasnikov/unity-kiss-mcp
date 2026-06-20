@@ -491,7 +491,8 @@ namespace UnityMCP.Editor
             cmd == "get_compile_errors" || cmd == "diagnose" ||  // C4: escape-hatch + diagnose reachable while wedged
             cmd == "force_refresh" ||  // G11: real force-recompile must work when wedged
             cmd == "get_test_results" ||  // P1: reads SessionState only — safe during compile
-            cmd == "get_test_count";  // discovery-only, no test run
+            cmd == "get_test_count" ||  // discovery-only, no test run
+            cmd == "execute_code";  // T2.5: ReloadGuard probe must work when wedged
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {

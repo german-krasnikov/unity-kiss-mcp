@@ -21,5 +21,8 @@ namespace UnityMCP.Editor.Chat
         public const string Model           = "model";
         // Audio assets (.wav / .mp3 / .ogg / .aiff).
         public const string Audio           = "audio";
+        // Drawn polygon region on the scene. Created by SceneRegionTool, stored in RegionSnapshot.
+        // Path = 8-char UUID (e.g., "a1b2c3d4"). Bracket format: [region:a1b2c3d4].
+        public const string Region          = "region";
     }
 }

@@ -174,6 +174,27 @@ def _recvexactly(s: socket.socket, n: int) -> bytes | None:
     return buf
 
 
+def _probe_guard_locked(port: int, timeout: float = 2.0) -> "bool | None":
+    """Returns True=wedged, False=clear, None=unable to query."""
+    code = 'UnityEditor.SessionState.GetBool("MCP_ReloadGuardLocked", false).ToString()'
+    msg = json.dumps({"cmd": "execute_code", "args": {"code": code}, "id": "chk-g"}).encode()
+    frame = struct.pack(">I", len(msg)) + msg
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout) as s:
+            s.sendall(frame)
+            raw_len = _recvexactly(s, 4)
+            if raw_len is None:
+                return None
+            n = struct.unpack(">I", raw_len)[0]
+            body = _recvexactly(s, n)
+            if body is None:
+                return None
+            text = json.loads(body.decode("utf-8", errors="replace")).get("data", "")
+            return text.strip().lower() == "true"
+    except OSError:
+        return None
+
+
 def _parse_stale_dlls(probe: dict) -> list[str]:
     """Parse dlls= field from diagnose probe. Returns names of stale assemblies.
 
@@ -214,6 +235,11 @@ def main() -> None:
             if probe is not None:
                 mvid = probe.get("main_mvid")
                 if mvid:
+                    guard = _probe_guard_locked(main_port)
+                    if guard is True:
+                        print(f"GUARD-WEDGED  mvid={mvid}  port={main_port}")
+                        print("ACTION: ReloadGuard permanently locked. Run ladder with T5 (play/stop), or wait 120s for watchdog.")
+                        raise SystemExit(3)
                     stale = _parse_stale_dlls(probe)
                     if stale:
                         print(f"STALE  assemblies={','.join(stale)}  port={main_port}")

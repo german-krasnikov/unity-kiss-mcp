@@ -298,3 +298,101 @@ def test_cleanup_concurrent_unlink_no_crash(tmp_path):
          patch.object(Path, "unlink", flaky_unlink):
         cleaned = cleanup_stale_port_files()
     assert cleaned == 0  # unlink failed → not counted
+
+
+# ===========================================================================
+# Group E: Reload Ladder — Timing Constants (wedge fix)
+# ===========================================================================
+
+def test_t1_poll_constant():
+    """_T1_POLL_S must be 40.0 — calibrated for 9-assembly cold build (30-45s)."""
+    from unity_mcp.tools.reload_ladder import _T1_POLL_S
+    assert _T1_POLL_S == 40.0
+
+
+def test_t4_poll_constant():
+    """_T4_POLL_S must be 45.0 — T4+T5 share this constant."""
+    from unity_mcp.tools.reload_ladder import _T4_POLL_S
+    assert _T4_POLL_S == 45.0
+
+
+def test_t2_sleep_constant():
+    """_T2_SLEEP_S must be 8.0 — compile-start latency for 9 assemblies."""
+    from unity_mcp.tools.reload_ladder import _T2_SLEEP_S
+    assert _T2_SLEEP_S == 8.0
+
+
+def test_t1_max_polls_none():
+    """_T1_MAX_POLLS must be None — deadline governs, not poll count."""
+    from unity_mcp.tools.reload_ladder import _T1_MAX_POLLS
+    assert _T1_MAX_POLLS is None
+
+
+# ===========================================================================
+# Group F: Guard Probe (_probe_guard_locked)
+# ===========================================================================
+
+import sys
+import importlib.util
+
+
+def _load_check_unity():
+    """Load check_unity.py as module (it lives in scripts/, not in package)."""
+    spec = importlib.util.spec_from_file_location(
+        "check_unity",
+        Path(__file__).parents[1] / "scripts/check_unity.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_guard_probe_true():
+    """_probe_guard_locked returns True when execute_code returns 'True'."""
+    mod = _load_check_unity()
+    response_body = json.dumps({"data": "True"}).encode()
+    import struct
+
+    def fake_create_connection(addr, timeout):
+        class FakeSock:
+            def sendall(self, data): pass
+            def recv(self, n):
+                # Return 4-byte length then body
+                combined = struct.pack(">I", len(response_body)) + response_body
+                return combined[:n]
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+        return FakeSock()
+
+    with patch("socket.create_connection", side_effect=fake_create_connection):
+        with patch.object(mod, "_recvexactly") as mock_recv:
+            mock_recv.side_effect = [
+                struct.pack(">I", len(response_body)),
+                response_body,
+            ]
+            result = mod._probe_guard_locked(9500)
+    assert result is True
+
+
+def test_guard_probe_false():
+    """_probe_guard_locked returns False when execute_code returns 'False'."""
+    mod = _load_check_unity()
+    response_body = json.dumps({"data": "False"}).encode()
+    import struct
+
+    with patch("socket.create_connection"):
+        with patch.object(mod, "_recvexactly") as mock_recv:
+            mock_recv.side_effect = [
+                struct.pack(">I", len(response_body)),
+                response_body,
+            ]
+            result = mod._probe_guard_locked(9500)
+    assert result is False
+
+
+def test_guard_probe_oserror():
+    """_probe_guard_locked returns None on OSError (socket failure)."""
+    mod = _load_check_unity()
+    with patch("socket.create_connection", side_effect=OSError("refused")):
+        result = mod._probe_guard_locked(9500)
+    assert result is None

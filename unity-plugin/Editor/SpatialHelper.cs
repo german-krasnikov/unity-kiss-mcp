@@ -263,8 +263,10 @@ namespace UnityMCP.Editor
                 "spatial_map" => SpatialMap(
                     JsonHelper.ExtractString(args, "path"),
                     ExtractFloat(args, "cell_size", 2f)),
+                "objects_in_polygon" => RegionTool.SceneRegionQuery.Execute(args),
                 _ => throw new System.ArgumentException(ErrorHelper.InvalidAction(action,
-                    new[] { "nearest", "in_front_of", "objects_in_radius", "bounds_info", "raycast", "spatial_map" }))
+                    new[] { "nearest", "in_front_of", "objects_in_radius", "bounds_info",
+                            "raycast", "spatial_map", "objects_in_polygon" }))
             };
         }
     }

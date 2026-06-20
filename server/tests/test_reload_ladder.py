@@ -86,6 +86,8 @@ class MockSend:
             return f"{cmd} ok"
         if cmd == "sync":
             return "sync ok"
+        if cmd == "execute_code":
+            return "False"  # guard not locked by default
         raise AssertionError(f"Unexpected cmd in MockSend: {cmd!r}")
 
 
@@ -101,8 +103,8 @@ def _fast_timeouts(monkeypatch):
 
     _T1_MAX_POLLS=1 ensures each T1/T2/T3 call consumes exactly 1 diagnose slot.
     """
-    monkeypatch.setattr(_ladder, "_T1_POLL_S", 60.0)   # not the limiting factor
-    monkeypatch.setattr(_ladder, "_T4_POLL_S", 60.0)
+    monkeypatch.setattr(_ladder, "_T1_POLL_S", 60.0)   # not the limiting factor; _T1_MAX_POLLS=1 caps it
+    monkeypatch.setattr(_ladder, "_T4_POLL_S", 0.0)   # expire immediately; T4/T5 heal via MVID delta not timeout
     monkeypatch.setattr(_ladder, "_POLL_INTERVAL_S", 0.0)
     monkeypatch.setattr(_ladder, "_T2_SLEEP_S", 0.0)
     monkeypatch.setattr(_ladder, "_T5_PLAY_WAIT_S", 0.0)
@@ -198,7 +200,8 @@ async def test_tier4_osascript_heals():
     send = MockSend([
         _diag_frozen(MVID_A),   # T0
         _diag_frozen(MVID_A),   # T1 poll → frozen
-        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen (T3 skipped: no bump_file)
+        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen
+        _diag_frozen(MVID_A),   # T3 sync+poll → frozen (production fallback, no bump_file)
         _diag_clean(MVID_B),    # T4 _poll_mvid_delta → delta!
     ])
 
@@ -222,7 +225,8 @@ async def test_tier4_accessibility_fail_returns_reimport():
     send = MockSend([
         _diag_frozen(MVID_A),   # T0
         _diag_frozen(MVID_A),   # T1 poll → frozen
-        _diag_frozen(MVID_A),   # T2 T1-retry → frozen (T3 skipped: no bump_file)
+        _diag_frozen(MVID_A),   # T2 T1-retry → frozen
+        # T3 production fallback: sync + diagnose (gets repeated last=frozen)
         # T4: activate(0) → cmd-r(1002) → REIMPORT-NEEDED immediately, no more diagnose
     ])
 
@@ -245,7 +249,8 @@ async def test_tier5_play_stop_with_consent():
     send = MockSend([
         _diag_frozen(MVID_A),   # T0
         _diag_frozen(MVID_A),   # T1 poll → frozen
-        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen (T3+T4 skipped: no bump/osascript)
+        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen
+        _diag_frozen(MVID_A),   # T3 production fallback sync+poll → frozen (no bump_file)
         _diag_clean(MVID_B),    # T5 diagnose after play/stop → CLEAN + new MVID!
     ])
 
@@ -298,7 +303,8 @@ async def test_tier5_no_mvid_delta_not_healed():
     send = MockSend([
         _diag_frozen(MVID_A),   # T0
         _diag_frozen(MVID_A),   # T1 poll → frozen
-        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen (T3+T4 skipped)
+        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen
+        _diag_frozen(MVID_A),   # T3 production fallback sync+poll → frozen (no bump_file)
         # T5: play+stop, diagnose returns CLEAN but same MVID_A (no reload happened)
         _diag_clean(MVID_A),    # T5 diagnose → clean flags but MVID == baseline!
     ])
@@ -317,7 +323,8 @@ async def test_tier5_mvid_delta_healed_shows_new_mvid():
     send = MockSend([
         _diag_frozen(MVID_A),   # T0
         _diag_frozen(MVID_A),   # T1 poll → frozen
-        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen (T3+T4 skipped)
+        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen
+        _diag_frozen(MVID_A),   # T3 production fallback sync+poll → frozen (no bump_file)
         _diag_clean(MVID_B),    # T5 diagnose → CLEAN + new MVID!
     ])
 
@@ -331,18 +338,23 @@ async def test_tier5_mvid_delta_healed_shows_new_mvid():
 
 @pytest.mark.asyncio
 async def test_tier2_no_dead_diagnose_call():
-    """T2 must NOT call diagnose between recompile and T1-retry (dead TCP RTT removed)."""
+    """T2 must NOT call diagnose between recompile and T1-retry (dead TCP RTT removed).
+
+    T3 production fallback (sync+poll) legitimately adds 1 diagnose after T2.
+    Total: T0(1) + T1-poll(1) + T2-T1retry-poll(1) + T3-poll(1) = 4. Any extra = dead call.
+    """
     send = MockSend([
         _diag_frozen(MVID_A),   # T0
         _diag_frozen(MVID_A),   # T1 poll → frozen
-        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen (escalate to T3/MANUAL)
+        _diag_frozen(MVID_A),   # T2 T1-retry poll → frozen
+        _diag_frozen(MVID_A),   # T3 production fallback poll → frozen
     ])
 
     await _ladder.run_ladder(send, play_stop_consent=False)
 
     diag_calls = [cmd for cmd, _ in send.calls if cmd == "diagnose"]
-    # T0(1) + T1-poll(1) + T2-T1retry-poll(1) = 3 total. Dead diagnose would add extra.
-    assert len(diag_calls) == 3, f"Dead diagnose detected: {len(diag_calls)} calls: {send.calls}"
+    # T0(1) + T1-poll(1) + T2-T1retry-poll(1) + T3-poll(1) = 4. Dead diagnose would add extra.
+    assert len(diag_calls) == 4, f"Unexpected diagnose count: {len(diag_calls)} calls: {send.calls}"
 
 
 # ── Test 12: _poll_mvid_delta check-first (no leading sleep) ─────────────────
@@ -768,7 +780,8 @@ async def test_t5_broken_new_domain_after_play_stop_returns_reimport():
     send = MockSend([
         _diag_frozen(MVID_A),         # T0 baseline
         _diag_frozen(MVID_A),         # T1 poll → frozen
-        _diag_frozen(MVID_A),         # T2 T1-retry → frozen (T3+T4 skipped)
+        _diag_frozen(MVID_A),         # T2 T1-retry → frozen
+        _diag_frozen(MVID_A),         # T3 production fallback sync+poll → frozen (no bump_file)
         _diag_broken_new_domain(),    # T5 poll: new MVID but compile=idle-failed
     ])
 
@@ -1042,7 +1055,7 @@ async def test_stress_f9_scenario_3_all_tiers_use_only_allowed_commands():
     diagnose, force_refresh, recompile, sync, editor.
     Any other command (esp. get_compile_errors) is an anti-pattern.
     """
-    ALLOWED_CMDS = frozenset({"diagnose", "force_refresh", "recompile", "sync", "editor"})
+    ALLOWED_CMDS = frozenset({"diagnose", "force_refresh", "recompile", "sync", "editor", "execute_code"})
 
     send = MockSend([_diag_frozen(MVID_A)])  # always frozen → all tiers exhaust
 
@@ -1053,3 +1066,131 @@ async def test_stress_f9_scenario_3_all_tiers_use_only_allowed_commands():
         f"F9: ladder called unexpected TCP commands: {unexpected}. "
         f"Only allowed: {sorted(ALLOWED_CMDS)}"
     )
+
+
+# ── T2.5 Guard Check Tests ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_t2_5_guard_wedged_no_consent_returns_guard_wedged():
+    """T2.5: guard=True + no consent → GUARD-WEDGED message, T3/T4/T5 not called."""
+    class GuardLockedSend(MockSend):
+        async def __call__(self, cmd, args=None):
+            if cmd == "execute_code":
+                self.calls.append((cmd, args or {}))
+                return "True"  # guard locked!
+            return await super().__call__(cmd, args)
+
+    send = GuardLockedSend([
+        _diag_frozen(MVID_A),   # T0
+        _diag_frozen(MVID_A),   # T1 poll → frozen
+        _diag_frozen(MVID_A),   # T2 T1-retry → frozen
+    ])
+
+    result = await _ladder.run_ladder(send, play_stop_consent=False)
+
+    assert "GUARD-WEDGED" in result, f"Expected GUARD-WEDGED, got: {result!r}"
+    # T3 (sync) and T5 (editor play) must not be called
+    cmds = [cmd for cmd, _ in send.calls]
+    assert "editor" not in cmds, f"T5 editor must not be called without consent: {cmds}"
+
+
+@pytest.mark.asyncio
+async def test_t2_5_guard_wedged_with_consent_runs_t5():
+    """T2.5: guard=True + consent → T5 (play/stop) called, T3/T4 skipped."""
+    class GuardLockedSend(MockSend):
+        async def __call__(self, cmd, args=None):
+            if cmd == "execute_code":
+                self.calls.append((cmd, args or {}))
+                return "True"  # guard locked!
+            return await super().__call__(cmd, args)
+
+    send = GuardLockedSend([
+        _diag_frozen(MVID_A),   # T0
+        _diag_frozen(MVID_A),   # T1 poll → frozen
+        _diag_frozen(MVID_A),   # T2 T1-retry → frozen
+        _diag_clean(MVID_B),    # T5 after play/stop → healed!
+    ])
+
+    result = await _ladder.run_ladder(send, play_stop_consent=True)
+
+    assert result.startswith("HEALED: T5-guard"), f"Expected T5-guard heal, got: {result!r}"
+    cmds = [cmd for cmd, _ in send.calls]
+    assert "editor" in cmds, f"T5 editor play must be called with consent: {cmds}"
+
+
+@pytest.mark.asyncio
+async def test_t2_5_not_wedged_continues_t3():
+    """T2.5: guard=False → run_ladder continues to T3 (sync called).
+
+    Chain: T1 frozen → T2 frozen → T2.5 guard=False → T3 sync → healed.
+    Verifies the dead-code gate (bump_file is not None) is removed.
+    """
+    send = MockSend([
+        _diag_frozen(MVID_A),   # T0 baseline
+        _diag_frozen(MVID_A),   # T1 poll → frozen
+        _diag_frozen(MVID_A),   # T2 T1-retry → frozen
+        _diag_clean(MVID_B),    # T3 sync+poll → healed!
+    ])
+
+    # bump_file=None → T3 production fallback (sync resolve) must still run
+    result = await _ladder.run_ladder(send, bump_file=None)
+
+    assert result.startswith("HEALED: T3"), f"Expected T3 heal via sync, got: {result!r}"
+    cmds = [cmd for cmd, _ in send.calls]
+    assert "sync" in cmds, f"T3 production fallback must call sync: {cmds}"
+
+
+# ── T3 Production Fallback ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_t3_production_fallback_calls_sync(tmp_path):
+    """_t3 with bump_file=None calls sync resolve=true and polls for MVID delta."""
+    send = MockSend([_diag_clean(MVID_B)])  # diagnose returns new MVID after sync
+
+    result = await _ladder._t3(send, MVID_A, None)
+
+    cmds = [cmd for cmd, _ in send.calls]
+    assert "sync" in cmds, f"_t3(bump_file=None) must call sync: {cmds}"
+    sync_calls = [(cmd, args) for cmd, args in send.calls if cmd == "sync"]
+    assert sync_calls[0][1].get("resolve") == "true", f"Must pass resolve=true: {sync_calls}"
+
+
+@pytest.mark.asyncio
+async def test_t3_production_fallback_heals_on_mvid_delta():
+    """_t3 with bump_file=None returns new MVID when poll finds delta."""
+    send = MockSend([_diag_clean(MVID_B)])
+
+    result = await _ladder._t3(send, MVID_A, None)
+
+    assert result == MVID_B, f"Expected new MVID {MVID_B!r}, got: {result!r}"
+
+
+@pytest.mark.asyncio
+async def test_t3_production_fallback_returns_none_on_tcp_error():
+    """_t3 with bump_file=None returns None on OSError."""
+    send = MockSend([], raise_on="sync")
+
+    result = await _ladder._t3(send, MVID_A, None)
+
+    assert result is None, f"TCP error must return None, got: {result!r}"
+
+
+# ── T5 max_polls=None ─────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_t5_max_polls_none_respects_deadline_not_count():
+    """_t5 must call _poll_mvid_delta with max_polls=None (deadline governs, not count)."""
+    poll_calls = []
+    original_poll = _ladder._poll_mvid_delta
+
+    async def tracking_poll(send, baseline, timeout_s, max_polls=None, cs_grace=1):
+        poll_calls.append(max_polls)
+        return None  # frozen
+
+    with patch.object(_ladder, "_poll_mvid_delta", tracking_poll):
+        async def noop_send(cmd, args=None):
+            return "ok"
+        await _ladder._t5(noop_send, MVID_A)
+
+    assert poll_calls, "T5 must call _poll_mvid_delta"
+    assert poll_calls[-1] is None, f"T5 must use max_polls=None, got: {poll_calls[-1]!r}"

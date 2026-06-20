@@ -83,6 +83,8 @@ namespace UnityMCP.Editor.Chat
         {
             RefreshColorResolver();
             ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
+            RegionTool.SceneRegionTool.OnRegionCommitted = (id, label) =>
+                ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0));
             CopyFlash.ShowAction = ShowCopyFlash;
             CreateBackend();
             ResetTokenCounters();
@@ -117,6 +119,7 @@ namespace UnityMCP.Editor.Chat
             _autoFix.OnErrorsDetected -= InjectCompileErrors;
             _autoFix.Unsubscribe();
             ChipPillFactory.AddToContextAction = null;
+            RegionTool.SceneRegionTool.OnRegionCommitted = null; // clear seam when chat closes
             CopyFlash.ShowAction = null;
             ReloadGuard.OnTurnFinished();
             if (_activity.Phase != ActivityPhase.Idle)

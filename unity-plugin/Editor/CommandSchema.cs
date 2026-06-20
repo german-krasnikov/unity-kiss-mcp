@@ -85,7 +85,7 @@ namespace UnityMCP.Editor
             { "material", P("action", "path", "object_path", "shader", "prop", "value", "source", "targets") },
             { "prefab", P("action", "path", "asset_path", "base_path", "variant_path", "recursive") },
             { "scriptable_object", P("action", "path", "type", "prop", "value", "filter") },
-            { "spatial_query", P("action", "path", "target", "distance", "radius", "component", "cell_size", "layer_mask", "center") },
+            { "spatial_query", P("action", "path", "target", "distance", "radius", "component", "cell_size", "layer_mask", "center", "vertices", "region_id", "cap") },
 
             // --- Meta ---
             { "ping", P(null) },
