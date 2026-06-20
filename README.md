@@ -137,7 +137,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6636 Tests (2606 Python · 3950 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6637 Tests (2607 Python · 3950 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -196,6 +196,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.44.1</b> — 2026-06-20 — **Fix: Codex Windows path crash** — TOML `command` now uses literal strings …</summary>
+
+**Fix: Codex Windows path crash** — TOML `command` now uses literal strings (single quotes) so `C:\Users\...` paths are not interpreted as unicode …
+
+</details>
+
+<details>
 <summary><b>v0.44.0</b> — 2026-06-20 — LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles …</summary>
 
 LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles animation
@@ -224,15 +231,9 @@ Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
 </details>
 
 <details>
-<summary><b>v0.41.0</b> — 2026-06-20 — **Session Handoff (Chat↔CLI)** — Button "→ CLI" in Chat copies resume command …</summary>
-
-**Session Handoff (Chat↔CLI)** — Button "→ CLI" in Chat copies resume command to clipboard.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.41.0** — 2026-06-20 — **Session Handoff (Chat↔CLI)** — Button "→ CLI" in Chat copies resume command …
 - **v0.40.1** — 2026-06-19 — **Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns …
 - **v0.40.0** — 2026-06-19 — **One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` …
 - **v0.38.0** — 2026-06-19 — **External MCP Server Support in Chat:**

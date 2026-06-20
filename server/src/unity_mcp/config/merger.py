@@ -50,21 +50,22 @@ def merge_toml_mcp(config_path: pathlib.Path, server_entry: dict) -> None:
         r'(?:\[mcp_servers\.unity\.[^\]]+\]\n?(?:(?!\[)[^\n]*\n?)*)*',
         re.MULTILINE,
     )
-    text = stale_re.sub("", text)
+    text = stale_re.sub(lambda _: "", text)
 
     section_re = re.compile(
         r'\[mcp_servers\.unity-mcp\]\n(?:(?!\[)[^\n]*\n)*', re.MULTILINE
     )
     cmd = server_entry["command"]
-    args = json.dumps(server_entry.get("args", []))
-    block = f'[mcp_servers.unity-mcp]\ncommand = "{cmd}"\nargs = {args}\n'
+    args_list = server_entry.get("args", [])
+    args_toml = "[" + ", ".join(f"'{a}'" for a in args_list) + "]"
+    block = f"[mcp_servers.unity-mcp]\ncommand = '{cmd}'\nargs = {args_toml}\n"
     env = server_entry.get("env", {})
     if env:
-        env_lines = "\n".join(f'{k} = "{v}"' for k, v in env.items())
+        env_lines = "\n".join(f"{k} = '{v}'" for k, v in env.items())
         block += f'\n[mcp_servers.unity-mcp.env]\n{env_lines}\n'
 
     if section_re.search(text):
-        text = section_re.sub(block, text)
+        text = section_re.sub(lambda _: block, text)
     else:
         text = text.rstrip() + "\n\n" + block
     config_path.parent.mkdir(parents=True, exist_ok=True)

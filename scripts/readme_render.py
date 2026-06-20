@@ -131,9 +131,8 @@ def extract_changelog_blocks(text: str, n: int = 2, max_bullets: int = 3, max_ch
 
 
 def inject_changelog_into_readme(readme: str, content: str) -> str:
-    result, n = re.subn(
-        r"(<!-- CHANGELOG_START -->).*?(<!-- CHANGELOG_END -->)",
-        rf"\1\n{content}\n\2", readme, flags=re.DOTALL)
+    pat = re.compile(r"(<!-- CHANGELOG_START -->).*?(<!-- CHANGELOG_END -->)", re.DOTALL)
+    result, n = pat.subn(lambda m: f"{m.group(1)}\n{content}\n{m.group(2)}", readme)
     return result if n else readme
 
 def make_badge_json(label: str, message: str, color: str) -> dict:

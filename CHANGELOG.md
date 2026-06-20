@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.44.1] — 2026-06-20 <!-- codex-windows-hotfix -->
+
+- **Fix: Codex Windows path crash** — TOML `command` now uses literal strings (single quotes) so `C:\Users\...` paths are not interpreted as unicode escapes
+- **Fix: regex escape in merge_toml_mcp** — `re.sub` replacement uses lambda to avoid `\U` backslash interpretation
+
 ## [v0.44.0] — 2026-06-20 <!-- arcade-levelup-codex-config -->
 
 **Arcade Level Up UX:**

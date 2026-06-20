@@ -189,7 +189,21 @@ def test_merge_toml_includes_env(tmp_path):
     merger.merge_toml_mcp(cfg, {"command": "uvx", "args": ["unity-mcp"], "env": {"PYTHONUTF8": "1"}})
     text = cfg.read_text(encoding="utf-8")
     assert "[mcp_servers.unity-mcp.env]" in text
-    assert 'PYTHONUTF8 = "1"' in text
+    assert "PYTHONUTF8 = '1'" in text
+
+
+def test_merge_toml_windows_path_no_regex_escape(tmp_path):
+    """Windows paths with backslashes must not cause re.error on sub()."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_text('[mcp_servers.unity-mcp]\ncommand = "/old"\nargs = []\n', encoding="utf-8")
+    merger.merge_toml_mcp(cfg, {
+        "command": r"C:\Users\TestUser\Python\python.exe",
+        "args": ["-m", "unity_mcp.server"],
+    })
+    text = cfg.read_text(encoding="utf-8")
+    assert r"C:\Users\TestUser" in text
+    assert text.count("[mcp_servers.unity-mcp]") == 1
 
 
 def test_merge_toml_creates_backup(tmp_path):
