@@ -123,6 +123,8 @@ namespace UnityMCP.Editor.Chat
                 _undoTracker.OnTurnFailed();
             _backend?.Stop();
             _backend = null;
+            _assetMentionIndex?.Dispose();
+            _assetMentionIndex = null;
         }
 
         private ChatRefResolver _resolver;
@@ -165,6 +167,7 @@ namespace UnityMCP.Editor.Chat
             root.Add(_inputArea);
             SetupAutoHeight();
             SetupSlash();
+            SetupMention();
             root.schedule.Execute(DrainAndRender).Every(33);
             root.schedule.Execute(TickFlowBarSweep).Every(950);
             root.RegisterCallback<DragUpdatedEvent>(OnDragUpdated);

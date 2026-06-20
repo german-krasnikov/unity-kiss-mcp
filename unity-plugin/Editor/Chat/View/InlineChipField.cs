@@ -129,6 +129,21 @@ namespace UnityMCP.Editor.Chat
             RebuildPills();
         }
 
+        /// <summary>Replace the raw @mention token (atIndex .. atIndex+1+queryLength) with a chip.</summary>
+        internal void ReplaceMentionRangeWithChip(int atIndex, int queryLength, ChipData chip)
+        {
+            int removeLen = 1 + queryLength; // '@' + query chars
+            string val = _textField.value ?? "";
+            if (atIndex < 0 || atIndex + removeLen > val.Length) return;
+
+            _suppressOffsetUpdate = true;
+            _textField.value = val.Remove(atIndex, removeLen);
+            _suppressOffsetUpdate = false;
+            _model.AdjustOffsetsAfterTextChange(atIndex, -removeLen);
+
+            InsertChipAt(atIndex, chip);
+        }
+
         internal void RemoveChipAt(int index)
         {
             if (index < 0 || index >= _model.Count) return;

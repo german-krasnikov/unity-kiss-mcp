@@ -29,6 +29,7 @@ namespace UnityMCP.Editor.Chat
             _inputArea.RegisterCallback<KeyDownEvent>(ev =>
             {
                 if (!_slashPopup.IsVisible) return;
+                if (_mentionPopup != null && _mentionPopup.IsVisible) return;
                 switch (ev.keyCode)
                 {
                     case UnityEngine.KeyCode.DownArrow:

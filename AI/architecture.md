@@ -432,6 +432,24 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **ChipKindRegistry** — Public static registry; plugins call `Register(provider)` from `[InitializeOnLoad]`. Detection: `Resolve(obj, assetPath)` returns first provider where `CanHandle` true (sorted by Priority). Supports dynamic Unregister + per-key lookup
 - **Priority Convention:** <100 overrides built-in type, 100–800 built-ins, >800 extends (new kinds). 8 built-in providers: Hierarchy/Scene/Script/Prefab/Material/Texture/ScriptableObject/Asset
 - **Inline Rendering (F12 refactor):** Replaced overlay stack (InlineChipOverlay/UitkCharRect/NbspReservation/TokenSpan) with **composed `InlineChipField`** — a flex-row VisualElement with pill children + trailing TextField. Pills are layout children, not overlays, eliminating mis-positioning and vanish-on-type bugs. Atomic backspace-at-0 removes last chip (standard tag-input UX). `InlineChipModel` is pure headless data (no rendering). `ChipPillFactory` builds pills shared by input field and response rendering.
+
+### @Mention Autocomplete (v0.41.4)
+- **MentionTokenParser.cs** — Pure static backward scan from cursor to find `@` prefix + alphanumeric query. Allocation-free, handles multi-word paths.
+- **MentionFuzzyScorer.cs** — Allocation-free fuzzy scoring with 26-bit bitmask pre-filter (early exit for impossible matches). Scores by word-boundary match > positional match > character count.
+- **SceneMentionIndex.cs** — Hierarchy index with VersionTracker dirty-flag tracking. 3000-entry cap (same as HierarchySerializer.MAX_NODES). Auto-rebuild on scene changes.
+- **AssetMentionIndex.cs** — Asset database index via OnAssetsChanged. Caps asset count. Implements IDisposable for cleanup on domain reload.
+- **RecentMentionSource.cs** — Selection.activeGameObject + 2000-point score boost. Always suggests last-selected object.
+- **MentionCoordinator.cs** — Merges sources, dedup by path (set uniqueness), sort by score desc, cap at maxResults (typically 8).
+- **MentionPopup.cs** — UIToolkit ScrollView popup (focusable=false for input field focus). Max 8 rows visible, keyboard-navigable (arrow keys, Enter select, Esc dismiss).
+- **MCPChatWindow.Mention.cs (partial)** — Debounce 100ms on text change. On @query match: show popup. Keyboard intercept (Up/Down/Enter/Esc). Blur → dismiss.
+- **InlineChipField.ReplaceMentionRangeWithChip** — Delete @mention text, insert chip at cursor with proper spacing. Offset tracking post-replacement.
+- **6-layer modular design:**
+  ```
+  User types "@Ca" → ChangeEvent → MentionTokenParser → MentionCoordinator
+  → [SceneMentionIndex, AssetMentionIndex, RecentMentionSource] → MentionFuzzyScorer
+  → merge/dedup/sort → MentionPopup.Show() → user selects → ReplaceMentionRangeWithChip → ChipData
+  ```
+- **Tests:** 72 NUnit tests (MentionTokenParserTests, MentionFuzzyScorerTests, SceneMentionIndexTests, AssetMentionIndexTests, MentionCoordinatorTests, MentionPopupTests, MentionIntegrationTests, MentionPerfTests, MentionEdgeCaseTests)
 - **Chip Display Overrides (F12 P4):** `ChipDisplayOverride` struct + parallel arrays in `ChipConfig` support per-kind LLM-payload depth (none/path/summary/full) and graphical color customization. Settings form enumerates all registered kinds (built-in + 3rd-party) dynamically with depth dropdown + color field. `ChipPillFactory.ColorResolver` static seam (set once on window open, consulted by both input and response pills). Zero core edits needed for 3rd-party customization.
 - **Show LLM Payload:** Right-click context menu reveals exact byte-for-byte AI payload (symmetry test enforces match)
 - **Reload Survival:** `PendingTurnState v5` serializes `KindKeys[]` parallel to chip paths; on resume, re-binds by key (fallback: re-detect if provider not registered yet)

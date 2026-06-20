@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.41.4] — 2026-06-20 <!-- chat-at-mentions -->
+
+- **@Mention Autocomplete** — Type `@` in Chat input to trigger autocomplete popup. 6-layer modular system: MentionTokenParser (cursor scan) → MentionFuzzyScorer (allocation-free fuzzy match) → [SceneMentionIndex, AssetMentionIndex, RecentMentionSource] indices → MentionCoordinator (merge/dedup/sort) → MentionPopup (UIToolkit, max 8 rows) → InlineChipField.ReplaceMentionRangeWithChip (insert chip at cursor). Features: 3000-entry scene hierarchy cap, asset database sync, Selection.activeGameObject boost, keyboard-navigable popup (arrow keys, Enter select, Esc dismiss), 100ms debounce on typing.
+
+**Test Summary (v0.41.4):**
+- **C# Tests (72 new NUnit tests, 10 test files)**
+  * MentionTokenParserTests (13 tests): token extraction, cursor position, multi-word paths
+  * MentionFuzzyScorerTests (10 tests): fuzzy matching, word-boundary scoring, pre-filter
+  * SceneMentionIndexTests (7 tests): hierarchy indexing, version tracking, capacity
+  * AssetMentionIndexTests (13 tests): asset database sync, lifecycle, cleanup
+  * MentionCoordinatorTests (7 tests): merge, dedup, sort, cap behavior
+  * MentionPopupTests (8 tests): UIToolkit popup show/hide, keyboard handling
+  * MentionIntegrationTests (5 tests): end-to-end @mention flow
+  * MentionPerfTests (5 tests): index performance, scaling to 3000 entries
+  * MentionEdgeCaseTests (5 tests): ambiguous names, rapid typing, unicode
+- **Total: 3863 NUnit tests (72 new, 3791 baseline)**
+
 ## [v0.41.0] — 2026-06-20 <!-- session-handoff-copy-antigravity -->
 
 - **Session Handoff (Chat↔CLI)** — Button "→ CLI" in Chat copies resume command to clipboard. Format per-backend: `--resume {sessionId}` (Claude/Codex), `--conversation {sessionId}` (Antigravity), `-s {sessionId}` (OpenCode), `-S {sessionId}` (Kimi). SessionScanner reads CLI history files to populate session picker popup for resuming old sessions in Chat.

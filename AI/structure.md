@@ -271,6 +271,15 @@ unity-kiss-mcp/
 │       ├── MCPDiagnosePanel.cs            # Unified diagnostics panel (Python, imports, TCP, config)
 │       ├── MCPDiagnoseWindow.cs           # Diagnostics UI window
 │       ├── Chat/                          # Optional in-Unity Agent Chat (v0.29.2: split into CLI + View, UNITY_MCP_CHAT define)
+│       │   ├── Mentions/                     # @Mention autocomplete system (v0.41.4)
+│       │   │   ├── IMentionSource.cs          # MentionCandidate struct + IMentionSource interface
+│       │   │   ├── MentionTokenParser.cs      # Pure static backward scan from cursor (allocation-free)
+│       │   │   ├── MentionFuzzyScorer.cs      # Allocation-free fuzzy scoring (26-bit bitmask pre-filter)
+│       │   │   ├── SceneMentionIndex.cs       # Hierarchy index with VersionTracker + 3000-entry cap
+│       │   │   ├── AssetMentionIndex.cs       # Asset database index + IDisposable cleanup
+│       │   │   ├── RecentMentionSource.cs     # Selection.activeGameObject + score boost
+│       │   │   ├── MentionCoordinator.cs      # Merge, dedup, sort, cap at maxResults
+│       │   │   └── MentionPopup.cs            # UIToolkit popup (focusable=false, max 8 rows)
 │       │   ├── CLI/                        # Chat.CLI assembly (protocol, parsing, backends, independent compile)
 │       │   │   ├── ChatEvent.cs               # Normalized event struct
 │       │   │   ├── ChatStreamParser.cs    # Parse stream-json from claude CLI stdout
@@ -334,6 +343,7 @@ unity-kiss-mcp/
 │       │   │   ├── MCPChatWindow.Drain.cs     # Event draining + state updates + domain refresh trigger (F27) (partial class)
 │       │   │   ├── MCPChatWindow.Send.cs      # Send path: OnSend, rawText/llmText split, chip snapshot (partial class)
 │       │   │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (_askPending flag v0.29.37)
+│       │   │   ├── MCPChatWindow.Mention.cs   # @Mention setup: debounce, popup show/hide, keyboard intercept (v0.41.4)
 │       │   │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons (F29: external files/folders, v0.23.0 Block 5: ProcessDraggedObject)
 │       │   │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
 │       │   │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
@@ -353,6 +363,7 @@ unity-kiss-mcp/
 │       │   │   ├── JsonArrayScan.cs           # Scan JSON arrays for streaming results
 │       │   │   ├── ArgTokenizer.cs            # Shell-style quote-aware split (F9, review-hardening)
 │       │   │   ├── ArgQuoting.cs              # Quote escaping helpers
+│       │   │   ├── InlineChipField.cs         # Composed flex-row pill control + ReplaceMentionRangeWithChip (F5, v0.41.4 mention)
 │       │   │   ├── InlineChipData.cs          # ChipData + InlineChipTracker (F5)
 │       │   │   ├── InlineChipOverlay.cs       # Pill row UI (F5)
 │       │   │   ├── InlineChipKeyHandler.cs    # TextField event routing (F5)
@@ -391,7 +402,7 @@ unity-kiss-mcp/
 │       │   │   ├── ToolGroupState.cs          # Tool grouping state
 │       │   │   ├── ToolGroupSummary.cs        # Summary of grouped tool calls
 │       │   │   ├── UserToolResultParser.cs    # Parse tool results
-│       │   │   ├── MCPChatWindow.uss          # UIToolkit styling (header removal + bottom footer)
+│       │   │   ├── MCPChatWindow.uss          # UIToolkit styling (header removal + bottom footer + mention popup styles)
 │       │   │   ├── Markdown/                  # Content rendering: registry seam + renderers
 │       │   │   │   ├── MdBlock.cs             # Block model (enum + metadata)
 │       │   │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)
@@ -468,6 +479,15 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── AssetViewerFactoryTests.cs # Media viewer factory + registry (v0.34.0, 224 tests + 11 extended v0.35.0)
 │       │   │   │   │   ├── PluginSettingsInjectionTests.cs # ISettingsProvider plugin interface (v0.34.0, 72 tests)
 │       │   │   │   │   ├── PluginToolbarButtonTests.cs # IToolbarButtonProvider plugin interface (v0.34.0, 105 tests)
+│       │   │   │   │   ├── MentionTokenParserTests.cs  # Token parsing + cursor position (v0.41.4, 13 tests)
+│       │   │   │   │   ├── MentionFuzzyScorerTests.cs  # Fuzzy scoring + word-boundary (v0.41.4, 10 tests)
+│       │   │   │   │   ├── SceneMentionIndexTests.cs   # Hierarchy indexing + version tracking (v0.41.4, 7 tests)
+│       │   │   │   │   ├── AssetMentionIndexTests.cs   # Asset indexing + cleanup (v0.41.4, 13 tests)
+│       │   │   │   │   ├── MentionCoordinatorTests.cs  # Merging, dedup, sorting (v0.41.4, 7 tests)
+│       │   │   │   │   ├── MentionPopupTests.cs        # UIToolkit popup behavior (v0.41.4, 8 tests)
+│       │   │   │   │   ├── MentionIntegrationTests.cs  # End-to-end @mention flow (v0.41.4, 5 tests)
+│       │   │   │   │   ├── MentionPerfTests.cs         # Index performance + scaling (v0.41.4, 5 tests)
+│       │   │   │   │   ├── MentionEdgeCaseTests.cs     # Ambiguous names, rapid typing, etc (v0.41.4, 5 tests)
 │       │   │   │   │   └── ... # 48+ total View tests
 │       │   │   │   └── Markdown/                # Render tests
 │       │   │   │       ├── MarkdownParserTests.cs

@@ -813,3 +813,58 @@
     opacity: 0;
     visibility: hidden;
 }
+
+/* ── @mention autocomplete popup ── */
+.mention-popup {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--unity-colors-window-background);
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 4px;
+    max-height: 240px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.mention-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 8px;
+    cursor: link;
+}
+
+.mention-row--selected {
+    background-color: var(--unity-colors-highlight-background);
+}
+
+.mention-row--selected .mention-label,
+.mention-row--selected .mention-detail {
+    color: var(--unity-colors-highlight-text);
+}
+
+.mention-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.mention-label {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: var(--unity-colors-default-text);
+    flex-shrink: 0;
+}
+
+.mention-detail {
+    font-size: 10px;
+    color: var(--unity-colors-label-text);
+    margin-left: 6px;
+    flex-grow: 1;
+    overflow: hidden;
+    -unity-text-overflow-position: end;
+    white-space: nowrap;
+}
