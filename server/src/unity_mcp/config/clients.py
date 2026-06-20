@@ -2,7 +2,8 @@
 import os
 import pathlib
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Callable, Optional
 
 
 @dataclass
@@ -11,6 +12,9 @@ class ClientInfo:
     config_path: pathlib.Path
     scope: str  # "global" or "project"
     stdout_only: bool = False  # if True: print config to stdout instead of writing file
+    root_key: str = "mcpServers"  # JSON key that holds server entries
+    entry_transformer: Optional[Callable[[dict], dict]] = field(default=None, repr=False)
+    is_toml: bool = False  # Codex uses TOML, not JSON
 
 
 def _claude_desktop_path() -> pathlib.Path:
@@ -27,6 +31,43 @@ def _windsurf_path() -> pathlib.Path:
         appdata = os.environ.get("APPDATA", pathlib.Path.home() / "AppData" / "Roaming")
         return pathlib.Path(appdata) / "Codeium" / "windsurf" / "mcp_config.json"
     return pathlib.Path.home() / ".codeium" / "windsurf" / "mcp_config.json"
+
+
+def _vscode_path() -> pathlib.Path:
+    if sys.platform == "darwin":
+        return pathlib.Path.home() / "Library" / "Application Support" / "Code" / "User" / "mcp.json"
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA", pathlib.Path.home() / "AppData" / "Roaming")
+        return pathlib.Path(appdata) / "Code" / "User" / "mcp.json"
+    return pathlib.Path.home() / ".config" / "Code" / "User" / "mcp.json"
+
+
+def _codex_path() -> pathlib.Path:
+    return pathlib.Path.home() / ".codex" / "config.toml"
+
+
+def _opencode_path() -> pathlib.Path:
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA", pathlib.Path.home() / "AppData" / "Roaming")
+        return pathlib.Path(appdata) / "opencode" / "opencode.json"
+    return pathlib.Path.home() / ".config" / "opencode" / "opencode.json"
+
+
+def _opencode_transform(entry: dict) -> dict:
+    """Reformat standard entry into OpenCode's command-as-array format."""
+    cmd = [entry["command"]] + entry.get("args", [])
+    result: dict = {"type": "local", "command": cmd, "enabled": True}
+    if "env" in entry:
+        result["env"] = entry["env"]
+    return result
+
+
+def _vscode_transform(entry: dict) -> dict:
+    """Reformat standard entry into VS Code's typed stdio format."""
+    result: dict = {"type": "stdio", "command": entry["command"], "args": entry.get("args", [])}
+    if "env" in entry:
+        result["env"] = entry["env"]
+    return result
 
 
 CLIENT_REGISTRY: dict[str, ClientInfo] = {
@@ -49,6 +90,31 @@ CLIENT_REGISTRY: dict[str, ClientInfo] = {
         name="Windsurf",
         config_path=_windsurf_path(),
         scope="global",
+    ),
+    "kimi": ClientInfo(
+        name="Kimi",
+        config_path=pathlib.Path.home() / ".kimi-code" / "mcp.json",
+        scope="global",
+    ),
+    "vscode": ClientInfo(
+        name="VS Code",
+        config_path=_vscode_path(),
+        scope="global",
+        root_key="servers",
+        entry_transformer=_vscode_transform,
+    ),
+    "opencode": ClientInfo(
+        name="OpenCode",
+        config_path=_opencode_path(),
+        scope="global",
+        root_key="mcp",
+        entry_transformer=_opencode_transform,
+    ),
+    "codex": ClientInfo(
+        name="Codex",
+        config_path=_codex_path(),
+        scope="global",
+        is_toml=True,
     ),
     "generic": ClientInfo(
         name="Generic (stdout)",

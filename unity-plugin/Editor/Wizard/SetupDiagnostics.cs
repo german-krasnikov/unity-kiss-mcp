@@ -1,4 +1,5 @@
 using System.IO;
+using UnityEditor.PackageManager;
 using UnityMCP.Editor;
 
 namespace UnityMCP.Editor.Wizard
@@ -6,6 +7,21 @@ namespace UnityMCP.Editor.Wizard
     /// <summary>Pure static diagnostics — no Unity I/O, fully unit-testable.</summary>
     public static class SetupDiagnostics
     {
+        // ── Repo root ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Resolves the repo root directory (parent of unity-plugin/) by walking up
+        /// from the package's resolvedPath and finding install.py.
+        /// Returns null if not found (e.g. installed from tarball/registry).
+        /// </summary>
+        public static string ResolveRepoRoot()
+        {
+            var info = PackageInfo.FindForAssembly(typeof(SetupDiagnostics).Assembly);
+            if (info == null) return null;
+            var parent = Path.GetFullPath(Path.Combine(info.resolvedPath, ".."));
+            return File.Exists(Path.Combine(parent, "install.py")) ? parent : null;
+        }
+
         // ── Python ────────────────────────────────────────────────────────────
 
         /// <summary>

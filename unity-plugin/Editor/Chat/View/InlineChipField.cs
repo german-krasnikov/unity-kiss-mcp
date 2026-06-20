@@ -181,6 +181,7 @@ namespace UnityMCP.Editor.Chat
                 var chip = _model.PositionedChips[i].Chip;
                 var pill = ChipPillFactory.Build(chip, onRemove: () => RemoveChipAt(captured));
                 pill.userData = captured;
+                ChipClickRouter.Register(pill, null, () => ChipKindRegistry.ForKey(chip.KindKey)?.Navigate(chip.Path));
                 AttachContextMenu(pill);
                 _pillRow.Add(pill);
             }

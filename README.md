@@ -101,18 +101,19 @@ iex (iwr https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/maste
    https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin
    ```
 3. Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. It will:
-   - Verify Python 3.10+ is available
-   - Test the MCP server connection
-   - Configure your AI tool (Claude Code, Claude Desktop, Cursor, Windsurf, + Antigravity, Kimi, Codex, OpenCode in Unity Chat)
-   - Display your TCP port
+   - Auto-detect installed AI tools (shows "detected" badge)
+   - One-click configure: pick your tool → choose Global or Project scope → done
+   - Supports 9 backends: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity
 
 **Configure an AI tool manually:**
 
 ```bash
 python install.py configure --tool claude-code
+# Project-scoped config (writes .mcp.json to project root):
+python install.py configure --tool claude-code --project-dir /path/to/unity/project
 ```
 
-Supported tools: `claude-code`, `claude-desktop`, `cursor`, `windsurf`
+Supported tools: `claude-code`, `claude-desktop`, `cursor`, `windsurf`, `vscode`, `codex`, `kimi`, `opencode`
 
 **Verify installation:**
 
@@ -136,7 +137,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 5667 Tests (2540 Python · 3047 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6547 Tests (2555 Python · 3912 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -195,6 +196,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.42.0</b> — 2026-06-20 — **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → …</summary>
+
+**Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → Configure). 9 backends: Claude Code/Desktop, Cursor, Windsurf, VS Code, …
+
+</details>
+
+<details>
 <summary><b>v0.41.4</b> — 2026-06-20 — **@Mention Autocomplete** — Type `@` in Chat input to trigger autocomplete …</summary>
 
 **@Mention Autocomplete** — Type `@` in Chat input to trigger autocomplete popup. 6-layer modular system: MentionTokenParser (cursor scan) → …
@@ -223,15 +231,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.38.0</b> — 2026-06-19 — **External MCP Server Support in Chat:**</summary>
-
-**External MCP Server Support in Chat:**
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.38.0** — 2026-06-19 — **External MCP Server Support in Chat:**
 - **v0.37.0** — 2026-06-18 — **Bridge Stability & Reload Recovery (v0.36.0):**
 - **v0.36.0** — 2026-06-18 — **Media Preview Redesign:**
 - **v0.35.0** — 2026-06-17 — **Inline Media Preview Bubbles** — Phase 2 lazy-load media panel in chat:

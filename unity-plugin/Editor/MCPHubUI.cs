@@ -27,6 +27,9 @@ namespace UnityMCP.Editor
                 () => nav.Push(SettingsPageFactory.BuildChatPage(() => nav.Pop()))));
             home.Add(HubCardButton.Build("🧠", "LLM Sampling",  "Claude / Codex presets",
                 () => nav.Push(SettingsPageFactory.BuildSamplingPage(() => nav.Pop()))));
+            home.Add(HubCardButton.Build("🔄", "Updates",
+                UpdateChecker.HasUpdate ? $"v{UpdateChecker.AvailableVersion} available" : "Check for updates",
+                () => nav.Push(SettingsPageFactory.BuildUpdatesPage(() => nav.Pop()))));
             home.Add(MCPHubDivider.Build(root));
 
             nav.SetRoot(home);

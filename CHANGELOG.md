@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.42.0] — 2026-06-20 <!-- wizard-detection-scope-chips -->
+
+- **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → Configure). 9 backends: Claude Code/Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity. Runs `install.py configure --tool <key>` from Unity, cross-platform (macOS/Windows/Linux)
+- **Backend Auto-Detection** — PickBackend screen shows "detected" badge for installed tools. Checks binary in PATH (`which`/`where`) and config directory existence (`~/.claude`, `~/.cursor`, etc.)
+- **Global/Project Scope Toggle** — Configure screen lets user choose Global (home dir) or Project (Unity project root) config scope. Project writes `.mcp.json` / `.cursor/mcp.json` / `.vscode/mcp.json` per tool
+- **Codex TOML Support** — `merge_toml_mcp` handles Codex's `config.toml` format. Text-based merge preserves existing `[mcp_servers.*]` sections
+- **Merge Safety** — `merge_mcp_config` now raises `ValueError` on corrupt JSON instead of silently resetting to `{}` (data loss prevention)
+- **Updates Hub Card** — "Updates" card in MCPHubUI opens UpdatesPage with Check button and Changelog viewer with markdown formatting
+- **MarkdownInlineFormatter** — Extracted to base assembly for DRY reuse (bold, italic, code, links). Chat's `MarkdownInline` delegates to it
+- **Input Chip Clicks** — Chips/bubbles in input field are now clickable (navigate to hierarchy/assets), reusing `ChipClickRouter` (DRY, no double context menu)
+- **Wizard asmdef Split** — `UnityMCP.Editor.Wizard` separate assembly. Diagnostic windows (MCPDiagnosePanel, MCPStatusWindow) moved to Wizard. `autoReferenced: true` avoids circular deps
+- **Python 3.9 Compat** — All PEP 604 `X | None` → `Optional[X]` across config module for macOS system Python compatibility
+
 ## [v0.41.4] — 2026-06-20 <!-- chat-at-mentions -->
 
 - **@Mention Autocomplete** — Type `@` in Chat input to trigger autocomplete popup. 6-layer modular system: MentionTokenParser (cursor scan) → MentionFuzzyScorer (allocation-free fuzzy match) → [SceneMentionIndex, AssetMentionIndex, RecentMentionSource] indices → MentionCoordinator (merge/dedup/sort) → MentionPopup (UIToolkit, max 8 rows) → InlineChipField.ReplaceMentionRangeWithChip (insert chip at cursor). Features: 3000-entry scene hierarchy cap, asset database sync, Selection.activeGameObject boost, keyboard-navigable popup (arrow keys, Enter select, Esc dismiss), 100ms debounce on typing.

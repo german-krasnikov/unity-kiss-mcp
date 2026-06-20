@@ -61,6 +61,9 @@ namespace UnityMCP.Editor
             return page;
         }
 
+        internal static VisualElement BuildUpdatesPage(Action onBack) =>
+            UpdatesPage.Build(onBack);
+
         internal static VisualElement BuildSamplingPage(Action onBack)
         {
             var page = new VisualElement();
@@ -71,7 +74,7 @@ namespace UnityMCP.Editor
             return page;
         }
 
-        private static VisualElement BackHeader(string title, Action onBack)
+        internal static VisualElement BackHeader(string title, Action onBack)
         {
             var header = new VisualElement();
             header.AddToClassList("nav-back-header");

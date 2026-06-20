@@ -2,11 +2,12 @@
 import pathlib
 import shutil
 import sys
+from typing import Optional
 
 from unity_mcp.paths import ports_dir as _ports_dir_canonical
 
 
-def _which(name: str) -> str | None:
+def _which(name: str) -> Optional[str]:
     """Wrapper around shutil.which for monkeypatching in tests."""
     return shutil.which(name)
 
@@ -16,7 +17,7 @@ def _ports_dir() -> pathlib.Path:
     return _ports_dir_canonical()
 
 
-def find_server_dir() -> pathlib.Path | None:
+def find_server_dir() -> Optional[pathlib.Path]:
     """Attempt to find local server installation directory.
 
     Returns None for uvx-managed installs (path not reliably discoverable).

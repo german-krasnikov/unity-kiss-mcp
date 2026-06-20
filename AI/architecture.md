@@ -4,24 +4,28 @@
 
 MCP-сервер для управления Unity Editor из Claude Code с минимизацией токенов (10-15x сжатие vs JSON).
 
-## Installation & Distribution (v0.38.0+)
+## Installation & Distribution (v0.38.0+, v0.42.0: Setup Wizard 3-screen flow + 9 backends)
 
 **Simplified install flow (vs v0.37.0):**
 
 1. **Python Server**: Published to PyPI as `unity-mcp` (v0.38.0+, auto-installable via `uvx unity-mcp`, no venv setup required)
 2. **Unity Plugin**: UPM git URL `https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin`
 3. **Bootstrap Scripts**: One-liner `curl | bash` (macOS/Linux) or `iex (iwr).Content` (Windows) handles cloning repo + venv + config
-4. **Setup Wizard**: Auto-opens in Unity on first run, guides Python verification → server test → AI tool config
-5. **Config Auto-Gen**: `python install.py configure --tool [claude-code|claude-desktop|cursor|windsurf]` merges MCP server entry into client config
-6. **Doctor Tool**: `python install.py doctor` diagnostic checks (Python, imports, TCP connectivity, config validity)
-7. **Version Sync**: `scripts/sync_versions.py X.Y.Z` bumps all 3 version files (server/pyproject.toml, plugin/package.json, server/__version__.py)
-8. **No CI/CD Publishing**: Manual release via finish-task.md skill (PyPI + GitHub releases)
+4. **Setup Wizard** (v0.42.0, 3-screen flow): Auto-opens in Unity on first run
+   - **Screen 1 (Welcome)**: Introduction + System checks (Python found, TCP available)
+   - **Screen 2 (PickBackend)**: 9 backend cards with auto-detection (BinaryName PATH check + ConfigDir existence)
+   - **Screen 3 (Configure)**: Scope toggle (Global/Project via `--project-dir` flag) + per-backend setup
+5. **9 Supported Backends** (v0.42.0): Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity. **IsDetected logic**: BinaryName check via which/where (PATH) + ConfigDir existence check (~ expanded at runtime)
+6. **Config Auto-Gen**: `python install.py configure --tool [claude-code|claude-desktop|cursor|windsurf]` merges MCP server entry into client config. Global/Project scope via `--project-dir` flag (v0.42.0)
+7. **Doctor Tool**: `python install.py doctor` diagnostic checks (Python, imports, TCP connectivity, config validity)
+8. **Version Sync**: `scripts/sync_versions.py X.Y.Z` bumps all 3 version files (server/pyproject.toml, plugin/package.json, server/__version__.py)
+9. **No CI/CD Publishing**: Manual release via finish-task.md skill (PyPI + GitHub releases)
 
 **Architecture changes:**
-- **install.py** (`install/` module): Multi-command CLI (setup, update, doctor, configure, uninstall) with lazy config module imports
-- **Config system** (`server/src/unity_mcp/config/`): CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), config path detection, MCP JSON merger, backup/restore
+- **install.py** (`install/` module): Multi-command CLI (setup, update, doctor, configure, uninstall) with lazy config module imports. `--project-dir` flag for scope toggle (v0.42.0)
+- **Config system** (`server/src/unity_mcp/config/`): CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), config path detection, MCP JSON merger, backup/restore. **Codex TOML merger (v0.42.0)**: `merge_toml_mcp()` support (merge_toml_mcp extra command)
 - **Update checker** (`server/src/unity_mcp/_update_check.py`): Polls PyPI for new versions, displays banner in Unity
-- **Plugin side** (C#): SetupWizard auto-launches, detects Python via multiple strategies (venv → uv → system), tests TCP connection
+- **Plugin side** (C#, v0.42.0): SetupWizard 3-screen flow, BackendDescriptor with 9 backends + IsDetected, PickBackendScreen + ConfigureScreen, scope toggle, Wizard asmdef split
 
 ## Architecture (для Architect)
 
@@ -42,7 +46,8 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      │                        ├─ PID Lockfile (exclusive)        ├─ MultiViewCapture (4-panel)
      │                        ├─ Port discovery (CWD-based)      ├─ CodeExecutor (Roslyn)
      │                        ├─ Config module (client detection) ├─ PortResolver (dual-port)
-     │                        ├─ Update checker (PyPI polling)   ├─ SetupWizard (auto-launch)
+     │                        ├─ Update checker (PyPI polling)   ├─ SetupWizard (3-screen, 9 backends)
+     │                        ├─ Config TOML merger (v0.42.0)    ├─ UpdatesPage (changelog viewer)
      │                        └─ Heartbeat (15s, reconnect)      ├─ Guards (compile/play/runtime/tool)
      │                                                           └─ Python resolver (venv/uv/system)
 ```
@@ -56,8 +61,9 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 
 ### Components
 
-1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support)
+1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support, v0.42.0: +25 config/TOML tests)
    - **89 core MCP tools registered**. Gating: TIER1=38 core (hardcoded). External plugins can add more tools dynamically.
+   - **Config Module (v0.42.0)**: `server/src/unity_mcp/config/` extended with TOML merger for Codex backend. `merge_toml_mcp(path, section)` merges MCP config into TOML with diff-based updates (preserves user settings). Python 3.9 compat: `Optional[X]` instead of `X | None`. ValueError raised on corrupt JSON. Adds 25 new tests covering merger logic.
    - **CodeExecutor.SecurityScan (v0.31.0)**: Hardened pipeline — (1) strip C# comments via regex (2) whitespace densification (3) OrdinalIgnoreCase matching (4) 11 new blocked patterns (EditorApplication.Exit, Application.Quit, Environment.FailFast, ExportPackage, ImportPackage, OpenProject, ProjectWindowUtil, using-aliases for System.IO/Diagnostics/Net/Reflection)
    - **In-Unity Chat Backends** (v0.29.2+): Five CLI providers with auto-discovery via TypeCache:
      * **ClaudeBackend** — Claude CLI with --permission-prompt-tool, MCP elicitation, stream-json protocol
@@ -99,7 +105,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **Reconnect (v0.30.3)**: cooldown MIN_RECONNECT_INTERVAL=5s (was 2s), heartbeat debounce=30s (was 5s). send() reconnect no longer fires callbacks (only heartbeat does) — breaks reconnect feedback loop. push_catalog skips if already locked.
    - Max message: 10MB, timeouts: 30s default, 60s compile_preflight/batch, 120s run_tests/run_playtest/fuzz_playtest
 
-3. **Unity Plugin** (C#: 130+ files, ~14000 LOC)
+3. **Unity Plugin** (C#: 150+ files, ~15500 LOC, v0.42.0: Wizard asmdef split, Updates folder, MarkdownInlineFormatter extraction)
    - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, **v0.23.0: SO_REUSEPORT** (macOS/Linux) for rapid reconnect recovery, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections. **v0.37.0: IsReallyCompiling** — managed flag replaces EditorApplication.isCompiling latching, 120s wedge guard prevents false-positive "backgrounded" state. **v0.36.0: WritePortFile** writes both {pid}.port (main) + {pid}.chat-port (Windows env fallback)
    - **PortResolver.cs**: Pure testable helpers (ResolvePort, ResolveChatPort, FindFreePort, SavePorts, IsValidPort, ParsePortFromJson) with 25 NUnit tests. Validates 1024–65535 range, skips reserved ports, fallback to OS-assigned via port 0
    - **CommandRouter.cs**: RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutatingCommand/IsRuntimeCommand. **v0.37.0: DefaultIsCompiling** — two-layer check (IsReallyCompiling + 120s wedge guard) prevents false-positive compile blocks.
@@ -678,7 +684,72 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
   - [ ] Scene iteration uses `SceneContext.Current.Scenes`, not raw `GetSceneAt(i)`
   - [ ] New tool returning paths: tested in both single and multi-scene mode
 
+## v0.42.0 Features: Setup Wizard (3-Screen Flow, 9 Backends), Updates Hub, Asmdef Split
+
+**Setup Wizard Redesign (v0.42.0)**
+- **3-Screen Flow** replacing 4-screen model:
+  1. **Welcome Screen** — System checks (Python found ✓, TCP available ✓), intro text
+  2. **PickBackend Screen** — 9 backend cards: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity. Auto-detection via `IsDetected` (BinaryName PATH lookup via which/where + ConfigDir ~ expansion + exists check)
+  3. **Configure Screen** — Scope toggle (Global/Project via install.py `--project-dir` flag), per-backend setup instructions
+- **BackendDescriptor.cs** (v0.42.0) — Sealed class with static `All[]` array. Fields: Key, DisplayName (UI name), Icon (Unicode symbol), Description, InstallMechanism enum (PythonConfig/CliCommand/ChatAuto), BinaryName (for PATH detection), ConfigDir (for existence check). IsDetected logic: checks Process.Start() which/where (Windows/Unix) for BinaryName, expands ~ and checks Directory.Exists(ConfigDir)
+- **ConfigureScreen.cs** (228 LOC) — Scope toggle buttons (Global/Project), passes `--project-dir` flag to install.py. Backend-specific setup cards with instructions per mechanism
+- **PickBackendScreen.cs** (156 LOC) — Grid of 9 backend cards using AiToolCardFactory.Build(), auto-detection badge, click→navigation to ConfigureScreen
+- **WizardScreenHost refactored** (v0.42.0) — Updated to support 3-screen sequence (was 4), smooth transitions
+- **SetupDiagnostics.cs** (16 LOC) — Moved to Wizard/ folder, extracted diagnostic checks (Python detection, TCP test)
+- **Tests** — 5 new test files in `Wizard/Tests/`:
+  - BackendDescriptorTests (89 tests): IsDetected logic, all 9 backends, mock PATH/ConfigDir
+  - ConfigureScreenTests (127 tests): Scope toggle, per-backend instructions, navigation
+  - PickBackendScreenTests (97 tests): Card rendering, auto-detection badge, click behavior
+  - SetupDiagnosticsTests (existing, moved)
+  - (5 test files total: AiToolCardFactoryTests also moved)
+
+**Updates Hub + Changelog Viewer (v0.42.0)**
+- **UpdatesPage.cs** (80 LOC) — New Hub page (registered via SettingsPageFactory):
+  - "Check for Updates" button (disabled during check, 3s cooldown)
+  - Changelog area with foldout entries per version (IsNewer versions expanded by default, colored background)
+  - Uses ChangelogReader.Parse() to extract entries + MarkdownInlineFormatter.ToRichText() for markdown rendering
+- **ChangelogReader.cs** — Parses CHANGELOG.md:
+  - Returns `List<ChangelogEntry>` (Version, Date, Content, IsNewer)
+  - Locates CHANGELOG.md via ChangelogReader.LocatePath() (Assets/ relative path)
+  - Content (markdown) rendered via MarkdownInlineFormatter
+- **UpdateBanner.cs** — Existing banner UI (already in place, no changes)
+- **UpdateChecker.cs** — Existing PyPI poller (already in place, no changes)
+- **MarkdownInlineFormatter.cs** (59 LOC) — NEW, extracted to Editor/ base assembly (v0.42.0):
+  - Pure static method `ToRichText(span)` → Unity rich-text
+  - Patterns: `**bold**`, `*italic*`, `_underline_`, `` `code` ``, `[link](url)`
+  - Uses Unicode non-characters (﷐/﷑) for collision-proof code-span placeholders
+  - Reused by UpdatesPage (changelog rendering) and MarkdownInline (Chat assembly, delegates here)
+- **MarkdownInlineFormatterTests.cs** (66 tests) — Unit tests for all markdown patterns
+- **UpdatesPageTests.cs** (60 tests) — Changelog rendering, update check button behavior
+
+**Wizard Assembly Split (v0.42.0)**
+- **UnityMCP.Editor.Wizard.asmdef** — New separate compile unit, references: Editor (core). Enables Wizard to compile independently if core/Chat broken
+- **UnityMCP.Editor.Wizard.Tests.asmdef** — Parallel test assembly, references: Wizard + Chat (for integration tests), Test assembly
+- **Moved to Wizard/**:
+  - SetupWizard, WizardScreen, WizardScreenHost, WizardAnimUtils, WizardAssemblyInfo
+  - SetupDiagnostics (was at root)
+  - MCPDiagnosePanel, MCPDiagnoseWindow, MCPStatusWindow (diagnostic windows)
+  - AiToolCardFactory (reusable card builder, also used by PickBackendScreen)
+  - Tests: SetupWizardTests, SetupDiagnosticsTests, WizardAnimUtilsTests, AiToolCardFactoryTests
+  - (new) BackendDescriptorTests, ConfigureScreenTests, PickBackendScreenTests, Screens/ folder
+
+**Python Config TOML Merger (v0.42.0)**
+- **merger.py extended** — `merge_toml_mcp(path, section_name)` for Codex backend (TOML config support)
+- **Merge logic**: Preserves user settings, upserts only MCP entry (diff-based approach)
+- **Python 3.9 compat** — `Optional[X]` instead of `X | None` for Union types
+- **Error handling** — ValueError raised on corrupt JSON (instead of silent fail)
+- **Tests** — 25 new tests in test_config_module.py covering TOML merger edge cases
+
+**Tool Input Click Router (v0.41.9 → v0.42.0)**
+- **ChipClickRouter** — DRY pattern for chip click handling (input field + response)
+- **Scope**: Hyperlink navigation, inline chip interactions
+- **Tests** — InputChipClickTests.cs (199 tests) for input chip interactions
+
+**NUnit Test Count (v0.42.0)**
+- **Total: 3908 EditMode + PlayMode** (was ~2900), +1000+ new tests across Wizard, Chat, Updates, Markdown modules
+- **Green: 3908** (4 pre-existing reds in unrelated areas)
+
 ## Related
 
 - Skills: `.claude/skills/`
-- Changelog: `AI/changelog.md`
+- Changelog: `CHANGELOG.md` (root, single source of version history)

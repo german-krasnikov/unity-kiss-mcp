@@ -29,13 +29,14 @@ def _add_server_to_path() -> None:
 try:
     _add_server_to_path()
     from unity_mcp.config.clients import CLIENT_REGISTRY, detect_installed
-    from unity_mcp.config.merger import merge_mcp_config
+    from unity_mcp.config.merger import merge_mcp_config, merge_toml_mcp
     from unity_mcp.config.backup import backup
     from unity_mcp.config.resolver import build_server_entry
 except ImportError:
     CLIENT_REGISTRY = {}  # type: ignore[assignment]
     detect_installed = lambda: []  # type: ignore[assignment]
     merge_mcp_config = None  # type: ignore[assignment]
+    merge_toml_mcp = None  # type: ignore[assignment]
     backup = None  # type: ignore[assignment]
     build_server_entry = lambda port=0: {}  # type: ignore[assignment]
 
@@ -76,18 +77,32 @@ def cmd_doctor(_args: argparse.Namespace) -> None:
 
 
 def cmd_configure(args: argparse.Namespace) -> None:
-    """Configure AI tools (--tool) or write .mcp.json to Unity project (--project)."""
+    """Configure AI tools (--tool) or write project-scoped config (--project-dir)."""
     if merge_mcp_config is None:
         ui.fail("unity_mcp not installed. Run: python install.py setup")
         sys.exit(1)
 
-    if getattr(args, "project", None):
-        _cmd_configure_project(args)
+    entry = build_server_entry(port=getattr(args, "port", 0))
+    tool_key = getattr(args, "tool", None)
+
+    project_dir = getattr(args, "project_dir", None) or getattr(args, "project", None)
+    if project_dir:
+        project = Path(project_dir).resolve()
+        if not project.is_dir():
+            sys.exit(f"Directory not found: {project}")
+        target = _project_config_path(project, tool_key or "claude-code")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        backup(target)
+        client = CLIENT_REGISTRY.get(tool_key or "claude-code", CLIENT_REGISTRY["claude-code"])
+        if client.is_toml:
+            merge_toml_mcp(target, entry)
+        else:
+            merge_mcp_config(target, entry, root_key=client.root_key, entry_transformer=client.entry_transformer)
+        ui.ok(f"{client.name} configured at {target}")
         return
 
-    entry = build_server_entry(port=getattr(args, "port", 0))
-    if getattr(args, "tool", None):
-        tools = [args.tool]
+    if tool_key:
+        tools = [tool_key]
     else:
         installed = detect_installed()
         ui.info(f"Detected: {', '.join(installed) or 'none'}")
@@ -99,22 +114,25 @@ def cmd_configure(args: argparse.Namespace) -> None:
             print(json.dumps({"mcpServers": {"unity-mcp": entry}}, indent=2, ensure_ascii=False))
             continue
         backup(client.config_path)
-        merge_mcp_config(client.config_path, entry)
+        if client.is_toml:
+            merge_toml_mcp(client.config_path, entry)
+        else:
+            merge_mcp_config(
+                client.config_path, entry,
+                root_key=client.root_key,
+                entry_transformer=client.entry_transformer,
+            )
         ui.ok(f"{client.name} configured at {client.config_path}")
 
 
-def _cmd_configure_project(args: argparse.Namespace) -> None:
-    project = Path(args.project).resolve()
-    if not project.is_dir():
-        sys.exit(f"Directory not found: {project}")
-    target = project / ".mcp.json"
-    config = {"mcpServers": {"unity": {
-        "command": "uvx",
-        "args": ["unity-mcp"],
-        "env": {"PYTHONUTF8": "1"},
-    }}}
-    target.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    ui.ok(f"Wrote {target}")
+def _project_config_path(project: Path, tool_key: str) -> Path:
+    """Return per-tool project-scoped config path."""
+    paths = {
+        "claude-code": project / ".mcp.json",
+        "cursor": project / ".cursor" / "mcp.json",
+        "vscode": project / ".vscode" / "mcp.json",
+    }
+    return paths.get(tool_key, project / ".mcp.json")
 
 
 def cmd_uninstall(_args: argparse.Namespace) -> None:
@@ -132,7 +150,8 @@ def main() -> None:
     sub.add_parser("doctor", help="Diagnose installation")
 
     cfg = sub.add_parser("configure", help="Configure AI tools or write .mcp.json")
-    cfg.add_argument("--project", help="Path to Unity project root (legacy)")
+    cfg.add_argument("--project", help="Path to Unity project root (legacy alias for --project-dir)")
+    cfg.add_argument("--project-dir", help="Unity project root — writes project-scope config")
     cfg.add_argument("--tool", choices=list(CLIENT_REGISTRY) or
                      ["claude-desktop", "claude-code", "cursor", "windsurf", "generic"])
     cfg.add_argument("--port", type=int, default=0)

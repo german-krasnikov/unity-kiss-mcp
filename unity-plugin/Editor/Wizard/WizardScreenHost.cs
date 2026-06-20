@@ -7,11 +7,12 @@ namespace UnityMCP.Editor.Wizard
 {
     /// <summary>
     /// Pure logic host for the setup wizard — testable without EditorWindow.
-    /// Manages screen navigation, dot updates, and completion.
+    /// Flow: Welcome → PickBackend → Configure (3 screens).
     /// </summary>
     public sealed class WizardScreenHost
     {
         private readonly IWizardScreen[] _screens;
+        private readonly ConfigureScreen _configureScreen;
         private VisualElement[] _dots;
         private Action _closeCallback;
         private Action _onNavigate;
@@ -25,12 +26,15 @@ namespace UnityMCP.Editor.Wizard
         {
             _closeCallback = closeCallback;
             _onNavigate    = onNavigate;
+
+            _configureScreen = new ConfigureScreen(Complete, Back);
+            var pickScreen   = new PickBackendScreen(OnBackendSelected, Back);
+
             _screens = new IWizardScreen[]
             {
                 new WelcomeScreen(Next, Complete),
-                new PythonCheckScreen(Next, Back),
-                new ServerTestScreen(Next, Back),
-                new AiConfigScreen(Complete, Back),
+                pickScreen,
+                _configureScreen,
             };
         }
 
@@ -46,6 +50,7 @@ namespace UnityMCP.Editor.Wizard
             if (index < 0 || index >= _screens.Length) return;
             CurrentScreen?.OnExit();
             CurrentIndex = index;
+            CurrentScreen?.OnEnter();
             RefreshDots();
             _onNavigate?.Invoke();
         }
@@ -57,6 +62,14 @@ namespace UnityMCP.Editor.Wizard
         {
             EditorPrefs.SetBool("MCPWizard.Done", true);
             _closeCallback?.Invoke();
+        }
+
+        // ── Backend handoff ───────────────────────────────────────────────────
+
+        private void OnBackendSelected(BackendDescriptor backend)
+        {
+            _configureScreen.SetBackend(backend);
+            Next();
         }
 
         // ── Dots ──────────────────────────────────────────────────────────────

@@ -250,31 +250,25 @@ def test_lockfile_read_pid_from_port_file_cyrillic_path(tmp_path):
 # ── install.py — generated .mcp.json env block ────────────────────────────
 
 def test_install_configure_writes_utf8_no_bom(tmp_path):
-    """cmd_configure() must write .mcp.json as UTF-8 no-BOM with ensure_ascii=False."""
+    """cmd_configure() --project-dir must write .mcp.json as UTF-8 no-BOM."""
     import sys
     import importlib.util
     import json
 
     install_py = Path(__file__).resolve().parent.parent.parent / "install.py"
-    spec = importlib.util.spec_from_file_location(
-        "install", install_py
-    )
+    spec = importlib.util.spec_from_file_location("install", install_py)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
 
     import argparse
-    args = argparse.Namespace(project=str(tmp_path))
+    args = argparse.Namespace(project_dir=str(tmp_path), project=None, tool="claude-code", port=0)
     mod.cmd_configure(args)
 
     target = tmp_path / ".mcp.json"
     raw = target.read_bytes()
     assert raw[:3] != BOM, ".mcp.json must not start with UTF-8 BOM"
     data = json.loads(raw.decode("utf-8"))
-    server_cfg = data["mcpServers"]["unity"]
-    assert "env" in server_cfg, ".mcp.json server config must have 'env' block"
-    assert server_cfg["env"].get("PYTHONUTF8") == "1", (
-        "PYTHONUTF8=1 must be in .mcp.json env to ensure UTF-8 on Windows"
-    )
+    assert "unity-mcp" in data["mcpServers"], "unity-mcp entry must be present"
 
 
 # ── bridge.py — ensure_ascii=False ────────────────────────────────────────

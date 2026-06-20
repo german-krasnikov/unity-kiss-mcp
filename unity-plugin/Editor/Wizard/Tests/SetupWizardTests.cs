@@ -91,10 +91,10 @@ namespace UnityMCP.Editor.Tests
         // ── WizardScreenHost tests ────────────────────────────────────────────
 
         [Test]
-        public void WizardScreenHost_HasFourScreens()
+        public void WizardScreenHost_HasThreeScreens()
         {
             var host = new WizardScreenHost();
-            Assert.AreEqual(4, host.ScreenCount);
+            Assert.AreEqual(3, host.ScreenCount);
         }
 
         [Test]
@@ -109,8 +109,8 @@ namespace UnityMCP.Editor.Tests
         public void WizardScreenHost_Navigate_UpdatesDots()
         {
             var host = new WizardScreenHost();
-            var dots = new VisualElement[4];
-            for (int i = 0; i < 4; i++) dots[i] = new VisualElement();
+            var dots = new VisualElement[3];
+            for (int i = 0; i < 3; i++) dots[i] = new VisualElement();
             host.SetDots(dots);
 
             host.Navigate(1);

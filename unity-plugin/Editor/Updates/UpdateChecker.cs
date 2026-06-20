@@ -85,7 +85,7 @@ namespace UnityMCP.Editor
             return a > b;
         }
 
-        static string GetCurrentVersion()
+        internal static string GetCurrentVersion()
         {
             try
             {

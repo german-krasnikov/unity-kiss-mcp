@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.UIElements;
-using UnityMCP.Editor.Wizard;
 
 namespace UnityMCP.Editor
 {
@@ -34,7 +33,12 @@ namespace UnityMCP.Editor
 
             banner.Add(row);
 
-            WizardAnimUtils.FadeIn(banner, 300);
+            banner.AddToClassList("wiz-fade-hidden");
+            banner.schedule.Execute(() =>
+            {
+                banner.RemoveFromClassList("wiz-fade-hidden");
+                banner.AddToClassList("wiz-fade-visible");
+            }).StartingIn(300);
 
             return banner;
         }

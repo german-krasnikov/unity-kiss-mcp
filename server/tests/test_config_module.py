@@ -41,8 +41,49 @@ def test_client_paths_are_platform_specific():
 
 def test_all_expected_clients_registered():
     from unity_mcp.config import clients as c
-    for key in ("claude-desktop", "claude-code", "cursor", "windsurf"):
+    for key in ("claude-desktop", "claude-code", "cursor", "windsurf", "kimi", "vscode", "opencode"):
         assert key in c.CLIENT_REGISTRY
+
+
+def test_kimi_in_client_registry():
+    from unity_mcp.config import clients as c
+    info = c.CLIENT_REGISTRY["kimi"]
+    assert "kimi-code" in str(info.config_path).lower()
+    assert info.root_key == "mcpServers"
+
+
+def test_vscode_in_client_registry():
+    from unity_mcp.config import clients as c
+    info = c.CLIENT_REGISTRY["vscode"]
+    assert "Code" in str(info.config_path) or "code" in str(info.config_path).lower()
+    assert info.root_key == "servers"
+
+
+def test_opencode_in_client_registry():
+    from unity_mcp.config import clients as c
+    info = c.CLIENT_REGISTRY["opencode"]
+    assert "opencode" in str(info.config_path).lower()
+    assert info.root_key == "mcp"
+
+
+def test_vscode_config_path_platform_specific():
+    from unity_mcp.config import clients as c
+    info = c.CLIENT_REGISTRY["vscode"]
+    if sys.platform == "darwin":
+        assert "Library" in str(info.config_path)
+    elif sys.platform == "win32":
+        assert "Code" in str(info.config_path)
+    else:
+        assert ".config" in str(info.config_path)
+
+
+def test_opencode_config_path_platform_specific():
+    from unity_mcp.config import clients as c
+    info = c.CLIENT_REGISTRY["opencode"]
+    if sys.platform == "win32":
+        assert "opencode" in str(info.config_path).lower()
+    else:
+        assert ".config" in str(info.config_path)
 
 
 # ─── merger.py ──────────────────────────────────────────────────────────────
@@ -78,6 +119,45 @@ def test_merge_updates_existing_unity_mcp(tmp_path):
     data = json.loads(cfg.read_text(encoding="utf-8"))
     assert data["mcpServers"]["unity-mcp"] == new_entry
     assert len(data["mcpServers"]) == 1  # not duplicated
+
+
+def test_merger_custom_root_key(tmp_path):
+    from unity_mcp.config import merger
+    cfg = tmp_path / "mcp.json"
+    entry = {"type": "stdio", "command": "uvx", "args": ["unity-mcp"]}
+    merger.merge_mcp_config(cfg, entry, root_key="servers")
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert "servers" in data
+    assert data["servers"]["unity-mcp"] == entry
+    assert "mcpServers" not in data
+
+
+def test_merger_entry_transformer(tmp_path):
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.json"
+    base_entry = {"command": "uvx", "args": ["unity-mcp"]}
+
+    def transform(e: dict) -> dict:
+        return {"type": "local", "command": [e["command"]] + e["args"], "enabled": True}
+
+    merger.merge_mcp_config(cfg, base_entry, entry_transformer=transform)
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    stored = data["mcpServers"]["unity-mcp"]
+    assert stored["type"] == "local"
+    assert stored["command"] == ["uvx", "unity-mcp"]
+    assert stored["enabled"] is True
+
+
+def test_merger_default_root_key_unchanged(tmp_path):
+    """Backward compat: no extra params = old behavior."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.json"
+    existing = {"mcpServers": {"other": {}}}
+    cfg.write_text(json.dumps(existing), encoding="utf-8")
+    merger.merge_mcp_config(cfg, {"command": "uvx", "args": ["unity-mcp"]})
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert "mcpServers" in data
+    assert "other" in data["mcpServers"]
 
 
 # ─── backup.py ──────────────────────────────────────────────────────────────
@@ -202,3 +282,86 @@ def test_build_server_entry_with_port(monkeypatch):
     monkeypatch.setattr(resolver, "_which", lambda name: "/usr/bin/uvx" if name == "uvx" else None)
     entry = resolver.build_server_entry(port=9501)
     assert entry["env"]["UNITY_MCP_PORT"] == "9501"
+
+
+# ─── transform env passthrough ───────────────────────────────────────────────
+
+def test_vscode_transform_passes_env():
+    from unity_mcp.config.clients import _vscode_transform
+    entry = {"command": "uvx", "args": ["unity-mcp"], "env": {"PORT": "9500"}}
+    result = _vscode_transform(entry)
+    assert result["env"] == {"PORT": "9500"}
+
+
+def test_opencode_transform_passes_env():
+    from unity_mcp.config.clients import _opencode_transform
+    entry = {"command": "uvx", "args": ["unity-mcp"], "env": {"PORT": "9500"}}
+    result = _opencode_transform(entry)
+    assert result["env"] == {"PORT": "9500"}
+
+
+# ─── merger.py: invalid JSON raises ─────────────────────────────────────────
+
+def test_merge_invalid_json_raises_valueerror(tmp_path):
+    from unity_mcp.config import merger
+    bad = tmp_path / "config.json"
+    bad.write_text("{ this is not json }", encoding="utf-8")
+    with pytest.raises(ValueError, match="Corrupt JSON"):
+        merger.merge_mcp_config(bad, {"command": "uvx", "args": []})
+
+
+# ─── --project-dir: path resolution ─────────────────────────────────────────
+# Tests exercise the config-layer logic (merger + clients) that --project-dir
+# delegates to; we don't import install.py from here (wrong sys.path context).
+
+def _project_config_path(project: pathlib.Path, tool_key: str) -> pathlib.Path:
+    """Mirror of install._project_config_path — kept in sync by test contract."""
+    paths = {
+        "claude-code": project / ".mcp.json",
+        "cursor": project / ".cursor" / "mcp.json",
+        "vscode": project / ".vscode" / "mcp.json",
+    }
+    return paths.get(tool_key, project / ".mcp.json")
+
+
+def _write_project_config(project: pathlib.Path, tool_key: str, entry: dict) -> pathlib.Path:
+    from unity_mcp.config import merger, clients as c
+    target = _project_config_path(project, tool_key)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    client = c.CLIENT_REGISTRY.get(tool_key, c.CLIENT_REGISTRY["claude-code"])
+    merger.merge_mcp_config(target, entry, root_key=client.root_key, entry_transformer=client.entry_transformer)
+    return target
+
+
+_ENTRY = {"command": "uvx", "args": ["unity-mcp"]}
+
+
+def test_configure_project_dir_claude_code(tmp_path):
+    target = _write_project_config(tmp_path, "claude-code", _ENTRY)
+    assert target == tmp_path / ".mcp.json"
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert data["mcpServers"]["unity-mcp"]["command"] == "uvx"
+
+
+def test_configure_project_dir_cursor(tmp_path):
+    target = _write_project_config(tmp_path, "cursor", _ENTRY)
+    assert target == tmp_path / ".cursor" / "mcp.json"
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert "unity-mcp" in data["mcpServers"]
+
+
+def test_configure_project_dir_vscode(tmp_path):
+    target = _write_project_config(tmp_path, "vscode", _ENTRY)
+    assert target == tmp_path / ".vscode" / "mcp.json"
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert "unity-mcp" in data["servers"]
+
+
+def test_project_merge_preserves_existing_servers(tmp_path):
+    """Existing servers in .mcp.json must survive project-dir write."""
+    cfg = tmp_path / ".mcp.json"
+    cfg.write_text(json.dumps({"mcpServers": {"filesystem": {"command": "fs", "args": []}}}), encoding="utf-8")
+    _write_project_config(tmp_path, "claude-code", _ENTRY)
+    data = json.loads(cfg.read_text(encoding="utf-8"))
+    assert "filesystem" in data["mcpServers"]
+    assert "unity-mcp" in data["mcpServers"]

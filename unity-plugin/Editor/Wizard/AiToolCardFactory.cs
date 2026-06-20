@@ -3,25 +3,25 @@ using System.IO;
 
 namespace UnityMCP.Editor.Wizard
 {
-    internal enum CardAction { CopyText, WriteConfig, CopyPort }
+    public enum CardAction { CopyText, WriteConfig, CopyPort }
 
-    internal readonly struct BackendCard
+    public readonly struct BackendCard
     {
-        internal readonly string Name;
-        internal readonly string Body;
-        internal readonly string BtnLabel;
-        internal readonly CardAction Action;
-        internal readonly string Payload;
+        public readonly string Name;
+        public readonly string Body;
+        public readonly string BtnLabel;
+        public readonly CardAction Action;
+        public readonly string Payload;
 
-        internal BackendCard(string name, string body, string btnLabel, CardAction action, string payload)
+        public BackendCard(string name, string body, string btnLabel, CardAction action, string payload)
         {
             Name = name; Body = body; BtnLabel = btnLabel; Action = action; Payload = payload;
         }
     }
 
-    internal static class AiToolCardFactory
+    public static class AiToolCardFactory
     {
-        internal static BackendCard[] Build(int port)
+        public static BackendCard[] Build(int port)
         {
             var snippet = $"claude mcp add unity -- env UNITY_MCP_PORT={port} uvx unity-mcp";
             return new[]
@@ -80,7 +80,7 @@ namespace UnityMCP.Editor.Wizard
 
         // ── Platform-aware config paths (mirrors Python clients.py) ──────────
 
-        internal static string ClaudeDesktopPath()
+        public static string ClaudeDesktopPath()
         {
 #if UNITY_EDITOR_WIN
             var appdata = Environment.GetEnvironmentVariable("APPDATA")
@@ -93,10 +93,10 @@ namespace UnityMCP.Editor.Wizard
 #endif
         }
 
-        internal static string CursorPath()
+        public static string CursorPath()
             => Path.Combine(Home(), ".cursor", "mcp.json");
 
-        internal static string WindsurfPath()
+        public static string WindsurfPath()
         {
 #if UNITY_EDITOR_WIN
             var appdata = Environment.GetEnvironmentVariable("APPDATA")

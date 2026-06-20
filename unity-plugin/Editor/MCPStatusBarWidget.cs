@@ -177,7 +177,7 @@ namespace UnityMCP.Editor
             else
                 m.AddDisabledItem(new GUIContent("Kill Phantoms"));
             m.AddSeparator("");
-            m.AddItem(new GUIContent("Open Status"), false, MCPStatusWindow.ShowWindow);
+            m.AddItem(new GUIContent("Open Status"), false, () => EditorApplication.ExecuteMenuItem("MCP/Status"));
             m.DropDown(_pillContainer.worldBound);
         }
 

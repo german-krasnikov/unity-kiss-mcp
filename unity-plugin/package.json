@@ -1,6 +1,6 @@
 {
   "name": "com.unity-mcp.editor",
-  "version": "0.41.4",
+  "version": "0.41.9",
   "displayName": "Unity MCP",
   "description": "MCP server for Unity Editor control",
   "unity": "6000.0",

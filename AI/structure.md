@@ -9,7 +9,7 @@ unity-kiss-mcp/
 │   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
 │   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall)
 │   └── tests/                  # Bootstrap + UI tests
-├── server/                     # Python MCP Server (2362 unit tests, 70 live = 2432 total Python, v0.30.4)
+├── server/                     # Python MCP Server (2555 unit tests, 78 live = 2633 total Python, v0.42.0)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
@@ -111,7 +111,7 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~2362 unit tests + 70 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline)
+│   └── tests/                  # ~2555 unit tests + 78 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
@@ -207,7 +207,8 @@ unity-kiss-mcp/
 │       ├── MCPSettings.cs                 # Pure static data class (catalog, EnabledTools, no EditorWindow)
 │       ├── CatalogParser.cs               # Plain-text catalog parser (v0.18.0+): "CORE:tool1,tool2\n..." format
 │       ├── SettingsNavController.cs       # iOS-style navigational stack + slide animations (v0.23.0 Block 1)
-│       ├── SettingsPageFactory.cs         # DRY builder for 4 settings pages (Tools/Permissions/Chat/Sampling) (v0.23.0 Block 1)
+│       ├── SettingsPageFactory.cs         # DRY builder for 5 settings pages (Tools/Permissions/Chat/Sampling/Updates) (v0.23.0 Block 1, v0.42.0: Updates page)
+│       ├── MarkdownInlineFormatter.cs      # Pure Markdown→RichText formatter (bold, italic, code, links) (Editor/ base, v0.42.0)
 │       ├── LlmConfig.cs                   # [Serializable] universal LLM config (Claude + Codex + Gemini) (v0.23.0 Block 3, backend field v0.30.1)
 │       ├── LlmConfigStore.cs              # Load/Save LLM configs to Library/ (v0.23.0 Block 3)
 │       ├── SamplingPresets.cs             # Backend + Model preset templates: Claude Fast / Gemini Flash / Codex (v0.30.1)
@@ -226,11 +227,13 @@ unity-kiss-mcp/
 │       ├── MCPActions.cs                  # Shared actions (Restart, Kill, Reimport)
 │       ├── MCPStatusModel.cs              # Pure state logic (no deps) — maps connection state → display
 │       ├── MCPStatusBarWidget.cs          # Injects MCP pill into AppStatusBar via reflection
-│       ├── Tests/                         # Editor tests asmdef (references core, v0.26.0: +[TestFixture] to 6 classes)
+│       ├── Tests/                         # Editor tests asmdef (references core, v0.26.0: +[TestFixture] to 6 classes, v0.42.0: Wizard tests moved to separate asmdef)
 │       │   ├── UnityMCP.Editor.Tests.asmdef
 │       │   ├── Helpers/                  # Test infrastructure (v0.26.0)
 │       │   │   ├── ChipTestBase.cs       # Base class: H() helpers centralized (12 shims extracted, v0.26.0)
 │       │   │   └── TestStringHelpers.cs  # CountOccurrences utility (DRY across 4+ files, v0.26.0)
+│       │   ├── MarkdownInlineFormatterTests.cs # Rich-text formatting (bold, italic, code, links) (v0.42.0)
+│       │   ├── UpdatesPageTests.cs        # Changelog rendering + update check UI (v0.42.0)
 │       │   ├── MultiSceneTestBase.cs      # Base class for multi-scene tests (DRY consolidation v0.24.3+v0.25.0: saves additive scenes, captures main scene name before NewScene)
 │       │   ├── MultiSceneFinderTests.cs   # Object finding across scenes + reference scanning (v0.24.3)
 │       │   ├── PortResolverTests.cs       # 25 NUnit tests (port validation, fallback, dual-port edge cases)
@@ -260,16 +263,33 @@ unity-kiss-mcp/
 │       │   ├── SetupDiagnosticsTests.cs   # Diagnostic checks (Python, imports, TCP)
 │       │   ├── DiagnoseCommandTests.cs    # Doctor command + result formatting
 │       │   ├── WizardAnimUtilsTests.cs    # Animation timing + interpolation
-│       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+)
-│       │   ├── SetupWizard.cs             # Auto-launch on first run, 4 screens (Python check, TCP test, AI tool config, complete)
+│       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+, v0.42.0: 3-screen flow, 9 backends, asmdef split)
+│       │   ├── SetupWizard.cs             # Auto-launch on first run, 3 screens (Welcome → PickBackend → Configure)
 │       │   ├── SetupWizard.uss            # Wizard stylesheet (layout, animations)
 │       │   ├── WizardScreen.cs            # Base class for wizard screens (lifecycle, navigation)
 │       │   ├── WizardScreenHost.cs        # Screen container + animation orchestrator
 │       │   ├── WizardAnimUtils.cs         # Reusable animation helpers (slide, fade, bounce)
-│       │   └── WizardConfigWriter.cs      # Write .mcp.json to project after completion
-│       ├── DiagnoseCommand.cs             # MCP/Doctor command (entry point)
-│       ├── MCPDiagnosePanel.cs            # Unified diagnostics panel (Python, imports, TCP, config)
-│       ├── MCPDiagnoseWindow.cs           # Diagnostics UI window
+│       │   ├── SetupDiagnostics.cs        # Python/TCP/config diagnostic checks
+│       │   ├── BackendDescriptor.cs       # 9 backend definitions + IsDetected logic (BinaryName + ConfigDir)
+│       │   ├── AiToolCardFactory.cs       # Reusable backend/tool card builder
+│       │   ├── Screens/                   # 3-screen implementations
+│       │   │   ├── ConfigureScreen.cs     # Scope toggle (Global/Project) + per-backend selection
+│       │   │   └── PickBackendScreen.cs   # 9 backend cards (Claude Code, Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity)
+│       │   ├── Tests/                     # Wizard assembly tests (separate asmdef)
+│       │   │   ├── UnityMCP.Editor.Wizard.Tests.asmdef
+│       │   │   ├── BackendDescriptorTests.cs
+│       │   │   ├── ConfigureScreenTests.cs
+│       │   │   ├── PickBackendScreenTests.cs
+│       │   │   └── ... (5 test files total)
+│       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
+│       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
+│       ├── Updates/                       # Update checking + changelog display (v0.42.0)
+│       │   ├── ChangelogReader.cs         # Parse CHANGELOG.md entries (version, date, content)
+│       │   ├── UpdateBanner.cs            # Update notification banner UI
+│       │   ├── UpdateChecker.cs           # PyPI version check
+│       │   └── UpdatesPage.cs             # Hub page: Check button + changelog (markdown rendering)
+│       ├── MCPDiagnosePanel.cs            # Unified diagnostics panel (moved to Wizard/ with other windows)
+│       ├── MCPDiagnoseWindow.cs           # Diagnostics UI window (moved to Wizard/)
 │       ├── Chat/                          # Optional in-Unity Agent Chat (v0.29.2: split into CLI + View, UNITY_MCP_CHAT define)
 │       │   ├── Mentions/                     # @Mention autocomplete system (v0.41.4)
 │       │   │   ├── IMentionSource.cs          # MentionCandidate struct + IMentionSource interface

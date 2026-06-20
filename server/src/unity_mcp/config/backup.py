@@ -2,9 +2,10 @@
 import pathlib
 import shutil
 from datetime import datetime
+from typing import Optional
 
 
-def backup(path: pathlib.Path) -> pathlib.Path | None:
+def backup(path: pathlib.Path) -> Optional[pathlib.Path]:
     """Create timestamped backup: foo.json → foo.json.2026-06-19T08-30-00.bak"""
     if not path.exists():
         return None

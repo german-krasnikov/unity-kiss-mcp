@@ -1,0 +1,19 @@
+{
+    "name": "UnityMCP.Editor.Wizard.Tests",
+    "rootNamespace": "UnityMCP.Editor.Tests",
+    "references": [
+        "UnityMCP.Editor",
+        "UnityMCP.Editor.Wizard",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": ["nunit.framework.dll"],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
