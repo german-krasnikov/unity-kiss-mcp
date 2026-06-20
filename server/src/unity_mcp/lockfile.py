@@ -137,18 +137,42 @@ def cleanup_stale_locks(port: int, lock_dir: Path = None) -> int:
 
 
 def read_pid_from_port_file(port: int) -> Optional[int]:
-    """Read Unity PID from ~/.unity-mcp/ports/{pid}.port matching the given port."""
+    """Read Unity PID from ~/.unity-mcp/ports/{pid}.port matching the given port.
+
+    Skips dead PIDs to avoid false-positive process-dead signals.
+    """
     ports_dir = _ports_dir()
     if not ports_dir.exists():
         return None
     for f in ports_dir.glob("*.port"):
         try:
             lines = f.read_text(encoding="utf-8", errors="replace").strip().split("\n")
-            if int(lines[0]) == port:
-                return int(f.stem)
+            if int(lines[0]) != port:
+                continue
+            pid = int(f.stem)
+            if is_pid_alive(pid):
+                return pid
         except (ValueError, IndexError, OSError):
             continue
     return None
+
+
+def cleanup_stale_port_files() -> int:
+    """Delete port files for dead PIDs. Returns count cleaned."""
+    ports_dir = _ports_dir()
+    if not ports_dir.exists():
+        return 0
+    cleaned = 0
+    for pattern in ("*.port", "*.chat-port", "*.reload-port"):
+        for f in ports_dir.glob(pattern):
+            try:
+                pid = int(f.stem)
+                if not is_pid_alive(pid):
+                    f.unlink()
+                    cleaned += 1
+            except (ValueError, OSError):
+                continue
+    return cleaned
 
 
 def read_reload_port() -> Optional[int]:

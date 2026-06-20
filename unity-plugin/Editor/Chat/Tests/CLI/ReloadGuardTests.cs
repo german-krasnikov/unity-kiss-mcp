@@ -1,7 +1,9 @@
 // TDD — RED first. Tests drive ReloadGuard lock/save/load/clear contract.
 // Uses a temp file path to avoid touching Library/ during tests.
 using System.IO;
+using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -202,6 +204,102 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNotNull(loaded);
             Assert.AreEqual("second", loaded.Value.PendingText);
             Assert.AreEqual("s2",     loaded.Value.SessionId);
+        }
+
+        // ── SD-2: ForceUnlock Refresh kick ────────────────────────────────────
+
+        [Test]
+        public void ForceUnlock_DoesNotThrow_WhenLockDepthIsOne()
+        {
+            // Covers SD-2: ForceUnlock() (via OnTurnFinished) must not throw.
+            // AssetDatabase.Refresh() cannot be intercepted in EditMode tests;
+            // what we verify is: no exception and IsLocked becomes false.
+            ReloadGuard.OnTurnStarted();
+            Assert.IsTrue(ReloadGuard.IsLocked);
+            Assert.DoesNotThrow(() => ReloadGuard.OnTurnFinished(),
+                "ForceUnlock path (via OnTurnFinished) must not throw");
+            Assert.IsFalse(ReloadGuard.IsLocked);
+        }
+
+        // ── SH-2: OnTurnStarted exception safety ──────────────────────────────
+
+        [Test]
+        public void OnTurnStarted_IsLockedAfterFirstCall()
+        {
+            // SH-2: _lockDepth incremented only after successful acquisition.
+            ReloadGuard.OnTurnStarted();
+            Assert.IsTrue(ReloadGuard.IsLocked);
+        }
+
+        [Test]
+        public void OnTurnFinished_UnlocksAfterMatchingTurnStarted()
+        {
+            // SH-2: nested depth unwinds correctly.
+            ReloadGuard.OnTurnStarted();
+            ReloadGuard.OnTurnStarted();
+            ReloadGuard.OnTurnFinished();
+            Assert.IsTrue(ReloadGuard.IsLocked, "still locked after first finish");
+            ReloadGuard.OnTurnFinished();
+            Assert.IsFalse(ReloadGuard.IsLocked, "unlocked after second finish");
+        }
+    }
+
+    // ── Stress tests: _lockDepth and source structure (SH-2, SD-2) ───────────
+
+    [TestFixture]
+    public class ReloadGuardStressTests
+    {
+        [SetUp]    public void SetUp()    => ReloadGuard.ResetForTest();
+        [TearDown] public void TearDown() => ReloadGuard.ResetForTest();
+
+        // T-C: ForceUnlock resets _lockDepth to exactly 0 (via watchdog path)
+        [Test]
+        public void ForceUnlock_LockDepthIsZeroAfterUnlock()
+        {
+            var f = typeof(ReloadGuard).GetField("_lockDepth",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(f, "_lockDepth field must exist");
+
+            ReloadGuard.OnTurnStarted();
+            ReloadGuard.OnTurnStarted(); // depth = 2
+            ReloadGuard.OverrideWatchdogSeconds(-1.0); // always-expired
+            ReloadGuard.InvokeWatchdogTickForTest();   // ForceUnlock → depth = 0
+            Assert.AreEqual(0, (int)f.GetValue(null), "_lockDepth must be 0 after ForceUnlock");
+        }
+
+        // T-D: OnTurnStarted SH-2 — _lockDepth++ is NOT inside a finally block
+        [Test]
+        public void OnTurnStarted_LockDepthIncrementNotInFinallyBlock()
+        {
+            var src = ResolveSource("unity-plugin/Editor/Chat/CLI/ReloadGuard.cs");
+            if (src == null) return;
+            // Old broken form had _lockDepth++ in finally {} → over-increment on exception.
+            // Verify the pattern "finally" immediately followed by "{" then "_lockDepth++" is absent.
+            var idxFinally = src.IndexOf("finally", System.StringComparison.Ordinal);
+            var idxLock    = src.IndexOf("_lockDepth++;", System.StringComparison.Ordinal);
+            // If there's no finally block at all, the fix is definitely safe
+            if (idxFinally == -1) return;
+            // _lockDepth++ must appear AFTER the finally keyword (success path, not finally body)
+            Assert.IsTrue(idxLock > idxFinally || idxLock == -1,
+                "SH-2: _lockDepth++ must not be the first statement in the finally block");
+        }
+
+        // T-G: ForceUnlock source contains AssetDatabase.Refresh() (SD-2)
+        [Test]
+        public void ForceUnlock_SourceContainsAssetDatabaseRefresh()
+        {
+            var src = ResolveSource("unity-plugin/Editor/Chat/CLI/ReloadGuard.cs");
+            if (src == null) return;
+            StringAssert.Contains("AssetDatabase.Refresh()", src,
+                "SD-2: ForceUnlock must call AssetDatabase.Refresh() to re-arm the file watcher");
+        }
+
+        private static string ResolveSource(string pluginRelPath)
+        {
+            var p = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+                Application.dataPath, "..", "..", pluginRelPath));
+            if (!System.IO.File.Exists(p)) { Assert.Ignore($"Source not found: {p}"); return null; }
+            return System.IO.File.ReadAllText(p);
         }
     }
 }

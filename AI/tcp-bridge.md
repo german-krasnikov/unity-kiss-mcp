@@ -56,20 +56,20 @@ Max message size: 10MB.
 
 Key features:
 - **BridgeState enum** (v0.36.0): DISCONNECTED | CONNECTED | DOMAIN_RELOADING | FAILED (startup grace expired). Tracks connection lifecycle state explicitly.
-- **DomainReloadTracker** (v0.36.0, `bridge_reload_state.py`): Dataclass with 30s expiry tracking domain reload state independently from compile probe. Three methods: `mark()` (called on DomainReloadError), `clear()` (on successful send), `is_active()` (checks expiry + elapsed). Shared between `send()` retry logic and heartbeat.
+- **DomainReloadTracker** (v0.36.0, `bridge_reload_state.py`): Dataclass with 90s expiry tracking domain reload state independently from compile probe (v0.42.1: increased from 30s to 90s for 9-assembly window). Three methods: `mark()` (called on DomainReloadError), `clear()` (on successful send), `is_active()` (checks expiry + elapsed). Shared between `send()` retry logic and heartbeat.
 - **should_retry()** (v0.36.0): Pure decision function extracting retry logic from _send_with_retry. Signature: `(error: Exception, attempt: int, session_deadline: float) → (bool, float, str)` returning (retry yes/no, delay_s, reason). On DomainReloadError: marks reload + state→DOMAIN_RELOADING. On any error: checks reload.is_active() or probe_busy(), backoff 2^(attempt+1) sequence: 2s→4s→8s (restored in v0.37.0, was regressed to 1s→2s→4s). Testable without mocking networking.
 - Socket options: `TCP_NODELAY`, `SO_KEEPALIVE` (macOS: idle=60s, interval=10s, count=3; detects dead peers within ~90s)
 - Heartbeat: 15s interval `_raw_ping()` (bypasses retry machinery), 3 consecutive failures OR `is_process_dead()` → close. Disconnected polling: 5s if probe busy, 2s otherwise.
 - `_raw_ping()`: lightweight ping (default timeout=10s, heartbeat calls with 20s) that acquires lock, sends framed message directly on socket, validates response ID match. Prevents heartbeat from consuming RPC responses.
 - Reconnect: cooldown `MIN_RECONNECT_INTERVAL=2.0s` gates frequency; `_reconnect_cooldown_ok()` check prevents thundering herd. Heartbeat uses probe for TIMING only, not as gate for reconnect.
-- `DomainReloadError`: raised when Unity sends `going_away` event frame → immediate close (no wait), triggers `mark_recompile_issued()` state probe update, fast reconnect. **v0.36.0**: heartbeat now calls `_reload.mark()` to extend retry window (30s).
+- `DomainReloadError`: raised when Unity sends `going_away` event frame → immediate close (no wait), triggers `mark_recompile_issued()` state probe update, fast reconnect. **v0.36.0**: heartbeat now calls `_reload.mark()` to extend retry window (v0.42.1: 90s, increased from 30s for 9-assembly window).
 - **Atomic reader/writer close** (v0.36.0): Both reader and writer closed atomically within lock during _reconnect() to prevent zombie reads after close.
 - `_ensure_heartbeat()`: called on every `send()`, auto-restarts heartbeat task if it died (safety net)
 - `send()` retry logic: idle errors get 1 grace attempt; busy (domain reload / probe) gets full retries with exponential backoff (capped at 8s). Session deadline `SESSION_TIMEOUT=120s` prevents infinite retries (overridable via env UNITY_MCP_SESSION_TIMEOUT for reasoning models like Codex o3/o3-pro; chat backend sets 300s). **v0.31.1 Fix**: When `DomainReloadError` is caught, `domain_reload_in_progress` flag is pinned to True for all subsequent retries within that send() call, preventing `_probe_busy()` re-evaluation from returning False too early (Editor.log may clear "compiling" status before TCP 9700 is restored). Non-DomainReloadError exceptions still allow probe re-evaluation per attempt. **v0.36.0: SESSION_TIMEOUT env override** — CliBackendBase injects UNITY_MCP_SESSION_TIMEOUT=300 so Python bridge allows longer think time for reasoning models without timeout.
 - Lock per connection for thread safety
 
 **P0 (Cycle 17+) Fix — Domain Reload Sticky Flag**
-- `_domain_reload_in_progress` now auto-expires after `DOMAIN_RELOAD_EXPIRY_S=30s`
+- `_domain_reload_in_progress` now auto-expires after `DOMAIN_RELOAD_EXPIRY_S=90s` (v0.42.1: increased from 30s to 90s for 9-assembly window)
 - Cleared on successful reconnect (when TCP fully restores)
 - Prevents permanent "busy" state if domain reload never completes (e.g., compile error during reload)
 - Regression: flag was set but never cleared, causing -32000 errors on all subsequent commands
@@ -197,14 +197,14 @@ Append-only JSONL crash log for unhandled exceptions:
 - Fixes blocking of test result polling during domain reload, causing -32000 errors
 
 **P0 (Cycle 17+) Fix — Domain Reload Sticky Flag**
-- `_domain_reload_in_progress` flag now auto-expires after 30s, cleared on successful reconnect
+- `_domain_reload_in_progress` flag now auto-expires after 90s (v0.42.1: increased from 30s to 90s for 9-assembly window), cleared on successful reconnect
 - Prevents permanent "busy" state if domain reload doesn't complete (e.g., compile error)
 
 ## Code Locations
 
 - Python bridge: `server/src/unity_mcp/bridge.py` (UnityBridge TCP client, BridgeState enum, should_retry() v0.36.0)
 - Python bridge heartbeat: `server/src/unity_mcp/bridge_heartbeat.py` (HeartbeatMixin, 15s ping loop, startup grace deadline)
-- Python domain reload tracker: `server/src/unity_mcp/bridge_reload_state.py` (DomainReloadTracker v0.36.0, 30s expiry)
+- Python domain reload tracker: `server/src/unity_mcp/bridge_reload_state.py` (DomainReloadTracker v0.36.0, 90s expiry as of v0.42.1, increased from 30s for 9-assembly window)
 - Python connection slot: `server/src/unity_mcp/connection_slot.py`
 - Python compile probe: `server/src/unity_mcp/compile_state.py`
 - Python unity state: `server/src/unity_mcp/unity_state.py`
@@ -313,8 +313,8 @@ On TimeoutError / ConnectionError:
 - `test_tracker_not_active_initially` — new instance has is_active()=False
 - `test_tracker_mark_activates` — mark() sets _active=True
 - `test_tracker_elapsed_increases` — elapsed() returns monotonic delta from mark time
-- `test_tracker_is_active_true_while_within_expiry` — is_active()=True while < 30s
-- `test_tracker_is_active_false_after_expiry` — is_active()=False after 30s+ elapsed
+- `test_tracker_is_active_true_while_within_expiry` — is_active()=True while < 90s (v0.42.1: increased from 30s)
+- `test_tracker_is_active_false_after_expiry` — is_active()=False after 90s+ elapsed (v0.42.1: increased from 30s)
 - `test_tracker_clear_deactivates` — clear() sets _active=False, _since=None
 - `test_tracker_clear_without_mark_safe` — clear() on unmarked tracker is safe
 - `test_tracker_elapsed_zero_when_unmarked` — elapsed()=0.0 when _since is None
@@ -322,9 +322,9 @@ On TimeoutError / ConnectionError:
 **test_bridge_should_retry.py (8 tests for should_retry() decision logic):**
 - `test_should_retry_max_retries_gate` — attempt >= MAX_RETRIES returns (False, 0.0, "max_retries")
 - `test_should_retry_deadline_gate` — time.monotonic() >= deadline returns (False, 0.0, "deadline")
-- `test_should_retry_domain_reload_error_marks_reload` — DomainReloadError sets state→DOMAIN_RELOADING
-- `test_should_retry_domain_reload_gets_backoff` — DomainReloadError attempt<MAX_RETRIES returns (True, 2^attempt≤8, "domain_reload")
-- `test_should_retry_reload_active_retries` — reload.is_active()=True gets backoff, attempt < MAX_RETRIES
+- `test_should_retry_domain_reload_error_marks_reload` — DomainReloadError sets state→DOMAIN_RELOADING (90s window as of v0.42.1)
+- `test_should_retry_domain_reload_gets_backoff` — DomainReloadError attempt<MAX_RETRIES returns (True, 2^attempt≤8, "domain_reload") within 90s window (v0.42.1)
+- `test_should_retry_reload_active_retries` — reload.is_active()=True gets backoff within 90s window (v0.42.1), attempt < MAX_RETRIES
 - `test_should_retry_probe_busy_retries` — probe_busy()=True gets backoff
 - `test_should_retry_transient_attempt_0` — attempt < 1 with no busy returns (True, 1.0, "transient")
 - `test_should_retry_grace_expired_attempt_1_plus` — attempt ≥ 1 with no busy returns (False, 0.0, "grace_expired")
@@ -345,6 +345,7 @@ On TimeoutError / ConnectionError:
 - [ ] Lock on Python writes (asyncio.Lock)
 - [ ] NoDelay = true on both sides
 - [ ] SO_KEEPALIVE configured (idle=60s, interval=10s, count=3; ~90s dead peer detect; relaxed from 10s/5s to survive App Nap)
+- [ ] Domain reload expiry window (90s as of v0.42.1, increased from 30s for 9-assembly compilations)
 - [ ] Main thread dispatch via ConcurrentQueue
 - [ ] Graceful shutdown (going_away event before close)
 - [ ] Heartbeat reconnect logic correct

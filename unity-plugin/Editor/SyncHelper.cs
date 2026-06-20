@@ -223,15 +223,21 @@ namespace UnityMCP.Editor
 
         internal static string ComputeStamp()
         {
-            // vacuous: assembly not loaded yet (e.g. during test injection)
-            var asm = typeof(SyncHelper).Assembly;
-            if (asm == null) return "";
-            var mvid = asm.ManifestModule.ModuleVersionId;
-            var loc  = asm.Location;
-            long mtime = 0;
-            if (!string.IsNullOrEmpty(loc) && File.Exists(loc))
-                mtime = new FileInfo(loc).LastWriteTimeUtc.Ticks;
-            return $"{mvid}:{mtime}";
+            var sb = new System.Text.StringBuilder();
+            long maxMtime = 0;
+            foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var name = asm.GetName().Name ?? "";
+                if (!name.StartsWith("UnityMCP.")) continue;
+                sb.Append(asm.ManifestModule.ModuleVersionId.ToString("N")).Append(';');
+                var loc = asm.Location;
+                if (!string.IsNullOrEmpty(loc) && File.Exists(loc))
+                {
+                    var t = new FileInfo(loc).LastWriteTimeUtc.Ticks;
+                    if (t > maxMtime) maxMtime = t;
+                }
+            }
+            return sb.Length == 0 ? "" : $"{sb}:{maxMtime}";
         }
     }
 
@@ -269,12 +275,9 @@ namespace UnityMCP.Editor
                     foreach (var f in Directory.GetFiles(dag, "UnityMCP*.mvfrm"))
                         File.Delete(f);
 
-            // Step 2: Delete digestcache → Bee re-hashes all inputs (handles new .cs files)
-            var digestCache = Path.Combine(beePath, "tundra.digestcache");
-            if (File.Exists(digestCache))
-                File.Delete(digestCache);
+            // (digestcache deletion removed — corrupts Bee artifact graph; ForceUpdate flag is sufficient)
 
-            // Step 3: Refresh tells Unity to invoke Bee
+            // Step 2: Refresh tells Unity to invoke Bee
             AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
         }
 

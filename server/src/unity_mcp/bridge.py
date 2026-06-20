@@ -105,7 +105,7 @@ class UnityBridge(HeartbeatMixin):
         self._counter = 0
         self._lock = asyncio.Lock()
         self._probe: CompileStateProbe = probe if probe is not None else CompileStateProbe(
-            CompileStateProbe.autodetect_project_path(), port=self._port
+            CompileStateProbe.autodetect_project_path(port=self._port), port=self._port
         )
         self._first_failure_ts: Optional[float] = None
         self._reconnect_started_at: Optional[float] = None
@@ -310,7 +310,7 @@ class UnityBridge(HeartbeatMixin):
                 if new_port != self._port:
                     self._port = new_port
                     self._probe = CompileStateProbe(
-                        CompileStateProbe.autodetect_project_path(), port=new_port)
+                        CompileStateProbe.autodetect_project_path(port=new_port), port=new_port)
             except Exception:
                 pass
         reader, writer = await asyncio.wait_for(

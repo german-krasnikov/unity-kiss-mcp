@@ -3,6 +3,7 @@
 // Run order: 1→2→3→...→22
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using UnityEditor.Compilation;
 using UnityMCP.Editor;
@@ -495,6 +496,45 @@ namespace UnityMCP.Editor.Tests
                 "G7: grace self-heal must NOT force state=ready when ScriptCompilationFailed");
         }
 
+        // SD-1 #37: ComputeStamp returns non-empty string in any UnityMCP context
+        [Test]
+        public void ComputeStamp_ReturnsNonEmptyString()
+        {
+            var stamp = SyncHelper.ComputeStamp();
+            Assert.IsNotEmpty(stamp, "ComputeStamp must return non-empty — UnityMCP.Editor always loaded");
+        }
+
+        // SD-1 #38: multi-assembly format has ';' separators (one per assembly MVID)
+        [Test]
+        public void ComputeStamp_ContainsMultipleAssemblyMVIDs()
+        {
+            var loaded = System.AppDomain.CurrentDomain.GetAssemblies()
+                .Where(a => (a.GetName().Name ?? "").StartsWith("UnityMCP."))
+                .ToList();
+            var stamp = SyncHelper.ComputeStamp();
+            if (loaded.Count > 1)
+                StringAssert.Contains(";", stamp,
+                    "multi-assembly stamp must contain ';' when more than one UnityMCP.* asm loaded");
+            else
+                Assert.IsNotEmpty(stamp, "stamp non-empty even with single assembly");
+        }
+
+        // SD-1 #39: stamp includes Wizard assembly MVID when loaded
+        [Test]
+        public void ComputeStamp_IncludesWizardAssemblyMVID()
+        {
+            var wizardAsm = System.AppDomain.CurrentDomain.GetAssemblies()
+                .FirstOrDefault(a => a.GetName().Name == "UnityMCP.Editor.Wizard");
+            if (wizardAsm == null)
+            {
+                Assert.Ignore("UnityMCP.Editor.Wizard not loaded — skip");
+                return;
+            }
+            var wizardMvid = wizardAsm.ManifestModule.ModuleVersionId.ToString("N");
+            var stamp = SyncHelper.ComputeStamp();
+            StringAssert.Contains(wizardMvid, stamp, "stamp must include Wizard assembly MVID");
+        }
+
         // C3 #34: OnCompileStarted does NOT overwrite existing StampAtTrigger
         [Test]
         public void OnCompileStarted_DoesNotOverwriteExistingStampAtTrigger()
@@ -692,6 +732,35 @@ namespace UnityMCP.Editor.Tests
             CommandRegistry.Execute("force_refresh", null);
             Assert.AreEqual(RequestScriptCompilationOptions.None, _mock.LastRSCOptions,
                 "force_refresh must call RequestScriptCompilation(None) — CleanBuildCache has Unity 6.x no-op bug");
+        }
+
+        // CP-2: ImportPackageSources must exist on UnitySyncOps
+        [Test]
+        public void ImportPackageSources_MethodExistsOnUnitySyncOps()
+        {
+            var m = typeof(UnitySyncOps).GetMethod("ImportPackageSources",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            Assert.IsNotNull(m, "ImportPackageSources must exist on UnitySyncOps");
+        }
+
+        // CP-2: tundra.digestcache deletion is removed — structural guard via source file read.
+        // Reads the actual SyncHelper.cs to verify the regression-prone line is absent.
+        [Test]
+        public void ImportPackageSources_DoesNotDeleteDigestCache()
+        {
+            // Find SyncHelper.cs relative to Assets folder
+            var assets = UnityEngine.Application.dataPath;          // …/unity-test-project/Assets
+            var pluginSrc = System.IO.Path.Combine(assets,
+                "..", "..", "unity-plugin", "Editor", "SyncHelper.cs");
+            pluginSrc = System.IO.Path.GetFullPath(pluginSrc);
+            if (!System.IO.File.Exists(pluginSrc))
+            {
+                Assert.Ignore($"SyncHelper.cs not found at {pluginSrc} — skip in CI");
+                return;
+            }
+            var src = System.IO.File.ReadAllText(pluginSrc);
+            StringAssert.DoesNotContain("tundra.digestcache", src,
+                "CP-2: tundra.digestcache deletion corrupts Bee artifact graph — must be removed");
         }
     }
 }

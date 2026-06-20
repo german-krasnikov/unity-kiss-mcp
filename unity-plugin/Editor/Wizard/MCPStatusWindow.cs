@@ -2,10 +2,12 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.Scripting.APIUpdating;
 using UnityMCP.Editor.Wizard;
 
 namespace UnityMCP.Editor
 {
+    [MovedFrom(autoUpdateAPI: true, sourceNamespace: "UnityMCP.Editor", sourceAssembly: "UnityMCP.Editor")]
     public class MCPStatusWindow : EditorWindow
     {
         private VisualElement _orb, _halo;
@@ -13,6 +15,9 @@ namespace UnityMCP.Editor
         private Label         _updateLabel;
         private ScrollView    _changelogScroll;
         private bool          _changelogLoaded;
+        private IVisualElementScheduledItem _refreshJob;
+        private IVisualElementScheduledItem _beatFastJob;
+        private IVisualElementScheduledItem _beatSoftJob;
 
         [MenuItem("MCP/Status", priority = 1)]
         public static void ShowWindow()
@@ -82,9 +87,9 @@ namespace UnityMCP.Editor
 
             RefreshState();
             RefreshUpdateLabel();
-            root.schedule.Execute(RefreshState).Every(700);
-            root.schedule.Execute(BeatFast).Every(900);
-            root.schedule.Execute(BeatSoft).Every(1500);
+            _refreshJob  = root.schedule.Execute(RefreshState).Every(700);
+            _beatFastJob = root.schedule.Execute(BeatFast).Every(900);
+            _beatSoftJob = root.schedule.Execute(BeatSoft).Every(1500);
         }
 
         private void OnCheckUpdates()
@@ -147,6 +152,13 @@ namespace UnityMCP.Editor
             var b = new Button(a) { text = t };
             b.AddToClassList("mcp-btn");
             return b;
+        }
+
+        private void OnDisable()
+        {
+            _refreshJob?.Pause();
+            _beatFastJob?.Pause();
+            _beatSoftJob?.Pause();
         }
 
         private void BeatFast()

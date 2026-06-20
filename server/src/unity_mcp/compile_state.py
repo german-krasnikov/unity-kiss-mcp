@@ -11,7 +11,7 @@ from typing import Optional
 from unity_mcp.lockfile import read_pid_from_port_file, is_pid_alive, read_project_path_from_port_file
 from unity_mcp.unity_state import read_state_for_port
 
-_DISCONNECT_WINDOW_S = 30.0
+_DISCONNECT_WINDOW_S = 90.0  # was 30.0 — match DOMAIN_RELOAD_EXPIRY_S
 _DEFAULT_REMAINING_S = 5.0  # TODO(FM-26 G16w): derive from real diagnose state, not a fabricated 5.0s default
 _MAX_REMAINING_S = 60.0
 
@@ -51,13 +51,30 @@ class CompileStateProbe:
 
         Covers the fresh-project-load window: OnQuit deleted the state-file,
         Unity is still initializing and :port is not yet accepting connections.
+
+        When state file absent + PID alive, probes TCP: if TCP responds, state
+        file just failed to write — Unity is ready → return False.
         """
         if self._port is None:
             return False
         if read_state_for_port(self._port) is not None:
             return False
         pid = read_pid_from_port_file(self._port)
-        return pid is not None and is_pid_alive(pid)
+        if pid is None or not is_pid_alive(pid):
+            return False
+        # State absent + PID alive: verify TCP not already responding.
+        # If TCP responds, state file failed to write — Unity is ready.
+        import socket as _socket
+        s = _socket.socket()
+        s.settimeout(1.0)
+        try:
+            s.connect(("127.0.0.1", self._port))
+            return False  # TCP responds = not in startup window
+        except OSError:
+            return True   # TCP not yet up = genuinely starting
+        finally:
+            try: s.close()
+            except OSError: pass
 
     def has_strong_busy_signal(self) -> bool:
         """State file (authoritative) → startup window → lock file.

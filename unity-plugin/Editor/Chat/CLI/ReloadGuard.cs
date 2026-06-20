@@ -2,7 +2,7 @@
 // Prevents assembly reload from killing a live turn; resumes it after reload.
 // Unity-API calls (Lock/Unlock/Disallow/Allow) are guarded by _lockDepth counter
 // so this class is usable from unit tests via OverrideFilePath + ResetForTest.
-// T6 safe pattern: Disallow → Lock → try/finally { Unlock → Allow } + SessionState rebalance.
+// T6 safe pattern: Disallow → Lock (granular try/catch) → ForceUnlock (Allow + Refresh) + SessionState rebalance.
 using System;
 using System.IO;
 using UnityEditor;
@@ -33,7 +33,12 @@ namespace UnityMCP.Editor.Chat
             {
                 SessionState.EraseBool(LockMarkerKey);
                 try { EditorApplication.UnlockReloadAssemblies(); } catch { }
-                try { AssetDatabase.AllowAutoRefresh(); } catch { }
+                try
+                {
+                    AssetDatabase.AllowAutoRefresh();
+                    AssetDatabase.Refresh();
+                }
+                catch { }
             }
         }
 
@@ -45,22 +50,31 @@ namespace UnityMCP.Editor.Chat
         {
             if (_lockDepth == 0)
             {
-                // T6 safe pattern (ref-§6): Disallow → Lock → try/finally { Unlock → Allow }.
-                // _lockDepth++ is inside finally: ForceUnlock always has a matching release path
-                // even when a Unity API throws during acquisition.
+                // Granular acquisition tracking: only increment _lockDepth when BOTH
+                // DisallowAutoRefresh AND LockReloadAssemblies succeeded.
+                // Prevents ForceUnlock from calling Unlock without a matching Lock.
+                bool disallowed = false;
+                bool locked = false;
                 try
                 {
                     AssetDatabase.DisallowAutoRefresh();
+                    disallowed = true;
                     EditorApplication.LockReloadAssemblies();
+                    locked = true;
                 }
-                finally
+                catch
                 {
-                    _lockDepth++;
-                    SessionState.SetBool(LockMarkerKey, true);
-                    _lockStartTime = EditorApplication.timeSinceStartup;
-                    EditorApplication.update += WatchdogTick;
+                    // Partial acquisition: roll back Disallow if Lock didn't succeed.
+                    if (disallowed && !locked)
+                        try { AssetDatabase.AllowAutoRefresh(); } catch { }
+                    // Do NOT increment _lockDepth — turn proceeds without lock.
+                    return;
                 }
-                return;  // _lockDepth already incremented in finally
+                _lockDepth++;
+                SessionState.SetBool(LockMarkerKey, true);
+                _lockStartTime = EditorApplication.timeSinceStartup;
+                EditorApplication.update += WatchdogTick;
+                return;
             }
             _lockDepth++;
         }
@@ -75,11 +89,16 @@ namespace UnityMCP.Editor.Chat
 
         private static void ForceUnlock()
         {
-            _lockDepth = 0;
             EditorApplication.update -= WatchdogTick;
-            EditorApplication.UnlockReloadAssemblies();
-            AssetDatabase.AllowAutoRefresh();
+            try { EditorApplication.UnlockReloadAssemblies(); } catch { }
+            try
+            {
+                AssetDatabase.AllowAutoRefresh();
+                AssetDatabase.Refresh();  // required to re-arm the file watcher; AllowAutoRefresh alone does not
+            }
+            catch { }
             SessionState.EraseBool(LockMarkerKey);
+            _lockDepth = 0;
         }
 
         private static void WatchdogTick()

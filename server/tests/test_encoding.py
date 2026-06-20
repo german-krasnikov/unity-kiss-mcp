@@ -239,7 +239,8 @@ def test_lockfile_read_pid_from_port_file_cyrillic_path(tmp_path):
     port_file = ports_dir / f"{pid}.port"
     port_file.write_bytes(content.encode("utf-8"))
 
-    with patch.object(Path, "home", return_value=tmp_path):
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True):
         result = read_pid_from_port_file(port)
 
     assert result == pid, (

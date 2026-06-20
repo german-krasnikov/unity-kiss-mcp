@@ -325,3 +325,15 @@ def test_busy_branch_consults_diagnose_not_fabricated_countdown():
         f"Gap documented (G16w): estimated_remaining_s returns fabricated default "
         f"{_DEFAULT_REMAINING_S}s without real state. Got {remaining}."
     )
+
+
+# ---------------------------------------------------------------------------
+# SH-8: bridge.__init__ passes port to autodetect_project_path
+# ---------------------------------------------------------------------------
+
+def test_bridge_init_passes_port_to_autodetect():
+    """UnityBridge.__init__ passes self._port to autodetect_project_path."""
+    with patch("unity_mcp.bridge.CompileStateProbe") as mock_probe_cls:
+        mock_probe_cls.autodetect_project_path.return_value = None
+        _bridge_mod.UnityBridge(port=9501)
+    mock_probe_cls.autodetect_project_path.assert_called_once_with(port=9501)

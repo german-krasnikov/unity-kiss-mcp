@@ -3,7 +3,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-DOMAIN_RELOAD_EXPIRY_S: float = 30.0
+DOMAIN_RELOAD_EXPIRY_S: float = 90.0  # was 30.0 — 9 assemblies can take 60s
 
 
 @dataclass

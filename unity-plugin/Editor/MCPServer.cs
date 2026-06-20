@@ -747,15 +747,14 @@ namespace UnityMCP.Editor
             _chatListener = null;
             EditorApplication.update -= ProcessMainThreadQueue;
             EditorApplication.update -= WatchdogTick;
+            while (_mainThreadQueue.TryDequeue(out _)) { }  // drain: prevent queued actions after domain tear-down
         }
 
         public static void Stop()
         {
             Debug.Log("[MCP] Server stopping");
             _shuttingDown = true;
-            TeardownCore();
-            // Drain queue after handlers are unregistered
-            while (_mainThreadQueue.TryDequeue(out _)) { }
+            TeardownCore();  // already drains queue
             DeletePortFile();
         }
 

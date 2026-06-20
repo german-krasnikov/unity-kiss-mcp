@@ -171,7 +171,8 @@ def test_read_pid_from_port_file(tmp_path):
     ports_dir.mkdir(parents=True)
     pid = 12345
     (ports_dir / f"{pid}.port").write_text("9500\n/path/to/project\nMyProject", encoding="utf-8")
-    with patch.object(Path, "home", return_value=tmp_path):
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True):
         assert read_pid_from_port_file(9500) == pid
 
 
@@ -199,7 +200,8 @@ def test_read_pid_from_port_file_cyrillic_path_does_not_crash(tmp_path):
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
     (ports_dir / "99999.port").write_bytes("9500\n/Users/Иван/МойПроект\nМойПроект\n".encode("utf-8"))
-    with patch.object(Path, "home", return_value=tmp_path):
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True):
         assert read_pid_from_port_file(9500) == 99999
 
 
@@ -396,3 +398,75 @@ def test_kill_all_finds_all_lockfiles(tmp_path):
         assert not (tmp_path / f"server-{port}-{pid}.lock").exists()
     # Other port file untouched
     assert (tmp_path / "server-9500-99999999.lock").exists()
+
+
+# ---------------------------------------------------------------------------
+# SD-3: read_pid_from_port_file PID liveness + cleanup_stale_port_files
+# ---------------------------------------------------------------------------
+
+def test_read_pid_from_port_file_skips_dead_pid(tmp_path):
+    """Dead PID port file skipped → returns None."""
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    (ports_dir / "99999.port").write_text("9500\n/path/to/project\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=False):
+        assert read_pid_from_port_file(9500) is None
+
+
+def test_read_pid_from_port_file_alive_pid_returned(tmp_path):
+    """Alive PID → returned."""
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    (ports_dir / "11111.port").write_text("9500\n/path/to/project\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True):
+        assert read_pid_from_port_file(9500) == 11111
+
+
+def test_cleanup_stale_port_files_removes_dead(tmp_path):
+    """Dead PID .port file is deleted."""
+    from unity_mcp.lockfile import cleanup_stale_port_files
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    f = ports_dir / "99999.port"
+    f.write_text("9500\n/path\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=False):
+        cleaned = cleanup_stale_port_files()
+    assert cleaned == 1
+    assert not f.exists()
+
+
+def test_cleanup_stale_port_files_keeps_alive(tmp_path):
+    """Alive PID .port file is preserved."""
+    from unity_mcp.lockfile import cleanup_stale_port_files
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    f = ports_dir / "11111.port"
+    f.write_text("9500\n/path\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True):
+        cleaned = cleanup_stale_port_files()
+    assert cleaned == 0
+    assert f.exists()
+
+
+def test_cleanup_stale_port_files_all_patterns(tmp_path):
+    """Cleans *.port, *.chat-port, *.reload-port patterns."""
+    from unity_mcp.lockfile import cleanup_stale_port_files
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    files = [
+        ports_dir / "99991.port",
+        ports_dir / "99992.chat-port",
+        ports_dir / "99993.reload-port",
+    ]
+    for f in files:
+        f.write_text("9500\n/path\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=False):
+        cleaned = cleanup_stale_port_files()
+    assert cleaned == 3
+    for f in files:
+        assert not f.exists()

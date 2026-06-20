@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.43.0] — 2026-06-20 <!-- reload-stability -->
+
+**Crash Prevention:**
+- Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
+- MCPStatusWindow OnDisable stops Socket.Poll freeze during domain reload
+- ReloadMiniServer tracks+closes clients on Stop (fd leak + reload freeze)
+- [MovedFrom] on EditorWindows moved across assemblies (layout crash)
+- TeardownCore drains _mainThreadQueue (use-after-free after domain unload)
+
+**Stale DLL Detection:**
+- ComputeStamp iterates all UnityMCP.* assemblies (was single-assembly blind)
+- ReloadGuard.ForceUnlock + constructor rebalance call AssetDatabase.Refresh
+- PID liveness check in port file discovery (dead PIDs blocked commands)
+- TCP probe in is_startup_in_progress (false "Unity busy" live bug)
+- DOMAIN_RELOAD_EXPIRY_S 30→90s (9-assembly reload window)
+
+**Hardening:**
+- Wizard asmdef autoReferenced:false (compile error isolation)
+- ReloadGuard OnTurnStarted exception safety (asymmetric lock rollback)
+- Bridge passes port to autodetect_project_path
+
+**Test Summary (v0.42.1):**
+- 39 new stress tests added (across multiple test files)
+- Focus on domain reload reliability under heavy load
+
 ## [v0.42.0] — 2026-06-20 <!-- wizard-detection-scope-chips -->
 
 - **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → Configure). 9 backends: Claude Code/Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity. Runs `install.py configure --tool <key>` from Unity, cross-platform (macOS/Windows/Linux)

@@ -254,6 +254,68 @@ for _ in range(24):  # 2min @ 5s intervals
    - **Codex requestUserInput Integration (v0.29.38)** — Codex CLI can now show same interactive `AskUserCard` via JSON-RPC `tool/requestUserInput` and `item/tool/requestUserInput` requests. **CodexAppServerParser**: Detects both request types, extracts numeric `id` field, prefixes response with `"codex:"` for reply routing. **CodexAppServerBackend**: Advertises `experimentalApi: true` in initialize capabilities. **ControlResponseBuilder**: New `CodexUserInputResponse()` method formats JSON-RPC response with `int.TryParse(id)` guard: numeric id → unquoted, string → quoted for safety. **AskUserCard**: Detects `"codex:"` prefix in `Submit()`, formats positional answers array `[{"answer":"..."}]` matching Codex protocol (vs. `{"answer":"..."}` for Claude). Same interactive UI experience across both backends.
    - **Tests**: v0.29.37 added 6 Python tests (permission_prompt_tool), 68 C# tests (AskUserCard redesign). v0.29.38 added 7 C# tests (CodexAppServerParser, ControlResponseBuilder, AskUserCard Codex protocol). Total: 2413 Python tests passed, 2623+ C# EditMode green.
 
+## Reload Stability (v0.42.0, commit 39672a0)
+
+Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into crashes and stale DLLs. Addressed via 13 surgical fixes + 39 regression tests.
+
+### Crash Prevention
+
+1. **Socket Poll Freeze (MCPStatusWindow)**: OnDisable now stops Socket.Poll() cleanly during domain reload (was blocking main thread indefinitely)
+2. **Reload Port Leak (ReloadMiniServer)**: Client tracking + graceful close on Stop prevents fd exhaustion + reload freeze
+3. **Window Layout Crash**: [MovedFrom] attributes on MCPStatusWindow/MCPSettings/etc moved across assemblies (Editor assemblies moved to Wizard, was losing window layout)
+4. **Use-After-Free (TeardownCore)**: Drains `_mainThreadQueue` before domain unload (was referencing deallocated memory post-domain)
+5. **Tundra Digest Cache**: Removed unconditional deletion of digestcache (SIGABRT in RegisterAssemblyDefinition during reload)
+
+### Stale DLL Detection Pipeline
+
+**ComputeStamp (compile_state.py)**: Now iterates all UnityMCP.* assemblies (was checking only one assembly, blind to breakage in other .dlls)
+- Detects stale .mvfrm files via MVID comparison (per assembly)
+- Aggregates into single STALE verdict if ANY assembly diverges
+
+**ReloadGuard (C# CLI assembly)**: 
+- Constructor barrier calls `AssetDatabase.Refresh()` on init
+- `ForceUnlock()` triggers additional `AssetDatabase.Refresh()` + `RequestScriptCompilation()`
+- Exception-safe: asymmetric lock rollback in `OnTurnStarted` to prevent deadlock
+
+**PID Liveness Check (lockfile.py)**: 
+- Port file discovery now verifies process is alive via `_is_zombie(pid)` check
+- Blocks stale PID lockfiles from ghosting commands (fast server restart without wait)
+
+**TCP Probe in is_startup_in_progress (server.py)**:
+- False "Unity busy" detection fixed by probing TCP port during startup detection
+- Distinguishes real startup grace from transient disconnect
+
+### Reload Timing
+
+**DOMAIN_RELOAD_EXPIRY_S**: Increased 30s → 90s for 9-assembly reload window
+- v0.42.0 increased assembly count 7→9 (main, Chat CLI, Chat View, Wizard, Reload, reload tests, Chat tests, Wizard tests)
+- Longer window accommodates full serialization + reload + recompile cycle
+- Bridge heartbeat retry logic uses this window to avoid false "domain stuck" timeouts
+
+**_DISCONNECT_WINDOW_S**: Also 90s (synchronizes with reload window)
+
+### Asmdef Isolation
+
+**Wizard.asmdef** (v0.42.0): `autoReferenced: false` enables independent compilation when core/Chat broken
+- Prevents Wizard compile errors from blocking MCP startup (diagnostic UI still available even during crashes)
+
+### Test Infrastructure (39 regression tests, commit 39672a0)
+
+**Python** (`test_reload_stability.py`, 300 LOC):
+- ComputeStamp multi-assembly detection (test_compute_stamp_detects_stale_in_any_assembly)
+- PID liveness fallback (test_port_discovery_skips_zombie_pids)
+- TCP probe avoids false startup detection (test_is_startup_probes_tcp)
+- DOMAIN_RELOAD_EXPIRY edge cases (test_domain_reload_expiry_90s_holds)
+
+**C#** (145 LOC across 3 test files):
+- ReloadMiniServerTests: client tracking, graceful shutdown (85 tests)
+- ReloadGuardTests: exception safety, ForceUnlock flow (98 tests)
+- MCPStatusWindowSchedulerTests: OnDisable stop behavior (37 tests)
+- MovedFromAttributeTests: layout crash isolation (25 tests)
+- ReloadStabilityTests (Wizard, Editor): full pipeline integration (91 tests)
+
+**Verification**: 39 new regression tests all green on macOS/Windows (domain reload stress: 100+ recompile cycles)
+
 ## Tool Categories
 
 **Update v0.30.4**: validate_move added to asset category (6 tools total). Test marker `live_haiku` → `live_cli` (v0.8.2+).

@@ -2,7 +2,7 @@
 import os
 import time
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -71,8 +71,8 @@ def test_probe_disconnect_window_expires(tmp_path):
     with patch("unity_mcp.compile_state.time") as mock_time:
         mock_time.monotonic.return_value = base_ts
         probe.mark_recompile_issued()
-        # Advance 31 seconds past mark
-        mock_time.monotonic.return_value = base_ts + 31
+        # Advance 91 seconds past mark (window is now 90s)
+        mock_time.monotonic.return_value = base_ts + 91
         assert probe.is_unity_busy() is False
 
 
@@ -344,11 +344,14 @@ def test_autodetect_project_path_env_override(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_startup_in_progress_no_state_pid_alive_no_lock(tmp_path):
-    """state-file None + PID alive + no BeeDriver Lock → is_startup_in_progress True."""
+    """state-file None + PID alive + TCP refuses → is_startup_in_progress True."""
     (tmp_path / "Library").mkdir()  # no BeeDriver/Lock subfolder
+    mock_sock = MagicMock()
+    mock_sock.connect.side_effect = OSError("Connection refused")
     with patch("unity_mcp.compile_state.read_state_for_port", return_value=None), \
          patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=99999), \
-         patch("unity_mcp.compile_state.is_pid_alive", return_value=True):
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True), \
+         patch("socket.socket", return_value=mock_sock):
         probe = CompileStateProbe(unity_project_path=tmp_path, port=9500)
         assert probe.is_startup_in_progress() is True
         assert probe.has_strong_busy_signal() is True
@@ -434,3 +437,59 @@ def test_stale_busy_live_pid_no_wedge_is_still_busy():
     assert result is True, "stale+busy+PID-alive + no wedge → still busy (P6 preserved)"
 
 
+
+
+# ---------------------------------------------------------------------------
+# SD-4: TCP probe in is_startup_in_progress
+# ---------------------------------------------------------------------------
+
+def test_is_startup_tcp_responds_returns_false():
+    """State absent + PID alive + TCP responds → False (Unity ready, state file missing)."""
+    mock_sock = MagicMock()
+    mock_sock.connect.return_value = None  # success
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=None), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=12345), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True), \
+         patch("socket.socket", return_value=mock_sock):
+        probe = CompileStateProbe(port=9500)
+        assert probe.is_startup_in_progress() is False
+
+
+def test_is_startup_tcp_not_responding_returns_true():
+    """State absent + PID alive + TCP refuses → True (genuinely starting)."""
+    mock_sock = MagicMock()
+    mock_sock.connect.side_effect = OSError("Connection refused")
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=None), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=12345), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=True), \
+         patch("socket.socket", return_value=mock_sock):
+        probe = CompileStateProbe(port=9500)
+        assert probe.is_startup_in_progress() is True
+
+
+def test_is_startup_tcp_probe_not_called_when_state_file_present():
+    """If state file exists → returns False before TCP probe."""
+    state = MagicMock()
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=state), \
+         patch("socket.socket") as mock_socket:
+        probe = CompileStateProbe(port=9500)
+        result = probe.is_startup_in_progress()
+    assert result is False
+    mock_socket.assert_not_called()  # TCP probe never reached
+
+
+def test_is_startup_no_port_returns_false():
+    """port=None → False always (no TCP probe)."""
+    probe = CompileStateProbe(port=None)
+    assert probe.is_startup_in_progress() is False
+
+
+def test_is_startup_dead_pid_returns_false():
+    """State absent + PID dead → False (no TCP probe needed)."""
+    with patch("unity_mcp.compile_state.read_state_for_port", return_value=None), \
+         patch("unity_mcp.compile_state.read_pid_from_port_file", return_value=99999), \
+         patch("unity_mcp.compile_state.is_pid_alive", return_value=False), \
+         patch("socket.socket") as mock_socket:
+        probe = CompileStateProbe(port=9500)
+        assert probe.is_startup_in_progress() is False
+        mock_socket.assert_not_called()

@@ -19,6 +19,8 @@ namespace UnityMCP.Reload
         private static volatile bool _running;
         private static volatile bool _starting;
         private static volatile bool _shuttingDown;
+        private static readonly ConcurrentDictionary<int, TcpClient> _activeClients =
+            new ConcurrentDictionary<int, TcpClient>();
 
         // Main-thread work queue — drained by EditorApplication.update via ReloadPlugin.
         public static readonly ConcurrentQueue<Action> UpdateQueue = new ConcurrentQueue<Action>();
@@ -56,6 +58,9 @@ namespace UnityMCP.Reload
         {
             _shuttingDown = true;
             _running = false;
+            foreach (var kv in _activeClients)
+                try { kv.Value.Close(); } catch { }
+            _activeClients.Clear();
             try { _listener?.Stop(); } catch { }
             _listener = null;
             _thread = null; // IsBackground=true — CLR won't wait; _listener.Stop() unblocks AcceptLoop
@@ -68,7 +73,14 @@ namespace UnityMCP.Reload
                 try
                 {
                     var client = _listener.AcceptTcpClient();
-                    ThreadPool.QueueUserWorkItem(_ => HandleClient(client));
+                    var clientId = client.GetHashCode();
+                    _activeClients[clientId] = client;
+                    client.ReceiveTimeout = 30_000;
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try { HandleClient(client); }
+                        finally { _activeClients.TryRemove(clientId, out _); }
+                    });
                 }
                 catch (SocketException) when (!_running) { break; }
                 catch (ObjectDisposedException) { break; }

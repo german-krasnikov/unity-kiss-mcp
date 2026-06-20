@@ -62,3 +62,12 @@ def test_double_mark_resets_timer():
     # _since should be >= first_since (reset or same)
     assert t._since >= first_since
     assert t.is_active() is True
+
+
+def test_domain_reload_expiry_is_90s():
+    assert DOMAIN_RELOAD_EXPIRY_S == 90.0
+
+
+def test_disconnect_window_matches_domain_reload_expiry():
+    from unity_mcp.compile_state import _DISCONNECT_WINDOW_S
+    assert _DISCONNECT_WINDOW_S == DOMAIN_RELOAD_EXPIRY_S

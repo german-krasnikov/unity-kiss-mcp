@@ -374,5 +374,21 @@ namespace UnityMCP.Editor.Tests
                 MCPServer.DeleteStateFile();
             }
         }
+
+        // CP-7: Stop() must drain _mainThreadQueue so no queued actions survive domain tear-down.
+        [Test]
+        public void Stop_DrainedQueueAfterStop()
+        {
+            var qField = typeof(MCPServer).GetField("_mainThreadQueue",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.IsNotNull(qField, "_mainThreadQueue field must exist");
+
+            MCPServer.Stop();
+
+            var queue = qField.GetValue(null)
+                as System.Collections.Concurrent.ConcurrentQueue<System.Action>;
+            Assert.IsNotNull(queue, "_mainThreadQueue must be ConcurrentQueue<Action>");
+            Assert.IsTrue(queue.IsEmpty, "_mainThreadQueue must be empty after Stop()");
+        }
     }
 }

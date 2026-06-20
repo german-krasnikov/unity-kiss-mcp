@@ -1,9 +1,12 @@
 // TDD: ReloadMiniServer — queue drain, unknown-command dispatch, bind-retry.
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Threading;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace UnityMCP.Reload.Tests
 {
@@ -153,6 +156,88 @@ namespace UnityMCP.Reload.Tests
         {
             var r = ReloadMiniServer.ErrResponse("abc", "bad");
             Assert.AreEqual("{\"id\":\"abc\",\"ok\":false,\"err\":\"bad\"}", r);
+        }
+
+        // ── CP-4: tracked clients ─────────────────────────────────────────────
+
+        [Test]
+        public void ActiveClients_FieldExists_AndIsConcurrentDictionary()
+        {
+            var field = typeof(ReloadMiniServer).GetField("_activeClients",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(field, "_activeClients field must exist");
+            var value = field.GetValue(null);
+            Assert.IsInstanceOf<ConcurrentDictionary<int, TcpClient>>(value,
+                "_activeClients must be ConcurrentDictionary<int, TcpClient>");
+        }
+
+        [Test]
+        public void Stop_CompletesQuicklyWithActiveClient()
+        {
+            ReloadMiniServer.Start(19760);
+            if (ReloadMiniServer.ActualPort == 0)
+            {
+                Assert.Ignore("Port bind failed — skip in CI");
+                return;
+            }
+            TcpClient tc = null;
+            try
+            {
+                tc = new TcpClient("127.0.0.1", ReloadMiniServer.ActualPort);
+                Thread.Sleep(50); // let AcceptLoop register the client
+                var stopDone = false;
+                var t = new Thread(() => { ReloadMiniServer.Stop(); stopDone = true; });
+                t.Start();
+                bool joined = t.Join(3000);
+                Assert.IsTrue(joined, "Stop() must complete in < 3s with active client");
+                Assert.IsTrue(stopDone);
+            }
+            finally
+            {
+                try { tc?.Close(); } catch { }
+                ReloadMiniServer.Stop(); // idempotent cleanup
+            }
+        }
+    }
+
+    // ── Stress tests: source structure + concurrent Stop (CP-4) ──────────────
+
+    [TestFixture]
+    public class ReloadMiniServerStressTests
+    {
+        // T-E: AcceptLoop sets client.ReceiveTimeout = 30_000 (source verification)
+        [Test]
+        public void AcceptLoop_SetsReceiveTimeout_InSource()
+        {
+            var p = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+                Application.dataPath, "..", "..", "unity-plugin-reload/Editor/ReloadMiniServer.cs"));
+            if (!System.IO.File.Exists(p)) { Assert.Ignore($"Source not found: {p}"); return; }
+            var src = System.IO.File.ReadAllText(p);
+            StringAssert.Contains("ReceiveTimeout = 30_000", src,
+                "CP-4: AcceptLoop must set client.ReceiveTimeout = 30_000 to bound blocking reads");
+        }
+
+        // T-F: Stop() + concurrent blocking reader — no deadlock/exception
+        [Test]
+        public void Stop_ConcurrentHandleClient_DoesNotThrow()
+        {
+            ReloadMiniServer.Start(19770);
+            if (ReloadMiniServer.ActualPort == 0) { Assert.Ignore("Port bind failed — skip"); return; }
+
+            Exception caught = null;
+            var client = new TcpClient("127.0.0.1", ReloadMiniServer.ActualPort);
+            var reader = new Thread(() =>
+            {
+                try { client.GetStream().Read(new byte[4], 0, 4); }
+                catch { } // SocketException on close = expected
+            });
+            reader.Start();
+            Thread.Sleep(30); // let AcceptLoop register the client
+            try { ReloadMiniServer.Stop(); }
+            catch (Exception e) { caught = e; }
+            finally { try { client.Close(); } catch { } }
+            reader.Join(2000);
+            Assert.IsNull(caught, $"Stop() must not throw with concurrent reader: {caught}");
         }
     }
 }
