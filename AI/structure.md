@@ -234,6 +234,7 @@ unity-kiss-mcp/
 │       │   │   └── TestStringHelpers.cs  # CountOccurrences utility (DRY across 4+ files, v0.26.0)
 │       │   ├── MarkdownInlineFormatterTests.cs # Rich-text formatting (bold, italic, code, links) (v0.42.0)
 │       │   ├── UpdatesPageTests.cs        # Changelog rendering + update check UI (v0.42.0)
+│       │   ├── LevelUpTests.cs            # LevelUp panel state machine, animation, release diff parsing (12 tests, v0.44.0)
 │       │   ├── MultiSceneTestBase.cs      # Base class for multi-scene tests (DRY consolidation v0.24.3+v0.25.0: saves additive scenes, captures main scene name before NewScene)
 │       │   ├── MultiSceneFinderTests.cs   # Object finding across scenes + reference scanning (v0.24.3)
 │       │   ├── PortResolverTests.cs       # 25 NUnit tests (port validation, fallback, dual-port edge cases)
@@ -280,14 +281,20 @@ unity-kiss-mcp/
 │       │   │   ├── BackendDescriptorTests.cs
 │       │   │   ├── ConfigureScreenTests.cs
 │       │   │   ├── PickBackendScreenTests.cs
-│       │   │   └── ... (5 test files total)
+│       │   │   ├── WizardConfigWriterTests.cs # Config backup/restore, merge safety (9 tests, v0.44.0)
+│       │   │   └── ... (6 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
-│       ├── Updates/                       # Update checking + changelog display (v0.42.0)
+│       ├── Updates/                       # Update checking + changelog display (v0.42.0, v0.44.0: LevelUp UX)
 │       │   ├── ChangelogReader.cs         # Parse CHANGELOG.md entries (version, date, content)
-│       │   ├── UpdateBanner.cs            # Update notification banner UI
-│       │   ├── UpdateChecker.cs           # PyPI version check
-│       │   └── UpdatesPage.cs             # Hub page: Check button + changelog (markdown rendering)
+│       │   ├── UpdateBanner.cs            # Update notification banner UI (DRY RepoGitUrl constant, v0.44.0)
+│       │   ├── UpdateChecker.cs           # PyPI version check (RepoGitUrl constant, v0.44.0)
+│       │   ├── UpdatesPage.cs             # Hub page: Check button + changelog (v0.44.0: uses LevelUpPanel)
+│       │   ├── LevelUpPanel.cs            # 4-state machine: Idle→Animating→Done→Diff (v0.44.0)
+│       │   ├── LevelUpAnimator.cs         # XP bar + sparkles animation (v0.44.0)
+│       │   ├── ReleaseDiff.cs             # Parse CHANGELOG.md for release notes (v0.44.0)
+│       │   ├── LevelUpAnim.uss            # Animation stylesheet (v0.44.0)
+│       │   └── Tests/
 │       ├── MCPDiagnosePanel.cs            # Unified diagnostics panel (moved to Wizard/ with other windows)
 │       ├── MCPDiagnoseWindow.cs           # Diagnostics UI window (moved to Wizard/)
 │       ├── Chat/                          # Optional in-Unity Agent Chat (v0.29.2: split into CLI + View, UNITY_MCP_CHAT define)

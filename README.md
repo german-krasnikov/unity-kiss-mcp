@@ -137,7 +137,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6589 Tests (2597 Python · 3912 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6636 Tests (2606 Python · 3950 Unity · 80 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -196,6 +196,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.44.0</b> — 2026-06-20 — LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles …</summary>
+
+LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles animation
+
+</details>
+
+<details>
 <summary><b>v0.43.0</b> — 2026-06-20 — Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)</summary>
 
 Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
@@ -224,15 +231,9 @@ Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
 </details>
 
 <details>
-<summary><b>v0.40.1</b> — 2026-06-19 — **Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns …</summary>
-
-**Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns parasitic MCP servers from `~/.mcp.json`; env vars (`UNITY_MCP_PORT`, …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.40.1** — 2026-06-19 — **Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns …
 - **v0.40.0** — 2026-06-19 — **One-Liner Installation** — `curl | bash` (macOS/Linux) or `iex (iwr).Content` …
 - **v0.38.0** — 2026-06-19 — **External MCP Server Support in Chat:**
 - **v0.37.0** — 2026-06-18 — **Bridge Stability & Reload Recovery (v0.36.0):**

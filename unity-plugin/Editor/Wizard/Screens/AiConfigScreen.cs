@@ -99,6 +99,18 @@ namespace UnityMCP.Editor.Wizard.Screens
             card.Add(heading);
             card.Add(body);
             card.Add(btn);
+
+            if (data.Action == CardAction.WriteConfig && WizardConfigWriter.HasBackup(data.Payload))
+            {
+                var restoreBtn = new Button(() =>
+                {
+                    WizardConfigWriter.RestoreConfig(data.Payload);
+                    WizardAnimUtils.FlashClass(btn, "wiz-btn-copied", 800);
+                }) { text = "Restore" };
+                restoreBtn.AddToClassList("wiz-btn-restore");
+                card.Add(restoreBtn);
+            }
+
             return card;
         }
 

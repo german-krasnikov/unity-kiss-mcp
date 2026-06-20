@@ -87,6 +87,28 @@ namespace UnityMCP.Editor.Wizard
             $"      \"env\": {{ \"UNITY_MCP_PORT\": \"{port}\" }}\n" +
             "    }";
 
+        // ── Backup / Restore ──────────────────────────────────────────────────
+
+        internal static bool HasBackup(string configPath)
+            => File.Exists(configPath + ".bak");
+
+        /// <summary>Restores config from .bak. Returns false if no .bak exists.</summary>
+        internal static bool RestoreConfig(string configPath)
+        {
+            var bak = configPath + ".bak";
+            if (!File.Exists(bak)) return false;
+            try
+            {
+                File.Copy(bak, configPath, overwrite: true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                UnityEditor.EditorUtility.DisplayDialog("Restore Failed", ex.Message, "OK");
+                return false;
+            }
+        }
+
         private static string ReplaceEntry(string json, string key, string newValue)
         {
             if (string.IsNullOrEmpty(json)) return null;

@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 from typing import Callable, Optional
 
 
@@ -33,13 +34,35 @@ def merge_mcp_config(
 
 def merge_toml_mcp(config_path: pathlib.Path, server_entry: dict) -> None:
     """Merge unity-mcp into a TOML config (Codex). Text-based, no TOML lib needed."""
-    text = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+    bak = config_path.with_suffix(".bak")
+    if config_path.exists():
+        if not bak.exists():
+            shutil.copy2(config_path, bak)
+        text = config_path.read_text(encoding="utf-8")
+    else:
+        text = ""
+
+    # Strip stale bare [mcp_servers.unity] (no suffix) — causes "invalid transport"
+    # Also strips any dotted sub-sections like [mcp_servers.unity.env].
+    # \n? at end handles EOF without trailing newline.
+    stale_re = re.compile(
+        r'\[mcp_servers\.unity\]\n?(?:(?!\[)[^\n]*\n?)*'
+        r'(?:\[mcp_servers\.unity\.[^\]]+\]\n?(?:(?!\[)[^\n]*\n?)*)*',
+        re.MULTILINE,
+    )
+    text = stale_re.sub("", text)
+
     section_re = re.compile(
         r'\[mcp_servers\.unity-mcp\]\n(?:(?!\[)[^\n]*\n)*', re.MULTILINE
     )
     cmd = server_entry["command"]
     args = json.dumps(server_entry.get("args", []))
     block = f'[mcp_servers.unity-mcp]\ncommand = "{cmd}"\nargs = {args}\n'
+    env = server_entry.get("env", {})
+    if env:
+        env_lines = "\n".join(f'{k} = "{v}"' for k, v in env.items())
+        block += f'\n[mcp_servers.unity-mcp.env]\n{env_lines}\n'
+
     if section_re.search(text):
         text = section_re.sub(block, text)
     else:

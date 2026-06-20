@@ -45,8 +45,7 @@ namespace UnityMCP.Editor
 
         static void DoUpdate()
         {
-            var url = "https://github.com/german-krasnikov/unity-kiss-mcp.git" +
-                      "?path=unity-plugin#v" + UpdateChecker.AvailableVersion;
+            var url = UpdateChecker.RepoGitUrl + "?path=unity-plugin#v" + UpdateChecker.AvailableVersion;
             UnityEditor.PackageManager.Client.Add(url);
         }
     }

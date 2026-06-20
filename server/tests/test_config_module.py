@@ -160,6 +160,105 @@ def test_merger_default_root_key_unchanged(tmp_path):
     assert "other" in data["mcpServers"]
 
 
+def test_merge_toml_strips_stale_unity_entry(tmp_path):
+    """Stale [mcp_servers.unity] (bare) must be removed when writing unity-mcp."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_text('[mcp_servers.unity]\ncommand = "/old/python"\nargs = []\n', encoding="utf-8")
+    merger.merge_toml_mcp(cfg, {"command": "/new/python", "args": ["-m", "unity_mcp.server"]})
+    text = cfg.read_text(encoding="utf-8")
+    assert "[mcp_servers.unity]\n" not in text
+    assert "[mcp_servers.unity-mcp]" in text
+    assert "/new/python" in text
+
+
+def test_merge_toml_preserves_other_tables(tmp_path):
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_text('model = "gpt-4"\n\n[projects.foo]\ntrust_level = "trusted"\n\n[mcp_servers.unity]\ncommand = "/old"\nargs = []\n', encoding="utf-8")
+    merger.merge_toml_mcp(cfg, {"command": "/new", "args": []})
+    text = cfg.read_text(encoding="utf-8")
+    assert 'model = "gpt-4"' in text
+    assert "[projects.foo]" in text
+    assert "[mcp_servers.unity]\n" not in text
+
+
+def test_merge_toml_includes_env(tmp_path):
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    merger.merge_toml_mcp(cfg, {"command": "uvx", "args": ["unity-mcp"], "env": {"PYTHONUTF8": "1"}})
+    text = cfg.read_text(encoding="utf-8")
+    assert "[mcp_servers.unity-mcp.env]" in text
+    assert 'PYTHONUTF8 = "1"' in text
+
+
+def test_merge_toml_creates_backup(tmp_path):
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_text("original content", encoding="utf-8")
+    merger.merge_toml_mcp(cfg, {"command": "uvx", "args": []})
+    bak = tmp_path / "config.bak"
+    assert bak.exists()
+    assert bak.read_text(encoding="utf-8") == "original content"
+
+
+def test_merge_toml_idempotent(tmp_path):
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    entry = {"command": "/py", "args": ["-m", "unity_mcp.server"]}
+    merger.merge_toml_mcp(cfg, entry)
+    merger.merge_toml_mcp(cfg, entry)
+    text = cfg.read_text(encoding="utf-8")
+    assert text.count("[mcp_servers.unity-mcp]") == 1
+
+
+def test_merge_toml_does_not_strip_unity_mcp_entry(tmp_path):
+    """Regression: stale_re must NOT consume [mcp_servers.unity-mcp]."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_text('[mcp_servers.unity-mcp]\ncommand = "/existing"\nargs = []\n', encoding="utf-8")
+    merger.merge_toml_mcp(cfg, {"command": "/new", "args": []})
+    text = cfg.read_text(encoding="utf-8")
+    assert text.count("[mcp_servers.unity-mcp]") == 1
+
+
+def test_merge_toml_strips_stale_unity_env_subsection(tmp_path):
+    """CRIT-1: stale [mcp_servers.unity.env] sub-section must be stripped too."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_text(
+        '[mcp_servers.unity]\ncommand = "/old"\nargs = []\n'
+        '\n[mcp_servers.unity.env]\nFOO = "bar"\n',
+        encoding="utf-8",
+    )
+    merger.merge_toml_mcp(cfg, {"command": "/new", "args": []})
+    text = cfg.read_text(encoding="utf-8")
+    assert "[mcp_servers.unity]" not in text
+    assert "[mcp_servers.unity.env]" not in text
+    assert 'FOO = "bar"' not in text
+
+
+def test_merge_toml_strips_stale_no_trailing_newline(tmp_path):
+    """CRIT-2: stale_re works even when file has no trailing newline."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_bytes(b'[mcp_servers.unity]\ncommand = "/old"\nargs = []')  # no trailing \n
+    merger.merge_toml_mcp(cfg, {"command": "/new", "args": []})
+    text = cfg.read_text(encoding="utf-8")
+    assert "[mcp_servers.unity]\n" not in text
+    assert "[mcp_servers.unity-mcp]" in text
+
+
+def test_merge_toml_backup_not_overwritten_on_second_call(tmp_path):
+    """MAJOR-2: first-write-wins — backup keeps original content across calls."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    cfg.write_text("original", encoding="utf-8")
+    merger.merge_toml_mcp(cfg, {"command": "uvx", "args": []})
+    merger.merge_toml_mcp(cfg, {"command": "uvx2", "args": []})
+    assert (tmp_path / "config.bak").read_text(encoding="utf-8") == "original"
+
+
 # ─── backup.py ──────────────────────────────────────────────────────────────
 
 def test_backup_creates_timestamped_copy(tmp_path):

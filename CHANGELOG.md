@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.44.0] — 2026-06-20 <!-- arcade-levelup-codex-config -->
+
+**Arcade Level Up UX:**
+- LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles animation
+- LevelUpAnimator: Progressive bar fill + particle effects via AnimationCurve
+- ReleaseDiff: Parses CHANGELOG.md for release notes (version comparison, content extraction)
+- LevelUpAnim.uss: Complete animation stylesheet
+- UpdatesPage.cs: Swapped UpdateBanner → LevelUpPanel for update flow
+
+**Codex Config Hardening:**
+- merger.py: Strips stale `[mcp_servers.unity]` entries on first write, preserves environment, creates .bak backup (first-write-wins)
+- install.py doctor: Warns about stale Codex MCP entries
+- WizardConfigWriter: HasBackup + RestoreConfig methods for config rollback
+- AiConfigScreen: Restore button in UI (recovery from corrupt config)
+
+**Test Summary:**
+- 12 new LevelUp NUnit tests (state machine, animations, release parsing)
+- 9 new WizardConfigWriter NUnit tests (backup/restore, merge safety)
+- Python pytest: 2606 passed (was 2597, +9 config tests)
+- NUnit EditMode: 3945 passed, 5 pre-existing (total 3950)
+
+**Stability:**
+- ReloadMiniServer.cs: Fixed CS1503 (explicit TcpClient variable)
+- HelperTests.cs: Removed MCPServer.Stop() (was killing TCP)
+
 ## [v0.43.0] — 2026-06-20 <!-- reload-stability -->
 
 **Crash Prevention:**

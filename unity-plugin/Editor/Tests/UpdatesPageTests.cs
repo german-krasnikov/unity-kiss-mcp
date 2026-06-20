@@ -42,10 +42,9 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void BuildUpdatesPage_NoBanner_WhenNoUpdate()
         {
-            // HasUpdate is false after reset, so banner should not appear
             var page = SettingsPageFactory.BuildUpdatesPage(() => { });
-            var banner = page.Q(className: "wiz-card");
-            Assert.IsNull(banner, "Banner should not be present when no update available");
+            var banner = page.Q(className: "lvlup-cta");
+            Assert.IsNull(banner, "LevelUp panel should not be present when no update available");
         }
 
         [Test]
@@ -53,8 +52,8 @@ namespace UnityMCP.Editor.Tests
         {
             UpdateChecker.SetAvailableVersionForTest("9.99.0");
             var page = SettingsPageFactory.BuildUpdatesPage(() => { });
-            var banner = page.Q(className: "wiz-card");
-            Assert.IsNotNull(banner, "Banner should be present when update available");
+            var banner = page.Q(className: "lvlup-cta");
+            Assert.IsNotNull(banner, "LevelUp panel should be present when update available");
         }
     }
 }

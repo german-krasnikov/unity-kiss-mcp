@@ -17,8 +17,8 @@ namespace UnityMCP.Editor
 
             var bannerSlot = new VisualElement();
             bannerSlot.AddToClassList("updates-banner-slot");
-            var initialBanner = UpdateBanner.Build();
-            if (initialBanner != null) bannerSlot.Add(initialBanner);
+            var levelUp = LevelUpPanel.Build(scheduleHost: scroll);
+            if (levelUp != null) bannerSlot.Add(levelUp);
             scroll.Add(bannerSlot);
 
             var checkBtn = new Button() { text = "Check for Updates" };
@@ -33,8 +33,8 @@ namespace UnityMCP.Editor
                     checkBtn.SetEnabled(true);
                     checkBtn.text = "Check for Updates";
                     bannerSlot.Clear();
-                    var newBanner = UpdateBanner.Build();
-                    if (newBanner != null) bannerSlot.Add(newBanner);
+                    var newLevelUp = LevelUpPanel.Build(scheduleHost: scroll);
+                    if (newLevelUp != null) bannerSlot.Add(newLevelUp);
                 }).StartingIn(3000);
             };
             scroll.Add(checkBtn);

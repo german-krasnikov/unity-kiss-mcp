@@ -5,6 +5,7 @@ Functions that don't reference patchable config imports live here.
 import argparse
 import json
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -138,10 +139,14 @@ def cmd_doctor(server_dir: Path, codex_config: Path, mcp_json: Path, ui,
     _check("unity_mcp importable", importable)
 
     paths_ok = False
+    stale_entry = False
     if codex_config.exists():
         content = codex_config.read_text(encoding="utf-8")
         paths_ok = str(py) in content
+        stale_entry = bool(re.search(r'^\[mcp_servers\.unity\]', content, re.MULTILINE))
     _check(".codex/config.toml paths correct", paths_ok)
+    if stale_entry:
+        ui.fail(".codex/config.toml has stale [mcp_servers.unity] — run: python install.py configure --tool codex")
 
     mcp_ok = False
     if mcp_json.exists():

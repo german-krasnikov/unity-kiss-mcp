@@ -9,8 +9,9 @@ namespace UnityMCP.Editor
         const string CacheTimeKey = "UnityMCP.UpdateCacheTime";
         const string SkipKey      = "UnityMCP.SkippedVersion";
         const int    CacheTtlHours = 24;
-        const string ReleasesUrl  =
-            "https://api.github.com/repos/german-krasnikov/unity-kiss-mcp/releases/latest";
+        const string RepoSlug    = "german-krasnikov/unity-kiss-mcp";
+        const string ReleasesUrl = "https://api.github.com/repos/" + RepoSlug + "/releases/latest";
+        internal const string RepoGitUrl = "https://github.com/" + RepoSlug + ".git";
 
         public static string AvailableVersion { get; private set; }
         public static bool   HasUpdate        => !string.IsNullOrEmpty(AvailableVersion);

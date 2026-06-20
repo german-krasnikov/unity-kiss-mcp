@@ -79,7 +79,7 @@ namespace UnityMCP.Reload
                     ThreadPool.QueueUserWorkItem(_ =>
                     {
                         try { HandleClient(client); }
-                        finally { _activeClients.TryRemove(clientId, out _); }
+                        finally { TcpClient removed; _activeClients.TryRemove(clientId, out removed); }
                     });
                 }
                 catch (SocketException) when (!_running) { break; }
