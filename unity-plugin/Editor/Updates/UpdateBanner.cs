@@ -4,7 +4,7 @@ using UnityEngine.UIElements;
 namespace UnityMCP.Editor
 {
     /// <summary>Renders a dismissible update-available banner.</summary>
-    public static class UpdateBanner
+    internal static class UpdateBanner
     {
         public static VisualElement Build()
         {
@@ -43,10 +43,6 @@ namespace UnityMCP.Editor
             return banner;
         }
 
-        static void DoUpdate()
-        {
-            var url = UpdateChecker.RepoGitUrl + "?path=unity-plugin#v" + UpdateChecker.AvailableVersion;
-            UnityEditor.PackageManager.Client.Add(url);
-        }
+        static void DoUpdate() => UpdateDispatcher.DoUpdate();
     }
 }

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.45.0] — 2026-06-20 <!-- install-source-detection -->
+
+**Install Source Detection & Connect/Disconnect:**
+- **InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM registry) via PackageInfo.source
+- **LocalPluginUpdater** — `git pull --tags` for file: installs (async via Task.Run), validates HEAD matches tag
+- **UpmPluginUpdater** — Client.Add chain for both editor + reload packages on git: update
+- **UpdateDispatcher** — DRY routing replaces copy-paste in LevelUpPanel + UpdateBanner
+- **ChatMcpConfigWriter** — `uvx` fallback for git: installs (no MCP server in PackageCache)
+- **install.py connect** — Link Unity projects via `file:` refs in manifest.json (enables local plugin dev)
+- **install.py disconnect** — Unlink projects, restore registry source
+- **install.py pull** — CLI update for file: installs (git pull --tags, preserves server connection)
+
+**Test Summary (v0.45.0):**
+- 16 new C# NUnit tests: InstallSourceDetectorTests (8), LocalPluginUpdaterTests (6), UpmPluginUpdaterTests (2)
+- 14 new Python pytest tests: test_install_connect.py (8), test_install_pull.py (6)
+- Python pytest: 2621 passed (was 2606, +15 install tests)
+- NUnit EditMode: 3966 passed, 5 pre-existing (total 3971)
+
 ## [v0.44.1] — 2026-06-20 <!-- codex-windows-hotfix -->
 
 - **Fix: Codex Windows path crash** — TOML `command` now uses literal strings (single quotes) so `C:\Users\...` paths are not interpreted as unicode escapes

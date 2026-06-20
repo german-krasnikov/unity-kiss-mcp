@@ -123,10 +123,6 @@ namespace UnityMCP.Editor
             catch (Exception e) { Debug.LogWarning($"[LevelUp] Failed to load diff: {e.Message}"); return new List<ReleaseDiff.DiffSection>(); }
         }
 
-        static void DoUpdate()
-        {
-            var url = UpdateChecker.RepoGitUrl + "?path=unity-plugin#v" + UpdateChecker.AvailableVersion;
-            UnityEditor.PackageManager.Client.Add(url);
-        }
+        static void DoUpdate() => UpdateDispatcher.DoUpdate();
     }
 }

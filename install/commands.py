@@ -165,6 +165,23 @@ def cmd_doctor(server_dir: Path, codex_config: Path, mcp_json: Path, ui,
         ui.info(f"TCP :{port} — closed (Unity not running or plugin disabled)")
 
 
+def cmd_pull(repo_root: Path, ui) -> int:
+    """git pull --tags for local clone installations. Returns 0 on success, 1 on failure."""
+    if not (repo_root / ".git").exists():
+        ui.error("Not a git clone. Download the latest release from GitHub.")
+        return 1
+    try:
+        result = subprocess.run(["git", "pull", "--tags"], cwd=repo_root)
+    except (FileNotFoundError, OSError) as exc:
+        ui.error(f"git pull failed: {exc}")
+        return 1
+    if result.returncode != 0:
+        ui.error("git pull failed — check the output above.")
+        return 1
+    ui.ok("Updated. Focus Unity to reload the plugin.")
+    return 0
+
+
 def cmd_uninstall(server_dir: Path, unity_mcp_data_dir: Path, ui, prompt_yn,
                   _args: argparse.Namespace) -> None:
     """Remove Unity MCP venv and optionally ~/.unity-mcp data."""
@@ -182,3 +199,67 @@ def cmd_uninstall(server_dir: Path, unity_mcp_data_dir: Path, ui, prompt_yn,
             ui.ok(f"{unity_mcp_data_dir} removed")
         else:
             ui.info("Keeping data directory")
+
+
+_MCP_PKGS = ("com.unity-mcp.editor", "com.unity-mcp.reload")
+_REPO_ROOT = Path(__file__).parent.parent.resolve()
+
+
+def cmd_connect(args: argparse.Namespace, ui) -> int:
+    """Add file: references to a Unity project's manifest.json."""
+    project_dir = Path(args.unity_project).resolve()
+    manifest = project_dir / "Packages" / "manifest.json"
+
+    if not manifest.exists():
+        ui.error(f"Not a Unity project: {project_dir} (Packages/manifest.json not found)")
+        return 1
+
+    editor_path = _REPO_ROOT / "unity-plugin"
+    reload_path = _REPO_ROOT / "unity-plugin-reload"
+
+    data = json.loads(manifest.read_text("utf-8"))
+    deps = data.setdefault("dependencies", {})
+
+    editor_ref = f"file:{editor_path}"
+    if deps.get("com.unity-mcp.editor") == editor_ref:
+        ui.ok("Already connected.")
+        return 0
+
+    shutil.copy2(manifest, manifest.with_suffix(".json.bak"))
+
+    deps["com.unity-mcp.editor"] = editor_ref
+    deps["com.unity-mcp.reload"] = f"file:{reload_path}"
+    manifest.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    ui.ok(f"Connected to {project_dir.name}. Focus Unity to reload.")
+    return 0
+
+
+def cmd_disconnect(args: argparse.Namespace, ui) -> int:
+    """Remove Unity MCP file: references from manifest.json."""
+    project_dir = Path(args.unity_project).resolve()
+    manifest = project_dir / "Packages" / "manifest.json"
+
+    if not manifest.exists():
+        ui.error(f"Not a Unity project: {project_dir}")
+        return 1
+
+    data = json.loads(manifest.read_text("utf-8"))
+    deps = data.get("dependencies", {})
+
+    removed = any(pkg in deps for pkg in _MCP_PKGS)
+    for pkg in _MCP_PKGS:
+        deps.pop(pkg, None)
+
+    testables = data.get("testables", [])
+    for pkg in _MCP_PKGS:
+        if pkg in testables:
+            testables.remove(pkg)
+
+    if not removed:
+        ui.ok("Not connected — nothing to remove.")
+        return 0
+
+    shutil.copy2(manifest, manifest.with_suffix(".json.bak"))
+    manifest.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    ui.ok("Disconnected. Focus Unity to unload plugin.")
+    return 0

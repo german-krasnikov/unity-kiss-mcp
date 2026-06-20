@@ -1,0 +1,55 @@
+using UnityEditor;
+using UnityEditor.PackageManager;
+using UnityEngine;
+
+namespace UnityMCP.Editor
+{
+    internal static class UpmPluginUpdater
+    {
+        const string EditorPkg = "unity-plugin";
+        const string ReloadPkg = "unity-plugin-reload";
+
+        /// <summary>Build UPM git URL for a package path + version tag.</summary>
+        internal static string BuildUrl(string packagePath, string version) =>
+            UpdateChecker.RepoGitUrl + $"?path={packagePath}#{(version.StartsWith("v") ? version : "v" + version)}";
+
+        /// <summary>Trigger UPM to update both editor + reload packages via git URL.</summary>
+        internal static void Update(string version)
+        {
+            if (string.IsNullOrEmpty(version))
+            {
+                Debug.LogError("[MCP Update] No version specified.");
+                return;
+            }
+
+            var url = BuildUrl(EditorPkg, version);
+            var req = Client.Add(url);
+            EditorApplication.update += Poll;
+
+            void Poll()
+            {
+                if (!req.IsCompleted) return;
+                EditorApplication.update -= Poll;
+
+                if (req.Status == StatusCode.Failure)
+                {
+                    Debug.LogError($"[MCP Update] UPM add failed: {req.Error?.message}");
+                    return;
+                }
+
+                // Chain: add reload package after editor package resolves
+                var reloadUrl = BuildUrl(ReloadPkg, version);
+                var reloadReq = Client.Add(reloadUrl);
+                EditorApplication.update += PollReload;
+
+                void PollReload()
+                {
+                    if (!reloadReq.IsCompleted) return;
+                    EditorApplication.update -= PollReload;
+                    if (reloadReq.Status == StatusCode.Failure)
+                        Debug.LogError($"[MCP Update] Reload package failed: {reloadReq.Error?.message}");
+                }
+            }
+        }
+    }
+}

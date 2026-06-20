@@ -135,8 +135,23 @@ def _project_config_path(project: Path, tool_key: str) -> Path:
     return paths.get(tool_key, project / ".mcp.json")
 
 
+def cmd_pull(_args: argparse.Namespace) -> None:
+    ui.box(["Unity MCP — pull latest"])
+    code = _cmds.cmd_pull(REPO_ROOT, ui)
+    if code != 0:
+        sys.exit(code)
+
+
 def cmd_uninstall(_args: argparse.Namespace) -> None:
     _cmds.cmd_uninstall(SERVER_DIR, _UNITY_MCP_DATA_DIR, ui, prompt_yn, _args)
+
+
+def cmd_connect(args: argparse.Namespace) -> None:
+    sys.exit(_cmds.cmd_connect(args, ui))
+
+
+def cmd_disconnect(args: argparse.Namespace) -> None:
+    sys.exit(_cmds.cmd_disconnect(args, ui))
 
 
 # ── argparse ──────────────────────────────────────────────────────────────────
@@ -156,12 +171,20 @@ def main() -> None:
                      ["claude-desktop", "claude-code", "cursor", "windsurf", "generic"])
     cfg.add_argument("--port", type=int, default=0)
 
+    sub.add_parser("pull", help="Pull latest code (git clone installs only)")
     sub.add_parser("uninstall", help="Remove Unity MCP")
+
+    p_connect = sub.add_parser("connect", help="Connect Unity MCP to a Unity project")
+    p_connect.add_argument("unity_project", help="Path to Unity project root")
+
+    p_disconnect = sub.add_parser("disconnect", help="Disconnect Unity MCP from a Unity project")
+    p_disconnect.add_argument("unity_project", help="Path to Unity project root")
 
     args = p.parse_args()
     dispatch = {
         "setup": cmd_setup, "update": cmd_update, "doctor": cmd_doctor,
-        "configure": cmd_configure, "uninstall": cmd_uninstall,
+        "configure": cmd_configure, "pull": cmd_pull, "uninstall": cmd_uninstall,
+        "connect": cmd_connect, "disconnect": cmd_disconnect,
     }
     dispatch[args.cmd](args)
 

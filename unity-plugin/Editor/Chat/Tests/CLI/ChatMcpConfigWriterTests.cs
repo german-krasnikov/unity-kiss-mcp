@@ -4,6 +4,41 @@ using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
 {
+    // ── GetOrCreateConfigPath install-source tests ────────────────────────────
+
+    [TestFixture]
+    public class ChatMcpConfigWriterInstallSourceTests
+    {
+        [TearDown]
+        public void TearDown() => InstallSourceDetector.ClearTestOverride();
+
+        [Test]
+        public void GetOrCreateConfigPath_GitInstall_NoServer_ReturnsUvxConfig()
+        {
+            InstallSourceDetector.SetSourceForTest(InstallSourceDetector.Source.Git);
+
+            // Point package to a path with no server/ next to it
+            // GetOrCreateConfigPath uses Packages/<id> which won't have a sibling server/ in test
+            var path = ChatMcpConfigWriter.GetOrCreateConfigPath();
+
+            Assert.IsNotNull(path, "should return a path, not null");
+            var json = File.ReadAllText(path);
+            StringAssert.Contains("uvx", json, "command must be uvx for git install");
+            StringAssert.Contains("unity-mcp", json);
+        }
+
+        [Test]
+        public void GetOrCreateConfigPath_LocalInstall_NoServer_ReturnsNull()
+        {
+            InstallSourceDetector.SetSourceForTest(InstallSourceDetector.Source.Local);
+
+            // In test env, Packages/com.unity-mcp.editor has no sibling server/ with pyproject.toml
+            // so serverDir == null — with Local source it must log error and return null
+            var path = ChatMcpConfigWriter.GetOrCreateConfigPath();
+
+            Assert.IsNull(path, "Local install with missing server should return null");
+        }
+    }
     [TestFixture]
     public class ChatMcpConfigWriterTests
     {

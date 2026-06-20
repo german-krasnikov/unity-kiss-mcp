@@ -2,14 +2,14 @@
 
 ```
 unity-kiss-mcp/
-├── install/                    # Installation & configuration CLI (v0.38.0+)
+├── install/                    # Installation & configuration CLI (v0.38.0+, v0.45.0: connect/disconnect/pull)
 │   ├── __init__.py
 │   ├── bootstrap.sh            # One-liner macOS/Linux: git clone + venv setup + config
 │   ├── bootstrap.ps1           # One-liner Windows: git clone + venv setup + config
 │   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
-│   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall)
-│   └── tests/                  # Bootstrap + UI tests
-├── server/                     # Python MCP Server (2594 unit tests, 78 live = 2672 total Python, v0.42.0)
+│   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall, connect, disconnect, pull - v0.45.0)
+│   └── tests/                  # Bootstrap + UI + install tests
+├── server/                     # Python MCP Server (2621 unit tests, 78 live = 2699 total Python, v0.45.0)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
@@ -264,6 +264,10 @@ unity-kiss-mcp/
 │       │   ├── SetupDiagnosticsTests.cs   # Diagnostic checks (Python, imports, TCP)
 │       │   ├── DiagnoseCommandTests.cs    # Doctor command + result formatting
 │       │   ├── WizardAnimUtilsTests.cs    # Animation timing + interpolation
+│       │   ├── InstallSourceDetectorTests.cs # 8 NUnit tests (file:/git: detection, PackageInfo parsing) (v0.45.0)
+│       │   ├── LocalPluginUpdaterTests.cs # 6 NUnit tests (git pull --tags, Task.Run async, tag matching) (v0.45.0)
+│       │   ├── UpmPluginUpdaterTests.cs   # 2 NUnit tests (Client.Add chain, both packages) (v0.45.0)
+│       │   ├── ChatMcpConfigWriterTests.cs # 4 NUnit tests (uvx fallback for git: installs) (v0.45.0)
 │       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+, v0.42.0: 3-screen flow, 9 backends, asmdef split)
 │       │   ├── SetupWizard.cs             # Auto-launch on first run, 3 screens (Welcome → PickBackend → Configure)
 │       │   ├── SetupWizard.uss            # Wizard stylesheet (layout, animations)
@@ -285,7 +289,7 @@ unity-kiss-mcp/
 │       │   │   └── ... (6 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
-│       ├── Updates/                       # Update checking + changelog display (v0.42.0, v0.44.0: LevelUp UX)
+│       ├── Updates/                       # Update checking + changelog display (v0.42.0, v0.44.0: LevelUp UX, v0.45.0: install-source detection)
 │       │   ├── ChangelogReader.cs         # Parse CHANGELOG.md entries (version, date, content)
 │       │   ├── UpdateBanner.cs            # Update notification banner UI (DRY RepoGitUrl constant, v0.44.0)
 │       │   ├── UpdateChecker.cs           # PyPI version check (RepoGitUrl constant, v0.44.0)
@@ -294,6 +298,10 @@ unity-kiss-mcp/
 │       │   ├── LevelUpAnimator.cs         # XP bar + sparkles animation (v0.44.0)
 │       │   ├── ReleaseDiff.cs             # Parse CHANGELOG.md for release notes (v0.44.0)
 │       │   ├── LevelUpAnim.uss            # Animation stylesheet (v0.44.0)
+│       │   ├── InstallSourceDetector.cs   # Detect file: (local) vs git: (registry) via PackageInfo.source (v0.45.0)
+│       │   ├── LocalPluginUpdater.cs      # git pull --tags for file: installs via Task.Run (v0.45.0)
+│       │   ├── UpmPluginUpdater.cs        # Client.Add chain for both packages on git: update (v0.45.0)
+│       │   ├── UpdateDispatcher.cs        # DRY routing replaces copy-paste in LevelUpPanel/UpdateBanner (v0.45.0)
 │       │   └── Tests/
 │       ├── MCPDiagnosePanel.cs            # Unified diagnostics panel (moved to Wizard/ with other windows)
 │       ├── MCPDiagnoseWindow.cs           # Diagnostics UI window (moved to Wizard/)

@@ -102,9 +102,17 @@ namespace UnityMCP.Editor.Chat
             var serverDir   = ResolveServerDir(packageRoot);
             if (serverDir == null)
             {
-                Debug.LogError($"[MCP Chat] Server not found at expected path (package={packageRoot}). " +
-                               "Check the UPM package is installed correctly.");
-                return null;
+                if (InstallSourceDetector.Detect() == InstallSourceDetector.Source.Local)
+                {
+                    Debug.LogError($"[MCP Chat] Server not found at expected path (package={packageRoot}). " +
+                                   "Check the UPM package is installed correctly.");
+                    return null;
+                }
+                // Git/Registry/Embedded/Unknown install — server available via PyPI
+                var uvxJson = BuildClaudeConfigJson("uvx", new[] { "unity-mcp" }, MCPServer.ServerChatPort);
+                var uvxPath = Path.Combine(Path.GetTempPath(), ConfigFile);
+                File.WriteAllText(uvxPath, uvxJson, JsonHelper.Utf8NoBom);
+                return uvxPath;
             }
 
             const string LastServerDirPref = "UnityMCP_LastServerDir";
