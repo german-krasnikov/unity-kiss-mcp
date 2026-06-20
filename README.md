@@ -137,7 +137,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 3974 Tests (0 Python · 3974 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4126 Tests (0 Python · 4126 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -196,6 +196,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.46.0</b> — 2026-06-21 — **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number …</summary>
+
+**Polygon2D** — Immutable 2D polygon (XZ plane), winding-number point-in-polygon test (nonzero fill rule), AABB bounds computation, CSV …
+
+</details>
+
+<details>
 <summary><b>v0.45.0</b> — 2026-06-20 — **InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM …</summary>
 
 **InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM registry) via PackageInfo.source
@@ -224,15 +231,9 @@ Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
 </details>
 
 <details>
-<summary><b>v0.42.0</b> — 2026-06-20 — **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → …</summary>
-
-**Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → Configure). 9 backends: Claude Code/Desktop, Cursor, Windsurf, VS Code, …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.42.0** — 2026-06-20 — **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → …
 - **v0.41.4** — 2026-06-20 — **@Mention Autocomplete** — Type `@` in Chat input to trigger autocomplete …
 - **v0.41.0** — 2026-06-20 — **Session Handoff (Chat↔CLI)** — Button "→ CLI" in Chat copies resume command …
 - **v0.40.1** — 2026-06-19 — **Fix: Chat duplicate TCP connections** — Claude Chat no longer spawns …
