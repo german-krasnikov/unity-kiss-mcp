@@ -38,6 +38,7 @@ namespace UnityMCP.Editor
 
             var stage = new VisualElement();
             stage.AddToClassList("orb-stage");
+            stage.Add(StatusAmbientAnim.Build(root));
             _halo = new VisualElement(); _halo.AddToClassList("orb-halo");
             _orb  = new VisualElement(); _orb.AddToClassList("orb");
             stage.Add(_halo);

@@ -148,6 +148,46 @@
     margin-top: 16px;
 }
 
+/* ── Step Transitions ────────────────────────────────────────────────────── */
+
+.wiz-transition-out {
+    translate: -100% 0;
+    opacity: 0;
+    transition-property: translate, opacity;
+    transition-duration: 0.2s;
+    transition-timing-function: ease-in;
+}
+
+.wiz-transition-in-start {
+    translate: 100% 0;
+    opacity: 0;
+}
+
+.wiz-transition-in-end {
+    translate: 0 0;
+    opacity: 1;
+    transition-property: translate, opacity;
+    transition-duration: 0.2s;
+    transition-timing-function: ease-out;
+}
+
+/* ── Progress Bar ────────────────────────────────────────────────────────── */
+
+.wiz-progress-bar {
+    height: 2px;
+    background-color: rgba(255, 255, 255, 0.05);
+    margin-top: 4px;
+}
+
+.wiz-progress-fill {
+    height: 100%;
+    background-color: #3ad29f;
+    width: 0;
+    transition-property: width;
+    transition-duration: 0.35s;
+    transition-timing-function: ease-out;
+}
+
 @keyframes wiz-shake-frames {
     0%   { translate: -6px 0; }
     20%  { translate:  5px 0; }

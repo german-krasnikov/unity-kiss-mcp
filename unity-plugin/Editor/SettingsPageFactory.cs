@@ -69,6 +69,7 @@ namespace UnityMCP.Editor
             var page = new VisualElement();
             page.AddToClassList("nav-page");
             page.Add(BackHeader("LLM Sampling", onBack));
+            page.Add(SamplingHeaderAnim.Build(page));
             var store = LlmConfigStore.Load();
             page.Add(BuildSamplingForm(store));
             return page;

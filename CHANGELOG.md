@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.52.0] — 2026-06-21 <!-- arcade-animation-system -->
+
+**Features:**
+- **Arcade Animation System** — Unified animation primitives for consistent UI effects across all windows.
+  * **ArcadePalette.cs** — Centralized color constants (Up=#3ad29f, Listen=#e8a23a, Down=#6e2b3a, Accent=#e94560) + `StateClass` seam for connection-aware colors. Prevents hardcoded #RRGGBB drift across codebase.
+  * **ArcadeAnim.cs** — Shared animation library with USS class toggles (GPU-accelerated, zero per-frame cost): `AnimateClass`, `FadeIn`, `SlideInRight`, `ShakeX`, `PulseOnce`, `FlashClass`, `GlowPulse`, `CountUp`, `StaggerFadeIn`, `Typewriter`.
+  * **ArcadeAnim.uss** — Shared USS keyframes + CSS transitions (@keyframes arcade-fade-*, arcade-slide-*, etc.).
+  * **Per-window HeaderAnims** — DRY builders follow `VisualElement Build()` pattern:
+    - `SamplingHeaderAnim.Build()` — 7-bar frequency analyzer for Sampling page
+    - `StatusAmbientAnim.Build()` — scanline + grid + sonar ring overlay for Status window
+    - `WizardStepAnim.cs` — slide transitions + progress bar for Setup Wizard
+  * **WizardAnimUtils.cs refactor** — Now delegates to ArcadeAnim (−code duplication).
+  * **MCPHub.uss + Updates** — Integrates arcade palette + anim classes.
+
+**Tests:**
+- Added 23 new C# NUnit tests: ArcadePaletteTests (7), ArcadeAnimTests (6), SamplingHeaderAnimTests (3), StatusAmbientAnimTests (5), WizardStepAnimTests (5). Total suite now 4,369 EditMode tests.
+
 ## [v0.51.0] — 2026-06-21 <!-- scene-annotation-primitives -->
 
 **Features:**

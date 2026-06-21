@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine.UIElements;
 
@@ -60,6 +61,7 @@ namespace UnityMCP.Editor
             var current = UpdateChecker.GetCurrentVersion();
             var entries = ChangelogReader.Parse(content, current);
 
+            var foldouts = new List<VisualElement>();
             foreach (var entry in entries)
             {
                 var header = string.IsNullOrEmpty(entry.Date)
@@ -74,7 +76,9 @@ namespace UnityMCP.Editor
                 body.style.whiteSpace = WhiteSpace.Normal;
                 foldout.Add(body);
                 parent.Add(foldout);
+                foldouts.Add(foldout);
             }
+            ArcadeAnim.StaggerFadeIn(foldouts, 60);
         }
     }
 }

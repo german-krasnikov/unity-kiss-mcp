@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine.UIElements;
 
@@ -11,6 +12,8 @@ namespace UnityMCP.Editor
             if (ss != null) root.styleSheets.Add(ss);
             var settingsSs = MCPEditorUtils.LoadStyleSheet("MCPSettings.uss");
             if (settingsSs != null) root.styleSheets.Add(settingsSs);
+            var arcadeSs = MCPEditorUtils.LoadStyleSheet("ArcadeAnim.uss");
+            if (arcadeSs != null) root.styleSheets.Add(arcadeSs);
             root.AddToClassList("hub-root");
 
             var nav = new SettingsNavController(root);
@@ -31,6 +34,15 @@ namespace UnityMCP.Editor
                 UpdateChecker.HasUpdate ? $"v{UpdateChecker.AvailableVersion} available" : "Check for updates",
                 () => nav.Push(SettingsPageFactory.BuildUpdatesPage(() => nav.Pop()))));
             home.Add(MCPHubDivider.Build(root));
+
+            var cards = new List<VisualElement>();
+            for (int i = 0; i < home.childCount; i++)
+            {
+                var child = home.ElementAt(i);
+                if (child.ClassListContains("hub-card"))
+                    cards.Add(child);
+            }
+            ArcadeAnim.StaggerFadeIn(cards, 60);
 
             nav.SetRoot(home);
         }

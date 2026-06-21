@@ -98,3 +98,72 @@
 .mcp-btn {
     margin: 3px;
 }
+
+/* ── Ambient Overlay ── */
+.status-ambient {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+}
+
+.status-scanline {
+    position: absolute;
+    left: 0; right: 0;
+    height: 1px;
+    background-color: rgba(58, 210, 159, 0.07);
+    top: -2px;
+    transition-property: top;
+    transition-duration: 2s;
+    transition-timing-function: linear;
+}
+
+.status-scanline--sweep {
+    top: 100%;
+}
+
+.status-grid {
+    position: absolute;
+    top: 50%; left: 50%;
+    translate: -50% -50%;
+    width: 80px; height: 80px;
+    flex-wrap: wrap;
+    flex-direction: row;
+    opacity: 0.06;
+    transition-property: opacity;
+    transition-duration: 1.5s;
+    transition-timing-function: ease-in-out;
+}
+
+.status-grid.conn-up     { opacity: 0.10; }
+.status-grid.conn-listen { opacity: 0.06; }
+.status-grid.conn-down   { opacity: 0.03; }
+
+.status-grid-dot {
+    width: 4px; height: 4px;
+    margin: 6px;
+    border-radius: 50%;
+    background-color: #3ad29f;
+}
+
+.status-grid.conn-listen .status-grid-dot { background-color: #e8a23a; }
+.status-grid.conn-down   .status-grid-dot { background-color: #6e2b3a; }
+
+.status-sonar {
+    position: absolute;
+    top: 50%; left: 50%;
+    translate: -50% -50%;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border-width: 1px;
+    border-color: rgba(58, 210, 159, 0.15);
+    opacity: 0;
+    scale: 1;
+    transition-property: scale, opacity;
+    transition-duration: 1.5s;
+    transition-timing-function: ease-out;
+}
+
+.status-sonar--ping {
+    scale: 3;
+    opacity: 0.4;
+}

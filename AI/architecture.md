@@ -328,6 +328,24 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 
 **Verification**: 39 new regression tests all green on macOS/Windows (domain reload stress: 100+ recompile cycles)
 
+## Arcade Animation System (v0.52.0+)
+
+**Unified animation primitives for UI consistency:**
+
+- **ArcadePalette.cs** — Centralized color constants (Up=#3ad29f, Listen=#e8a23a, Down=#6e2b3a, Accent=#e94560) + `StateClass` seam for connection status color
+- **ArcadeAnim.cs** — Shared animation library with USS class toggles (GPU-accelerated, no per-frame cost):
+  * `AnimateClass(el, hiddenClass, visibleClass, delayMs)` — generic class-toggle animator base
+  * `FadeIn`, `SlideInRight`, `ShakeX`, `PulseOnce`, `FlashClass`, `GlowPulse` — common effects
+  * `CountUp` — numeric label animation (0 → N over duration)
+  * `StaggerFadeIn`, `Typewriter` — sequential element effects
+- **ArcadeAnim.uss** — Shared USS keyframes + transitions (@keyframes arcade-fade-*, arcade-slide-*, etc.)
+- **Per-window HeaderAnims** — DRY builders following `VisualElement Build()` pattern:
+  * `SamplingHeaderAnim.Build()` — 7-bar frequency analyzer for Sampling page
+  * `StatusAmbientAnim.Build()` — scanline + grid + sonar ring overlay for Status window
+  * `WizardStepAnim.cs` — slide transitions + progress bar for Setup Wizard
+- **Architecture:** All effects use CSS class toggles (schedule.Execute for delayed transitions). Single-source-of-truth color palette prevents hardcoded #RRGGBB drift. DRY consolidation across ~6 animation-heavy windows.
+- **Tests:** 23 NUnit tests (ArcadePaletteTests 7, ArcadeAnimTests 6, SamplingHeaderAnimTests 3, StatusAmbientAnimTests 5, WizardStepAnimTests 5)
+
 ## Level Design Toolkit (v0.46.0+, F1-F5)
 
 **Chat-Integrated Visual Tools:**

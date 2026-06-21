@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -9,6 +10,7 @@ namespace UnityMCP.Editor.Wizard
     {
         private WizardScreenHost _host;
         private VisualElement    _pageSlot;
+        private VisualElement    _progressBar;
 
         [MenuItem("MCP/Setup Wizard", priority = 2)]
         [MenuItem("Window/Unity MCP/Setup Wizard", priority = 200)]
@@ -41,19 +43,38 @@ namespace UnityMCP.Editor.Wizard
             _pageSlot = new VisualElement();
             _pageSlot.style.flexGrow = 1;
 
+            _progressBar = WizardStepAnim.BuildProgressBar();
+
             rootVisualElement.Add(dotsBar);
             rootVisualElement.Add(_pageSlot);
+            rootVisualElement.Add(_progressBar);
 
             _host.Navigate(0);
         }
 
         private void OnNavigated()
         {
-            _pageSlot.Clear();
+            // Update progress immediately (no visual dependency on old content)
+            int count = _host.ScreenCount;
+            float ratio = count > 1 ? (float)_host.CurrentIndex / (count - 1) : 1f;
+            WizardStepAnim.SetProgress(_progressBar, ratio);
+
+            // Slide old content out, then replace after transition completes
+            var oldChildren = _pageSlot.Children().ToList();
+            foreach (var child in oldChildren)
+                WizardStepAnim.TransitionOut(child);
+
             var screen = _host.CurrentScreen;
             if (screen == null) return;
-            _pageSlot.Add(screen.Build());
-            screen.OnEnter();
+
+            _pageSlot.schedule.Execute(() =>
+            {
+                _pageSlot.Clear();
+                var el = screen.Build();
+                _pageSlot.Add(el);
+                WizardStepAnim.TransitionIn(el);
+                screen.OnEnter();
+            }).StartingIn(220);
         }
     }
 }
