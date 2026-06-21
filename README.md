@@ -185,7 +185,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4374 Tests (0 Python · 4374 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4377 Tests (0 Python · 4377 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -244,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.52.5</b> — 2026-06-22 — **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.</summary>
+
+**Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.
+
+</details>
+
+<details>
 <summary><b>v0.52.0</b> — 2026-06-21 — **Arcade Animation System** — Unified animation primitives for consistent UI …</summary>
 
 **Arcade Animation System** — Unified animation primitives for consistent UI effects across all windows.
@@ -272,15 +279,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.50.1</b> — 2026-06-21 — **Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after …</summary>
-
-**Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after successful Level Up (v0.50.0 regression).
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.50.1** — 2026-06-21 — **Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after …
 - **v0.50.0** — 2026-06-21 — **Wizard Fallback** — Setup Wizard detects missing backends (e.g., no Claude …
 - **v0.47.0** — 2026-06-21 — Replaces USD cost display with input/output token counts + context window fill %
 - **v0.46.0** — 2026-06-21 — **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number …

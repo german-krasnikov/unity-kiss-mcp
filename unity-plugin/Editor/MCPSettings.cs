@@ -11,14 +11,10 @@ namespace UnityMCP.Editor
     {
         // ── EditorPrefs API (P0 — must stay intact) ──────────────────────────
         internal const string KeyPrefix      = "UnityMCP_Tool_";
-        internal const string KeyAutoDiscard = "UnityMCP_AutoDiscardScene";
         private const string KeyCatalog     = "UnityMCP_Catalog";
 
         public static bool IsToolEnabled(string toolName) =>
             EditorPrefs.GetBool(KeyPrefix + toolName, true);
-
-        public static bool AutoDiscardScene =>
-            EditorPrefs.GetBool(KeyAutoDiscard, false);
 
         // ── Catalog persistence (P1) ─────────────────────────────────────────
         public static void SetCatalog(string json) =>
@@ -82,7 +78,6 @@ namespace UnityMCP.Editor
 
         private static bool OnWantsToQuit()
         {
-            if (!AutoDiscardScene) return true;
             var scene = SceneManager.GetActiveScene();
             if (scene.isDirty)
             {

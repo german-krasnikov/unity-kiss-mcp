@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.52.5] — 2026-06-22 <!-- auto-discard-always -->
+
+- **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active. Prevents "Save Scene?" dialog blocking Unity on exit.
+- **TestRunner compile guard** — `Execute()` rejects test runs during compilation, preventing stale-DLL test results.
+
 ## [v0.52.0] — 2026-06-21 <!-- arcade-animation-system -->
 
 **Features:**

@@ -25,6 +25,10 @@ namespace UnityMCP.Editor
 
         // Testable seam — override in tests to avoid Editor-uptime dependency
         internal static Func<double> GetTimeSinceStartup = () => EditorApplication.timeSinceStartup;
+        internal static Func<bool> GetIsCompiling = () => EditorApplication.isCompiling;
+
+        internal static bool IsRunning => _isRunning == 1
+            || SessionState.GetBool(KeyPending, false);
 
         [InitializeOnLoadMethod]
         private static void ResetOnReload()
@@ -66,6 +70,12 @@ namespace UnityMCP.Editor
 #if UNITY_INCLUDE_TESTS
         public static void Execute(string mode, Action<string> onComplete, string group = null, string filter = null)
         {
+            if (GetIsCompiling())
+            {
+                onComplete?.Invoke("Error: compilation in progress — poll sync_status and retry after compile completes");
+                return;
+            }
+
             if (_isRunning == 1 && GetTimeSinceStartup() - _runStartedAt > 120.0)
                 _isRunning = 0;
 

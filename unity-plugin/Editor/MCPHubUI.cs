@@ -52,12 +52,6 @@ namespace UnityMCP.Editor
             var section = new VisualElement();
             section.AddToClassList("hub-section");
 
-            var autoDiscard = new Toggle("Auto-discard scene on quit")
-                { value = MCPSettings.AutoDiscardScene };
-            autoDiscard.RegisterValueChangedCallback(e =>
-                EditorPrefs.SetBool(MCPSettings.KeyAutoDiscard, e.newValue));
-            section.Add(autoDiscard);
-
             var chatEnable = new Toggle("Enable Agent Chat")
                 { value = ChatSettingsHook.IsChatEnabled() };
             chatEnable.tooltip = "Adds the UNITY_MCP_CHAT define — Unity recompiles on change.";
