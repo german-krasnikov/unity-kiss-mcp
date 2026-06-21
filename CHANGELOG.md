@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.50.3] — 2026-06-21 <!-- mcp-structured-output-cleanup -->
+
+**Optimization:**
+- **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass that forcibly disables `structured_output` on all 99 registered tools, eliminating duplicate `content` + `structuredContent` in MCP responses and `outputSchema` from ListTools. Reduces response size & Claude parsing overhead. Bumped `mcp` dependency to `>=1.28.0`.
+
 ## [v0.50.2] — 2026-06-21 <!-- visibility-hotfix -->
 
 **Bug Fixes:**

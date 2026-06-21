@@ -63,7 +63,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 ### Components
 
 1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support, v0.42.0: +25 config/TOML tests, v0.47.1: +73+78 config validation tests)
-   - **89 core MCP tools registered**. Gating: TIER1=38 core (hardcoded). External plugins can add more tools dynamically.
+   - **99 core MCP tools registered** (v0.50.3+). Gating: TIER1=41 core (hardcoded). External plugins can add more tools dynamically. `_UnstructuredMCP(FastMCP)` subclass forces `structured_output=False` on all tools.
    - **Config Module (v0.42.0+v0.44.0)**: `server/src/unity_mcp/config/` extended with TOML merger for Codex backend. `merge_toml_mcp(path, section)` merges MCP config into TOML with diff-based updates (preserves user settings). Python 3.9 compat: `Optional[X]` instead of `X | None`. ValueError raised on corrupt JSON. **Stale entry cleanup (v0.44.0)**: strips `[mcp_servers.unity]` duplicates on first write, creates .bak backup. **v0.47.1**: `validator.py` skips json.loads for TOML clients, checks string presence in configs. Adds 25 new tests (v0.42.0) + 9 new tests (v0.44.0) + 151 new tests (v0.47.1: 73 Python + 78 C# in test_config_gaps.py)
    - **CodeExecutor.SecurityScan (v0.31.0)**: Hardened pipeline — (1) strip C# comments via regex (2) whitespace densification (3) OrdinalIgnoreCase matching (4) 11 new blocked patterns (EditorApplication.Exit, Application.Quit, Environment.FailFast, ExportPackage, ImportPackage, OpenProject, ProjectWindowUtil, using-aliases for System.IO/Diagnostics/Net/Reflection)
    - **In-Unity Chat Backends** (v0.29.2+): Five CLI providers with auto-discovery via TypeCache:
@@ -73,9 +73,9 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      * **KimiBackend** (v0.34.0) — Kimi K2 CLI with role-based NDJSON protocol (system→user→assistant), model autoconfig via ~/.kimi-code/models.json, binary resolver sources kimi PATH via zsh -lic
      * **OpenCodeBackend** (v0.34.0) — OpenCode CLI with multi-provider model selection, stream-json protocol
    - Transport: stdio (default) or streamable-http (`UNITY_MCP_TRANSPORT=http`)
-   - FastMCP("UnityMCP", lifespan=lifespan)
+   - `_UnstructuredMCP(FastMCP)` subclass: overrides `add_tool()` to force `structured_output=False` on all 99 registered tools, eliminating duplicate `content` + `structuredContent` in responses + `outputSchema` from ListTools (v0.50.3). Reduces MCP response size & Claude parsing overhead.
    - Lifespan: auto-discover Unity port from `~/.unity-mcp/ports/*.port`, acquire exclusive PID lockfile, create ConnectionSlot, connect bridge, fetch disabled tools cache (`get_disabled_tools`), push Python-authoritative catalog (`_push_catalog`), start heartbeat, register reconnect callbacks, load_plugins()
-   - **MCP SDK Version (v0.31.0)**: Pinned `mcp>=1.27.1,<2` — v2.0 ships 2026-07-28 with breaking changes (e.g., `response.content` structure). Upper bound prevents silent breakage.
+   - **MCP SDK Version (v0.31.0, v0.50.3)**: Pinned `mcp>=1.28.0,<2` — v2.0 ships 2026-07-28 with breaking changes (e.g., `response.content` structure). Upper bound prevents silent breakage. v0.50.3: bumped to 1.28.0+ for structured_output support.
    - Plugin system (3-source discovery: pkgutil built-in, entry_points, UNITY_MCP_PLUGIN_DIRS env): each plugin has `register(mcp, send_fn, args_fn)`. UNITY_MCP_SKIP_PLUGINS env (comma-separated prefixes) skips matching plugins.
    - _send() helper: sends to bridge via slot, raises ToolError on !ok
    - File-based output: checks `file` field in response → returns path string
@@ -391,7 +391,7 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 
 **Update v0.46.0**: ChipKind registry now includes Field + AnnotatedScreenshot. ModelContextWindows presets added per LLM.
 
-### TIER1 (always visible, 38 core)
+### TIER1 (always visible, 41 core)
 
 Core (38): 24 base + 3 intent + 3 code-intel + 8 runtime = get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, set_parent, do, ask, get_metrics, animator_intent, vfx_intent, ui_intent, find_references, compile_preflight, semantic_at, invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 

@@ -6,6 +6,17 @@ os.environ.setdefault("UNITY_MCP_DISTILL", "1")
 log = logging.getLogger("unity_mcp.server")
 from contextlib import asynccontextmanager
 from mcp.server.fastmcp import FastMCP
+
+
+class _UnstructuredMCP(FastMCP):
+    def add_tool(self, fn, name=None, title=None, description=None,
+                 annotations=None, icons=None, meta=None,
+                 structured_output=None) -> None:
+        super().add_tool(fn, name=name, title=title, description=description,
+                         annotations=annotations, icons=icons, meta=meta,
+                         structured_output=False)
+
+
 from mcp.server.fastmcp.exceptions import ToolError
 from .connection_slot import ConnectionSlot
 from .lockfile import acquire_lock, release_lock, cleanup_stale_locks
@@ -251,7 +262,7 @@ async def lifespan(app):
             release_lock(lock_fd)
 
 
-mcp = FastMCP("UnityMCP", lifespan=lifespan)
+mcp = _UnstructuredMCP("UnityMCP", lifespan=lifespan)
 
 register_all(mcp, _send, _args, get_slot=lambda: slot,
              get_middleware=lambda: _middleware)

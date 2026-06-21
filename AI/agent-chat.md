@@ -970,5 +970,5 @@ Two paired changes guarantee the model receives full object/file paths and the U
 
 - **Core Architecture:** `AI/architecture.md` (CommandRouter, TCP bridge, tools catalog)
 - **TCP Bridge:** `AI/tcp-bridge.md` (4-byte framing, heartbeat, SO_KEEPALIVE)
-- **MCP Server:** `AI/mcp-server.md` (Python FastMCP, deferred schema loading, plugin system, tool gating)
+- **MCP Server:** `AI/mcp-server.md` (Python _UnstructuredMCP(FastMCP), structured_output=False on all tools, deferred schema loading, plugin system, tool gating)
 - **Changelog:** `AI/changelog.md` (feature timeline)

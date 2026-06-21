@@ -2,7 +2,7 @@
 
 ## Overview
 
-Python MCP сервер с 91 core registered tools для управления Unity Editor. FastMCP + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically.
+Python MCP сервер с 99 core registered tools для управления Unity Editor. `_UnstructuredMCP(FastMCP)` subclass (v0.50.3) + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically. Structured output disabled on all tools to eliminate duplicate `content` + `structuredContent` in MCP responses (reduces size & parsing overhead).
 
 ## Architecture (для Architect)
 
@@ -45,7 +45,7 @@ server/src/unity_mcp/
     └── __init__.py              # 3-source auto-discovery (pkgutil, entry_points, UNITY_MCP_PLUGIN_DIRS)
 ```
 
-### Tools (91 core)
+### Tools (99 core)
 
 **TIER1 — always visible (41 core):**
 
@@ -90,7 +90,8 @@ get_test_results, budget_status
 
 ```python
 # server.py
-mcp = FastMCP("UnityMCP", lifespan=lifespan)
+# _UnstructuredMCP(FastMCP) subclass forces structured_output=False on all tools
+mcp = _UnstructuredMCP("UnityMCP", lifespan=lifespan)
 register_all(mcp, _send, _args, get_slot=lambda: slot, get_middleware=lambda: _middleware)
 load_plugins(mcp, _send, _args)
 

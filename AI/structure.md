@@ -11,7 +11,7 @@ unity-kiss-mcp/
 │   └── tests/                  # Bootstrap + UI + install tests
 ├── server/                     # Python MCP Server (2621 unit tests, 78 live = 2699 total Python, v0.45.0; v0.47.1: +151 config validation tests)
 │   ├── src/unity_mcp/
-│   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
+│   │   ├── server.py           # _UnstructuredMCP(FastMCP) instance, lifespan, 99 registered MCP tools (v0.50.3)
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
 │   │   ├── config/             # Config module (v0.38.0+): client detection, MCP JSON merger, backup/restore; v0.47.1: GitHub-direct install, per-client root_key
@@ -129,6 +129,7 @@ unity-kiss-mcp/
 │       ├── test_scene_brief*.py        # Scene brief
 │       ├── test_screenshot_*.py        # Screenshot features
 │       ├── test_update_check.py        # Update checker: GitHub API, version parsing, cache TTL (v0.47.1)
+│       ├── test_unstructured_mcp.py    # Guard tests: _UnstructuredMCP forces structured_output=False (4 tests, v0.50.3)
 │       ├── live/conftest.py            # Live test fixtures + _ok/_iid helpers (v0.26.0 DRY)
 │       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
 │       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
