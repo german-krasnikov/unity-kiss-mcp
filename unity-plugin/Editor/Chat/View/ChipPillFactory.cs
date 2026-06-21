@@ -102,7 +102,45 @@ namespace UnityMCP.Editor.Chat
 
         /// <summary>Build from a ChipData struct (uses DisplayName as label).</summary>
         internal static VisualElement Build(ChipData chip, Action onRemove = null)
-            => Build(chip.KindKey, chip.DisplayName, onRemove);
+        {
+            var pill = Build(chip.KindKey, chip.DisplayName, onRemove);
+            TryAddThumbnail(pill, chip.Path);
+            return pill;
+        }
+
+        private static void TryAddThumbnail(VisualElement pill, string path)
+        {
+            if (!PreviewPathResolver.IsImageFile(path)) return;
+            var resolved = PreviewPathResolver.Resolve(path);
+            if (!System.IO.File.Exists(resolved)) return;
+
+            try
+            {
+                var bytes = System.IO.File.ReadAllBytes(resolved);
+                var tex = new Texture2D(2, 2);
+                tex.LoadImage(bytes);
+
+                var thumb = new Image { image = tex, scaleMode = ScaleMode.ScaleToFit };
+                thumb.AddToClassList("chip-thumbnail");
+                thumb.style.height = 48;
+                thumb.style.width = StyleKeyword.Auto;
+                thumb.style.marginLeft = 4;
+                thumb.style.borderTopLeftRadius = thumb.style.borderTopRightRadius = 3;
+                thumb.style.borderBottomLeftRadius = thumb.style.borderBottomRightRadius = 3;
+
+                thumb.RegisterCallback<DetachFromPanelEvent>(_ =>
+                {
+                    if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
+                });
+
+                var removeBtn = pill.Q<Button>(className: "inline-chip-remove");
+                if (removeBtn != null)
+                    pill.Insert(pill.IndexOf(removeBtn), thumb);
+                else
+                    pill.Add(thumb);
+            }
+            catch { /* silently ignore preview failures */ }
+        }
 
         // ── internal helpers ──────────────────────────────────────────────────
 

@@ -108,6 +108,9 @@ namespace UnityMCP.Editor.Chat
             _tokenReadout = new Label(""); _tokenReadout.AddToClassList("token-readout");
             bar.Add(_tokenReadout);
 
+            _contextBar = new ContextProgressBar();
+            bar.Add(_contextBar);
+
             _cliBtn = new Button(OnCopyCliResume) { text = "→ CLI" };
             _cliBtn.AddToClassList("chat-btn");
             _cliBtn.tooltip = "Copy resume command for CLI";

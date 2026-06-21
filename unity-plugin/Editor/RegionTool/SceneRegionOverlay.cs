@@ -53,10 +53,20 @@ namespace UnityMCP.Editor.RegionTool
         {
             var row = new VisualElement { style = { flexDirection = FlexDirection.Row, marginTop = 4 } };
 
-            void ModeBtn(string label, string tip, DrawingModeId id)
+            void ModeBtn(Texture2D icon, string label, string tip, DrawingModeId id)
             {
-                var btn = new Button { text = label, tooltip = tip };
-                btn.style.flexGrow = 1;
+                var btn = new Button { tooltip = tip };
+                btn.style.flexGrow        = 1;
+                btn.style.flexDirection   = FlexDirection.Row;
+                btn.style.alignItems      = Align.Center;
+                btn.style.justifyContent  = Justify.Center;
+
+                var img = new Image { image = icon, scaleMode = ScaleMode.ScaleToFit };
+                img.style.width = img.style.height = 14;
+                img.style.marginRight = 2;
+                btn.Add(img);
+                btn.Add(new Label(label) { style = { fontSize = 10 } });
+
                 btn.clicked += () =>
                 {
                     if (!(ToolManager.activeToolType == typeof(SceneRegionTool)))
@@ -66,10 +76,10 @@ namespace UnityMCP.Editor.RegionTool
                 row.Add(btn);
             }
 
-            ModeBtn("Lasso", "Freehand lasso (Q)",         DrawingModeId.Lasso);
-            ModeBtn("Rect",  "Rectangle selection (W)",    DrawingModeId.Rectangle);
-            ModeBtn("Circle","Circle selection (E)",        DrawingModeId.Circle);
-            ModeBtn("PbP",   "Point-by-point polygon (R)", DrawingModeId.PointByPoint);
+            ModeBtn(RegionIcons.Lasso,  "Lasso",  "Freehand lasso (Q)",         DrawingModeId.Lasso);
+            ModeBtn(RegionIcons.Rect,   "Rect",   "Rectangle selection (W)",    DrawingModeId.Rectangle);
+            ModeBtn(RegionIcons.Circle, "Circle", "Circle selection (E)",        DrawingModeId.Circle);
+            ModeBtn(RegionIcons.PbP,    "PbP",    "Point-by-point polygon (R)", DrawingModeId.PointByPoint);
             return row;
         }
 

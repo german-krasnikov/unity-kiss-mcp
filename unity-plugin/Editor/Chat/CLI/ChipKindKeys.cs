@@ -24,5 +24,9 @@ namespace UnityMCP.Editor.Chat
         // Drawn polygon region on the scene. Created by SceneRegionTool, stored in RegionSnapshot.
         // Path = 8-char UUID (e.g., "a1b2c3d4"). Bracket format: [region:a1b2c3d4].
         public const string Region          = "region";
+        // Single serialized field of a component. Path = "goPath|CompType|fieldName".
+        public const string Field           = "field";
+        // Annotated screenshot captured by the annotation editor. Path = absolute PNG path.
+        public const string AnnotatedScreenshot = "annotated_screenshot";
     }
 }

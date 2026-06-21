@@ -14,15 +14,15 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test] public void Abbr_Negative_ReturnsAsIs() => Assert.AreEqual("-5",     TokenFormat.Abbr(-5));
 
         [Test] public void FormatReadout_AllZero_ReturnsEmpty()
-            => Assert.AreEqual("", TokenFormat.FormatReadout(0, 0, 0f));
+            => Assert.AreEqual("", TokenFormat.FormatReadout(0, 0));
 
-        [Test] public void FormatReadout_NoCost_OmitsCostSegment()
-            => Assert.AreEqual("↑ 100  ↓ 50", TokenFormat.FormatReadout(100, 50, 0f));
-
-        [Test] public void FormatReadout_WithCost_AppendsCost()
-            => StringAssert.Contains("$0.0020", TokenFormat.FormatReadout(100, 50, 0.002f));
+        [Test] public void FormatReadout_WithTokens_NoUsd()
+            => Assert.AreEqual("↑ 100  ↓ 50", TokenFormat.FormatReadout(100, 50));
 
         [Test] public void FormatReadout_LargeTokens_Abbreviated()
-            => StringAssert.StartsWith("↑ 1.0k", TokenFormat.FormatReadout(1000, 50, 0f));
+            => StringAssert.StartsWith("↑ 1.0k", TokenFormat.FormatReadout(1000, 50));
+
+        [Test] public void FormatReadout_OnlyOutput_ShowsBoth()
+            => Assert.AreEqual("↑ 0  ↓ 50", TokenFormat.FormatReadout(0, 50));
     }
 }

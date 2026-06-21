@@ -14,8 +14,8 @@ namespace UnityMCP.Editor.Chat
         private bool           _agentMode;
         private BackendKind    _selectedKind = BackendKind.Claude;
         private PermissionConfig _permConfig = new PermissionConfig();
-        private int            _inputTokens, _outputTokens;
-        private float          _costUsd;
+        private int                _inputTokens, _outputTokens;
+        private ContextProgressBar _contextBar;
         private readonly TurnUndoTracker  _undoTracker       = new TurnUndoTracker();
         private readonly SessionAllowlist  _sessionAllowlist  = new SessionAllowlist();
         private readonly SentTextCache _sentTextCache = new SentTextCache();
@@ -68,8 +68,8 @@ namespace UnityMCP.Editor.Chat
         internal void ResetTokenCounters()
         {
             _inputTokens = _outputTokens = 0;
-            _costUsd = 0f;
             if (_tokenReadout != null) _tokenReadout.text = "";
+            _contextBar?.Reset();
         }
 
         internal void RefreshColorResolver()
@@ -85,6 +85,11 @@ namespace UnityMCP.Editor.Chat
             ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
             RegionTool.SceneRegionTool.OnRegionCommitted = (id, label) =>
                 ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0));
+            ScreenshotToolbarButton.OnScreenshotCaptured = path =>
+                ProcessExternalPath(path, InsertInlineChip);
+            Annotation.AnnotationEditorWindow.OnAnnotationReady = (path, displayName) =>
+                ChipPillFactory.AddToContextAction?.Invoke(
+                    new ChipData(ChipKindKeys.AnnotatedScreenshot, path, displayName, 0));
             CopyFlash.ShowAction = ShowCopyFlash;
             CreateBackend();
             ResetTokenCounters();
@@ -120,6 +125,8 @@ namespace UnityMCP.Editor.Chat
             _autoFix.Unsubscribe();
             ChipPillFactory.AddToContextAction = null;
             RegionTool.SceneRegionTool.OnRegionCommitted = null; // clear seam when chat closes
+            ScreenshotToolbarButton.OnScreenshotCaptured = null;
+            Annotation.AnnotationEditorWindow.OnAnnotationReady = null;
             CopyFlash.ShowAction = null;
             ReloadGuard.OnTurnFinished();
             if (_activity.Phase != ActivityPhase.Idle)

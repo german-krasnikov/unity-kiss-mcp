@@ -161,10 +161,15 @@ namespace UnityMCP.Editor.Chat
             }
         }
 
-        // Codex reasoning models (o3, o3-pro) can think silently for 2-5 minutes.
-        // Claude/Gemini: 90s is plenty for normal responses.
-        private double InactivityTimeoutSec =>
-            _selectedKind == BackendKind.Codex ? 300.0 : 90.0;
+        private double InactivityTimeoutSec
+        {
+            get
+            {
+                int cfg = BackendConfigStore.Load().InactivityTimeoutSec;
+                int floor = _selectedKind == BackendKind.Codex ? 300 : 30;
+                return System.Math.Max(floor, cfg);
+            }
+        }
 
         private void DrainAndRender()
         {

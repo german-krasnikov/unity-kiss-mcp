@@ -17,8 +17,18 @@ namespace UnityMCP.Editor.Chat
             autoScrollToggle.RegisterValueChangedCallback(evt => EditorPrefs.SetBool("MCPChat.AutoScroll", evt.newValue));
             parent.Add(autoScrollToggle);
 
-            // Per-backend settings — Claude foldout is expanded by default (contains primary connection info)
+            // General settings
             var store = BackendConfigStore.Load();
+            var timeoutField = new IntegerField("Inactivity Timeout (s)") { value = store.InactivityTimeoutSec };
+            timeoutField.tooltip = "Kill turn after this many seconds of silence (30–600)";
+            timeoutField.RegisterValueChangedCallback(e =>
+            {
+                store.InactivityTimeoutSec = Mathf.Clamp(e.newValue, 30, 600);
+                store.Save();
+            });
+            parent.Add(timeoutField);
+
+            // Per-backend settings — Claude foldout is expanded by default (contains primary connection info)
             var claudeFoldout = new Foldout { text = "Claude Settings", value = true };
 
             // Binary path (auto + override) — inside Claude foldout

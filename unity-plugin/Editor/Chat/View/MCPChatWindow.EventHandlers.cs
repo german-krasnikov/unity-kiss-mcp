@@ -33,15 +33,15 @@ namespace UnityMCP.Editor.Chat
                     _resolver?.Refresh();
                     _lastRefresh = EditorApplication.timeSinceStartup;
                     _transcript?.FinalizeAssistant();
-                    if (ev.InputTokens > 0 || ev.OutputTokens > 0 || ev.CostUsd > 0f)
+                    if (ev.InputTokens > 0 || ev.OutputTokens > 0)
                     {
                         // result.usage carries cumulative session totals, not per-turn deltas.
                         _inputTokens  = ev.InputTokens;
                         _outputTokens = ev.OutputTokens;
-                        _costUsd      = ev.CostUsd;
                         if (_tokenReadout != null)
-                            _tokenReadout.text =
-                                TokenFormat.FormatReadout(_inputTokens, _outputTokens, _costUsd);
+                            _tokenReadout.text = TokenFormat.FormatReadout(_inputTokens, _outputTokens);
+                        _contextBar?.Update(_inputTokens,
+                            ModelContextWindows.GetContextWindow(_selectedModel, _selectedKind));
                     }
                     var hasErrors = CompileErrorCapture.HasErrors();
                     if (hasErrors)

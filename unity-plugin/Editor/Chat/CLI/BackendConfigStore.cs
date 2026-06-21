@@ -16,6 +16,7 @@ namespace UnityMCP.Editor.Chat
         public OpenCodeBackendConfig  OpenCode     = new OpenCodeBackendConfig();
         public ChipConfig             Chips        = new ChipConfig();
         public ModelPresetsConfig     ModelPresets = new ModelPresetsConfig();
+        public int                    InactivityTimeoutSec = 180;
 
         private static string DefaultPath =>
             Path.Combine(Application.dataPath, "..", "Library", "MCP_ChatBackendConfig.json");

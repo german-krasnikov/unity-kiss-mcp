@@ -21,6 +21,8 @@ namespace UnityMCP.Editor.RegionTool
                     { hideFlags = HideFlags.HideAndDontSave };
                 _fillMaterial.SetInt("_ZWrite", 0);
                 _fillMaterial.SetInt("_Cull", 0);
+                _fillMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                _fillMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
                 return _fillMaterial;
             }
         }
@@ -29,6 +31,7 @@ namespace UnityMCP.Editor.RegionTool
 
         public static void Draw(RenderState state)
         {
+            if (Event.current.type != EventType.Repaint) return;
             var verts = state.Vertices;
             if (verts == null || verts.Count < 2) return;
 
@@ -65,6 +68,12 @@ namespace UnityMCP.Editor.RegionTool
         static void DrawFill(IReadOnlyList<Vector2> verts, Color fillColor)
         {
             if (verts.Count < 3) return;
+            if (Event.current.type != EventType.Repaint) return;
+
+            // Skip GL fill when scene view is not focused — prevents black flash
+            // (Unity may not render 3D content before duringSceneGui in unfocused windows)
+            var sv = SceneView.currentDrawingSceneView;
+            if (sv != null && !sv.hasFocus) return;
 
             // Centroid
             float cx = 0f, cz = 0f;
