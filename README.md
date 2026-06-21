@@ -137,7 +137,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4126 Tests (0 Python · 4126 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4271 Tests (0 Python · 4271 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -196,6 +196,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.47.0</b> — 2026-06-21 — Replaces USD cost display with input/output token counts + context window fill %</summary>
+
+Replaces USD cost display with input/output token counts + context window fill %
+
+</details>
+
+<details>
 <summary><b>v0.46.0</b> — 2026-06-21 — **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number …</summary>
 
 **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number point-in-polygon test (nonzero fill rule), AABB bounds computation, CSV …
@@ -224,15 +231,9 @@ LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + spa
 </details>
 
 <details>
-<summary><b>v0.43.0</b> — 2026-06-20 — Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)</summary>
-
-Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.43.0** — 2026-06-20 — Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
 - **v0.42.0** — 2026-06-20 — **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → …
 - **v0.41.4** — 2026-06-20 — **@Mention Autocomplete** — Type `@` in Chat input to trigger autocomplete …
 - **v0.41.0** — 2026-06-20 — **Session Handoff (Chat↔CLI)** — Button "→ CLI" in Chat copies resume command …

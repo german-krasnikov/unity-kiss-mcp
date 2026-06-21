@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [v0.46.0] — 2026-06-21 <!-- level-design-toolkit -->
+## [v0.47.0] — 2026-06-21 <!-- level-design-toolkit -->
 
 **Level Design Toolkit (Chat-Integrated Visual Tools):**
 
@@ -35,21 +35,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **AnnotationHistory** — Undo/redo stack with command pattern
 - **AnnotationEditorWindow** — EditorWindow host with toolbar + color picker
 - **AnnotationCompositor** — Flatten commands → PNG encode for sharing
-- **AnnotationIcons** — Procedural Painter2D vector icons (230 LOC, tool palette + region overlay icons)
+- **AnnotationIcons** — Procedural vector icons (230 LOC, tool palette + region overlay icons)
 - **AnnotateToolbarButton** — Chat toolbar launcher for annotation editor
 
 **F5: Raycast World Coordinates**
 - **AnnotationRaycaster** — Scene raycast from mouse position, returns world XYZ + GameObject
 - **AnnotationMetaWriter** — Embeds hit data into annotation metadata JSON
-- Enables chat references like "annotated pixel at world (15.2, -3.5, 42.1) on Player"
 
-**F6-F9: Supporting Features**
-- **Region Icons** — Moved to RegionTool/Rendering/, procedural vector icons for tool palette
-- **Region hasFocus Guard** — Prevents black GL flash on Scene View focus loss (RegionRenderer)
-- **Chip Thumbnails** — Inline 32x32px preview for image chips (ChipPillFactory)
-- **Configurable Inactivity Timeout** — Moved from hardcoded 90s/300s to BackendConfigStore (default 180s, Settings slider 30–600s)
+**Supporting Features:**
+- **Region Icons** — Procedural vector icons for region overlay (Lasso, Rect, Circle, PbP)
+- **Region hasFocus Guard** — Prevents black GL flash on Scene View focus loss
+- **Chip Thumbnails** — Inline thumbnail preview for snap/annotate image chips
+- **Configurable Inactivity Timeout** — Settings UI, default 180s (was 90s hardcoded), range 30–600s
 
-**Region Selection for Level Design (v0.46.0 Phase 1):**
+**Test Summary:**
+- ~160 new C# NUnit tests (annotation editor, field chips, screenshot, context bar)
+- C# NUnit EditMode: 4070 → 4126+ tests
+- Total: 0 regressions
+
+## [v0.46.0] — 2026-06-21 <!-- region-selection -->
+
+**Region Selection for Level Design:**
 - **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number point-in-polygon test (nonzero fill rule), AABB bounds computation, CSV import/export, Ramer-Douglas-Peucker simplification
 - **SceneRegionTool** — EditorTool with multi-mode FSM (Shift+R activate, Q/W/E/R mode switch, Enter commit, Esc cancel, G grid snap). Four drawing modes: Lasso, Rectangle, Circle, PointByPoint
 - **SceneRegionQuery** — 3-stage spatial pipeline: AABB filter → component type filter → winding-number PIP → cap + format
@@ -58,12 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Python spatial_query extended** — `objects_in_polygon` action accepts `vertices` (CSV 'x1,z1;x2,z2;...', >=3 pairs) or `region_id`
 
 **Test Summary (v0.46.0):**
-- 104 new C# NUnit tests for annotation editor: Canvas (30), Command (86), Compositor (82), EditorWindow (31), History (123), Icons (77), Rasterizer (90), ToolState (54), Toolbar (29), ContextBar (57), AnnotateButton (42), ScreenshotService (69), ScreenshotButton (78), FieldChip (113), FieldContextMenu (61), AnnotatedChip (60), AnnotationMeta (64), AnnotationRaycast (228), ModelContextWindows (27)
-- 104 new C# NUnit tests for region selection: Drawing modes (5 files, 52 tests), Rendering (1 file, 52 tests)
+- 104 new C# NUnit tests: Drawing modes (5 files, 52 tests), Rendering (1 file, 52 tests)
 - 20 new Python pytest tests: test_region.py (polygon validation, spatial queries, state management)
-- C# NUnit EditMode: 3966 → 4126+ tests (~+160 total annotation+region)
-- Python pytest: 2621 → ~2641 tests (+20 region)
-- Total: 0 regressions, all new tests green
+- C# NUnit EditMode: 3966 → 4070 tests (+104 RegionTool)
+- Python pytest: 2621 → 2641 tests (+20 region)
 
 ## [v0.45.0] — 2026-06-20 <!-- install-source-detection -->
 
