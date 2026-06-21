@@ -362,6 +362,30 @@
     transition: scale 0.1s ease-out;
 }
 
+/* ── Updates: ascending bars (upload/rocket) ── */
+.anim-updates {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    height: 48px;
+    margin: 6px 0;
+}
+
+.upload-bar {
+    width: 8px;
+    border-radius: 2px;
+    margin: 0 3px;
+    background-color: var(--unity-colors-default-border);
+    transition-property: height, background-color;
+    transition-duration: 0.18s, 0.3s;
+}
+
+.upload-bar--active { opacity: 1.0; }
+
+.upload-bar.conn-up     { background-color: #3ad29f; }
+.upload-bar.conn-listen { background-color: #e8a23a; }
+.upload-bar.conn-down   { background-color: #6e2b3a; }
+
 /* ── Updates Changelog ── */
 .updates-entry-newer {
     border-left-width: 2px;

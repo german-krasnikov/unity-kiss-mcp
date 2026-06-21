@@ -12,6 +12,7 @@ namespace UnityMCP.Editor
             var page = new VisualElement();
             page.AddToClassList("nav-page");
             page.Add(SettingsPageFactory.BackHeader("Updates", onBack));
+            page.Add(UpdatesHeaderAnim.Build(page));
 
             var scroll = new ScrollView();
             scroll.style.flexGrow = 1;
