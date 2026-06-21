@@ -45,14 +45,17 @@ namespace UnityMCP.Editor
                 return;
             }
 
-            onProgress?.Invoke("Running git pull --tags …");
+            onProgress?.Invoke("Running git pull --tags --autostash …");
+
+            // --autostash: stash dirty WD automatically, pull, pop — safe for local dev installs.
+            const string GitArgs = "pull --tags --autostash";
 
             // Production: offload blocking WaitForExit to background thread, marshal back via delayCall.
             if (runner is DefaultRunner)
             {
                 System.Threading.Tasks.Task.Run(() =>
                 {
-                    var code = runner.Run("git", "pull --tags", repoRoot);
+                    var code = runner.Run("git", GitArgs, repoRoot);
                     EditorApplication.delayCall += () =>
                     {
                         if (code == 0)
@@ -63,7 +66,7 @@ namespace UnityMCP.Editor
                         }
                         else
                         {
-                            Debug.LogError($"[MCP Update] git pull failed (exit {code}). Pull manually and focus Unity.");
+                            Debug.LogError($"[MCP Update] git pull failed (exit {code}).\nRun manually:\n  cd \"{repoRoot}\"\n  git stash && git pull --tags && git stash pop");
                             onComplete?.Invoke(false);
                         }
                     };
@@ -72,7 +75,7 @@ namespace UnityMCP.Editor
             }
 
             // Tests inject synchronous FakeRunner — run inline so asserts fire immediately.
-            var exitCode = runner.Run("git", "pull --tags", repoRoot);
+            var exitCode = runner.Run("git", GitArgs, repoRoot);
             if (exitCode == 0)
             {
                 onProgress?.Invoke("Refreshing Unity assets …");
@@ -81,7 +84,7 @@ namespace UnityMCP.Editor
             }
             else
             {
-                Debug.LogError($"[MCP Update] git pull failed (exit {exitCode}). Pull manually and focus Unity.");
+                Debug.LogError($"[MCP Update] git pull failed (exit {exitCode}).\nRun manually:\n  cd \"{repoRoot}\"\n  git stash && git pull --tags && git stash pop");
                 onComplete?.Invoke(false);
             }
         }

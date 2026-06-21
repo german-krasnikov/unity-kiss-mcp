@@ -14,11 +14,12 @@ namespace UnityMCP.Editor
             UpdateChecker.RepoGitUrl + $"?path={packagePath}#{(version.StartsWith("v") ? version : "v" + version)}";
 
         /// <summary>Trigger UPM to update both editor + reload packages via git URL.</summary>
-        internal static void Update(string version)
+        internal static void Update(string version, System.Action<bool> onComplete = null)
         {
             if (string.IsNullOrEmpty(version))
             {
                 Debug.LogError("[MCP Update] No version specified.");
+                onComplete?.Invoke(false);
                 return;
             }
 
@@ -34,6 +35,7 @@ namespace UnityMCP.Editor
                 if (req.Status == StatusCode.Failure)
                 {
                     Debug.LogError($"[MCP Update] UPM add failed: {req.Error?.message}");
+                    onComplete?.Invoke(false);
                     return;
                 }
 
@@ -47,7 +49,14 @@ namespace UnityMCP.Editor
                     if (!reloadReq.IsCompleted) return;
                     EditorApplication.update -= PollReload;
                     if (reloadReq.Status == StatusCode.Failure)
+                    {
                         Debug.LogError($"[MCP Update] Reload package failed: {reloadReq.Error?.message}");
+                        onComplete?.Invoke(false);
+                    }
+                    else
+                    {
+                        onComplete?.Invoke(true);
+                    }
                 }
             }
         }

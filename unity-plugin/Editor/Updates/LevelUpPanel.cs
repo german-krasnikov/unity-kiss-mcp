@@ -67,7 +67,7 @@ namespace UnityMCP.Editor
 
             var statsBtn = new Button(() => ShowDiff(root, scheduleHost, from, to)) { text = "See new stats" };
             statsBtn.AddToClassList("wiz-btn-secondary");
-            var updateBtn = new Button(DoUpdate) { text = "Update now" };
+            var updateBtn = new Button(() => DoUpdate(root, to)) { text = "Update now" };
             updateBtn.AddToClassList("wiz-btn-primary");
 
             btnRow.Add(statsBtn);
@@ -104,7 +104,7 @@ namespace UnityMCP.Editor
                 }
             }
 
-            var updateBtn = new Button(DoUpdate) { text = $"Update now — v{to}" };
+            var updateBtn = new Button(() => DoUpdate(root, to)) { text = $"Update now — v{to}" };
             updateBtn.AddToClassList("wiz-btn-primary");
             root.Add(updateBtn);
         }
@@ -123,6 +123,21 @@ namespace UnityMCP.Editor
             catch (Exception e) { Debug.LogWarning($"[LevelUp] Failed to load diff: {e.Message}"); return new List<ReleaseDiff.DiffSection>(); }
         }
 
-        static void DoUpdate() => UpdateDispatcher.DoUpdate();
+        static void DoUpdate(VisualElement root, string to)
+        {
+            root.Query<Button>().ForEach(b => b.SetEnabled(false));
+            UpdateDispatcher.DoUpdate(ok =>
+            {
+                if (!ok)
+                {
+                    root.Query<Button>().ForEach(b => b.SetEnabled(true));
+                    return;
+                }
+                root.Clear();
+                var label = new Label($"Updated to v{to}!");
+                label.AddToClassList("lvlup-badge");
+                root.Add(label);
+            });
+        }
     }
 }

@@ -280,7 +280,8 @@ unity-kiss-mcp/
 │       │   ├── SetupDiagnostics.cs        # Python/TCP/config diagnostic checks + per-tool AI config validation (v0.47.1)
 │       │   ├── BackendDescriptor.cs       # 9 backend definitions + IsDetected logic (BinaryName + ConfigDir); platform-aware root_key (v0.47.1)
 │       │   ├── AiToolCardFactory.cs       # Reusable backend/tool card builder + platform-aware path methods (v0.47.1)
-│       │   ├── Screens/                   # 3-screen implementations
+│       │   ├── Screens/                   # 3-screen implementations (4 total: Welcome → PickBackend → AiConfig → Configure)
+│       │   │   ├── WelcomeScreen.cs       # Introduction + system checks (Python found, TCP available)
 │       │   │   ├── AiConfigScreen.cs      # AI tool configuration cards + fallback JSON export for UPM installs (v0.47.1, new)
 │       │   │   ├── ConfigureScreen.cs     # Scope toggle (Global/Project) + per-backend selection; uses GitInstallUrl constant (v0.47.1)
 │       │   │   └── PickBackendScreen.cs   # 9 backend cards (Claude Code, Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity)

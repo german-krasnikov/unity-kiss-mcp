@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.50.2] — 2026-06-21 <!-- visibility-hotfix -->
+
+**Bug Fixes:**
+- **WizardConfigWriter visibility** — changed class and `GitInstallUrl` from `internal` to `public` for cross-assembly access from `ChatMcpConfigWriter` (CS0122/CS0117 fix).
+
+## [v0.50.1] — 2026-06-21 <!-- update-hotfix -->
+
+**Bug Fixes:**
+- **Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after successful Level Up (v0.50.0 regression). Previously showed "v0.47.1 → v0.50.0 available" indefinitely.
+- **Local Dev Install (git pull)** — `LocalPluginUpdater` now uses `git pull --autostash` to automatically stash/unstash dirty working tree. Adds actionable error message with exact command on failure (previously generic "Pull manually").
+
 ## [v0.50.0] — 2026-06-21 <!-- windows-install-improvements -->
 
 **Installation & Setup:**

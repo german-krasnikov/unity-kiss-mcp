@@ -5,7 +5,7 @@ using System.Text;
 
 namespace UnityMCP.Editor.Wizard
 {
-    internal static class WizardConfigWriter
+    public static class WizardConfigWriter
     {
         internal static void Write(string toolName, string configPath, int port)
         {
@@ -80,7 +80,7 @@ namespace UnityMCP.Editor.Wizard
             return Fresh(port);
         }
 
-        internal const string GitInstallUrl =
+        public const string GitInstallUrl =
             "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server";
 
         private static string Entry(int port) =>

@@ -110,6 +110,13 @@ namespace UnityMCP.Editor
             return json.Substring(q1 + 1, q2 - q1 - 1);
         }
 
+        public static void ClearCache()
+        {
+            EditorPrefs.DeleteKey(CacheKey);
+            EditorPrefs.DeleteKey(CacheTimeKey);
+            AvailableVersion = null;
+        }
+
         public static void SkipVersion()
         {
             if (string.IsNullOrEmpty(AvailableVersion)) return;

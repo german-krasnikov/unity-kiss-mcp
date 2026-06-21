@@ -185,7 +185,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4277 Tests (0 Python · 4277 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4275 Tests (0 Python · 4275 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -244,6 +244,20 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.50.2</b> — 2026-06-21 — **WizardConfigWriter visibility** — changed class and `GitInstallUrl` from …</summary>
+
+**WizardConfigWriter visibility** — changed class and `GitInstallUrl` from `internal` to `public` for cross-assembly access from …
+
+</details>
+
+<details>
+<summary><b>v0.50.1</b> — 2026-06-21 — **Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after …</summary>
+
+**Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after successful Level Up (v0.50.0 regression).
+
+</details>
+
+<details>
 <summary><b>v0.50.0</b> — 2026-06-21 — **Wizard Fallback** — Setup Wizard detects missing backends (e.g., no Claude …</summary>
 
 **Wizard Fallback** — Setup Wizard detects missing backends (e.g., no Claude Code) and provides next-best-option UI (v0.47.1).
@@ -265,22 +279,10 @@ Replaces USD cost display with input/output token counts + context window fill %
 </details>
 
 <details>
-<summary><b>v0.45.0</b> — 2026-06-20 — **InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM …</summary>
-
-**InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM registry) via PackageInfo.source
-
-</details>
-
-<details>
-<summary><b>v0.44.1</b> — 2026-06-20 — **Fix: Codex Windows path crash** — TOML `command` now uses literal strings …</summary>
-
-**Fix: Codex Windows path crash** — TOML `command` now uses literal strings (single quotes) so `C:\Users\...` paths are not interpreted as unicode …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.45.0** — 2026-06-20 — **InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM …
+- **v0.44.1** — 2026-06-20 — **Fix: Codex Windows path crash** — TOML `command` now uses literal strings …
 - **v0.44.0** — 2026-06-20 — LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles …
 - **v0.43.0** — 2026-06-20 — Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
 - **v0.42.0** — 2026-06-20 — **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → …

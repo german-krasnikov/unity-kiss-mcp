@@ -81,11 +81,26 @@ namespace UnityMCP.Editor.Tests
         }
 
         [Test]
-        public void UpdateAsync_PullIncludesTags()
+        public void UpdateAsync_PullIncludesTagsAndAutostash()
         {
             var fake = new FakeRunner();
             LocalPluginUpdater.UpdateAsync("/repo", fake, _ => { }, _ => { });
             StringAssert.Contains("--tags", fake.Calls[0].args);
+            StringAssert.Contains("--autostash", fake.Calls[0].args);
+        }
+
+        [Test]
+        public void UpdateAsync_GitFails_ErrorIncludesManualCommand()
+        {
+            var fake = new FakeRunner { ExitCode = 1 };
+            LogAssert.Expect(LogType.Error, new System.Text.RegularExpressions.Regex("git stash && git pull"));
+
+            LocalPluginUpdater.UpdateAsync(
+                repoRoot: "/my/repo",
+                runner: fake,
+                onProgress: _ => { },
+                onComplete: _ => { }
+            );
         }
     }
 }
