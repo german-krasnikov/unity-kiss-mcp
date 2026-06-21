@@ -118,3 +118,35 @@ async def test_send_raw_file_only_unchanged():
         assert result == "Data saved to: /tmp/MCP/multiview.png"
     finally:
         srv.slot = orig_slot
+
+
+# ---------------------------------------------------------------------------
+# annotation_id param
+# ---------------------------------------------------------------------------
+
+async def test_screenshot_annotation_id_sets_camera_annotation_frame(screenshot_tool):
+    """annotation_id forces camera=annotation_frame."""
+    fn, captured = screenshot_tool
+    await fn(annotation_id="region_01")
+    assert captured['args'].get('camera') == "annotation_frame"
+
+
+async def test_screenshot_annotation_id_passed_to_args(screenshot_tool):
+    """annotation_id is forwarded in bridge args."""
+    fn, captured = screenshot_tool
+    await fn(annotation_id="region_01")
+    assert captured['args'].get('annotation_id') == "region_01"
+
+
+async def test_screenshot_annotation_id_none_not_in_args(screenshot_tool):
+    """annotation_id=None omitted from args (backward compat)."""
+    fn, captured = screenshot_tool
+    await fn(camera="scene_view")
+    assert 'annotation_id' not in captured['args']
+
+
+async def test_screenshot_annotation_id_overrides_camera(screenshot_tool):
+    """annotation_id overrides any explicit camera value."""
+    fn, captured = screenshot_tool
+    await fn(camera="multi_view", annotation_id="region_42")
+    assert captured['args'].get('camera') == "annotation_frame"

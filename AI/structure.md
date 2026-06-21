@@ -296,39 +296,50 @@ unity-kiss-mcp/
 │       │   │   └── ... (8 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
-│       ├── RegionTool/                     # Region Selection for Level Design (v0.46.0, 104 C# tests)
+│       ├── RegionTool/                     # Region Selection + Scene Annotations (v0.46.0, v0.51.0: annotations, 171 C# tests)
 │       │   ├── Polygon2D.cs                 # Immutable 2D polygon, winding-number PIP, AABB bounds, CSV import/export, RDP simplify
 │       │   ├── SceneRegionTool.cs           # EditorTool: multi-mode FSM (Lasso/Rect/Circle/PbP), keyboard shortcuts, state machine
-│       │   ├── SceneRegionQuery.cs          # 3-stage spatial pipeline: AABB filter → component filter → PIP → cap
+│       │   ├── SceneRegionQuery.cs          # 3-stage spatial pipeline: AABB filter → component filter → PIP → cap (v0.51.0: +FindNearPolyline)
 │       │   ├── SceneRegionState.cs          # LRU registry (8 slots) + EditorPrefs persistence, ToPolygon2D() factory
-│       │   ├── RegionSnapshot.cs            # Data record: polygon vertices, region ID, matched GameObjects
+│       │   ├── RegionSnapshot.cs            # Data record: polygon vertices, region ID, matched GameObjects (v0.51.0: +AnnotationType, +Label, +LengthOrDistance, factory methods)
 │       │   ├── SceneRegionOverlay.cs        # UIToolkit overlay for UI elements (mode display, settings)
+│       │   ├── SceneAnnotationOverlay.cs    # UIToolkit overlay for annotation tools (v0.51.0)
+│       │   ├── SceneAnnotationTool.cs       # Unified EditorTool entry point for all annotation modes (Shift+A, v0.51.0)
+│       │   ├── SceneAnnotationShortcut.cs   # Hotkey wiring for annotation modes (Shift+A, mode switches, v0.51.0)
+│       │   ├── SceneAnnotationUtils.cs      # Common validation, snapping, formatting utilities (v0.51.0)
 │       │   ├── PolygonDetail.cs             # Detail level enum (High/Medium/Low) + RDP thresholds
 │       │   ├── PolygonDetailSettings.cs     # EditorPrefs toggle for detail level
-│       │   ├── Drawing/                     # Drawing mode implementations (IDrawingMode interface)
-│       │   │   ├── IDrawingMode.cs          # Interface: Begin, Update, Finalize, IsActive, IsComplete, PreviewVertices
+│       │   ├── Drawing/                     # Drawing mode implementations (IDrawingMode + IAnnotationMode v0.51.0)
+│       │   │   ├── IDrawingMode.cs          # Interface: Begin, Update, Finalize, IsActive, IsComplete, PreviewVertices (v0.51.0: +IAnnotationMode)
 │       │   │   ├── DrawingUtils.cs          # Grid snap, point distance calculation
 │       │   │   ├── LassoMode.cs             # Free-form drawing (mouse track on drag)
 │       │   │   ├── RectangleMode.cs         # Orthogonal box (mouse start → end)
 │       │   │   ├── CircleMode.cs            # Circle (center + radius via mouse distance)
-│       │   │   └── PointByPointMode.cs      # Manual vertex click (double-click or Enter to finish)
+│       │   │   ├── PointByPointMode.cs      # Manual vertex click (double-click or Enter to finish)
+│       │   │   ├── PointMode.cs             # Single-point annotation with optional label (v0.51.0)
+│       │   │   ├── PolylineMode.cs          # Polyline drawing with auto-length calculation (v0.51.0)
+│       │   │   └── MeasurementMode.cs       # Distance measurement annotation (v0.51.0)
 │       │   ├── Rendering/                   # Rendering pipeline
-│       │   │   ├── RegionRenderer.cs        # GL wireframe + fill rendering, depth-tested display, hasFocus guard (v0.46.0)
+│       │   │   ├── RegionRenderer.cs        # GL wireframe + fill + annotation overlays, depth-tested (v0.46.0, v0.51.0: +DrawAnnotation)
 │       │   │   ├── RenderStyle.cs           # Color, alpha, line width configuration
-│       │   │   ├── RenderState.cs           # Active/Preview/Committed polygon states
+│       │   │   ├── RenderState.cs           # Active/Preview/Committed polygon states (v0.51.0: +3 annotation fields)
 │       │   │   └── RegionIcons.cs           # Procedural Painter2D vector icons for tool palette + overlay (v0.46.0, 128 LOC)
-│       │   └── Tests/                       # 104 NUnit tests
+│       │   └── Tests/                       # 171 NUnit tests (v0.46.0: 104 + v0.51.0: 67)
 │       │       ├── Drawing/
 │       │       │   ├── LassoModeTests.cs
 │       │       │   ├── RectangleModeTests.cs
 │       │       │   ├── CircleModeTests.cs
 │       │       │   ├── PointByPointModeTests.cs
 │       │       │   ├── PolygonDetailTests.cs
-│       │       │   └── DrawingModeFactoryTests.cs
-│       │       └── Rendering/
-│       │           └── RegionRendererTests.cs
-│       ├── Chat/CLI/RegionChipProvider.cs   # Region selection chip provider for chat (chip dropdown option)
+│       │       │   ├── DrawingModeFactoryTests.cs
+│       │       │   └── AnnotationDrawingModeTests.cs (v0.51.0: 23 tests for Point/Polyline/Measurement)
+│       │       ├── Rendering/
+│       │       │   ├── RegionRendererTests.cs
+│       │       │   └── RenderStateAnnotationTests.cs (v0.51.0)
+│       │       └── RegionSnapshotAnnotationTests.cs (v0.51.0: 27 tests for factory methods + type-specific ShortLabel)
+│       ├── Chat/CLI/RegionChipProvider.cs   # Region + annotation chip provider for chat (v0.46.0, v0.51.0: +3 format methods)
 │       ├── Chat/Tests/CLI/RegionChipProviderTests.cs # Chip provider tests
+│       ├── Chat/Tests/CLI/RegionChipProviderAnnotationTests.cs # Annotation-specific chip provider tests (v0.51.0: 17 tests)
 │       ├── Chat/Tests/CLI/SceneRegionStateTests.cs # State persistence tests
 │       ├── Updates/                       # Update checking + changelog display (v0.42.0, v0.44.0: LevelUp UX, v0.45.0: install-source detection)
 │       │   ├── ChangelogReader.cs         # Parse CHANGELOG.md entries (version, date, content)

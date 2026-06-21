@@ -94,18 +94,23 @@ async def screenshot(width: int = 640, height: int = 480, camera: str | None = N
                      offset: str | None = None, fixed_size: float | None = None,
                      highlight: str | None = None,
                      show_colliders: bool | None = None,
-                     angle: str | None = None) -> str:
+                     angle: str | None = None,
+                     annotation_id: str | None = None) -> str:
     """Capture screenshot (file path); describe= -> Haiku text (15-100x fewer tokens), raw=True forces path.
     camera: scene_view|scene_view_frame|multi_view|single_view|overview|overview_game. angle (single_view): front|left|top|iso|ex,ey,ez.
     zoom: higher=closer. angles: per-view Euler "ex,ey,ez|..." (_=skip). supersample 1-4. offset/fixed_size: framing.
-    highlight: paths[:#RRGGBB] for bbox. show_colliders: wireframes."""
+    highlight: paths[:#RRGGBB] for bbox. show_colliders: wireframes.
+    annotation_id: frame + highlight annotation by id (auto sets camera=annotation_frame)."""
+    if annotation_id is not None:
+        camera = "annotation_frame"
     result = await _send("screenshot", _args(width=width, height=height, camera=camera,
                                              path=path, zoom=zoom, angles=angles,
                                              supersample=supersample,
                                              offset=offset, fixed_size=fixed_size,
                                              highlight=highlight,
                                              show_colliders="true" if show_colliders else None,
-                                             angle=angle))
+                                             angle=angle,
+                                             annotation_id=annotation_id))
     if raw or describe is None or "Data saved to:" not in result:
         return result
     png_path = result.split("Data saved to: ")[-1].strip()

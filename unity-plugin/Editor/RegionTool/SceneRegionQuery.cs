@@ -137,6 +137,65 @@ namespace UnityMCP.Editor.RegionTool
             return header + "\n" + sb.ToString().TrimEnd();
         }
 
+        /// <summary>
+        /// Find GameObjects whose XZ position is within <paramref name="radius"/> of any segment
+        /// of the polyline defined by <paramref name="points"/>.
+        /// AABB pre-filter runs first; per-segment distance only for objects inside expanded AABB.
+        /// </summary>
+        public static GameObject[] FindNearPolyline(Vector2[] points, float radius, int cap = DefaultCap)
+        {
+            if (points == null || points.Length < 2)
+                return System.Array.Empty<GameObject>();
+
+            cap = System.Math.Min(System.Math.Max(1, cap), HardMaxCap);
+
+            // Build AABB over all polyline points, expanded by radius
+            float minX = points[0].x, maxX = points[0].x;
+            float minZ = points[0].y, maxZ = points[0].y;
+            for (int i = 1; i < points.Length; i++)
+            {
+                if (points[i].x < minX) minX = points[i].x;
+                if (points[i].x > maxX) maxX = points[i].x;
+                if (points[i].y < minZ) minZ = points[i].y;
+                if (points[i].y > maxZ) maxZ = points[i].y;
+            }
+            minX -= radius; maxX += radius;
+            minZ -= radius; maxZ += radius;
+
+            var result = new System.Collections.Generic.List<GameObject>(cap);
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
+            {
+                var pos = go.transform.position;
+                // Stage 1: AABB pre-filter
+                if (pos.x < minX || pos.x > maxX || pos.z < minZ || pos.z > maxZ) continue;
+
+                // Stage 2: min distance to any segment
+                var xz = new Vector2(pos.x, pos.z);
+                float minDist = float.MaxValue;
+                for (int i = 0; i < points.Length - 1; i++)
+                {
+                    float d = PointToSegmentDist(xz, points[i], points[i + 1]);
+                    if (d < minDist) minDist = d;
+                }
+                if (minDist > radius) continue;
+
+                result.Add(go);
+                if (result.Count >= cap) break;
+            }
+            return result.ToArray();
+        }
+
+        /// <summary>Distance from point P to segment AB.</summary>
+        internal static float PointToSegmentDist(Vector2 p, Vector2 a, Vector2 b)
+        {
+            var ab = b - a;
+            float lenSq = ab.sqrMagnitude;
+            if (lenSq < 1e-10f) return (p - a).magnitude;
+            float t = Vector2.Dot(p - a, ab) / lenSq;
+            t = System.Math.Max(0f, System.Math.Min(1f, t));
+            return (p - (a + t * ab)).magnitude;
+        }
+
         private static string F(float v, string fmt = "F2")
             => v.ToString(fmt, System.Globalization.CultureInfo.InvariantCulture);
     }

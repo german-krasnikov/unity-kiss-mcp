@@ -5,9 +5,11 @@ using UnityMCP.Editor;
 namespace UnityMCP.Editor.RegionTool
 {
     /// <summary>
-    /// Immutable snapshot of a drawn scene region. Persisted to Library/MCP_Regions.json.
+    /// Immutable snapshot of a drawn scene region or annotation.
+    /// Persisted to Library/MCP_Regions.json.
     /// VerticesFlat = [x0,z0, x1,z1, ...] — flat pairs for JsonUtility compatibility.
     /// ObjectPaths capped at 50; TotalCount holds true count.
+    /// AnnotationType = "region"|"point"|"polyline"|"measurement" (null = legacy "region").
     /// </summary>
     [Serializable]
     internal sealed class RegionSnapshot
@@ -40,8 +42,39 @@ namespace UnityMCP.Editor.RegionTool
         public int  SnapshotVersion;  // set to SceneRegionState.CurrentVersion on creation
         public long CreatedTicks;     // DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 
-        public string ShortLabel =>
-            $"{(Truncated ? TotalCount + "+" : (ObjectPaths?.Length.ToString() ?? "0"))}obj {Area:F0}m²";
+        // Annotation type (Phase 1A). null = legacy "region" (JsonUtility default).
+        public string AnnotationType = "region";
+        public string Label;
+        public float  LengthOrDistance;
+        public string Direction; // "dx,dz" normalized (polyline first→last)
+
+        public string ShortLabel
+        {
+            get
+            {
+                var type = AnnotationType ?? "region";
+                switch (type)
+                {
+                    case "point":
+                        return string.IsNullOrEmpty(Label)
+                            ? $"pos=({CenterX:F1},{CenterZ:F1})"
+                            : $"{Label} pos=({CenterX:F1},{CenterZ:F1})";
+                    case "polyline":
+                    {
+                        int pts = VerticesFlat != null ? VerticesFlat.Length / 2 : 0;
+                        return string.IsNullOrEmpty(Label)
+                            ? $"{pts}pts {LengthOrDistance:F1}m"
+                            : $"{Label} {pts}pts {LengthOrDistance:F1}m";
+                    }
+                    case "measurement":
+                        return string.IsNullOrEmpty(Label)
+                            ? $"{LengthOrDistance:F1}m"
+                            : $"{Label} {LengthOrDistance:F1}m";
+                    default:
+                        return $"{(Truncated ? TotalCount + "+" : (ObjectPaths?.Length.ToString() ?? "0"))}obj {Area:F0}m²";
+                }
+            }
+        }
 
         public static RegionSnapshot Create(
             string id,
@@ -97,6 +130,108 @@ namespace UnityMCP.Editor.RegionTool
             for (int i = 0; i < verts.Length; i++)
                 verts[i] = new Vector2(VerticesFlat[i * 2], VerticesFlat[i * 2 + 1]);
             return new Polygon2D(verts);
+        }
+
+        // ── Annotation factory methods ─────────────────────────────────────────
+
+        /// <summary>Create a point annotation at the given XZ position.</summary>
+        public static RegionSnapshot CreatePoint(
+            string id, Vector2 xz, string[] nearestPaths, string sceneName, string label = "")
+        {
+            var paths = nearestPaths ?? Array.Empty<string>();
+            return new RegionSnapshot
+            {
+                Id             = id,
+                SchemaVersion  = 1,
+                AnnotationType = "point",
+                Label          = label,
+                VerticesFlat   = new[] { xz.x, xz.y },
+                Area           = 0f,
+                CenterX        = xz.x,
+                CenterZ        = xz.y,
+                MinX = xz.x, MinZ = xz.y, MaxX = xz.x, MaxZ = xz.y,
+                SceneName      = sceneName ?? "",
+                ObjectPaths    = paths,
+                ObjectIds      = new int[paths.Length], // parallel; 0 = not populated (annotations use path-based lookup)
+                TotalCount     = paths.Length,
+                CreatedTicks   = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            };
+        }
+
+        /// <summary>Create a polyline annotation from a sequence of XZ points.</summary>
+        public static RegionSnapshot CreatePolyline(
+            string id, Vector2[] points, string[] nearPaths, string sceneName, string label = "")
+        {
+            var flat = new float[points.Length * 2];
+            float minX = float.MaxValue, minZ = float.MaxValue;
+            float maxX = float.MinValue, maxZ = float.MinValue;
+            float len  = 0f;
+
+            for (int i = 0; i < points.Length; i++)
+            {
+                flat[i * 2]     = points[i].x;
+                flat[i * 2 + 1] = points[i].y;
+                if (points[i].x < minX) minX = points[i].x;
+                if (points[i].y < minZ) minZ = points[i].y;
+                if (points[i].x > maxX) maxX = points[i].x;
+                if (points[i].y > maxZ) maxZ = points[i].y;
+                if (i > 0) len += Vector2.Distance(points[i - 1], points[i]);
+            }
+
+            // direction: normalized vector from first to last
+            var dir = points.Length >= 2
+                ? (points[points.Length - 1] - points[0]).normalized
+                : Vector2.right;
+
+            var cx = (minX + maxX) * 0.5f;
+            var cz = (minZ + maxZ) * 0.5f;
+
+            return new RegionSnapshot
+            {
+                Id               = id,
+                SchemaVersion    = 1,
+                AnnotationType   = "polyline",
+                Label            = label,
+                VerticesFlat     = flat,
+                Area             = 0f,
+                CenterX          = cx,
+                CenterZ          = cz,
+                MinX = minX, MinZ = minZ, MaxX = maxX, MaxZ = maxZ,
+                LengthOrDistance = len,
+                Direction        = dir.x.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)
+                                   + "," + dir.y.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                SceneName        = sceneName ?? "",
+                ObjectPaths      = nearPaths ?? Array.Empty<string>(),
+                ObjectIds        = new int[(nearPaths?.Length ?? 0)], // parallel; 0 = not populated
+                TotalCount       = nearPaths?.Length ?? 0,
+                CreatedTicks     = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            };
+        }
+
+        /// <summary>Create a measurement annotation between two XZ points.</summary>
+        public static RegionSnapshot CreateMeasurement(
+            string id, Vector2 a, Vector2 b, string sceneName, string label = "")
+        {
+            float dist = Vector2.Distance(a, b);
+            return new RegionSnapshot
+            {
+                Id               = id,
+                SchemaVersion    = 1,
+                AnnotationType   = "measurement",
+                Label            = label,
+                VerticesFlat     = new[] { a.x, a.y, b.x, b.y },
+                Area             = 0f,
+                CenterX          = (a.x + b.x) * 0.5f,
+                CenterZ          = (a.y + b.y) * 0.5f,
+                MinX = Mathf.Min(a.x, b.x), MinZ = Mathf.Min(a.y, b.y),
+                MaxX = Mathf.Max(a.x, b.x), MaxZ = Mathf.Max(a.y, b.y),
+                LengthOrDistance = dist,
+                SceneName        = sceneName ?? "",
+                ObjectPaths      = Array.Empty<string>(),
+                ObjectIds        = Array.Empty<int>(),
+                TotalCount       = 0,
+                CreatedTicks     = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            };
         }
     }
 }

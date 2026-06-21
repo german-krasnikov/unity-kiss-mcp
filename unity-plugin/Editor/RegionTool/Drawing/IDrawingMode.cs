@@ -43,4 +43,35 @@ namespace UnityMCP.Editor.RegionTool
             _ => throw new ArgumentOutOfRangeException(nameof(id), id, null)
         };
     }
+
+    // ── Annotation modes (Point / Polyline / Measurement) ──────────────────
+
+    internal enum AnnotationModeId { Point, Polyline, Measurement }
+
+    /// <summary>
+    /// Lightweight drawing mode for annotation primitives (Point, Polyline, Measurement).
+    /// Unlike IDrawingMode, Finalize() is not required — use FinalizedPoints instead.
+    /// </summary>
+    internal interface IAnnotationMode
+    {
+        AnnotationModeId Id { get; }
+        void Begin(Vector2 startXZ, bool gridSnap);
+        bool OnEvent(Event e, Vector2 currentXZ);
+        IReadOnlyList<Vector2> PreviewVertices { get; }
+        bool IsComplete { get; }
+        bool IsActive { get; }
+        Vector2[] FinalizedPoints { get; }
+        void Reset();
+    }
+
+    internal static class AnnotationModeFactory
+    {
+        public static IAnnotationMode Create(AnnotationModeId id) => id switch
+        {
+            AnnotationModeId.Point       => new PointMode(),
+            AnnotationModeId.Polyline    => new PolylineMode(),
+            AnnotationModeId.Measurement => new MeasurementMode(),
+            _ => throw new ArgumentOutOfRangeException(nameof(id), id, null)
+        };
+    }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using UnityMCP.Editor.RegionTool;
 
 namespace UnityMCP.Editor
 {
@@ -294,6 +295,17 @@ namespace UnityMCP.Editor
         private static string BuildScreenshotResponse(string id, string args)
         {
             var camera = JsonHelper.ExtractString(args, "camera");
+
+            if (camera == "annotation_frame")
+            {
+                var annotId = JsonHelper.ExtractString(args, "annotation_id");
+                if (!string.IsNullOrEmpty(annotId))
+                {
+                    var snap = SceneRegionState.GetById(annotId);
+                    if (snap != null) SceneRegionState.FrameRegion(snap.Id);
+                }
+                camera = "scene_view";
+            }
 
             if (camera == "overview" || camera == "overview_game")
             {

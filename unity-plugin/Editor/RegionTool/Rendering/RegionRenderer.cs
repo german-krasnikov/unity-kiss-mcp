@@ -10,6 +10,136 @@ namespace UnityMCP.Editor.RegionTool
     /// </summary>
     internal static class RegionRenderer
     {
+        static readonly Color AnnotationColor = new Color(0.133f, 0.827f, 0.933f); // cyan #22d3ee
+
+        // ── Annotation entry point ─────────────────────────────────────────
+
+        /// <summary>Draw annotation primitives (point/polyline/measurement) in SceneView.</summary>
+        public static void DrawAnnotation(RenderState state)
+        {
+            if (Event.current == null || Event.current.type != EventType.Repaint) return;
+            switch (state.AnnotationType)
+            {
+                case "point":       DrawPoint(state);       break;
+                case "polyline":    DrawPolyline(state);    break;
+                case "measurement": DrawMeasurement(state); break;
+            }
+        }
+
+        static void DrawPoint(RenderState state)
+        {
+            var verts = state.Vertices;
+            if (verts == null || verts.Count < 1) return;
+
+            var xz = verts[0];
+            var pos = new Vector3(xz.x, 0.01f, xz.y);
+
+            Handles.color = AnnotationColor;
+            float sz = HandleUtility.GetHandleSize(pos) * RenderStyle.VertexSize * 2f;
+            Handles.DotHandleCap(0, pos, Quaternion.identity, sz, EventType.Repaint);
+
+            if (!string.IsNullOrEmpty(state.Label))
+                Handles.Label(pos + Vector3.right * sz * 2f, state.Label);
+
+            // Dashed cross: ±1m
+            DrawDashedCross(pos, 1f);
+        }
+
+        static void DrawPolyline(RenderState state)
+        {
+            var verts = state.Vertices;
+            if (verts == null || verts.Count < 2) return;
+
+            var buf = BuildHandlesBuffer(verts, closed: false);
+            Handles.color = AnnotationColor;
+            Handles.DrawAAPolyLine(2.5f, buf);
+
+            // Vertex dots
+            foreach (var v in buf)
+            {
+                float vsz = HandleUtility.GetHandleSize(v) * RenderStyle.VertexSize;
+                Handles.DotHandleCap(0, v, Quaternion.identity, vsz, EventType.Repaint);
+            }
+
+            // Arrow on midpoint of each segment
+            DrawSegmentArrows(verts);
+
+            // HUD
+            Handles.BeginGUI();
+            string label = string.IsNullOrEmpty(state.Label) ? "" : state.Label + " | ";
+            GUI.Box(new Rect(10, 60, 200, 24), GUIContent.none, EditorStyles.helpBox);
+            GUI.Label(new Rect(14, 64, 192, 18),
+                $"{label}{verts.Count}pts | {state.Length:F1}m", EditorStyles.miniLabel);
+            Handles.EndGUI();
+        }
+
+        static void DrawMeasurement(RenderState state)
+        {
+            var verts = state.Vertices;
+            if (verts == null || verts.Count < 2) return;
+
+            var a = new Vector3(verts[0].x, 0.01f, verts[0].y);
+            var b = new Vector3(verts[1].x, 0.01f, verts[1].y);
+
+            Handles.color = AnnotationColor;
+            Handles.DrawAAPolyLine(2.5f, a, b);
+
+            // Perpendicular tick marks at each end (±0.3m, like a ruler)
+            DrawEndTick(a, b, 0.3f);
+            DrawEndTick(b, a, 0.3f);
+
+            // Floating distance label at midpoint
+            var mid = (a + b) * 0.5f;
+            string distLabel = state.Length > 0f
+                ? $"{state.Length:F2}m"
+                : $"{Vector3.Distance(a, b):F2}m";
+            if (!string.IsNullOrEmpty(state.Label)) distLabel = state.Label + ": " + distLabel;
+            Handles.Label(mid + Vector3.up * 0.2f, distLabel);
+        }
+
+        static void DrawDashedCross(Vector3 center, float halfLen)
+        {
+            Handles.DrawDottedLine(
+                center + Vector3.right   * halfLen,
+                center - Vector3.right   * halfLen, 4f);
+            Handles.DrawDottedLine(
+                center + Vector3.forward * halfLen,
+                center - Vector3.forward * halfLen, 4f);
+        }
+
+        static void DrawSegmentArrows(IReadOnlyList<Vector2> verts)
+        {
+            for (int i = 0; i < verts.Count - 1; i++)
+            {
+                var a2 = verts[i];
+                var b2 = verts[i + 1];
+                var mid = (a2 + b2) * 0.5f;
+                var dir2d = (b2 - a2).normalized;
+
+                var midPos = new Vector3(mid.x, 0.01f, mid.y);
+                float sz = HandleUtility.GetHandleSize(midPos) * 0.15f;
+
+                var fwd = new Vector3(dir2d.x, 0f, dir2d.y);
+                var right = Vector3.Cross(Vector3.up, fwd).normalized;
+
+                var tip   = midPos + fwd * sz;
+                var left  = midPos - fwd * sz * 0.5f + right * sz * 0.4f;
+                var right3 = midPos - fwd * sz * 0.5f - right * sz * 0.4f;
+                Handles.DrawAAPolyLine(1.5f, tip, left);
+                Handles.DrawAAPolyLine(1.5f, tip, right3);
+            }
+        }
+
+        static void DrawEndTick(Vector3 endPt, Vector3 otherPt, float halfLen)
+        {
+            var along = (otherPt - endPt).normalized;
+            var perp  = Vector3.Cross(along, Vector3.up).normalized;
+            Handles.DrawAAPolyLine(2f,
+                endPt + perp * halfLen,
+                endPt - perp * halfLen);
+        }
+
+
         static Material _fillMaterial;
 
         static Material FillMaterial

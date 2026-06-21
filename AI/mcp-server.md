@@ -19,7 +19,7 @@ server/src/unity_mcp/
 ├── tools/
 │   ├── __init__.py     # Tool module registry
 │   ├── objects.py      # get_component/inspect/find/set_property/create/delete/manage_component/set_active/wire_event/unwire_event/set_material/set_parent/set_property_delta/transfer_object/object_diff
-│   ├── scene.py        # hierarchy, console, compile_errors, screenshot, recompile, run_tests, get_test_results, scene (open_additive/close/set_active/list), search_scene, editor, checkpoint, fingerprint, scene_diff, save/load_session, screenshot_baseline/compare, get_changes
+│   ├── scene.py        # hierarchy, console, compile_errors, screenshot(annotation_id), recompile, run_tests, get_test_results, scene (open_additive/close/set_active/list), search_scene, editor, checkpoint, fingerprint, scene_diff, save/load_session, screenshot_baseline/compare, get_changes
 │   ├── code_intel.py   # find_references, compile_preflight, semantic_at, await_compile
 │   ├── runtime.py      # invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 │   ├── batch.py        # batch, references, validate_references + DRY serialization

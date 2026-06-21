@@ -123,16 +123,17 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **FileOutputHelper (v0.23.0)**: ScreenshotsDir now `<ProjectRoot>/ScreenShots/` (project-local, not shared cache)
    - **RefManager**: short refs $a-$zz (702 slots), invalidated on scene change
    - **ErrorHelper**: contextual errors with did-you-mean hints
-   - **RegionTool (v0.46.0, new)**: Interactive Scene View polygon region selection for level design
+   - **RegionTool (v0.46.0+v0.51.0)**: Interactive Scene View annotation tool for level design
      * **Polygon2D**: Immutable 2D polygon (XZ plane), winding-number PIP test, AABB bounds, CSV import/export, RDP simplification
      * **SceneRegionTool**: EditorTool with multi-mode FSM (Lasso/Rectangle/Circle/PointByPoint), keyboard shortcuts (Shift+R activate, Q/W/E/R mode switch, G grid snap, Enter commit, Esc cancel)
      * **SceneRegionQuery**: 3-stage spatial pipeline (AABB pre-filter → component filter → PIP test → cap+format), GameObject[] array result
      * **SceneRegionState**: LRU registry (8 slots) + EditorPrefs persistence, CSV export for later use
-     * **Drawing Modes** (IDrawingMode interface): LassoMode (free-form), RectangleMode (orthogonal), CircleMode (radius), PointByPointMode (manual vertices). Each mode tracks active state, completion, grid snap tolerance. DrawingUtils shared snapping logic.
-     * **Rendering**: RegionRenderer (GL wireframe + fill), RenderStyle (color/alpha), RenderState (active/preview/committed). UIToolkit SceneRegionOverlay for UI elements.
-     * **PolygonDetail**: Detail level presets (High/Medium/Low), per-preset RDP threshold, EditorPrefs toggle
-     * **Chat Integration**: RegionChipProvider for region selection in chat (selectable from dropdown, persists across turns)
-     * **Tests**: 104 C# NUnit tests (Drawing modes, Rendering, state management)
+     * **Drawing Modes (v0.51.0: expanded)** (IDrawingMode + IAnnotationMode): LassoMode, RectangleMode, CircleMode, PointByPointMode (region selection); PointMode (single point + label), PolylineMode (polyline with auto-length), MeasurementMode (distance measurement). Each mode tracks active state, completion, grid snap tolerance. DrawingUtils shared snapping logic.
+     * **RegionSnapshot (v0.51.0: expanded)**: Unified model with `AnnotationType` field ("region"|"point"|"polyline"|"measurement", null=legacy). Factory methods: `CreatePoint()`, `CreatePolyline()`, `CreateMeasurement()`. Labels + LengthOrDistance + Direction support per type.
+     * **Rendering (v0.51.0)**: RegionRenderer (GL wireframe + fill + annotation overlays), RenderState (+3 annotation fields), UIToolkit SceneRegionOverlay + SceneAnnotationOverlay. Multi-layer display: regions (wireframe+fill), points (radius marker), polylines (vertices+length), measurements (dimension line).
+     * **SceneAnnotationTool (v0.51.0)**: Unified entry point (Shift+A) for all annotation modes. Mode switching via menu. SceneAnnotationShortcut wires hotkeys. SceneAnnotationUtils for common validation/snapping.
+     * **Chat Integration**: RegionChipProvider for region+annotation selection in chat (format methods: FormatRegion, FormatPoint, FormatPolyline, FormatMeasurement)
+     * **Tests**: 104 C# NUnit tests (v0.46.0) + 67 new annotation tests (v0.51.0): RegionSnapshotAnnotationTests (27), AnnotationDrawingModeTests (23), RegionChipProviderAnnotationTests (17)
 
 4. **Guards (C#)**
    - **Compile guard**: blocks all except ping, get_version, get_console, screenshot, get_enabled_tools, compile_status

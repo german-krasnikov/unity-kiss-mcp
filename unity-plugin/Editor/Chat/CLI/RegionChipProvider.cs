@@ -38,7 +38,14 @@ namespace UnityMCP.Editor.Chat
             var snap = SceneRegionState.GetById(chip.Path);
             if (snap == null) return bracket + " (expired)";
 
-            return bracket + "\n" + FormatSnapshot(snap, ctx.Depth);
+            var body = (snap.AnnotationType ?? "region") switch
+            {
+                "point"       => FormatPoint(snap, ctx.Depth),
+                "polyline"    => FormatPolyline(snap, ctx.Depth),
+                "measurement" => FormatMeasurement(snap),
+                _             => FormatSnapshot(snap, ctx.Depth),
+            };
+            return bracket + "\n" + body;
         }
 
         public void Navigate(string reference)
@@ -60,7 +67,77 @@ namespace UnityMCP.Editor.Chat
             menu.AppendAction("Remove Region", _ => SceneRegionState.Remove(reference));
         }
 
-        // ── Payload formatting ────────────────────────────────────────────────
+        // ── Annotation payload formatting ─────────────────────────────────────
+
+        static string FormatPoint(RegionSnapshot snap, string depth)
+        {
+            var sb = new StringBuilder();
+            sb.Append($"pos=({snap.CenterX:F2},{snap.CenterZ:F2})");
+            if (!string.IsNullOrEmpty(snap.Label))
+                sb.Append($" label={snap.Label}");
+            if (!string.IsNullOrEmpty(snap.SceneName))
+                sb.Append($" scene={snap.SceneName}");
+
+            if (depth == "full" && snap.ObjectPaths != null && snap.ObjectPaths.Length > 0)
+            {
+                sb.Append("\nnearest:");
+                foreach (var p in snap.ObjectPaths) sb.Append('\n').Append(p);
+            }
+            return sb.ToString();
+        }
+
+        static string FormatPolyline(RegionSnapshot snap, string depth)
+        {
+            int pts = snap.VerticesFlat != null ? snap.VerticesFlat.Length / 2 : 0;
+            var sb  = new StringBuilder();
+            sb.Append($"pts={pts} len={snap.LengthOrDistance:F1}m");
+            if (!string.IsNullOrEmpty(snap.Label))
+                sb.Append($" label={snap.Label}");
+            if (!string.IsNullOrEmpty(snap.SceneName))
+                sb.Append($" scene={snap.SceneName}");
+            if (!string.IsNullOrEmpty(snap.Direction))
+                sb.Append($" dir=({snap.Direction})");
+
+            if (depth == "full")
+            {
+                if (snap.VerticesFlat != null && snap.VerticesFlat.Length >= 4)
+                {
+                    sb.Append("\npoints=");
+                    for (int i = 0; i < pts; i++)
+                    {
+                        if (i > 0) sb.Append(';');
+                        sb.Append(snap.VerticesFlat[i * 2].ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                        sb.Append(',');
+                        sb.Append(snap.VerticesFlat[i * 2 + 1].ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                    }
+                }
+                if (snap.ObjectPaths != null && snap.ObjectPaths.Length > 0)
+                {
+                    sb.Append("\nnear(r=2m):");
+                    foreach (var p in snap.ObjectPaths) sb.Append('\n').Append(p);
+                }
+            }
+            return sb.ToString();
+        }
+
+        static string FormatMeasurement(RegionSnapshot snap)
+        {
+            var sb = new StringBuilder();
+            sb.Append($"dist={snap.LengthOrDistance:F1}m");
+
+            if (snap.VerticesFlat != null && snap.VerticesFlat.Length >= 4)
+            {
+                sb.Append($" from=({snap.VerticesFlat[0]:F1},{snap.VerticesFlat[1]:F1})");
+                sb.Append($" to=({snap.VerticesFlat[2]:F1},{snap.VerticesFlat[3]:F1})");
+            }
+            if (!string.IsNullOrEmpty(snap.Label))
+                sb.Append($" label={snap.Label}");
+            if (!string.IsNullOrEmpty(snap.SceneName))
+                sb.Append($" scene={snap.SceneName}");
+            return sb.ToString();
+        }
+
+        // ── Region payload formatting ─────────────────────────────────────────
 
         static string FormatSnapshot(RegionSnapshot snap, string depth)
         {

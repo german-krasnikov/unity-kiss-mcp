@@ -17,5 +17,10 @@ namespace UnityMCP.Editor.RegionTool
         public float                  Area;
         public int                    ObjectCount;
         public int                    TokenEstimate;
+
+        // Annotation fields (null = existing region behavior)
+        public string                 AnnotationType;
+        public string                 Label;
+        public float                  Length;         // total polyline length / measurement distance
     }
 }

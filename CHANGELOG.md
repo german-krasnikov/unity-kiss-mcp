@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.51.0] — 2026-06-21 <!-- scene-annotation-primitives -->
+
+**Features:**
+- **Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation modes: Point (location + label), Polyline (multi-vertex path with auto-length), Measurement (distance dimension). Unified `RegionSnapshot` model with `AnnotationType` field ("region"|"point"|"polyline"|"measurement"). Factory methods `CreatePoint()`, `CreatePolyline()`, `CreateMeasurement()` for programmatic creation. SceneAnnotationTool (Shift+A) unified entry point for all modes. `screenshot(annotation_id=id)` auto-frames and highlights saved annotations. RegionChipProvider extended with format methods for all annotation types.
+
+**Tests:**
+- Added 67 new C# NUnit tests: RegionSnapshotAnnotationTests (27), AnnotationDrawingModeTests (23), RegionChipProviderAnnotationTests (17). Total suite now 4,346 EditMode tests (12 pre-existing failures).
+
 ## [v0.50.3] — 2026-06-21 <!-- mcp-structured-output-cleanup -->
 
 **Optimization:**
