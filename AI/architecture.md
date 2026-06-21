@@ -326,9 +326,69 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 
 **Verification**: 39 new regression tests all green on macOS/Windows (domain reload stress: 100+ recompile cycles)
 
+## Level Design Toolkit (v0.46.0+, F1-F5)
+
+**Chat-Integrated Visual Tools:**
+
+1. **F1: Token Counter + Context Progress Bar** (replaces USD cost display)
+   - **ModelContextWindows.cs** — Context window size per LLM (hardcoded: Claude 200k, Opus 4.8 vs 4.6/4.7, Haiku 100k, Sonnet 400k, Codex/Gemini preset fallback)
+   - **TokenFormat.cs** — Extended `FormatReadout()` displays `↑input ↓output | ▓▓▓▓░░░░░░ 40%` (input+output count + progress fill as Unicode bar)
+   - **ContextProgressBar.cs** — UIToolkit visual bar (50px height, animated fill on token change, responsive layout)
+   - **TokenResetTests** — Verify counter resets on backend/model/inactivity-timeout switch
+
+2. **F2: Component Field Chips** — Right-click Component header in Inspector → "Attach Field" dropdown
+   - **FieldChipProvider.cs** — Chip provider for individual component fields (priority 200, between Script and Scene)
+   - **FieldContextMenu.cs** — Inspector context menu listener, routes field selection
+   - **ChipKindKeys.cs** — New ChipKind: `Field` + `AnnotatedScreenshot` (supports v0.46 annotation flow)
+   - **FieldChipProviderTests, FieldContextMenuTests** — Full menu + selection flow coverage
+
+3. **F3: Native Screenshot Button + Chip**
+   - **ScreenshotService.cs** — Wrapper around existing ScreenshotCapture, captures camera view to file
+   - **ScreenshotToolbarButton.cs** — Toolbar button (📷 icon), OnClick calls ScreenshotService, emits chip + injects into chat
+   - **ScreenshotServiceTests, ScreenshotToolbarButtonTests** — Service + button lifecycle
+
+4. **F4: Full Annotation Editor** (Annotation/ folder, 11 files)
+   - **AnnotationCanvas.cs** — Drawing surface (Texture2D-backed, pixel-level rasterization)
+   - **AnnotationCommand.cs** — Command pattern: pen/line/arrow/rect/ellipse/text/erase (base class + 7 subclasses)
+   - **AnnotationHistory.cs** — Undo/redo stack (command list, index tracking)
+   - **AnnotationToolState.cs** — Active tool + brush color/size state (mutable, live-updated)
+   - **AnnotationToolbar.cs** — Tool palette + color picker + undo/redo buttons (UIToolkit buttons)
+   - **AnnotationEditorWindow.cs** — EditorWindow host (canvas + toolbar side-by-side)
+   - **AnnotationRasterizer.cs** — Rasterize commands to Texture2D (line bresenham, circle/ellipse scanline fills)
+   - **AnnotationDrawer.cs** — Preview command strokes (GL lines, circles, text)
+   - **AnnotationCompositor.cs** — Flatten command stream to final PNG (rasterize all + encode)
+   - **AnnotationIcons.cs** — Procedural vector icons for toolbar buttons + RegionTool overlay (230 LOC: Pen/Line/Arrow/Rect/Ellipse/Text/Erase/Save icons via Painter2D)
+   - **AnnotateToolbarButton.cs** — Chat toolbar button to launch AnnotationEditorWindow
+   - **AnnotatedScreenshotChipProvider.cs** — Chip kind for annotated images (markdown `![](path.png)` with annotation metadata JSON)
+   - **Tests**: 10+ NUnit test files covering all components (canvas rasterization, undo/redo, metadata serialization)
+
+5. **F5: Raycast World Coordinates** in Annotation Metadata
+   - **AnnotationRaycaster.cs** — Scene raycast from mouse position + camera (returns world XYZ + GameObject + hit distance)
+   - **AnnotationMetaWriter.cs** — Embeds raycast hits into annotation metadata JSON (for chat reference: "annotated pixel at world 15.2, -3.5, 42.1 on Player")
+   - **Tests**: AnnotationRaycasterTests (228 cases), AnnotationMetaWriterTests (64 cases) covering raycast edge cases + metadata serialization
+
+6. **Region Icons** (RegionIcons.cs, moved to RegionTool/Rendering/)
+   - Procedural Painter2D vector rendering for Lasso/Rect/Circle/PbP tools + overlay UI
+   - Replaces hardcoded icon assets, resolves v0.46 black-flash issue
+
+7. **Region hasFocus Guard** (RegionRenderer.cs)
+   - Prevents black GL rendering flash when Scene View loses focus
+   - Checks EditorGUIUtility.editingTextField to hide region overlay during text input
+
+8. **Chip Thumbnails** (ChipPillFactory.cs)
+   - Inline thumbnail previews (32x32px) for image chips in both input and response
+   - Lazy-load from ScreenShots/ directory, fallback graceful if file missing
+
+9. **Configurable Inactivity Timeout**
+   - Moved from hardcoded 90s (Claude) / 300s (Codex) to **BackendConfigStore** (default 180s)
+   - **ChatSettingsSection** → General → Inactivity timeout slider (30–600s)
+   - Persists to Library/MCP_ChatBackendConfig.json, per-backend override available
+
 ## Tool Categories
 
 **Update v0.30.4**: validate_move added to asset category (6 tools total). Test marker `live_haiku` → `live_cli` (v0.8.2+).
+
+**Update v0.46.0**: ChipKind registry now includes Field + AnnotatedScreenshot. ModelContextWindows presets added per LLM.
 
 ### TIER1 (always visible, 38 core)
 

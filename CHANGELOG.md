@@ -7,23 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [v0.46.0] — 2026-06-21 <!-- region-selection -->
+## [v0.46.0] — 2026-06-21 <!-- level-design-toolkit -->
 
-**Region Selection for Level Design:**
+**Level Design Toolkit (Chat-Integrated Visual Tools):**
+
+**F1: Token Counter + Context Progress Bar**
+- Replaces USD cost display with input/output token counts + context window fill %
+- **ModelContextWindows** — LLM context sizes (Claude 200k, Opus 4.8/4.6/4.7, Haiku 100k, Sonnet 400k, Codex/Gemini fallback)
+- **ContextProgressBar** — UIToolkit animated progress bar (50px, responsive layout)
+- **TokenFormat extended** — Displays `↑1.2k ↓840 | ▓▓▓▓░░░░░░ 45%` format
+
+**F2: Component Field Chips**
+- Right-click Component header → "Attach Field" dropdown to attach individual component fields to chat context
+- **FieldChipProvider** — Auto-detection for component properties (priority 200)
+- **FieldContextMenu** — Inspector context menu integration
+- **ChipKindKeys** — New Kind: `Field` (extensible provider pattern)
+
+**F3: Native Screenshot Button**
+- Toolbar button (📷) captures current camera view directly to file
+- **ScreenshotService** — Wrapper around existing ScreenshotCapture
+- **ScreenshotToolbarButton** — Emits image chip, injects into chat automatically
+
+**F4: Full Annotation Editor (11-file subsystem)**
+- Complete drawing system with undo/redo, multiple tools
+- **Tools**: Pen (freehand), Line, Arrow, Rectangle, Ellipse, Text, Erase
+- **AnnotationCanvas** — Texture2D-backed pixel rasterization (bresenham lines, scanline fills)
+- **AnnotationHistory** — Undo/redo stack with command pattern
+- **AnnotationEditorWindow** — EditorWindow host with toolbar + color picker
+- **AnnotationCompositor** — Flatten commands → PNG encode for sharing
+- **AnnotationIcons** — Procedural Painter2D vector icons (230 LOC, tool palette + region overlay icons)
+- **AnnotateToolbarButton** — Chat toolbar launcher for annotation editor
+
+**F5: Raycast World Coordinates**
+- **AnnotationRaycaster** — Scene raycast from mouse position, returns world XYZ + GameObject
+- **AnnotationMetaWriter** — Embeds hit data into annotation metadata JSON
+- Enables chat references like "annotated pixel at world (15.2, -3.5, 42.1) on Player"
+
+**F6-F9: Supporting Features**
+- **Region Icons** — Moved to RegionTool/Rendering/, procedural vector icons for tool palette
+- **Region hasFocus Guard** — Prevents black GL flash on Scene View focus loss (RegionRenderer)
+- **Chip Thumbnails** — Inline 32x32px preview for image chips (ChipPillFactory)
+- **Configurable Inactivity Timeout** — Moved from hardcoded 90s/300s to BackendConfigStore (default 180s, Settings slider 30–600s)
+
+**Region Selection for Level Design (v0.46.0 Phase 1):**
 - **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number point-in-polygon test (nonzero fill rule), AABB bounds computation, CSV import/export, Ramer-Douglas-Peucker simplification
-- **SceneRegionTool** — EditorTool with multi-mode finite-state machine (Shift+R activate, Q/W/E/R mode switch, Enter commit, Esc cancel, G grid snap). Four drawing modes: Lasso (free-form), Rectangle (orthogonal), Circle (center+radius), PointByPoint (manual vertices)
-- **SceneRegionQuery** — 3-stage spatial query pipeline: AABB bounding-box pre-filter → component type filter → winding-number PIP test → result capped + formatted. Both direct GameObject[] return (for tool) and text response (for chat)
-- **SceneRegionState** — LRU registry (8 concurrent regions) with EditorPrefs persistence. Regions exportable as CSV for reuse in batch scripts
-- **Drawing Modes** — IDrawingMode interface shared by 4 mode implementations. DrawingUtils provides grid-snap + point-distance logic. Per-mode state tracking (active, complete, vertex list)
-- **Rendering** — RegionRenderer (GL wireframe + fill), RenderStyle (color/alpha/width), RenderState (active/preview/committed states). UIToolkit SceneRegionOverlay for UI elements
-- **PolygonDetail** — Detail level presets (High/Medium/Low) with per-preset RDP simplification thresholds. EditorPrefs toggle for user preference
-- **Chat Integration** — RegionChipProvider adds "Region" option to chat chip dropdown. Selected region persists across turns
-- **Python spatial_query extended** — `objects_in_polygon` action accepts `vertices` (CSV 'x1,z1;x2,z2;...', >=3 pairs) or `region_id` (references SceneRegionState). Validates polygon geometry (3-256 vertices, float range checks). Returns formatted text matching existing SpatialHelper patterns
+- **SceneRegionTool** — EditorTool with multi-mode FSM (Shift+R activate, Q/W/E/R mode switch, Enter commit, Esc cancel, G grid snap). Four drawing modes: Lasso, Rectangle, Circle, PointByPoint
+- **SceneRegionQuery** — 3-stage spatial pipeline: AABB filter → component type filter → winding-number PIP → cap + format
+- **SceneRegionState** — LRU registry (8 concurrent), EditorPrefs persistence, CSV export
+- **Chat Integration** — RegionChipProvider adds "Region" dropdown option, persists across turns
+- **Python spatial_query extended** — `objects_in_polygon` action accepts `vertices` (CSV 'x1,z1;x2,z2;...', >=3 pairs) or `region_id`
 
 **Test Summary (v0.46.0):**
-- 104 new C# NUnit tests: Drawing modes (5 files), Rendering (1 file)
+- 104 new C# NUnit tests for annotation editor: Canvas (30), Command (86), Compositor (82), EditorWindow (31), History (123), Icons (77), Rasterizer (90), ToolState (54), Toolbar (29), ContextBar (57), AnnotateButton (42), ScreenshotService (69), ScreenshotButton (78), FieldChip (113), FieldContextMenu (61), AnnotatedChip (60), AnnotationMeta (64), AnnotationRaycast (228), ModelContextWindows (27)
+- 104 new C# NUnit tests for region selection: Drawing modes (5 files, 52 tests), Rendering (1 file, 52 tests)
 - 20 new Python pytest tests: test_region.py (polygon validation, spatial queries, state management)
-- C# NUnit EditMode: 3966 → ~4070 tests (+104 RegionTool)
+- C# NUnit EditMode: 3966 → 4126+ tests (~+160 total annotation+region)
 - Python pytest: 2621 → ~2641 tests (+20 region)
 - Total: 0 regressions, all new tests green
 

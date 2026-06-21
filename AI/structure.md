@@ -307,9 +307,10 @@ unity-kiss-mcp/
 │       │   │   ├── CircleMode.cs            # Circle (center + radius via mouse distance)
 │       │   │   └── PointByPointMode.cs      # Manual vertex click (double-click or Enter to finish)
 │       │   ├── Rendering/                   # Rendering pipeline
-│       │   │   ├── RegionRenderer.cs        # GL wireframe + fill rendering, depth-tested display
+│       │   │   ├── RegionRenderer.cs        # GL wireframe + fill rendering, depth-tested display, hasFocus guard (v0.46.0)
 │       │   │   ├── RenderStyle.cs           # Color, alpha, line width configuration
-│       │   │   └── RenderState.cs           # Active/Preview/Committed polygon states
+│       │   │   ├── RenderState.cs           # Active/Preview/Committed polygon states
+│       │   │   └── RegionIcons.cs           # Procedural Painter2D vector icons for tool palette + overlay (v0.46.0, 128 LOC)
 │       │   └── Tests/                       # 104 NUnit tests
 │       │       ├── Drawing/
 │       │       │   ├── LassoModeTests.cs
@@ -355,6 +356,12 @@ unity-kiss-mcp/
 │       │   │   ├── ClaudeArgBuilder.cs    # Build --mcp-config file + CLI args (--permission-prompt-tool wired, v0.29.37)
 │       │   │   ├── UserTurnBuilder.cs     # Encode user messages → stdin JSON
 │       │   │   ├── ToolVerbMap.cs             # Tool name → humanized action text
+│       │   │   ├── AnnotatedScreenshotChipProvider.cs # Chip provider for annotated images (v0.46.0)
+│       │   │   ├── AnnotationMetaWriter.cs   # Serialize annotation metadata (world coords + raycasts) to JSON (v0.46.0)
+│       │   │   ├── FieldChipProvider.cs      # Chip provider for component fields (v0.46.0, priority 200)
+│       │   │   ├── ModelContextWindows.cs    # LLM context window size presets (v0.46.0)
+│       │   │   ├── ScreenshotService.cs      # Screenshot capture + chip integration (v0.46.0)
+│       │   │   ├── ScreenshotToolbarButton.cs # Toolbar button for screenshot (v0.46.0)
 │       │   │   ├── SessionHandoff.cs          # GetResumeCommand(), GetBinaryName() static helpers (v0.41.0)
 │       │   │   ├── SessionScanner.cs          # Scan ~/Library/Caches/<backend>/ for resume sessions (v0.41.0, 190 LOC)
 │       │   │   ├── CopyFlash.cs               # Static seam for showing "Copied!" notification (v0.41.0)
@@ -414,6 +421,7 @@ unity-kiss-mcp/
 │       │   │   ├── MCPChatWindow.FlowBar.cs   # Activity animation track+chip (_askPending flag v0.29.37)
 │       │   │   ├── MCPChatWindow.Mention.cs   # @Mention setup: debounce, popup show/hide, keyboard intercept (v0.41.4)
 │       │   │   ├── MCPChatWindow.Chips.cs     # Drag-drop chip UX + removable ✕ buttons (F29: external files/folders, v0.23.0 Block 5: ProcessDraggedObject)
+│       │   │   ├── MCPChatWindow.EventHandlers.cs # Last tool name tracking for timeout context hints (v0.46.0)
 │       │   │   ├── MCPChatWindow.InlineChips.cs # Inline chip methods (extracted partial, F5)
 │       │   │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
 │       │   │   ├── MCPChatWindow.Resize.cs    # Window resize logic
@@ -472,6 +480,20 @@ unity-kiss-mcp/
 │       │   │   ├── ToolGroupSummary.cs        # Summary of grouped tool calls
 │       │   │   ├── UserToolResultParser.cs    # Parse tool results
 │       │   │   ├── MCPChatWindow.uss          # UIToolkit styling (header removal + bottom footer + mention popup styles)
+│       │   │   ├── AnnotateToolbarButton.cs   # Toolbar button to launch Annotation editor (v0.46.0)
+│       │   │   ├── Annotation/                # Annotation editor system (v0.46.0, 11 files)
+│       │   │   │   ├── AnnotationCanvas.cs    # Drawing surface (Texture2D-backed pixel rasterization)
+│       │   │   │   ├── AnnotationCommand.cs   # Command pattern: Pen/Line/Arrow/Rect/Ellipse/Text/Erase + base
+│       │   │   │   ├── AnnotationHistory.cs   # Undo/redo stack (commands + index)
+│       │   │   │   ├── AnnotationToolState.cs # Active tool + brush state (color, size)
+│       │   │   │   ├── AnnotationToolbar.cs   # Tool palette + color picker + undo/redo (UIToolkit)
+│       │   │   │   ├── AnnotationEditorWindow.cs # EditorWindow host (canvas + toolbar)
+│       │   │   │   ├── AnnotationRasterizer.cs # Rasterize commands to Texture2D (bresenham, scanline fills)
+│       │   │   │   ├── AnnotationDrawer.cs    # Preview command strokes (GL lines, circles, text)
+│       │   │   │   ├── AnnotationCompositor.cs # Flatten + PNG encode
+│       │   │   │   └── AnnotationIcons.cs     # Procedural vector icons (Painter2D, 230 LOC)
+│       │   │   ├── ContextProgressBar.cs      # UIToolkit progress bar for context window fill (v0.46.0)
+│       │   │   ├── FieldContextMenu.cs        # Inspector context menu for field chip attachment (v0.46.0)
 │       │   │   ├── Markdown/                  # Content rendering: registry seam + renderers
 │       │   │   │   ├── MdBlock.cs             # Block model (enum + metadata)
 │       │   │   │   ├── MarkdownParser.cs      # string → List<MdBlock> (single-pass)
@@ -527,9 +549,28 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── TokenFormatTests.cs    # Token cost display + null-safe guards (v0.30.4, 12 tests)
 │       │   │   │   │   ├── UserTurnBuilderImageTests.cs # User turn JSON with image serialization (v0.34.0, 76 tests)
 │       │   │   │   │   └── ... # 40+ total CLI tests
-│       │   │   │   ├── View/                  # View assembly tests (UI, cards, interactivity)
+│       │   │   │   ├── CLI/                   # CLI assembly tests
+│       │   │   │   │   ├── AnnotatedScreenshotChipProviderTests.cs # Annotated image chip rendering (v0.46.0, 60 tests)
+│       │   │   │   │   ├── AnnotationMetaWriterTests.cs # Annotation metadata JSON serialization (v0.46.0, 64 tests)
+│       │   │   │   │   ├── AnnotationRaycasterTests.cs # Raycast hit detection + world coords (v0.46.0, 228 tests)
+│       │   │   │   │   ├── FieldChipProviderTests.cs # Component field chip detection (v0.46.0, 113 tests)
+│       │   │   │   │   ├── ModelContextWindowsTests.cs # LLM context window presets (v0.46.0, 27 tests)
+│       │   │   │   │   ├── ScreenshotServiceTests.cs # Screenshot capture flow (v0.46.0, 69 tests)
+│       │   │   │   │   ├── ScreenshotToolbarButtonTests.cs # Screenshot toolbar button (v0.46.0, 78 tests)
+│       │   │   │   │   ├── AnnotateToolbarButtonTests.cs # Annotation editor launcher (v0.46.0, 42 tests)
+│       │   │   │   └── View/                  # View assembly tests (UI, cards, interactivity)
 │       │   │   │   │   ├── AskUserCardTests.cs     # User input dialog + Codex protocol (v0.29.38 addition)
 │       │   │   │   │   ├── ApproveFlowTests.cs     # Interactive approvals flow
+│       │   │   │   │   ├── AnnotationCanvasTests.cs # Canvas rasterization (v0.46.0, 30 tests)
+│       │   │   │   │   ├── AnnotationCommandTests.cs # Command pattern + execution (v0.46.0, 86 tests)
+│       │   │   │   │   ├── AnnotationCompositorTests.cs # PNG composition + flattening (v0.46.0, 82 tests)
+│       │   │   │   │   ├── AnnotationEditorWindowTests.cs # Editor window lifecycle (v0.46.0, 31 tests)
+│       │   │   │   │   ├── AnnotationHistoryTests.cs # Undo/redo stack (v0.46.0, 123 tests)
+│       │   │   │   │   ├── AnnotationIconsTests.cs # Procedural icon rendering (v0.46.0, 77 tests)
+│       │   │   │   │   ├── AnnotationRasterizerTests.cs # Line/circle rasterization (v0.46.0, 90 tests)
+│       │   │   │   │   ├── AnnotationToolStateTests.cs # Tool state tracking (v0.46.0, 54 tests)
+│       │   │   │   │   ├── AnnotationToolbarTests.cs # Toolbar UI + interaction (v0.46.0, 29 tests)
+│       │   │   │   │   ├── ContextProgressBarTests.cs # Progress bar fill animation (v0.46.0, 57 tests)
 │       │   │   │   │   ├── CopyMessageUxTests.cs   # Right-click copy + CopyFlash notification (v0.41.0)
 │       │   │   │   │   ├── ChipSequenceTests.cs
 │       │   │   │   │   ├── ChipSendSequenceTests.cs
@@ -575,7 +616,7 @@ unity-kiss-mcp/
 │       ├── UnityMCP.Runtime.TestHelpers.asmdef # Separate assembly for test utilities
 │       └── TestHelpers/
 │           └── TestDummyMB.cs             # Dummy MonoBehaviour for AddComponent<> in editor tests (moved from Editor/Chat/Tests v0.25.0)
-├── unity-test-project/          # Unity 6000.3 test project (2690+ NUnit tests incl. Editor + Chat, v0.30.4: +69 new)
+├── unity-test-project/          # Unity 6000.3 test project (4070+ NUnit tests incl. Editor + Chat, v0.46.0: +104 annotation/screenshot/field chips)
 │   ├── Assets/Tests/Editor/     # NUnit test files
 │   ├── Assets/Animations/       # Animation clips + controllers
 │   ├── Assets/Scenes/
