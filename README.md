@@ -185,7 +185,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4275 Tests (0 Python · 4275 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4351 Tests (0 Python · 4351 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -244,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.51.0</b> — 2026-06-21 — **Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation …</summary>
+
+**Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation modes: Point (location + label), Polyline (multi-vertex path with …
+
+</details>
+
+<details>
 <summary><b>v0.50.3</b> — 2026-06-21 — **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass …</summary>
 
 **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass that forcibly disables `structured_output` on all 99 registered tools, …
@@ -272,15 +279,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.47.0</b> — 2026-06-21 — Replaces USD cost display with input/output token counts + context window fill %</summary>
-
-Replaces USD cost display with input/output token counts + context window fill %
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.47.0** — 2026-06-21 — Replaces USD cost display with input/output token counts + context window fill %
 - **v0.46.0** — 2026-06-21 — **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number …
 - **v0.45.0** — 2026-06-20 — **InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM …
 - **v0.44.1** — 2026-06-20 — **Fix: Codex Windows path crash** — TOML `command` now uses literal strings …
