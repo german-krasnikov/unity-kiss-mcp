@@ -43,7 +43,7 @@ The easiest way is via `uvx` (no installation needed):
 
 ```bash
 # Test that uvx can run the server (optional)
-uvx unity-mcp --help
+uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help
 ```
 
 Or clone and setup manually:
@@ -91,7 +91,7 @@ This adds the unity-mcp server to your Claude Code `mcp_settings.json` file:
   "mcpServers": {
     "unity-mcp": {
       "command": "uvx",
-      "args": ["unity-mcp"]
+      "args": ["--from", "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server", "unity-mcp"]
     }
   }
 }
@@ -143,44 +143,21 @@ python install.py doctor
 
 This checks:
 - Python >= 3.10
-- uv is available
-- `unity-mcp` package is importable
-- MCP config file exists and is valid
-- TCP port 9500 (or assigned port) is listening
+- uv and uvx executables in PATH
+- git in PATH
+- `.venv` exists and `unity_mcp` is importable
+- Claude Code, Claude Desktop, Cursor, Windsurf, and Codex configs (if they exist)
+- TCP port connectivity to Unity (9500 or auto-discovered port)
 
 ## 7. Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | `claude: command not found` | Ensure Claude Code is installed and in PATH. Check `which claude` or `where.exe claude`. |
-| `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or `uvx unity-mcp --help` to verify the package is installed. |
+| `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or `uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help` to verify. |
 | Setup Wizard doesn't open in Unity | (1) Verify plugin is in Package Manager. (2) Close and reopen Unity. (3) Check Console for errors. |
 | MCP tools don't appear in Claude Code | (1) Confirm Setup Wizard configured Claude Code. (2) Restart Claude Code. (3) Check Console for MCP connection errors. |
 | Tools fail with "Connection refused" | (1) Ensure Unity is open with the plugin. (2) Check TCP port with `python install.py doctor`. (3) Restart Unity. |
 | Python path resolution fails in Chat Settings | Override manually: **Settings > Agent Chat > Claude Binary Path** — enter absolute path to `claude` binary. |
 | macOS quarantine error (`cannot open` libpydantic) | Remove quarantine attributes: `xattr -dr com.apple.quarantine <project_root>/server/.venv/lib` |
 
-## Old Reference: Manual Config
-
-If Setup Wizard did not run or you need to reconfigure manually:
-
-```bash
-# View auto-detected tools
-python install.py configure
-
-# Configure Claude Code explicitly
-python install.py configure --tool claude-code
-```
-
-Your global Claude Code config (`~/.claude/mcp_settings.json`) will be updated to include:
-
-```json
-{
-  "mcpServers": {
-    "unity-mcp": {
-      "command": "uvx",
-      "args": ["unity-mcp"]
-    }
-  }
-}
-```

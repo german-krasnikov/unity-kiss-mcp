@@ -23,15 +23,14 @@ namespace UnityMCP.Editor.Wizard
     {
         public static BackendCard[] Build(int port)
         {
-            var snippet = $"claude mcp add unity -- env UNITY_MCP_PORT={port} uvx unity-mcp";
             return new[]
             {
                 // ── Group A: External MCP Hosts ───────────────────────────────
                 new BackendCard("Claude Code",
-                    snippet,
-                    "Copy",
-                    CardAction.CopyText,
-                    snippet),
+                    "Write mcpServers entry to ~/.claude.json",
+                    "Write Config",
+                    CardAction.WriteConfig,
+                    ClaudeCodePath()),
 
                 new BackendCard("Claude Desktop",
                     "Write mcpServers entry to claude_desktop_config.json",
@@ -79,6 +78,9 @@ namespace UnityMCP.Editor.Wizard
         }
 
         // ── Platform-aware config paths (mirrors Python clients.py) ──────────
+
+        public static string ClaudeCodePath()
+            => Path.Combine(Home(), ".claude.json");
 
         public static string ClaudeDesktopPath()
         {

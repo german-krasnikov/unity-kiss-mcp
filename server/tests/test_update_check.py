@@ -84,10 +84,10 @@ def test_check_for_update_no_update(tmp_path, monkeypatch):
     assert result is None
 
 
-def test_check_for_update_fetches_pypi(tmp_path, monkeypatch):
+def test_check_for_update_fetches_github(tmp_path, monkeypatch):
     monkeypatch.setattr("unity_mcp._update_check.CACHE_FILE", tmp_path / "cache.json")
     mock_resp = MagicMock()
-    mock_resp.read.return_value = json.dumps({"info": {"version": "0.99.0"}}).encode()
+    mock_resp.read.return_value = json.dumps({"tag_name": "v0.99.0"}).encode()
     mock_resp.__enter__ = lambda s: s
     mock_resp.__exit__ = MagicMock(return_value=False)
     with patch("urllib.request.urlopen", return_value=mock_resp):

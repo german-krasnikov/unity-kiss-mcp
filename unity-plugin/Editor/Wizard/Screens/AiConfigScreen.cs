@@ -98,6 +98,21 @@ namespace UnityMCP.Editor.Wizard.Screens
 
             card.Add(heading);
             card.Add(body);
+
+            if (data.Action == CardAction.WriteConfig)
+            {
+                var snippet = new TextField
+                {
+                    value      = WizardConfigWriter.Fresh(port),
+                    isReadOnly = true,
+                    multiline  = true,
+                };
+                snippet.style.fontSize    = 10;
+                snippet.style.whiteSpace  = WhiteSpace.Normal;
+                snippet.style.marginBottom = 6;
+                card.Add(snippet);
+            }
+
             card.Add(btn);
 
             if (data.Action == CardAction.WriteConfig && WizardConfigWriter.HasBackup(data.Payload))

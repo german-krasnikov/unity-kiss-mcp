@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.50.0] — 2026-06-21 <!-- windows-install-improvements -->
+
+**Installation & Setup:**
+- **Wizard Fallback** — Setup Wizard detects missing backends (e.g., no Claude Code) and provides next-best-option UI (v0.47.1). Gracefully degrades on missing Python/uvx.
+- **Config Visibility & Diagnostics** — Enhanced config diagnostics in `install.py doctor`. Detects stale MCP entries and missing backend configs. WizardConfigWriter now surfaces config errors in UI.
+- **Antivirus Fallback** — Script execution blocked by antivirus on Windows mitigated with shebang detection and alternative bootstrap path (v0.47.1).
+
+**Cross-Platform:**
+- **TOML Path Validation (Windows)** — Codex config paths now properly handle Windows backslashes in TOML literal strings (single quotes) to prevent unicode escape interpretation (v0.44.1 regression fix).
+- **File URI Standardization** — Config writers use OS-agnostic paths with cross-platform backslash handling in git URLs and config file paths.
+- **Unified os.devnull Usage** — Replaced platform-specific `/dev/null` references with `os.devnull` for Windows compatibility across all subprocess calls.
+- **Merged TOML Merge Helper** — `merge_toml_mcp` regex escape safety fixed to avoid backslash interpretation in replacements (v0.44.1 fix).
+
+**DRY & Architecture:**
+- **Git URL Constants (Single Source of Truth)** — Consolidated install URL and git references into `WizardConfigWriter.GitInstallUrl` (C#) and shared Python config. Removed duplicate URL definitions that diverged between implementations.
+- **Dead Code Removal** — Removed `Screens` legacy UI directory and stale bootstrap artifacts (−380 LOC). Architecture now cleaner for UPM-only bootstrap.
+- **PyPI → GitHub Migration** — `merge_mcp_config` now sources server from `git+URL` instead of PyPI registry for uvx to support offline installs and custom forks. Falls back gracefully if GitHub API unavailable.
+
+**Bug Fixes & Diagnostics:**
+- **Update Check (GitHub API)** — New `UpdateChecker.CheckGitHub()` queries releases endpoint with fallback to PyPI. Includes ETag caching and stale-config detection. Invalid API responses logged to doctor output.
+- **PATH Refresh on Config** — `install.py configure` now refreshes shell PATH (macOS: source zshrc; Windows: ReadEnvironmentVariable) to ensure CLI tools are immediately available.
+- **Stale Config Detection** — Doctor diagnoses config drift (mismatched version between Python server and saved config). Offers auto-repair via `install.py configure --repair`.
+- **Bootstrap Fixes** — Fixed edge case where curl fails on macOS with SSL certificate errors; added fallback to `wget` and explicit certificate path handling.
+
 ## [v0.47.0] — 2026-06-21 <!-- level-design-toolkit -->
 
 **Level Design Toolkit (Chat-Integrated Visual Tools):**

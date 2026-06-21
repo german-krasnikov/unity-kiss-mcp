@@ -3,11 +3,12 @@ import logging
 import pathlib
 import time
 import urllib.request
-from unity_mcp.__version__ import __version__
+from unity_mcp import __version__
+from unity_mcp.config.resolver import GIT_INSTALL_URL
 
 CACHE_FILE = pathlib.Path.home() / ".unity-mcp" / "update_cache.json"
 CACHE_TTL = 86400  # 24 hours
-PYPI_URL = "https://pypi.org/pypi/unity-mcp/json"
+GITHUB_URL = "https://api.github.com/repos/german-krasnikov/unity-kiss-mcp/releases/latest"
 TIMEOUT = 3
 
 log = logging.getLogger("unity_mcp")
@@ -22,9 +23,10 @@ def check_for_update() -> str | None:
         return latest if _is_newer(latest, __version__) else None
 
     try:
-        with urllib.request.urlopen(PYPI_URL, timeout=TIMEOUT) as resp:
+        req = urllib.request.Request(GITHUB_URL, headers={"Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
             data = json.loads(resp.read())
-            latest = data["info"]["version"]
+            latest = data["tag_name"].lstrip("v")
     except Exception:
         return None
 
@@ -58,5 +60,5 @@ def _write_cache(data: dict) -> None:
 
 
 def format_update_banner(new_version: str) -> str:
-    msg = f"  Update available: {__version__} → {new_version}  (run: uvx unity-mcp)"
+    msg = f"  Update available: {__version__} → {new_version}  (run: uvx --reinstall --from {GIT_INSTALL_URL} unity-mcp)"
     return f"\n{msg}\n"

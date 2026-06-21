@@ -53,7 +53,7 @@ def write_codex_config(server_dir: Path, codex_dir: Path, codex_config: Path, ui
     codex_dir.mkdir(exist_ok=True)
     codex_config.write_text(
         "[mcp_servers.unity-mcp]\n"
-        f'command = "{py}"\n'
+        f'command = "{py.as_posix()}"\n'
         'args = ["-m", "unity_mcp.server"]\n'
         "startup_timeout_sec = 10\n"
         "tool_timeout_sec = 120\n"
@@ -80,7 +80,11 @@ def discover_port() -> int:
 def setup_env(server_dir: Path, codex_dir: Path, codex_config: Path, ui,
               force_recreate: bool = False) -> None:
     if not check_python():
-        sys.exit(f"Python 3.10+ required, got {sys.version}")
+        sys.exit(
+            f"Python 3.10+ required, got {sys.version.split()[0]}\n"
+            "  Download: https://python.org/downloads/\n"
+            "  Windows tip: check 'Add Python to PATH' during install"
+        )
 
     has_uv = shutil.which("uv") is not None
 
@@ -128,6 +132,8 @@ def cmd_doctor(server_dir: Path, codex_config: Path, mcp_json: Path, ui,
     ui.box(["Unity MCP doctor"])
     _check("Python >= 3.10", check_python(), sys.version.split()[0])
     _check("uv found", shutil.which("uv") is not None)
+    _check("uvx found", shutil.which("uvx") is not None)
+    _check("git found", shutil.which("git") is not None)
 
     py = venv_python(server_dir)
     _check(".venv/python exists", py.exists(), str(py))
@@ -152,10 +158,30 @@ def cmd_doctor(server_dir: Path, codex_config: Path, mcp_json: Path, ui,
     if mcp_json.exists():
         try:
             data = json.loads(mcp_json.read_text(encoding="utf-8"))
-            mcp_ok = "unity" in data.get("mcpServers", {})
+            mcp_ok = "unity-mcp" in data.get("mcpServers", {})
         except Exception:
             pass
     _check(".mcp.json configured", mcp_ok)
+
+    # Check AI tool configs
+    from unity_mcp.config.clients import CLIENT_REGISTRY
+    from unity_mcp.config.resolver import GIT_INSTALL_URL as _GIT_URL
+    for key, info in CLIENT_REGISTRY.items():
+        if info.stdout_only or info.is_toml:
+            continue
+        if info.config_path.exists():
+            try:
+                content = info.config_path.read_text(encoding="utf-8")
+                has_entry = '"unity-mcp"' in content
+                has_git_url = _GIT_URL in content
+                if has_entry and not has_git_url:
+                    _check(f"{info.name} config", False,
+                           f"stale PyPI config — run: install.py configure --tool {key}")
+                else:
+                    _check(f"{info.name} config", has_entry,
+                           str(info.config_path) if has_entry else "unity-mcp missing")
+            except OSError:
+                pass
 
     port = discover_port()
     try:
@@ -220,7 +246,7 @@ def cmd_connect(args: argparse.Namespace, ui) -> int:
     data = json.loads(manifest.read_text("utf-8"))
     deps = data.setdefault("dependencies", {})
 
-    editor_ref = f"file:{editor_path}"
+    editor_ref = f"file:{editor_path.as_posix()}"
     if deps.get("com.unity-mcp.editor") == editor_ref:
         ui.ok("Already connected.")
         return 0
@@ -228,7 +254,7 @@ def cmd_connect(args: argparse.Namespace, ui) -> int:
     shutil.copy2(manifest, manifest.with_suffix(".json.bak"))
 
     deps["com.unity-mcp.editor"] = editor_ref
-    deps["com.unity-mcp.reload"] = f"file:{reload_path}"
+    deps["com.unity-mcp.reload"] = f"file:{reload_path.as_posix()}"
     manifest.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", "utf-8")
     ui.ok(f"Connected to {project_dir.name}. Focus Unity to reload.")
     return 0

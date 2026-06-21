@@ -80,10 +80,13 @@ namespace UnityMCP.Editor.Wizard
             return Fresh(port);
         }
 
+        internal const string GitInstallUrl =
+            "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server";
+
         private static string Entry(int port) =>
             "\"unity-mcp\": {\n" +
             "      \"command\": \"uvx\",\n" +
-            "      \"args\": [\"unity-mcp\"],\n" +
+            $"      \"args\": [\"--from\", \"{GitInstallUrl}\", \"unity-mcp\"],\n" +
             $"      \"env\": {{ \"UNITY_MCP_PORT\": \"{port}\" }}\n" +
             "    }";
 

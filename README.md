@@ -93,9 +93,57 @@ curl -fsSL https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/mas
 iex (iwr https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/master/install/bootstrap.ps1).Content
 ```
 
+<details>
+<summary>Windows: antivirus blocked the script?</summary>
+
+Run these commands manually in a **new PowerShell window**:
+
+```powershell
+winget install astral-sh.uv
+git clone https://github.com/german-krasnikov/unity-kiss-mcp.git "$HOME\.unity-mcp\server"
+cd "$HOME\.unity-mcp\server"
+uv run python install.py setup
+```
+
+(The new window ensures `uv` is available in PATH after installation.)
+
+</details>
+
+<details>
+<summary>Manual MCP configuration (all AI tools)</summary>
+
+Add this to your MCP config file:
+
+```json
+{
+  "mcpServers": {
+    "unity-mcp": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server", "unity-mcp"],
+      "env": { "UNITY_MCP_PORT": "9500" }
+    }
+  }
+}
+```
+
+| AI Tool | Config file path |
+|---------|-----------------|
+| Claude Code | `~/.claude.json` |
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
+| Cursor | `~/.cursor/mcp.json` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` (macOS/Linux) or `%APPDATA%\Codeium\windsurf\mcp_config.json` (Windows) |
+| Kimi | `~/.kimi-code/mcp.json` |
+| VS Code | `~/Library/Application Support/Code/User/mcp.json` (macOS), `%APPDATA%\Code\User\mcp.json` (Windows), or `~/.config/Code/User/mcp.json` (Linux) |
+| OpenCode | `~/.config/opencode/opencode.json` (macOS/Linux) or `%APPDATA%\opencode\opencode.json` (Windows) |
+| Codex | `~/.codex/config.toml` |
+
+**Without uvx:** replace `"command": "uvx", "args": ["--from", "git+...", "unity-mcp"]` with `"command": "python", "args": ["-m", "unity_mcp.server"]`
+
+</details>
+
 **Manual setup:**
 
-1. Python server: `uvx unity-mcp` — zero-install, runs on demand via PyPI (no separate install step).
+1. Python server: `uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp` — zero-install, runs on demand from GitHub (no separate install step).
 2. Add the Unity plugin via **Package Manager → Add package from git URL:**
    ```
    https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin
@@ -137,7 +185,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4271 Tests (0 Python · 4271 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 4277 Tests (0 Python · 4277 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -196,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.50.0</b> — 2026-06-21 — **Wizard Fallback** — Setup Wizard detects missing backends (e.g., no Claude …</summary>
+
+**Wizard Fallback** — Setup Wizard detects missing backends (e.g., no Claude Code) and provides next-best-option UI (v0.47.1).
+
+</details>
+
+<details>
 <summary><b>v0.47.0</b> — 2026-06-21 — Replaces USD cost display with input/output token counts + context window fill %</summary>
 
 Replaces USD cost display with input/output token counts + context window fill %
@@ -224,15 +279,9 @@ Replaces USD cost display with input/output token counts + context window fill %
 </details>
 
 <details>
-<summary><b>v0.44.0</b> — 2026-06-20 — LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles …</summary>
-
-LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles animation
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.44.0** — 2026-06-20 — LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles …
 - **v0.43.0** — 2026-06-20 — Remove tundra.digestcache deletion (SIGABRT in RegisterAssemblyDefinition)
 - **v0.42.0** — 2026-06-20 — **Setup Wizard One-Button Install** — 3-screen flow (Welcome → PickBackend → …
 - **v0.41.4** — 2026-06-20 — **@Mention Autocomplete** — Type `@` in Chat input to trigger autocomplete …

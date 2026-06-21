@@ -26,7 +26,13 @@ namespace UnityMCP.Editor.Wizard
                 Key = "claude-desktop", DisplayName = "Claude Desktop", Icon = "◆",
                 Description = "Desktop app — writes mcpServers config",
                 Mechanism = InstallMechanism.PythonConfig,
+#if UNITY_EDITOR_WIN
+                ConfigDir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "Claude")
+#elif UNITY_EDITOR_OSX
                 ConfigDir = "~/Library/Application Support/Claude"
+#else
+                ConfigDir = "~/.config/Claude"
+#endif
             },
             new BackendDescriptor
             {
@@ -40,7 +46,12 @@ namespace UnityMCP.Editor.Wizard
                 Key = "windsurf", DisplayName = "Windsurf", Icon = "◈",
                 Description = "Codeium's editor — writes mcp_config.json",
                 Mechanism = InstallMechanism.PythonConfig,
-                BinaryName = "windsurf", ConfigDir = "~/.codeium"
+                BinaryName = "windsurf",
+#if UNITY_EDITOR_WIN
+                ConfigDir = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), "Codeium", "windsurf")
+#else
+                ConfigDir = "~/.codeium"
+#endif
             },
             new BackendDescriptor
             {

@@ -38,9 +38,8 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void CheckServer_WhenNotRunning_ReturnsFalse()
         {
-            // MCPServer is not running in test context (no TCP listener)
             var (ok, detail) = SetupDiagnostics.CheckServer();
-            // Either ok or not — but result must be consistent (not throw)
+            Assert.IsFalse(ok, "MCPServer should not be running in EditMode test context");
             Assert.IsNotNull(detail);
         }
 
@@ -66,6 +65,48 @@ namespace UnityMCP.Editor.Tests
             var (ok, detail) = SetupDiagnostics.CheckPython("");
             Assert.IsFalse(ok);
             Assert.IsNotNull(detail);
+        }
+
+        // ── P1-A: snippet unification ────────────────────────────────────────
+
+        [Test]
+        public void BuildClaudeCodeSnippet_ContainsUvx()
+        {
+            var snippet = SetupDiagnostics.BuildClaudeCodeSnippet(9500);
+            StringAssert.Contains("uvx", snippet);
+            StringAssert.Contains("--from", snippet);
+            StringAssert.Contains("github.com", snippet);
+        }
+
+        [Test]
+        public void BuildClaudeCodeSnippet_DoesNotContainPython3()
+        {
+            var snippet = SetupDiagnostics.BuildClaudeCodeSnippet(9500);
+            Assert.That(snippet, Does.Not.Contain("python3"));
+        }
+
+        // ── P0-B fix 1: ResolveRepoRoot delegates ────────────────────────────
+
+        [Test]
+        public void ResolveRepoRoot_DelegatesToInstallSourceDetector_WhenOverrideSet()
+        {
+            var tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "DiagTest_" + System.Guid.NewGuid().ToString("N"));
+            System.IO.Directory.CreateDirectory(tmp);
+            System.IO.File.WriteAllText(System.IO.Path.Combine(tmp, "install.py"), "# stub");
+            InstallSourceDetector.SetSourceForTest(InstallSourceDetector.Source.Local);
+            InstallSourceDetector.SetLocalRepoRootForTest(tmp);
+            try
+            {
+                // ResolveRepoRoot must return whatever InstallSourceDetector.LocalRepoRoot() returns
+                var direct = InstallSourceDetector.LocalRepoRoot();
+                var via    = SetupDiagnostics.ResolveRepoRoot();
+                Assert.AreEqual(direct, via, "ResolveRepoRoot must delegate to InstallSourceDetector.LocalRepoRoot()");
+            }
+            finally
+            {
+                InstallSourceDetector.ClearTestOverride();
+                System.IO.Directory.Delete(tmp, recursive: true);
+            }
         }
     }
 }

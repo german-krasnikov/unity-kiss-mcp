@@ -4,28 +4,28 @@
 
 MCP-сервер для управления Unity Editor из Claude Code с минимизацией токенов (10-15x сжатие vs JSON).
 
-## Installation & Distribution (v0.38.0+, v0.42.0: Setup Wizard 3-screen flow + 9 backends)
+## Installation & Distribution (v0.38.0+, v0.42.0: Setup Wizard 3-screen flow + 9 backends; v0.47.1: Windows UX + GitHub-direct install)
 
 **Simplified install flow (vs v0.37.0):**
 
-1. **Python Server**: Published to PyPI as `unity-mcp` (v0.38.0+, auto-installable via `uvx unity-mcp`, no venv setup required)
+1. **Python Server**: Installs directly from GitHub via `uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp` (v0.47.1: eliminated PyPI dependency, GIT_INSTALL_URL constant in resolver.py)
 2. **Unity Plugin**: UPM git URL `https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin`
-3. **Bootstrap Scripts**: One-liner `curl | bash` (macOS/Linux) or `iex (iwr).Content` (Windows) handles cloning repo + venv + config
-4. **Setup Wizard** (v0.42.0, 3-screen flow): Auto-opens in Unity on first run
+3. **Bootstrap Scripts**: One-liner `curl | bash` (macOS/Linux) or `iex (iwr).Content` (Windows) handles cloning repo + venv + config. **v0.47.1 Windows**: uses `Invoke-RestMethod` instead of `iwr` to reduce AV triggers, refreshes PATH after fallback uv install via astral.sh
+4. **Setup Wizard** (v0.42.0, 3-screen flow; v0.47.1: fallback JSON export): Auto-opens in Unity on first run
    - **Screen 1 (Welcome)**: Introduction + System checks (Python found, TCP available)
    - **Screen 2 (PickBackend)**: 9 backend cards with auto-detection (BinaryName PATH check + ConfigDir existence)
-   - **Screen 3 (Configure)**: Scope toggle (Global/Project via `--project-dir` flag) + per-backend setup
-5. **9 Supported Backends** (v0.42.0): Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity. **IsDetected logic**: BinaryName check via which/where (PATH) + ConfigDir existence check (~ expanded at runtime)
-6. **Config Auto-Gen**: `python install.py configure --tool [claude-code|claude-desktop|cursor|windsurf]` merges MCP server entry into client config. Global/Project scope via `--project-dir` flag (v0.42.0)
-7. **Doctor Tool**: `python install.py doctor` diagnostic checks (Python, imports, TCP connectivity, config validity)
+   - **Screen 3 (Configure)**: Scope toggle (Global/Project via `--project-dir` flag) + per-backend setup. **v0.47.1**: Shows AiConfigScreen with fallback copyable JSON config when UPM install source detected (file: vs git: via InstallSourceDetector)
+5. **9 Supported Backends** (v0.42.0): Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity. **IsDetected logic**: BinaryName check via which/where (PATH) + ConfigDir existence check (~ expanded at runtime). **v0.47.1**: per-client root_key detection (e.g., `mcpServers` for Claude Code/Desktop, `mcp_servers` for Codex TOML, platform-aware ConfigDir for Windows)
+6. **Config Auto-Gen**: `python install.py configure --tool [claude-code|claude-desktop|cursor|windsurf]` merges MCP server entry into client config. Global/Project scope via `--project-dir` flag (v0.42.0). **v0.47.1**: AiToolCardFactory abstracts platform paths, Claude Code writes ~/.claude.json instead of clipboard
+7. **Doctor Tool**: `python install.py doctor` diagnostic checks (Python, imports, TCP connectivity, config validity). **v0.47.1**: validates git+URL presence in configs, warns on stale PyPI entries, checks uvx + git in PATH
 8. **Version Sync**: `scripts/sync_versions.py X.Y.Z` bumps all 3 version files (server/pyproject.toml, plugin/package.json, server/__version__.py)
-9. **No CI/CD Publishing**: Manual release via finish-task.md skill (PyPI + GitHub releases)
+9. **GitHub-Direct Install** (v0.47.1): DRY consolidation — `GIT_INSTALL_URL` constant shared between Python resolver.py and C# WizardConfigWriter.cs, consumed by all backends for consistent versioning. Update banner includes `--reinstall` flag for recovery
 
 **Architecture changes:**
-- **install.py** (`install/` module): Multi-command CLI (setup, update, doctor, configure, uninstall) with lazy config module imports. `--project-dir` flag for scope toggle (v0.42.0). **doctor warns about stale Codex entries (v0.44.0)**. **v0.45.0**: Added `connect` (link projects via file: in manifest.json), `disconnect` (restore registry source), `pull` (git pull --tags for file: installs)
-- **Config system** (`server/src/unity_mcp/config/`): CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), config path detection, MCP JSON merger, backup/restore. **Codex TOML merger (v0.42.0)**: `merge_toml_mcp()` support. **Stale entry cleanup (v0.44.0)**: strips `[mcp_servers.unity]` on first write, creates .bak backup (first-write-wins)
-- **Update checker & LevelUp UX** (v0.42.0+v0.44.0): PyPI polling + UpdatesPage changelog viewer. **LevelUp arcade-style animation (v0.44.0)**: 4-state panel (Idle→Animating→Done→Diff), XP bar + sparkles via LevelUpAnimator, release notes diff via ReleaseDiff (DRY RepoGitUrl constant, v0.44.0). **v0.45.0**: InstallSourceDetector (file: vs git: detection via PackageInfo.source), LocalPluginUpdater (git pull --tags async), UpmPluginUpdater (Client.Add chain), UpdateDispatcher (DRY routing), ChatMcpConfigWriter uvx fallback
-- **Plugin side** (C#, v0.42.0): SetupWizard 3-screen flow, BackendDescriptor with 9 backends + IsDetected, PickBackendScreen + ConfigureScreen, scope toggle, Wizard asmdef split. **Config recovery (v0.44.0)**: WizardConfigWriter.HasBackup + RestoreConfig, AiConfigScreen Restore button. **v0.45.0**: Async local plugin updates (LocalPluginUpdater.UpdateAsync), UPM registry updates (UpmPluginUpdater.UpdateAsync)
+- **install.py** (`install/` module): Multi-command CLI (setup, update, doctor, configure, uninstall) with lazy config module imports. `--project-dir` flag for scope toggle (v0.42.0). **doctor warns about stale Codex entries (v0.44.0)**. **v0.45.0**: Added `connect` (link projects via file: in manifest.json), `disconnect` (restore registry source), `pull` (git pull --tags for file: installs). **v0.47.1**: doctor validates git+URL presence in configs, warns on stale PyPI entries, checks uvx/git in PATH
+- **Config system** (`server/src/unity_mcp/config/`): CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), config path detection, MCP JSON merger, backup/restore. **Codex TOML merger (v0.42.0)**: `merge_toml_mcp()` support. **Stale entry cleanup (v0.44.0)**: strips `[mcp_servers.unity]` on first write, creates .bak backup (first-write-wins). **v0.47.1**: `resolver.GIT_INSTALL_URL` as single source of truth, validator.py skips json.loads for TOML clients (Codex), respects per-client root_key (mcpServers vs mcp_servers)
+- **Update checker & LevelUp UX** (v0.42.0+v0.44.0): GitHub API polling (v0.47.1: switched from PyPI to GitHub releases API via api.github.com/repos/.../releases/latest) + UpdatesPage changelog viewer. **LevelUp arcade-style animation (v0.44.0)**: 4-state panel (Idle→Animating→Done→Diff), XP bar + sparkles via LevelUpAnimator, release notes diff via ReleaseDiff. **v0.45.0**: InstallSourceDetector (file: vs git: detection via PackageInfo.source), LocalPluginUpdater (git pull --tags async), UpmPluginUpdater (Client.Add chain), UpdateDispatcher (DRY routing), ChatMcpConfigWriter uvx fallback. **v0.47.1**: `_update_check.py` uses GitHub releases API with importlib.metadata for version read, 24h cache TTL, banner includes --reinstall flag
+- **Plugin side** (C#, v0.42.0): SetupWizard 3-screen flow, BackendDescriptor with 9 backends + IsDetected, PickBackendScreen + ConfigureScreen, scope toggle, Wizard asmdef split. **Config recovery (v0.44.0)**: WizardConfigWriter.HasBackup + RestoreConfig, AiConfigScreen Restore button. **v0.45.0**: Async local plugin updates (LocalPluginUpdater.UpdateAsync), UPM registry updates (UpmPluginUpdater.UpdateAsync). **v0.47.1**: `WizardConfigWriter.GitInstallUrl` constant (shared with Python resolver.py), AiConfigScreen with fallback copyable JSON on UPM installs, `AiToolCardFactory` platform-aware path methods for Windows (ConfigDir detection, .as_posix() for TOML paths, BackendDescriptor platform-specific root_key)
 
 ## Architecture (для Architect)
 
@@ -46,8 +46,9 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      │                        ├─ PID Lockfile (exclusive)        ├─ MultiViewCapture (4-panel)
      │                        ├─ Port discovery (CWD-based)      ├─ CodeExecutor (Roslyn)
      │                        ├─ Config module (client detection) ├─ PortResolver (dual-port)
-     │                        ├─ Update checker (PyPI polling)   ├─ SetupWizard (3-screen, 9 backends)
+     │                        ├─ Update checker (GitHub API, v0.47.1) ├─ SetupWizard (3-screen, 9 backends, AiConfigScreen fallback)
      │                        ├─ Config TOML merger (v0.42.0)    ├─ UpdatesPage (changelog viewer)
+     │                        ├─ GIT_INSTALL_URL constant        ├─ AiToolCardFactory (platform paths)
      │                        └─ Heartbeat (15s, reconnect)      ├─ Guards (compile/play/runtime/tool)
      │                                                           └─ Python resolver (venv/uv/system)
 ```
@@ -61,9 +62,9 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 
 ### Components
 
-1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support, v0.42.0: +25 config/TOML tests)
+1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support, v0.42.0: +25 config/TOML tests, v0.47.1: +73+78 config validation tests)
    - **89 core MCP tools registered**. Gating: TIER1=38 core (hardcoded). External plugins can add more tools dynamically.
-   - **Config Module (v0.42.0+v0.44.0)**: `server/src/unity_mcp/config/` extended with TOML merger for Codex backend. `merge_toml_mcp(path, section)` merges MCP config into TOML with diff-based updates (preserves user settings). Python 3.9 compat: `Optional[X]` instead of `X | None`. ValueError raised on corrupt JSON. **Stale entry cleanup (v0.44.0)**: strips `[mcp_servers.unity]` duplicates on first write, creates .bak backup. Adds 25 new tests (v0.42.0) + 9 new tests (v0.44.0).
+   - **Config Module (v0.42.0+v0.44.0)**: `server/src/unity_mcp/config/` extended with TOML merger for Codex backend. `merge_toml_mcp(path, section)` merges MCP config into TOML with diff-based updates (preserves user settings). Python 3.9 compat: `Optional[X]` instead of `X | None`. ValueError raised on corrupt JSON. **Stale entry cleanup (v0.44.0)**: strips `[mcp_servers.unity]` duplicates on first write, creates .bak backup. **v0.47.1**: `validator.py` skips json.loads for TOML clients, checks string presence in configs. Adds 25 new tests (v0.42.0) + 9 new tests (v0.44.0) + 151 new tests (v0.47.1: 73 Python + 78 C# in test_config_gaps.py)
    - **CodeExecutor.SecurityScan (v0.31.0)**: Hardened pipeline — (1) strip C# comments via regex (2) whitespace densification (3) OrdinalIgnoreCase matching (4) 11 new blocked patterns (EditorApplication.Exit, Application.Quit, Environment.FailFast, ExportPackage, ImportPackage, OpenProject, ProjectWindowUtil, using-aliases for System.IO/Diagnostics/Net/Reflection)
    - **In-Unity Chat Backends** (v0.29.2+): Five CLI providers with auto-discovery via TypeCache:
      * **ClaudeBackend** — Claude CLI with --permission-prompt-tool, MCP elicitation, stream-json protocol

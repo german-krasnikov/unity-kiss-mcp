@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
+using UnityMCP.Editor.Wizard;
 
 namespace UnityMCP.Editor.Chat
 {
@@ -109,7 +110,9 @@ namespace UnityMCP.Editor.Chat
                     return null;
                 }
                 // Git/Registry/Embedded/Unknown install — server available via PyPI
-                var uvxJson = BuildClaudeConfigJson("uvx", new[] { "unity-mcp" }, MCPServer.ServerChatPort);
+                var uvxJson = BuildClaudeConfigJson("uvx",
+                    new[] { "--from", WizardConfigWriter.GitInstallUrl, "unity-mcp" },
+                    MCPServer.ServerChatPort);
                 var uvxPath = Path.Combine(Path.GetTempPath(), ConfigFile);
                 File.WriteAllText(uvxPath, uvxJson, JsonHelper.Utf8NoBom);
                 return uvxPath;

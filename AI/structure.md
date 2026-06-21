@@ -9,21 +9,21 @@ unity-kiss-mcp/
 │   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
 │   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall, connect, disconnect, pull - v0.45.0)
 │   └── tests/                  # Bootstrap + UI + install tests
-├── server/                     # Python MCP Server (2621 unit tests, 78 live = 2699 total Python, v0.45.0)
+├── server/                     # Python MCP Server (2621 unit tests, 78 live = 2699 total Python, v0.45.0; v0.47.1: +151 config validation tests)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # FastMCP instance, lifespan, 89 registered MCP tools
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
-│   │   ├── config/             # Config module (v0.38.0+): client detection, MCP JSON merger, backup/restore
-│   │   │   ├── clients.py      # CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), detect_installed()
+│   │   ├── config/             # Config module (v0.38.0+): client detection, MCP JSON merger, backup/restore; v0.47.1: GitHub-direct install, per-client root_key
+│   │   │   ├── clients.py      # CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), detect_installed(), platform-aware ConfigDir (v0.47.1)
 │   │   │   ├── merger.py       # merge_mcp_config(path, entry) — idempotent MCP server entry addition
 │   │   │   ├── backup.py       # Backup/restore config files before modifications
-│   │   │   ├── resolver.py     # build_server_entry(port) — MCP server entry generator
-│   │   │   └── validator.py    # Config validation + path detection per tool
+│   │   │   ├── resolver.py     # build_server_entry(port) — MCP server entry generator; GIT_INSTALL_URL constant (v0.47.1: shared with C#)
+│   │   │   └── validator.py    # Config validation + path detection per tool; v0.47.1: skips json.loads for TOML clients, respects root_key
 │   │   ├── server_filtering.py # Port discovery + TCP probe (v0.23.0), chat-port fallback (v0.36.0), catalog push, tool filtering
 │   │   ├── lockfile.py         # Cross-platform exclusive locking + zombie detection (v0.23.0)
 │   │   ├── diagnose.py         # Shared diagnose parser + verdict logic (_parse_diagnose, _verdict, _DiagnoseFields)
-│   │   ├── _update_check.py    # Version checker — polls PyPI for new releases, displays banner in Unity (v0.38.0+)
+│   │   ├── _update_check.py    # Version checker — GitHub releases API (v0.47.1: switched from PyPI), 24h cache, includes --reinstall flag in banner
 │   │   ├── compile_state.py    # CompileStateProbe (heuristic Unity compile detection)
 │   │   ├── middleware.py       # 23-layer middleware pipeline (env-gated UNITY_MCP_MIDDLEWARE=1)
 │   │   ├── middleware_paths.py # PathResolverMixin extracted from middleware.py
@@ -111,13 +111,14 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~2555 unit tests + 78 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests)
+│   └── tests/                  # ~2555 unit tests + 78 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests in test_config_gaps.py)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
 │       ├── test_reload_ladder.py       # Reload recovery T0-T5 stages + verdict scenarios (20+ tests, v0.27.4)
 │       ├── test_middleware*.py          # Middleware layers (god-file split in v0.26.0)
 │       ├── test_batch*.py              # Batch + conflict + timeout
+│       ├── test_config_gaps.py         # Config validation: resolver.py + validator.py + update_check.py + doctor (73+78=151 tests, v0.47.1: GitHub API, git+URL, TOML clients, per-client root_key)
 │       ├── test_multiscene.py          # Multi-scene CRUD, transfer, diff, bugs (305 tests, v0.24.3)
 │       ├── test_transfer_object.py     # transfer_object cross-scene operations (91 tests, v0.24.3)
 │       ├── test_schema_cache.py        # Schema caching + validation (17 tests, v0.26.0)
@@ -127,11 +128,12 @@ unity-kiss-mcp/
 │       ├── test_budget_*.py            # Budget/cost tracking
 │       ├── test_scene_brief*.py        # Scene brief
 │       ├── test_screenshot_*.py        # Screenshot features
+│       ├── test_update_check.py        # Update checker: GitHub API, version parsing, cache TTL (v0.47.1)
 │       ├── live/conftest.py            # Live test fixtures + _ok/_iid helpers (v0.26.0 DRY)
 │       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
 │       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
 │       ├── test_region.py               # Region Selection spatial queries + polygon validation (20 tests, v0.46.0)
-│       └── ... + domain tests (183 files total, 1018 @pytest.mark.asyncio removed v0.26.0)
+│       └── ... + domain tests (183+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
 │   ├── Editor/
 │   │   ├── ReloadBinder.cs                   # SO_REUSEADDR bind-retry for port 9600+
@@ -269,25 +271,27 @@ unity-kiss-mcp/
 │       │   ├── LocalPluginUpdaterTests.cs # 6 NUnit tests (git pull --tags, Task.Run async, tag matching) (v0.45.0)
 │       │   ├── UpmPluginUpdaterTests.cs   # 2 NUnit tests (Client.Add chain, both packages) (v0.45.0)
 │       │   ├── ChatMcpConfigWriterTests.cs # 4 NUnit tests (uvx fallback for git: installs) (v0.45.0)
-│       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+, v0.42.0: 3-screen flow, 9 backends, asmdef split)
+│       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+, v0.42.0: 3-screen flow, 9 backends, asmdef split; v0.47.1: AiConfigScreen fallback, removed dead screens)
 │       │   ├── SetupWizard.cs             # Auto-launch on first run, 3 screens (Welcome → PickBackend → Configure)
 │       │   ├── SetupWizard.uss            # Wizard stylesheet (layout, animations)
 │       │   ├── WizardScreen.cs            # Base class for wizard screens (lifecycle, navigation)
-│       │   ├── WizardScreenHost.cs        # Screen container + animation orchestrator
+│       │   ├── WizardScreenHost.cs        # Screen container + animation orchestrator (removed PythonCheckScreen, ServerTestScreen v0.47.1)
 │       │   ├── WizardAnimUtils.cs         # Reusable animation helpers (slide, fade, bounce)
-│       │   ├── SetupDiagnostics.cs        # Python/TCP/config diagnostic checks
-│       │   ├── BackendDescriptor.cs       # 9 backend definitions + IsDetected logic (BinaryName + ConfigDir)
-│       │   ├── AiToolCardFactory.cs       # Reusable backend/tool card builder
+│       │   ├── SetupDiagnostics.cs        # Python/TCP/config diagnostic checks + per-tool AI config validation (v0.47.1)
+│       │   ├── BackendDescriptor.cs       # 9 backend definitions + IsDetected logic (BinaryName + ConfigDir); platform-aware root_key (v0.47.1)
+│       │   ├── AiToolCardFactory.cs       # Reusable backend/tool card builder + platform-aware path methods (v0.47.1)
 │       │   ├── Screens/                   # 3-screen implementations
-│       │   │   ├── ConfigureScreen.cs     # Scope toggle (Global/Project) + per-backend selection
+│       │   │   ├── AiConfigScreen.cs      # AI tool configuration cards + fallback JSON export for UPM installs (v0.47.1, new)
+│       │   │   ├── ConfigureScreen.cs     # Scope toggle (Global/Project) + per-backend selection; uses GitInstallUrl constant (v0.47.1)
 │       │   │   └── PickBackendScreen.cs   # 9 backend cards (Claude Code, Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity)
 │       │   ├── Tests/                     # Wizard assembly tests (separate asmdef)
 │       │   │   ├── UnityMCP.Editor.Wizard.Tests.asmdef
 │       │   │   ├── BackendDescriptorTests.cs
 │       │   │   ├── ConfigureScreenTests.cs
 │       │   │   ├── PickBackendScreenTests.cs
-│       │   │   ├── WizardConfigWriterTests.cs # Config backup/restore, merge safety (9 tests, v0.44.0)
-│       │   │   └── ... (6 test files total)
+│       │   │   ├── WizardConfigWriterTests.cs # Config backup/restore, merge safety, GitInstallUrl constant (9+8=17 tests, v0.44.0-v0.47.1)
+│       │   │   ├── AiToolCardFactoryTests.cs # Platform path methods + card rendering (20 tests, v0.47.1)
+│       │   │   └── ... (8 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
 │       ├── RegionTool/                     # Region Selection for Level Design (v0.46.0, 104 C# tests)

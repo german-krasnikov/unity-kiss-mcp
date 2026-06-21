@@ -156,7 +156,15 @@ namespace UnityMCP.Editor.Wizard.Screens
             var installPy = SetupDiagnostics.ResolveRepoRoot();
             if (installPy == null)
             {
-                AppendLog("ERROR: install.py not found — run from source checkout.");
+                // UPM git/registry install: no install.py — show JSON for manual copy
+                int port = MCPServer.IsRunning ? MCPServer.ServerPort : 9500;
+                AppendLog("Installed via UPM. Copy the JSON config below and paste it into your AI tool's config file:");
+                AppendLog("");
+                var json = WizardConfigWriter.Fresh(port);
+                AppendLog(json);
+                GUIUtility.systemCopyBuffer = json;
+                AppendLog("(Copied to clipboard)");
+                if (_configureBtn != null) _configureBtn.SetEnabled(true);
                 return;
             }
 
@@ -182,9 +190,7 @@ namespace UnityMCP.Editor.Wizard.Screens
                     RedirectStandardError = true,
                     CreateNoWindow = true
                 };
-                var proc = _proc = Process.Start(psi);
-                if (proc == null) { AppendLog("ERROR: Could not start process."); return; }
-
+                var proc = _proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
                 proc.OutputDataReceived += (_, e) =>
                 {
                     if (e.Data == null) return;
@@ -208,7 +214,7 @@ namespace UnityMCP.Editor.Wizard.Screens
                         if (_configureBtn != null) _configureBtn.SetEnabled(true);
                     };
                 };
-                proc.EnableRaisingEvents = true;
+                proc.Start();
                 proc.BeginOutputReadLine();
                 proc.BeginErrorReadLine();
             }

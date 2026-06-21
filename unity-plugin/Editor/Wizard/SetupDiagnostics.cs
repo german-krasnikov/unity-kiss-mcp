@@ -1,5 +1,5 @@
+using System;
 using System.IO;
-using UnityEditor.PackageManager;
 using UnityMCP.Editor;
 
 namespace UnityMCP.Editor.Wizard
@@ -10,17 +10,11 @@ namespace UnityMCP.Editor.Wizard
         // ── Repo root ─────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Resolves the repo root directory (parent of unity-plugin/) by walking up
-        /// from the package's resolvedPath and finding install.py.
-        /// Returns null if not found (e.g. installed from tarball/registry).
+        /// Resolves the repo root directory (parent of unity-plugin/) by delegating to
+        /// InstallSourceDetector.LocalRepoRoot(). Returns null for UPM git/registry installs.
         /// </summary>
         public static string ResolveRepoRoot()
-        {
-            var info = PackageInfo.FindForAssembly(typeof(SetupDiagnostics).Assembly);
-            if (info == null) return null;
-            var parent = Path.GetFullPath(Path.Combine(info.resolvedPath, ".."));
-            return File.Exists(Path.Combine(parent, "install.py")) ? parent : null;
-        }
+            => InstallSourceDetector.LocalRepoRoot();
 
         // ── Python ────────────────────────────────────────────────────────────
 
@@ -71,8 +65,50 @@ namespace UnityMCP.Editor.Wizard
 
         /// <summary>Builds the <c>claude mcp add</c> command for the given port.</summary>
         public static string BuildClaudeCodeSnippet(int port)
+            => $"claude mcp add unity -- env UNITY_MCP_PORT={port} uvx --from {WizardConfigWriter.GitInstallUrl} unity-mcp";
+
+        // ── Port file ─────────────────────────────────────────────────────────
+
+        /// <summary>Checks whether ~/.unity-mcp/ports/ contains at least one .port file.</summary>
+        public static (bool ok, string detail) CheckPortFile()
         {
-            return $"claude mcp add unity -- env UNITY_MCP_PORT={port} python3 -m unity_mcp.server";
+            var portsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".unity-mcp", "ports");
+            if (!Directory.Exists(portsDir))
+                return (false, "~/.unity-mcp/ports not found");
+            var files = Directory.GetFiles(portsDir, "*.port");
+            return files.Length > 0
+                ? (true, $"{files.Length} port file(s)")
+                : (false, "no .port files (Unity not started yet?)");
+        }
+
+        // ── AI config ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Checks whether at least one AI tool config file contains a "unity-mcp" entry.
+        /// Returns the path of the first matching config, or an error detail.
+        /// </summary>
+        public static (bool ok, string detail) CheckAiConfig()
+        {
+            var paths = new[]
+            {
+                AiToolCardFactory.ClaudeCodePath(),
+                AiToolCardFactory.ClaudeDesktopPath(),
+                AiToolCardFactory.CursorPath(),
+                AiToolCardFactory.WindsurfPath(),
+            };
+            foreach (var p in paths)
+            {
+                if (!File.Exists(p)) continue;
+                try
+                {
+                    if (File.ReadAllText(p).Contains("\"unity-mcp\""))
+                        return (true, p);
+                }
+                catch (IOException) { }
+            }
+            return (false, "no AI tool config found with unity-mcp entry");
         }
     }
 }

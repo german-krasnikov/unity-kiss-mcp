@@ -118,7 +118,7 @@ CLIENT_REGISTRY: dict[str, ClientInfo] = {
     ),
     "generic": ClientInfo(
         name="Generic (stdout)",
-        config_path=pathlib.Path("/dev/null"),
+        config_path=pathlib.Path(os.devnull),
         scope="global",
         stdout_only=True,
     ),

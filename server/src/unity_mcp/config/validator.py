@@ -24,6 +24,14 @@ def validate_config(client_key: str) -> str:
     path = info.config_path
     lines = [f"Client: {info.name}", f"Config: {path}"]
 
+    if info.is_toml:
+        if path.exists():
+            has_entry = "unity-mcp" in path.read_text(encoding="utf-8")
+            lines.append(f"Status: {'configured' if has_entry else 'unity-mcp not found in TOML'}")
+        else:
+            lines.append("Status: file not found")
+        return "\n".join(lines)
+
     if not path.exists():
         lines.append("Status: not found")
         return "\n".join(lines)
@@ -34,9 +42,9 @@ def validate_config(client_key: str) -> str:
         lines.append(f"Status: invalid JSON ({e})")
         return "\n".join(lines)
 
-    servers = data.get("mcpServers", {})
+    servers = data.get(info.root_key, {})
     if "unity-mcp" not in servers:
-        lines.append("Status: not configured (unity-mcp missing from mcpServers)")
+        lines.append(f"Status: not configured (unity-mcp missing from {info.root_key!r})")
         return "\n".join(lines)
 
     entry = servers["unity-mcp"]

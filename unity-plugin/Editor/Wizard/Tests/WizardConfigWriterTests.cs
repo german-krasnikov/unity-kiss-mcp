@@ -121,5 +121,29 @@ namespace UnityMCP.Editor.Tests
             StringAssert.Contains("theme", result);
             StringAssert.Contains("unity-mcp", result);
         }
+
+        // ── Fresh — port and key presence ─────────────────────────────────────
+
+        [Test]
+        public void Fresh_ContainsPort()
+        {
+            var result = WizardConfigWriter.Fresh(9501);
+            StringAssert.Contains("9501", result, "Fresh should embed the port number");
+        }
+
+        [Test]
+        public void Fresh_ContainsUnityMcpKey()
+        {
+            var result = WizardConfigWriter.Fresh(9500);
+            StringAssert.Contains("unity-mcp", result, "Fresh should contain the unity-mcp key");
+        }
+
+        [Test]
+        public void Fresh_ContainsGitInstallArgs()
+        {
+            var result = WizardConfigWriter.Fresh(9500);
+            StringAssert.Contains("--from", result, "Fresh should use --from git install");
+            StringAssert.Contains("github.com", result, "Fresh should reference GitHub URL");
+        }
     }
 }

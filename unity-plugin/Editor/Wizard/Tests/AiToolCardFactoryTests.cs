@@ -33,11 +33,19 @@ namespace UnityMCP.Editor.Tests
         }
 
         [Test]
-        public void Build_PortIsInPayload_ClaudeCode()
+        public void Build_ClaudeCode_IsWriteConfig()
         {
-            var cards = AiToolCardFactory.Build(12345);
-            Assert.IsTrue(cards[0].Payload.Contains("12345"),
-                $"ClaudeCode payload should contain port 12345, was: {cards[0].Payload}");
+            var cards = AiToolCardFactory.Build(9500);
+            Assert.AreEqual(CardAction.WriteConfig, cards[0].Action,
+                "Claude Code card should use WriteConfig (writes ~/.claude.json)");
+        }
+
+        [Test]
+        public void Build_ClaudeCode_PayloadIsClaudeJsonPath()
+        {
+            var cards = AiToolCardFactory.Build(9500);
+            Assert.IsTrue(cards[0].Payload.EndsWith(".claude.json"),
+                $"ClaudeCode payload should be path to .claude.json, was: {cards[0].Payload}");
         }
 
         [Test]
@@ -53,8 +61,8 @@ namespace UnityMCP.Editor.Tests
         public void Build_ConfigPaths_NotNullOrEmpty()
         {
             var cards = AiToolCardFactory.Build(9500);
-            // Cards 1,2,3 are WriteConfig (Desktop, Cursor, Windsurf)
-            for (int i = 1; i <= 3; i++)
+            // Cards 0-3 are all WriteConfig (Claude Code, Desktop, Cursor, Windsurf)
+            for (int i = 0; i <= 3; i++)
                 Assert.IsFalse(string.IsNullOrEmpty(cards[i].Payload),
                     $"Card[{i}] '{cards[i].Name}' config path should not be empty");
         }

@@ -1,6 +1,12 @@
 #Requires -Version 5.1
 # Run with: iex (iwr https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/master/install/bootstrap.ps1).Content
 # If execution policy blocks this: Set-ExecutionPolicy Bypass -Scope CurrentUser
+#
+# If your antivirus blocks this script, run these commands manually:
+#   winget install astral-sh.uv
+#   git clone https://github.com/german-krasnikov/unity-kiss-mcp.git "$HOME\.unity-mcp\server"
+#   cd "$HOME\.unity-mcp\server" && uv run python install.py setup
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ErrorActionPreference = "Stop"
 
 function ok($msg)   { Write-Host "  [OK]  $msg" -ForegroundColor Green }
@@ -20,7 +26,11 @@ if (Get-Command uv -ErrorAction SilentlyContinue) {
         ok "uv installed"
     } catch {
         # Fallback: PowerShell installer from astral.sh/uv/install.ps1
-        irm https://astral.sh/uv/install.ps1 | iex
+        $uvScript = Invoke-RestMethod 'https://astral.sh/uv/install.ps1'
+        & ([scriptblock]::Create($uvScript))
+        # Refresh PATH after script-based install
+        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                    [Environment]::GetEnvironmentVariable("Path", "User")
         ok "uv installed (via script)"
     }
 }

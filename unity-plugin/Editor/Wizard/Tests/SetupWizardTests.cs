@@ -34,36 +34,6 @@ namespace UnityMCP.Editor.Tests
         }
 
         [Test]
-        public void PythonCheckScreen_Build_ReturnsNonNull()
-        {
-            var screen = new PythonCheckScreen(null, null);
-            var el = screen.Build();
-            Assert.IsNotNull(el);
-        }
-
-        [Test]
-        public void PythonCheckScreen_Title_IsPython()
-        {
-            var screen = new PythonCheckScreen(null, null);
-            Assert.AreEqual("Python", screen.Title);
-        }
-
-        [Test]
-        public void ServerTestScreen_Build_ReturnsNonNull()
-        {
-            var screen = new ServerTestScreen(null, null);
-            var el = screen.Build();
-            Assert.IsNotNull(el);
-        }
-
-        [Test]
-        public void ServerTestScreen_Title_IsServer()
-        {
-            var screen = new ServerTestScreen(null, null);
-            Assert.AreEqual("Server", screen.Title);
-        }
-
-        [Test]
         public void AiConfigScreen_Build_ReturnsNonNull()
         {
             var screen = new AiConfigScreen(null, null);

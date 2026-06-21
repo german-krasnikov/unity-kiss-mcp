@@ -35,11 +35,14 @@ def find_python() -> str:
     return sys.executable
 
 
+GIT_INSTALL_URL = "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server"
+
+
 def find_server_command() -> list[str]:
     """Return best command to start MCP server. Priority: uvx > venv python > sys.executable."""
     exe = find_python()
     if exe == "uvx":
-        return ["uvx", "unity-mcp"]
+        return ["uvx", "--from", GIT_INSTALL_URL, "unity-mcp"]
     if pathlib.Path(exe) != pathlib.Path(sys.executable):
         return [exe]
     return [exe, "-m", "unity_mcp.server"]
