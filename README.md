@@ -244,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.50.3</b> — 2026-06-21 — **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass …</summary>
+
+**Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass that forcibly disables `structured_output` on all 99 registered tools, …
+
+</details>
+
+<details>
 <summary><b>v0.50.2</b> — 2026-06-21 — **WizardConfigWriter visibility** — changed class and `GitInstallUrl` from …</summary>
 
 **WizardConfigWriter visibility** — changed class and `GitInstallUrl` from `internal` to `public` for cross-assembly access from …
@@ -272,15 +279,9 @@ Replaces USD cost display with input/output token counts + context window fill %
 </details>
 
 <details>
-<summary><b>v0.46.0</b> — 2026-06-21 — **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number …</summary>
-
-**Polygon2D** — Immutable 2D polygon (XZ plane), winding-number point-in-polygon test (nonzero fill rule), AABB bounds computation, CSV …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.46.0** — 2026-06-21 — **Polygon2D** — Immutable 2D polygon (XZ plane), winding-number …
 - **v0.45.0** — 2026-06-20 — **InstallSourceDetector** — Detects `file:` (local Git clone) vs `git:` (UPM …
 - **v0.44.1** — 2026-06-20 — **Fix: Codex Windows path crash** — TOML `command` now uses literal strings …
 - **v0.44.0** — 2026-06-20 — LevelUpPanel: 4-state machine (Idle→Animating→Done→Diff) with XP bar + sparkles …
