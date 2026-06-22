@@ -22,13 +22,17 @@ namespace UnityMCP.Editor
             => ResolvePort(envValue, null, cacheJson, defaultStart);
 
         // 5-arg: env → projectSettings → cache → FindFreePort
+        // Collision guard: if resolved port == mainPort, fall back to FindFreePort.
         internal static int ResolveChatPort(string envValue, string projectJson, string cacheJson, int mainPort, int defaultStart)
         {
-            if (envValue != null && int.TryParse(envValue, out var p) && IsValidPort(p)) return p;
+            if (envValue != null && int.TryParse(envValue, out var p) && IsValidPort(p))
+                return p == mainPort ? FindFreePort(defaultStart, skipPort: mainPort) : p;
             var fromProject = ParsePortFromJson(projectJson, "chatPort");
-            if (fromProject.HasValue && IsValidPort(fromProject.Value)) return fromProject.Value;
+            if (fromProject.HasValue && IsValidPort(fromProject.Value))
+                return fromProject.Value == mainPort ? FindFreePort(defaultStart, skipPort: mainPort) : fromProject.Value;
             var fromCache = ParsePortFromJson(cacheJson, "chatPort");
-            if (fromCache.HasValue && IsValidPort(fromCache.Value)) return fromCache.Value;
+            if (fromCache.HasValue && IsValidPort(fromCache.Value))
+                return fromCache.Value == mainPort ? FindFreePort(defaultStart, skipPort: mainPort) : fromCache.Value;
             return FindFreePort(defaultStart, skipPort: mainPort);
         }
 
@@ -48,7 +52,7 @@ namespace UnityMCP.Editor
 
         internal static int FindFreePort(int startFrom, int skipPort = -1)
         {
-            for (var port = startFrom; port <= 9599; port++)
+            for (var port = startFrom; port <= 9699; port++)
             {
                 if (port == skipPort) continue;
                 try
@@ -64,6 +68,13 @@ namespace UnityMCP.Editor
             fb.Start();
             var assigned = ((IPEndPoint)fb.LocalEndpoint).Port;
             fb.Stop();
+            if (assigned == skipPort)
+            {
+                fb = new TcpListener(IPAddress.Loopback, 0);
+                fb.Start();
+                assigned = ((IPEndPoint)fb.LocalEndpoint).Port;
+                fb.Stop();
+            }
             return assigned;
         }
 

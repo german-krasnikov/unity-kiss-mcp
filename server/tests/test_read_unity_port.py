@@ -318,3 +318,116 @@ def test_skip_probe_true_returns_port_without_tcp_check(monkeypatch, tmp_path):
     # With skip_probe=True → candidate accepted despite probe failure
     assert _read_unity_port(skip_probe=True) == 9510
     assert not probe_calls  # probe was NOT called
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: UNITY_MCP_PROJECT_DIR / CLAUDE_PROJECT_DIR env vars
+# ---------------------------------------------------------------------------
+
+def test_read_unity_port_uses_unity_mcp_project_dir(monkeypatch, tmp_path):
+    """UNITY_MCP_PROJECT_DIR set → uses it for port-file matching instead of CWD."""
+    monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    project_a = str(tmp_path / "ProjectA")
+    project_b = str(tmp_path / "ProjectB")
+    # ProjectA has older mtime — would lose without project dir matching
+    _make_port_file_with_path(ports_dir, pid=100, port=9500, project_path=project_a, mtime=500.0)
+    _make_port_file_with_path(ports_dir, pid=200, port=9501, project_path=project_b, mtime=2000.0)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("os.kill", lambda pid, sig: None)
+    # CWD is unrelated, but UNITY_MCP_PROJECT_DIR points to ProjectA
+    monkeypatch.setattr("os.getcwd", lambda: str(tmp_path / "SomeOtherDir"))
+    monkeypatch.setenv("UNITY_MCP_PROJECT_DIR", project_a)
+    assert _read_unity_port() == 9500
+
+
+def test_read_unity_port_falls_back_to_claude_project_dir(monkeypatch, tmp_path):
+    """UNITY_MCP_PROJECT_DIR not set, CLAUDE_PROJECT_DIR set → uses it."""
+    monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
+    monkeypatch.delenv("UNITY_MCP_PROJECT_DIR", raising=False)
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    project_a = str(tmp_path / "ProjectA")
+    project_b = str(tmp_path / "ProjectB")
+    _make_port_file_with_path(ports_dir, pid=100, port=9500, project_path=project_a, mtime=500.0)
+    _make_port_file_with_path(ports_dir, pid=200, port=9501, project_path=project_b, mtime=2000.0)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("os.kill", lambda pid, sig: None)
+    monkeypatch.setattr("os.getcwd", lambda: str(tmp_path / "SomeOtherDir"))
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", project_a)
+    assert _read_unity_port() == 9500
+
+
+def test_read_unity_port_falls_back_to_cwd(monkeypatch, tmp_path):
+    """Neither env var set → uses getcwd() as before (backward compat)."""
+    monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
+    monkeypatch.delenv("UNITY_MCP_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    project_a = str(tmp_path / "ProjectA")
+    project_b = str(tmp_path / "ProjectB")
+    _make_port_file_with_path(ports_dir, pid=100, port=9500, project_path=project_a, mtime=500.0)
+    _make_port_file_with_path(ports_dir, pid=200, port=9501, project_path=project_b, mtime=2000.0)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("os.kill", lambda pid, sig: None)
+    # CWD inside ProjectA → should match ProjectA despite older mtime
+    monkeypatch.setattr("os.getcwd", lambda: project_a + "/Assets")
+    assert _read_unity_port() == 9500
+
+
+def test_read_unity_port_project_dir_matches_correct_of_three(monkeypatch, tmp_path):
+    """3 port files for 3 projects; project_dir matches the middle one."""
+    monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    proj_a = str(tmp_path / "ProjA")
+    proj_b = str(tmp_path / "ProjB")
+    proj_c = str(tmp_path / "ProjC")
+    _make_port_file_with_path(ports_dir, pid=101, port=9600, project_path=proj_a, mtime=3000.0)
+    _make_port_file_with_path(ports_dir, pid=102, port=9601, project_path=proj_b, mtime=2000.0)
+    _make_port_file_with_path(ports_dir, pid=103, port=9602, project_path=proj_c, mtime=1000.0)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("os.kill", lambda pid, sig: None)
+    monkeypatch.setattr("os.getcwd", lambda: str(tmp_path / "Unrelated"))
+    monkeypatch.setenv("UNITY_MCP_PROJECT_DIR", proj_b)
+    # ProjectB is middle — newest is A (9600), but env var selects B (9601)
+    assert _read_unity_port() == 9601
+
+
+def test_read_unity_port_empty_unity_mcp_project_dir_falls_through(monkeypatch, tmp_path):
+    """UNITY_MCP_PROJECT_DIR="" (empty string) → falls through to CLAUDE_PROJECT_DIR."""
+    monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    proj_a = str(tmp_path / "ProjA")
+    proj_b = str(tmp_path / "ProjB")
+    _make_port_file_with_path(ports_dir, pid=101, port=9600, project_path=proj_a, mtime=2000.0)
+    _make_port_file_with_path(ports_dir, pid=102, port=9601, project_path=proj_b, mtime=1000.0)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("os.kill", lambda pid, sig: None)
+    monkeypatch.setattr("os.getcwd", lambda: str(tmp_path / "Unrelated"))
+    monkeypatch.setenv("UNITY_MCP_PROJECT_DIR", "")   # empty → falls through
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", proj_b)  # next level picks this up
+    assert _read_unity_port() == 9601
+
+
+def test_read_unity_port_unity_mcp_project_dir_priority_over_claude(monkeypatch, tmp_path):
+    """UNITY_MCP_PROJECT_DIR takes priority over CLAUDE_PROJECT_DIR."""
+    monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    proj_a = str(tmp_path / "ProjA")
+    proj_b = str(tmp_path / "ProjB")
+    _make_port_file_with_path(ports_dir, pid=101, port=9600, project_path=proj_a, mtime=2000.0)
+    _make_port_file_with_path(ports_dir, pid=102, port=9601, project_path=proj_b, mtime=1000.0)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    monkeypatch.setattr("os.kill", lambda pid, sig: None)
+    monkeypatch.setattr("os.getcwd", lambda: str(tmp_path / "Unrelated"))
+    monkeypatch.setenv("UNITY_MCP_PROJECT_DIR", proj_b)  # B: older, lower port
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", proj_a)      # A: newer, higher mtime
+    # UNITY_MCP_PROJECT_DIR wins → 9601 (ProjB)
+    assert _read_unity_port() == 9601

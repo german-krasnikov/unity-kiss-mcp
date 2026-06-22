@@ -1,6 +1,7 @@
 """PID lockfile — per-session presence file, no SIGTERM."""
 import logging
 import os
+import socket
 import sys
 from pathlib import Path
 from typing import Optional
@@ -157,8 +158,21 @@ def read_pid_from_port_file(port: int) -> Optional[int]:
     return None
 
 
-def cleanup_stale_port_files() -> int:
-    """Delete port files for dead PIDs. Returns count cleaned."""
+def _tcp_probe(port: int, timeout: float = 0.2) -> bool:
+    """Return True if TCP port accepts connections."""
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def cleanup_stale_port_files(tcp_probe: bool = False) -> int:
+    """Delete port files for dead PIDs. Returns count cleaned.
+
+    tcp_probe=True: also removes files where PID is alive but port is not listening
+    (catches AssetImportWorker processes that hold a PID but lost the TCP server).
+    """
     ports_dir = _ports_dir()
     if not ports_dir.exists():
         return 0
@@ -170,6 +184,16 @@ def cleanup_stale_port_files() -> int:
                 if not is_pid_alive(pid):
                     f.unlink()
                     cleaned += 1
+                    continue
+                if tcp_probe:
+                    try:
+                        content = f.read_text(encoding="utf-8", errors="replace")
+                        port = int(content.split("\n")[0])
+                        if not _tcp_probe(port):
+                            f.unlink()
+                            cleaned += 1
+                    except (ValueError, OSError):
+                        pass
             except (ValueError, OSError):
                 continue
     return cleaned

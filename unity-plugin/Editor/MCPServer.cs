@@ -322,8 +322,14 @@ namespace UnityMCP.Editor
 
         private static double _lastWatchdogCheck;
 
+        // Pure helper — no Unity API calls, fully unit-testable.
+        // Mirrors ReloadPlugin.ShouldStartReloadServer pattern.
+        internal static bool ShouldStartServer(bool isBatchMode) => !isBatchMode;
+
         static MCPServer()
         {
+            if (!ShouldStartServer(Application.isBatchMode)) return;
+
             // Persist auto-assigned ports so they survive domain reload
             SavePorts(Port, ChatPort);
             EditorApplication.update += ProcessMainThreadQueue;

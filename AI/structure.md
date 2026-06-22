@@ -134,7 +134,10 @@ unity-kiss-mcp/
 │       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
 │       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
 │       ├── test_region.py               # Region Selection spatial queries + polygon validation (20 tests, v0.46.0)
-│       └── ... + domain tests (183+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
+│       ├── test_read_unity_port.py      # Port discovery waterfall + UNITY_MCP_PROJECT_DIR (7 tests, v0.52.6)
+│       ├── test_bridge_port_rediscovery.py # Bridge port pinning + reconnect stability (6 tests, v0.52.6)
+│       ├── test_lockfile.py             # PID lockfile + cleanup_stale_port_files (additions, v0.52.6)
+│       └── ... + domain tests (186+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
 │   ├── Editor/
 │   │   ├── ReloadBinder.cs                   # SO_REUSEADDR bind-retry for port 9600+
@@ -246,7 +249,8 @@ unity-kiss-mcp/
 │       │   ├── LevelUpTests.cs            # LevelUp panel state machine, animation, release diff parsing (12 tests, v0.44.0)
 │       │   ├── MultiSceneTestBase.cs      # Base class for multi-scene tests (DRY consolidation v0.24.3+v0.25.0: saves additive scenes, captures main scene name before NewScene)
 │       │   ├── MultiSceneFinderTests.cs   # Object finding across scenes + reference scanning (v0.24.3)
-│       │   ├── PortResolverTests.cs       # 25 NUnit tests (port validation, fallback, dual-port edge cases)
+│       │   ├── PortResolverTests.cs       # 25+4 NUnit tests (port validation, fallback, dual-port edge cases, v0.52.6: chat collision guard)
+│       │   ├── MCPServerStartGuardTests.cs # 3 NUnit tests (ShouldStartServer batch mode guard, v0.52.6)
 │       │   ├── MCPStatusModelTests.cs     # 14 NUnit tests (state transitions, labels, pills) [+TestFixture v0.26.0]
 │       │   ├── CatalogParserTests.cs      # [+TestFixture v0.26.0]
 │       │   ├── JsonHelperTests.cs         # [+TestFixture v0.26.0]

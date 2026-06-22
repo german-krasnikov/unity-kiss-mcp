@@ -175,8 +175,11 @@ def read_unity_port(skip_probe: bool = False) -> int:
         return 9500
 
     # CWD-based selection: prefer project whose path is a prefix of cwd.
+    # Waterfall: UNITY_MCP_PROJECT_DIR > CLAUDE_PROJECT_DIR > CWD.
     # If multiple match (nested), prefer longest path.
-    cwd = os.getcwd()
+    cwd = (os.environ.get("UNITY_MCP_PROJECT_DIR")
+           or os.environ.get("CLAUDE_PROJECT_DIR")
+           or os.getcwd())
     cwd_matches = [
         (len(pp), mtime, port, proj, pid)
         for mtime, port, proj, pid, pp in candidates

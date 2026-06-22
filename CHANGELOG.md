@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.52.6] — 2026-06-22 <!-- multi-unity-port-race-fix -->
+
+**Bug Fixes:**
+- **Multi-Unity Port Race Conditions** — Fixed port file collision and reconnection storms when multiple CLI tools (Cursor, Codex, Windsurf, etc.) connect to the same Unity instance.
+  * **C# MCPServer.ShouldStartServer guard** — static constructor now checks batch mode before writing port files, preventing AssetImportWorker from polluting ~/.unity-mcp/ports/ during asset imports.
+  * **C# PortResolver chat port collision guard** — ResolveChatPort ensures chat port ≠ main port, preventing accidental self-binding. FindFreePort ceiling raised 9599→9699.
+  * **Python bridge port pinning** — `_pinned_port` and `_pinned_pid` cache ensure bridge sticks to the same Unity instance during domain reload cycles, preventing reconnection storms.
+  * **Python server_filtering waterfall** — read_unity_port() env chain (UNITY_MCP_PROJECT_DIR > CLAUDE_PROJECT_DIR > os.getcwd()) enables multi-CLI project discovery.
+  * **Python lockfile cleanup** — cleanup_stale_port_files() with TCP probe removes truly stale port files (not listening on bound port).
+
+**Tests:**
+- Added 17 new tests: MCPServerStartGuardTests (3), PortResolverTests (4 new), test_read_unity_port (7), test_bridge_port_rediscovery (6), test_lockfile (additions).
+
 ## [v0.52.5] — 2026-06-22 <!-- auto-discard-always -->
 
 - **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active. Prevents "Save Scene?" dialog blocking Unity on exit.

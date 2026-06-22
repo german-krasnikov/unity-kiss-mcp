@@ -287,5 +287,39 @@ namespace UnityMCP.Editor.Tests
             Assert.AreEqual(9601, PortResolver.ParsePortFromJson(json, "chatPort"));
             File.Delete(path);
         }
+
+        // ── Port collision guard ──────────────────────────────────────────────
+
+        [Test]
+        public void ResolveChatPort_CacheEqualsMain_FallsBackToFindFreePort()
+        {
+            // Cache has chatPort == mainPort — must find a different free port
+            var result = PortResolver.ResolveChatPort(null, null, "{\"chatPort\":9500}", mainPort: 9500, defaultStart: 9501);
+            Assert.AreNotEqual(9500, result);
+            Assert.IsTrue(PortResolver.IsValidPort(result));
+        }
+
+        [Test]
+        public void ResolveChatPort_ValidDifferentFromMain_ReturnsAsIs()
+        {
+            var result = PortResolver.ResolveChatPort(null, null, "{\"chatPort\":9501}", mainPort: 9500, defaultStart: 9502);
+            Assert.AreEqual(9501, result);
+        }
+
+        [Test]
+        public void ResolveChatPort_ProjectSettingsEqualsMain_FallsBackToFindFreePort()
+        {
+            var result = PortResolver.ResolveChatPort(null, "{\"chatPort\":9500}", null, mainPort: 9500, defaultStart: 9501);
+            Assert.AreNotEqual(9500, result);
+            Assert.IsTrue(PortResolver.IsValidPort(result));
+        }
+
+        [Test]
+        public void ResolveChatPort_EnvEqualsMain_FallsBackToFindFreePort()
+        {
+            var result = PortResolver.ResolveChatPort("9500", null, null, mainPort: 9500, defaultStart: 9501);
+            Assert.AreNotEqual(9500, result);
+            Assert.IsTrue(PortResolver.IsValidPort(result));
+        }
     }
 }

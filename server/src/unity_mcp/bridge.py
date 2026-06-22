@@ -24,6 +24,7 @@ from unity_mcp.bridge_reload_state import DomainReloadTracker, DOMAIN_RELOAD_EXP
 from unity_mcp.compile_state import CompileStateProbe
 from unity_mcp.crash_log import CrashLogger
 from unity_mcp.metrics import METRICS
+from unity_mcp.lockfile import is_pid_alive
 
 # Re-export so existing `from .bridge import DomainReloadError` keeps working
 __all__ = [
@@ -120,6 +121,8 @@ class UnityBridge(HeartbeatMixin):
         self._port_discoverer: Optional[Callable[[], int]] = port_discoverer
         self._reload: DomainReloadTracker = DomainReloadTracker()
         self._ppid_mismatch_count: int = 0
+        self._pinned_port: Optional[int] = None
+        self._pinned_pid: Optional[int] = None
 
     @property
     def _startup_grace_expired(self) -> bool:
@@ -304,9 +307,13 @@ class UnityBridge(HeartbeatMixin):
         await self.close()
         if self._port_discoverer is not None:
             try:
-                import inspect
-                kw = {"skip_probe": True} if "skip_probe" in inspect.signature(self._port_discoverer).parameters else {}
-                new_port = self._port_discoverer(**kw)
+                # If pinned Unity is still alive, stay on its port (avoid latching to wrong instance).
+                if self._pinned_port is not None and is_pid_alive(self._pinned_pid):
+                    new_port = self._pinned_port
+                else:
+                    import inspect
+                    kw = {"skip_probe": True} if "skip_probe" in inspect.signature(self._port_discoverer).parameters else {}
+                    new_port = self._port_discoverer(**kw)
                 if new_port != self._port:
                     self._port = new_port
                     self._probe = CompileStateProbe(
@@ -369,6 +376,13 @@ class UnityBridge(HeartbeatMixin):
         self._state = BridgeState.CONNECTED
         self._reload.clear()
         self._last_reconnect_at = time.monotonic()
+        # Pin port+pid so future reconnects stay on same Unity instance while alive.
+        self._pinned_port = self._port
+        try:
+            from unity_mcp.lockfile import read_pid_from_port_file
+            self._pinned_pid = read_pid_from_port_file(self._port)
+        except Exception:
+            self._pinned_pid = None
         if fire_callbacks:
             for cb in self._on_reconnect_callbacks:
                 try:

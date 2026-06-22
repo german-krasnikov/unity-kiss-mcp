@@ -470,3 +470,68 @@ def test_cleanup_stale_port_files_all_patterns(tmp_path):
     assert cleaned == 3
     for f in files:
         assert not f.exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 4b: cleanup_stale_port_files — *.chat-port + TCP probe
+# ---------------------------------------------------------------------------
+
+def test_cleanup_stale_port_files_cleans_chat_port(tmp_path):
+    """Dead PID .chat-port file is deleted."""
+    from unity_mcp.lockfile import cleanup_stale_port_files
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    f = ports_dir / "99998.chat-port"
+    f.write_text("9510\n/path\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=False):
+        cleaned = cleanup_stale_port_files()
+    assert cleaned == 1
+    assert not f.exists()
+
+
+def test_cleanup_stale_port_files_tcp_probe_dead_port(tmp_path):
+    """PID alive but port not listening → file deleted (AssetImportWorker case)."""
+    from unity_mcp.lockfile import cleanup_stale_port_files
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    f = ports_dir / "11111.port"
+    f.write_text("9511\n/path\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True), \
+         patch("unity_mcp.lockfile._tcp_probe", return_value=False):
+        cleaned = cleanup_stale_port_files(tcp_probe=True)
+    assert cleaned == 1
+    assert not f.exists()
+
+
+def test_cleanup_stale_port_files_tcp_probe_live_port_kept(tmp_path):
+    """PID alive and port listening → file kept."""
+    from unity_mcp.lockfile import cleanup_stale_port_files
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    f = ports_dir / "11112.port"
+    f.write_text("9512\n/path\n", encoding="utf-8")
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True), \
+         patch("unity_mcp.lockfile._tcp_probe", return_value=True):
+        cleaned = cleanup_stale_port_files(tcp_probe=True)
+    assert cleaned == 0
+    assert f.exists()
+
+
+def test_cleanup_stale_port_files_no_tcp_probe_by_default(tmp_path):
+    """tcp_probe=False (default) — alive PID with dead port is NOT cleaned."""
+    from unity_mcp.lockfile import cleanup_stale_port_files
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    f = ports_dir / "11113.port"
+    f.write_text("9513\n/path\n", encoding="utf-8")
+    probe_calls = []
+    with patch.object(Path, "home", return_value=tmp_path), \
+         patch("unity_mcp.lockfile.is_pid_alive", return_value=True), \
+         patch("unity_mcp.lockfile._tcp_probe", side_effect=lambda p, **kw: probe_calls.append(p) or False):
+        cleaned = cleanup_stale_port_files()
+    assert cleaned == 0
+    assert f.exists()
+    assert not probe_calls  # TCP probe was NOT called
