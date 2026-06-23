@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
@@ -305,6 +306,95 @@ namespace UnityMCP.Editor.Chat.Tests
                 "/bin/uv", new[] { "run", "--directory", "/srv", "unity-mcp" });
 
             StringAssert.DoesNotContain("\"env\"", json);
+        }
+
+        // ── Port-scoped filename tests (T1-T8) ───────────────────────────────
+
+        // T1 — discriminates the core bug: two ports → two distinct file names
+        [Test]
+        public void ConfigFileName_TwoPorts_ProduceTwoDistinctNames()
+        {
+            var n1 = ChatMcpConfigWriter.ConfigFileName(9501);
+            var n2 = ChatMcpConfigWriter.ConfigFileName(9502);
+            Assert.AreNotEqual(n1, n2);
+            StringAssert.Contains("9501", n1);
+            StringAssert.Contains("9502", n2);
+        }
+
+        // T2 — no-clobber: writing config for 9502 does NOT overwrite config for 9501
+        [Test]
+        public void GetOrCreateConfigPath_TwoPorts_BDoesNotClobberA()
+        {
+            var pathA = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+            var pathB = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9502);
+            Assert.AreNotEqual(pathA, pathB);
+            var jsonA = File.ReadAllText(pathA);
+            StringAssert.Contains("\"9501\"", jsonA, "A's file must still have port 9501 after B was written");
+        }
+
+        // T3 — filename/body agreement: port in name matches port in body
+        [Test]
+        public void GetOrCreateConfigPath_FilenamePortMatchesBodyPort()
+        {
+            var path = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+            var json = File.ReadAllText(path);
+            StringAssert.Contains("9501", Path.GetFileName(path));
+            StringAssert.Contains("\"9501\"", json);
+        }
+
+        // T4 — atomic write: no .tmp residue left behind
+        [Test]
+        public void GetOrCreateConfigPath_LeavesNoTmpResidue()
+        {
+            ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+            var tmps = Directory.GetFiles(_tmpDir, "*.tmp");
+            Assert.IsEmpty(tmps);
+        }
+
+        // T5 — regression guard: port>0 must not produce the legacy bare filename
+        [Test]
+        public void GetOrCreateConfigPath_PortGtZero_DoesNotProduceLegacyBareFilename()
+        {
+            var path = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+            Assert.AreNotEqual("unity-mcp-config.json", Path.GetFileName(path));
+        }
+
+        // T6 — reload-survival: same port → same path on repeated calls
+        [Test]
+        public void GetOrCreateConfigPath_SamePort_ReturnsSamePathBothCalls()
+        {
+            var p1 = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+            var p2 = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+            Assert.AreEqual(p1, p2);
+        }
+
+        // T7 — stale-scan cleanup: old file deleted, fresh file preserved
+        [Test]
+        public void CleanupStaleConfigs_OldFilesDeleted_CurrentFilePreserved()
+        {
+            var stalePath = Path.Combine(_tmpDir, "unity-mcp-config-9999.json");
+            File.WriteAllText(stalePath, "{}", JsonHelper.Utf8NoBom);
+            File.SetLastWriteTime(stalePath, DateTime.UtcNow.AddHours(-3));
+
+            var currentPath = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+
+            ChatMcpConfigWriter.CleanupStaleConfigs(_tmpDir, maxAgeHours: 2);
+
+            Assert.IsFalse(File.Exists(stalePath), "stale file must be deleted");
+            Assert.IsTrue(File.Exists(currentPath), "current file must survive");
+        }
+
+        // T8 — own-file delete: only target port deleted, sibling untouched
+        [Test]
+        public void DeleteConfig_DeletesOnlyOwnPort_LeavesSiblingIntact()
+        {
+            var pathA = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9501);
+            var pathB = ChatMcpConfigWriter.GetOrCreateConfigPath(_tmpDir, 9502);
+
+            ChatMcpConfigWriter.DeleteConfig(_tmpDir, 9501);
+
+            Assert.IsFalse(File.Exists(pathA), "own-port file must be deleted");
+            Assert.IsTrue(File.Exists(pathB), "sibling port file must survive");
         }
     }
 }

@@ -11,8 +11,11 @@ namespace UnityMCP.Editor.Chat
 {
     public static class ChatMcpConfigWriter
     {
-        private const string PackageId  = "com.unity-mcp.editor";
-        private const string ConfigFile = "unity-mcp-config.json";
+        private const string PackageId = "com.unity-mcp.editor";
+
+        /// <summary>Returns per-port config filename. Port=0 falls back to legacy bare name.</summary>
+        public static string ConfigFileName(int port) =>
+            port > 0 ? $"unity-mcp-config-{port}.json" : "unity-mcp-config.json";
 
         // ── Pure helpers ──────────────────────────────────────────────────────
 
@@ -96,8 +99,16 @@ namespace UnityMCP.Editor.Chat
         /// <summary>
         /// Resolves everything, writes the config to a stable temp file, and returns its path.
         /// Returns null (+ LogError) if the server directory cannot be found.
+        /// Callers that existed before the port-scoped fix need not change.
         /// </summary>
-        public static string GetOrCreateConfigPath()
+        public static string GetOrCreateConfigPath() =>
+            GetOrCreateConfigPath(Path.GetTempPath(), MCPServer.ServerChatPort);
+
+        /// <summary>
+        /// Injectable overload (testability seam). No MCPServer/EditorPrefs references — pure/testable.
+        /// Writes unity-mcp-config-{port}.json into configDir and returns the absolute path.
+        /// </summary>
+        public static string GetOrCreateConfigPath(string configDir, int port)
         {
             var packageRoot = Path.GetFullPath($"Packages/{PackageId}");
             var serverDir   = ResolveServerDir(packageRoot);
@@ -112,9 +123,9 @@ namespace UnityMCP.Editor.Chat
                 // Git/Registry/Embedded/Unknown install — server available via PyPI
                 var uvxJson = BuildClaudeConfigJson("uvx",
                     new[] { "--from", WizardConfigWriter.GitInstallUrl, "unity-mcp" },
-                    MCPServer.ServerChatPort);
-                var uvxPath = Path.Combine(Path.GetTempPath(), ConfigFile);
-                File.WriteAllText(uvxPath, uvxJson, JsonHelper.Utf8NoBom);
+                    port);
+                var uvxPath = Path.Combine(configDir, ConfigFileName(port));
+                AtomicWrite(uvxPath, uvxJson);
                 return uvxPath;
             }
 
@@ -124,12 +135,46 @@ namespace UnityMCP.Editor.Chat
                 Debug.LogWarning($"[MCP] Server directory changed ({lastDir} → {serverDir}). Run: python install.py update");
             EditorPrefs.SetString(LastServerDirPref, serverDir);
 
-            var uvPath        = ResolveUvPath();
-            var (cmd, args)   = ResolvePythonCommand(serverDir, uvPath);
-            var json          = BuildClaudeConfigJson(cmd, args, MCPServer.ServerChatPort);
-            var configPath    = Path.Combine(Path.GetTempPath(), ConfigFile);
-            File.WriteAllText(configPath, json, JsonHelper.Utf8NoBom);
+            var uvPath      = ResolveUvPath();
+            var (cmd, args) = ResolvePythonCommand(serverDir, uvPath);
+            var json        = BuildClaudeConfigJson(cmd, args, port);
+            var configPath  = Path.Combine(configDir, ConfigFileName(port));
+            AtomicWrite(configPath, json);
             return configPath;
+        }
+
+        // ── Cleanup helpers ───────────────────────────────────────────────────
+
+        /// <summary>Deletes stale per-port config files older than maxAgeHours. Best-effort.</summary>
+        public static void CleanupStaleConfigs(string configDir = null, double maxAgeHours = 2.0)
+        {
+            var dir    = configDir ?? Path.GetTempPath();
+            var cutoff = DateTime.UtcNow.AddHours(-maxAgeHours);
+            foreach (var pattern in new[] { "unity-mcp-config-*.json", "opencode-unity-mcp-*.json",
+                                            "unity-mcp-config.json", "opencode-unity-mcp.json" })
+                foreach (var f in Directory.GetFiles(dir, pattern))
+                    try { if (File.GetLastWriteTimeUtc(f) < cutoff) File.Delete(f); } catch { }
+        }
+
+        /// <summary>Deletes the config file for a specific port. Best-effort.</summary>
+        public static void DeleteConfig(string configDir, int port)
+        {
+            try { File.Delete(Path.Combine(configDir ?? Path.GetTempPath(), ConfigFileName(port))); }
+            catch { }
+        }
+
+        /// <summary>Deletes the config file for the current server's chat port. Best-effort.</summary>
+        public static void DeleteOwnConfig() =>
+            DeleteConfig(Path.GetTempPath(), MCPServer.ServerChatPort);
+
+        // ── Private helpers ───────────────────────────────────────────────────
+
+        private static void AtomicWrite(string path, string content)
+        {
+            var tmp = path + ".tmp";
+            File.WriteAllText(tmp, content, JsonHelper.Utf8NoBom);
+            if (File.Exists(path)) File.Delete(path);
+            File.Move(tmp, path);
         }
     }
 }

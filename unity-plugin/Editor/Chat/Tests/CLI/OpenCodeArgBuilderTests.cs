@@ -151,24 +151,23 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void WriteConfig_CreatesFile()
         {
-            OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
-            var path = Path.Combine(_tempDir, "opencode-unity-mcp.json");
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
             Assert.IsTrue(File.Exists(path));
         }
 
         [Test]
         public void WriteConfig_ContainsMcpKey()
         {
-            OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
-            var content = File.ReadAllText(Path.Combine(_tempDir, "opencode-unity-mcp.json"));
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            var content = File.ReadAllText(path);
             StringAssert.Contains("\"mcp\"", content);
         }
 
         [Test]
         public void WriteConfig_ContainsTypeLocal()
         {
-            OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
-            var content = File.ReadAllText(Path.Combine(_tempDir, "opencode-unity-mcp.json"));
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            var content = File.ReadAllText(path);
             StringAssert.Contains("\"type\"", content);
             StringAssert.Contains("\"local\"", content);
         }
@@ -176,16 +175,16 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void WriteConfig_ContainsUnityMcpKey()
         {
-            OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
-            var content = File.ReadAllText(Path.Combine(_tempDir, "opencode-unity-mcp.json"));
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            var content = File.ReadAllText(path);
             StringAssert.Contains("unity-mcp", content);
         }
 
         [Test]
         public void WriteConfig_ContainsCommandArray()
         {
-            OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
-            var content = File.ReadAllText(Path.Combine(_tempDir, "opencode-unity-mcp.json"));
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            var content = File.ReadAllText(path);
             // "command" must be an array (JSON array bracket)
             StringAssert.Contains("\"command\"", content);
             // Should contain python3 or python as array element
@@ -195,28 +194,61 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void WriteConfig_ContainsEnvironmentKey_NotEnvKey()
         {
-            OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
-            var content = File.ReadAllText(Path.Combine(_tempDir, "opencode-unity-mcp.json"));
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            var content = File.ReadAllText(path);
             StringAssert.Contains("\"environment\"", content);
         }
 
         [Test]
         public void WriteConfig_ContainsPort()
         {
-            OpenCodeArgBuilder.WriteConfig(_tempDir, 9876);
-            var content = File.ReadAllText(Path.Combine(_tempDir, "opencode-unity-mcp.json"));
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9876);
+            var content = File.ReadAllText(path);
             StringAssert.Contains("9876", content);
         }
 
         [Test]
         public void WriteConfig_Overwrites_ExistingFile()
         {
-            var path = Path.Combine(_tempDir, "opencode-unity-mcp.json");
+            // Write once to create the file with port-scoped name
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
             File.WriteAllText(path, "old content");
             OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
             var content = File.ReadAllText(path);
             StringAssert.Contains("\"mcp\"", content);
             StringAssert.DoesNotContain("old content", content);
+        }
+
+        // ── Port-scoped filename tests (T9-T11) ───────────────────────────────
+
+        // T9 — two ports → two separate files that coexist without clobbering
+        [Test]
+        public void WriteConfig_TwoPorts_FilesCoexist()
+        {
+            var p1 = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            var p2 = OpenCodeArgBuilder.WriteConfig(_tempDir, 9876);
+            Assert.AreNotEqual(p1, p2);
+            Assert.IsTrue(File.Exists(p1));
+            Assert.IsTrue(File.Exists(p2));
+            StringAssert.Contains("9500", File.ReadAllText(p1));
+            StringAssert.Contains("9876", File.ReadAllText(p2));
+        }
+
+        // T10 — BuildEnv path must match WriteConfig path for the same port
+        [Test]
+        public void BuildEnv_PathMatchesWriteConfig_SamePort()
+        {
+            var writtenPath = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            var envPath     = OpenCodeArgBuilder.BuildEnv(_tempDir, 9500)["OPENCODE_CONFIG"];
+            Assert.AreEqual(writtenPath, envPath);
+        }
+
+        // T11 — port>0 must not produce the legacy bare filename
+        [Test]
+        public void WriteConfig_PortGtZero_DoesNotProduceLegacyBareFilename()
+        {
+            var path = OpenCodeArgBuilder.WriteConfig(_tempDir, 9500);
+            Assert.AreNotEqual("opencode-unity-mcp.json", Path.GetFileName(path));
         }
     }
 }

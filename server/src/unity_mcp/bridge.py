@@ -19,7 +19,7 @@ from unity_mcp.bridge_socket import (
     _TCP_KEEPALIVE_DARWIN,
     _TCP_KEEPINTVL_DARWIN,
 )
-from unity_mcp.bridge_heartbeat import HeartbeatMixin
+from unity_mcp.bridge_heartbeat import HeartbeatMixin, BACKOFF_MIN_S
 from unity_mcp.bridge_reload_state import DomainReloadTracker, DOMAIN_RELOAD_EXPIRY_S
 from unity_mcp.compile_state import CompileStateProbe
 from unity_mcp.crash_log import CrashLogger
@@ -117,7 +117,8 @@ class UnityBridge(HeartbeatMixin):
         self._heartbeat_interval: float = 15.0
         self._ping_failures: int = 0
         self._last_reconnect_at: float = 0.0
-        self._min_reconnect_interval: float = MIN_RECONNECT_INTERVAL
+        self._min_reconnect_interval: float = MIN_RECONNECT_INTERVAL  # kept for compat
+        self._reconnect_backoff: float = BACKOFF_MIN_S
         self._port_discoverer: Optional[Callable[[], int]] = port_discoverer
         self._reload: DomainReloadTracker = DomainReloadTracker()
         self._ppid_mismatch_count: int = 0
@@ -307,14 +308,17 @@ class UnityBridge(HeartbeatMixin):
         await self.close()
         if self._port_discoverer is not None:
             try:
-                # If pinned Unity is still alive, stay on its port (avoid latching to wrong instance).
-                if self._pinned_port is not None and is_pid_alive(self._pinned_pid):
+                # B2: explicit None guard — is_pid_alive(None) returns False (intentional
+                # fallthrough), but we want deliberate bypass when pid is unknown.
+                if (self._pinned_port is not None and self._pinned_pid is not None
+                        and is_pid_alive(self._pinned_pid)):
                     new_port = self._pinned_port
                 else:
                     import inspect
                     kw = {"skip_probe": True} if "skip_probe" in inspect.signature(self._port_discoverer).parameters else {}
                     new_port = self._port_discoverer(**kw)
-                if new_port != self._port:
+                # B3: None means no live candidates — preserve current port.
+                if new_port is not None and new_port != self._port:
                     self._port = new_port
                     self._probe = CompileStateProbe(
                         CompileStateProbe.autodetect_project_path(port=new_port), port=new_port)

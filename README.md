@@ -185,7 +185,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6322 Tests (2694 Python · 3548 Unity · 80 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6364 Tests (2723 Python · 3558 Unity · 83 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -244,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.53.0</b> — 2026-06-23 — **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + …</summary>
+
+**Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + jitter; hard-coded 9500 fallback removed (read_unity_port now returns …
+
+</details>
+
+<details>
 <summary><b>v0.52.6</b> — 2026-06-22 — **Multi-Unity Port Race Conditions** — Fixed port file collision and …</summary>
 
 **Multi-Unity Port Race Conditions** — Fixed port file collision and reconnection storms when multiple CLI tools (Cursor, Codex, Windsurf, etc.) …
@@ -272,15 +279,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.50.3</b> — 2026-06-21 — **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass …</summary>
-
-**Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass that forcibly disables `structured_output` on all 99 registered tools, …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.50.3** — 2026-06-21 — **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass …
 - **v0.50.2** — 2026-06-21 — **WizardConfigWriter visibility** — changed class and `GitInstallUrl` from …
 - **v0.50.1** — 2026-06-21 — **Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after …
 - **v0.50.0** — 2026-06-21 — **Wizard Fallback** — Setup Wizard detects missing backends (e.g., no Claude …

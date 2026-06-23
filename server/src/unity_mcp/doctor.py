@@ -118,7 +118,9 @@ def _resolve_port(port: int) -> int:
         return port
     from .server_filtering import read_unity_port
     try:
-        return read_unity_port(skip_probe=True)
+        # B3: read_unity_port may return None when skip_probe=True and no live Unity.
+        discovered = read_unity_port(skip_probe=True)
+        return discovered if discovered is not None else 9500
     except Exception:
         return 9500
 

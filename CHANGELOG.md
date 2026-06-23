@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.53.0] — 2026-06-23
+
+**Reliability & Stability:**
+- **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + jitter; hard-coded 9500 fallback removed (read_unity_port now returns None for stale ports)
+- **Idle-watchdog ppid-gate** — Server only auto-exits when orphaned (getppid mismatch), not on silent-pause
+- **Per-port Chat config** — Prevents cross-connect between multiple Unity instances (per-port temp files + cleanup on startup/shutdown)
+- **Test cleanup** — Removed hard-coded version check test
+
 ## [v0.52.6] — 2026-06-22 <!-- multi-unity-port-race-fix -->
 
 **Bug Fixes:**

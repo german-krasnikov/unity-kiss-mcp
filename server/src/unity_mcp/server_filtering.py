@@ -129,9 +129,11 @@ def _tcp_probe(port: int, timeout: float = 0.2) -> bool:
         return False
 
 
-def read_unity_port(skip_probe: bool = False) -> int:
+def read_unity_port(skip_probe: bool = False) -> int | None:
     """Discover Unity MCP port from discovery files, env var, or default 9500.
 
+    Returns None when skip_probe=True and no live candidates found (no silent 9500 drift).
+    Returns 9500 when skip_probe=False and no candidates (cold-start backward compat).
     Priority: env var → CWD project match → newest mtime → 9500.
     When UNITY_MCP_CHAT=1 (set by C# chat backend), scans *.chat-port files
     as a Windows fallback when UNITY_MCP_PORT env propagation fails.
@@ -172,7 +174,9 @@ def read_unity_port(skip_probe: bool = False) -> int:
             except OSError: pass
 
     if not candidates:
-        return 9500
+        # B3: skip_probe reconnect → no live targets → None (caller preserves self._port).
+        # Cold-start (skip_probe=False) → fallback 9500 for backward compat.
+        return None if skip_probe else 9500
 
     # CWD-based selection: prefer project whose path is a prefix of cwd.
     # Waterfall: UNITY_MCP_PROJECT_DIR > CLAUDE_PROJECT_DIR > CWD.

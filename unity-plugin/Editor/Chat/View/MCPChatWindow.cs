@@ -100,6 +100,7 @@ namespace UnityMCP.Editor.Chat
             _autoFix.OnErrorsDetected += InjectCompileErrors;
             _undoTracker.Invalidate();
             CommandRouter.OnAskUser += OnMcpAskUser;
+            ChatMcpConfigWriter.CleanupStaleConfigs();
         }
 
         private void ShowCopyFlash()
@@ -132,6 +133,7 @@ namespace UnityMCP.Editor.Chat
             if (_activity.Phase != ActivityPhase.Idle)
                 _undoTracker.OnTurnFailed();
             _backend?.Stop();
+            ChatMcpConfigWriter.DeleteOwnConfig();
             _backend = null;
             _assetMentionIndex?.Dispose();
             _assetMentionIndex = null;

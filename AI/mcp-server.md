@@ -98,17 +98,20 @@ load_plugins(mcp, _send, _args)
 @asynccontextmanager
 async def lifespan(app):
     # 1. Auto-discover Unity port from ~/.unity-mcp/ports/*.port or UNITY_MCP_PORT env
-    # 2. Acquire exclusive PID lockfile ~/.unity-mcp/server-{port}.lock
-    # 3. Create ConnectionSlot, connect bridge
-    # 4. Wire middleware layers (if UNITY_MCP_MIDDLEWARE=1)
-    # 5. Wire ToolHinter (default on, disable with UNITY_MCP_HINTS=0)
-    # 6. Wire budget tracking (default on, disable with UNITY_MCP_BUDGET=0)
-    # 7. Wire optional layers: SceneBrief, SpeculativeLayer, Lessons, Watchdog, Inference
-    # 8. Fetch enabled tools cache, start heartbeat, register reconnect callbacks
+    # 2. Cleanup stale port-scoped config files (v0.53.0): unity-mcp-config-{port}.json older than 2h
+    # 3. Acquire exclusive PID lockfile ~/.unity-mcp/server-{port}.lock
+    # 4. Create ConnectionSlot, connect bridge
+    # 5. Wire middleware layers (if UNITY_MCP_MIDDLEWARE=1)
+    # 6. Wire ToolHinter (default on, disable with UNITY_MCP_HINTS=0)
+    # 7. Wire budget tracking (default on, disable with UNITY_MCP_BUDGET=0)
+    # 8. Wire optional layers: SceneBrief, SpeculativeLayer, Lessons, Watchdog, Inference
+    # 9. Fetch enabled tools cache, start heartbeat, register reconnect callbacks
     yield
-    # Shutdown: stop heartbeat, cancel watchdog, close bridge, release lock
+    # Shutdown: stop heartbeat, cancel watchdog, close bridge, release lock, delete own config
 
 def main():
+    _last_activity = time.monotonic()
+    _start_idle_watchdog()  # daemon: exits if parent dies + idle > UNITY_MCP_IDLE_TIMEOUT (default 300s)
     transport = os.environ.get("UNITY_MCP_TRANSPORT", "stdio")
     if transport == "http":
         port = int(os.environ.get("UNITY_MCP_HTTP_PORT", "8765"))
@@ -116,6 +119,8 @@ def main():
     else:
         mcp.run(transport="stdio")
 ```
+
+**Idle watchdog (v0.53.0)** — daemon thread calling `os._exit(0)` after UNITY_MCP_IDLE_TIMEOUT seconds of inactivity. Key gate: `if os.getppid() == _ORIGINAL_PPID: continue` (line 40 in server.py) — only exits if parent process has changed (truly orphaned). Alive parent → watchdog remains dormant, acting as orphan-reaper only. Timeout=0 disables. Updated on every `_touch_activity()` call before MCP tool dispatch.
 
 ### Bridge / Connection
 
@@ -125,7 +130,7 @@ def main():
   - Protocol: JSON over TCP, 4-byte big-endian length prefix
   - Socket: `TCP_NODELAY`, `SO_KEEPALIVE` (macOS: idle=60s, interval=10s, count=3)
   - Heartbeat: 15s interval, raw ping, 3 failures → close, 2s polling when disconnected (5s if compile busy)
-  - Reconnect cooldown: MIN_RECONNECT_INTERVAL=2.0s, ping verification, fires callbacks
+  - Reconnect backoff (v0.52.7): exponential (5s→60s, reset on success, ±10% jitter), cooldown re-armed on every attempt. Ping verification, fires callbacks
   - DomainReloadError on Unity `going_away` event frame
 
 ### Compile State Probe (compile_state.py)

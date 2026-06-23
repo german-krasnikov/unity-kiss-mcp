@@ -1,10 +1,31 @@
 import asyncio
 import json
 import os
+import random
 import struct
+import threading
 import time
 
 from unity_mcp.bridge_socket import DomainReloadError
+
+# Exponential backoff bounds for reconnect attempts.
+BACKOFF_MIN_S: float = 5.0
+BACKOFF_MAX_S: float = 60.0
+
+_hard_exit_scheduled: bool = False
+
+
+def _schedule_hard_exit() -> None:
+    """Schedule os._exit(0) after 2s delay — gives current heartbeat tick time to finish."""
+    global _hard_exit_scheduled
+    if _hard_exit_scheduled:
+        return
+    _hard_exit_scheduled = True
+    import logging
+    logging.getLogger("unity_mcp.bridge").warning("Parent died — scheduling hard exit in 2s")
+    t = threading.Timer(2.0, os._exit, args=(0,))
+    t.daemon = True
+    t.start()
 
 # Captured at import time — all bridges in this process share the same parent.
 _ORIGINAL_PPID: int = os.getppid()
@@ -63,11 +84,7 @@ class HeartbeatMixin:
         if os.getppid() != _ORIGINAL_PPID:
             self._ppid_mismatch_count += 1
             if self._ppid_mismatch_count >= 2:
-                import logging
-                logging.getLogger("unity_mcp.bridge").warning(
-                    "Parent died (ppid %d → %d), stopping heartbeat",
-                    _ORIGINAL_PPID, os.getppid()
-                )
+                _schedule_hard_exit()
                 self.stop_heartbeat()
                 return
             return  # skip tick, recheck next heartbeat
@@ -101,14 +118,23 @@ class HeartbeatMixin:
                 return
 
             if self._reconnect_cooldown_ok():
+                # A2: arm cooldown BEFORE attempt — success and failure both count.
+                self._last_reconnect_at = time.monotonic()
                 async with self._lock:
                     if self.connected:
                         return
                     try:
                         await self._reconnect()
                         self._ping_failures = 0
+                        # B1: success — reset backoff for fast recovery after Unity returns.
+                        self._reconnect_backoff = BACKOFF_MIN_S
                     except Exception:
-                        pass
+                        # B1: failure — double backoff (exponential dampening).
+                        # N3: cap AFTER jitter so result never exceeds BACKOFF_MAX_S.
+                        self._reconnect_backoff = min(
+                            self._reconnect_backoff * 2 * (1.0 + random.uniform(-0.1, 0.1)),
+                            BACKOFF_MAX_S,
+                        )
             return
         await asyncio.sleep(interval)
         if self._lock.locked():
@@ -142,8 +168,8 @@ class HeartbeatMixin:
                 self._ping_failures = 0
 
     def _reconnect_cooldown_ok(self) -> bool:
-        """True if enough time elapsed since last reconnect."""
-        return (time.monotonic() - self._last_reconnect_at) >= self._min_reconnect_interval
+        """True if enough time elapsed since last reconnect attempt (success or failure)."""
+        return (time.monotonic() - self._last_reconnect_at) >= self._reconnect_backoff
 
     async def _raw_ping(self, timeout: float = 5.0) -> None:
         """Send ping directly on socket, bypassing send() retry machinery.

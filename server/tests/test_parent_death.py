@@ -8,6 +8,14 @@ import pytest
 import unity_mcp.bridge_heartbeat as hb_module
 
 
+@pytest.fixture(autouse=True)
+def _reset_hard_exit():
+    """Reset _hard_exit_scheduled so _schedule_hard_exit fires once per test."""
+    hb_module._hard_exit_scheduled = False
+    yield
+    hb_module._hard_exit_scheduled = False
+
+
 def test_original_ppid_is_module_level_int():
     assert isinstance(hb_module._ORIGINAL_PPID, int)
     assert hb_module._ORIGINAL_PPID > 0
@@ -60,8 +68,11 @@ async def test_parent_death_stops_heartbeat_no_systemexit():
     bridge = _make_bridge_mixin()
 
     fake_original = os.getppid() + 9999
+    # Patch threading.Timer so _schedule_hard_exit doesn't fire real os._exit after test.
     with patch.object(hb_module, "_ORIGINAL_PPID", fake_original), \
-         patch("unity_mcp.bridge_heartbeat.os.getppid", return_value=os.getppid()):
+         patch("unity_mcp.bridge_heartbeat.os.getppid", return_value=os.getppid()), \
+         patch("unity_mcp.bridge_heartbeat.threading.Timer"), \
+         patch("unity_mcp.bridge_heartbeat.os._exit"):
         # First mismatch: returns early
         await bridge._heartbeat_tick(15.0)
         assert bridge._ppid_mismatch_count == 1

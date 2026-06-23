@@ -9,7 +9,9 @@ namespace UnityMCP.Editor.Chat
 {
     public static class OpenCodeArgBuilder
     {
-        private const string ConfigFileName = "opencode-unity-mcp.json";
+        /// <summary>Per-port config filename. Port=0 falls back to legacy bare name.</summary>
+        internal static string ConfigFileName(int port) =>
+            port > 0 ? $"opencode-unity-mcp-{port}.json" : "opencode-unity-mcp.json";
 
         /// <summary>
         /// Build opencode exec argv and env keys to strip.
@@ -64,7 +66,7 @@ namespace UnityMCP.Editor.Chat
             if (!Directory.Exists(configDir))
                 Directory.CreateDirectory(configDir);
 
-            var path    = Path.Combine(configDir, ConfigFileName);
+            var path    = Path.Combine(configDir, ConfigFileName(port));
             var content = BuildConfigBlock(port);
             File.WriteAllText(path, content, new UTF8Encoding(false));
             return path;
@@ -73,7 +75,7 @@ namespace UnityMCP.Editor.Chat
         /// <summary>Returns env dict to merge into spawn env.</summary>
         public static Dictionary<string, string> BuildEnv(string configDir, int port = 9500)
         {
-            var configPath = Path.Combine(configDir ?? Path.GetTempPath(), ConfigFileName);
+            var configPath = Path.Combine(configDir ?? Path.GetTempPath(), ConfigFileName(port));
             return new Dictionary<string, string>
             {
                 { "OPENCODE_CONFIG", configPath },

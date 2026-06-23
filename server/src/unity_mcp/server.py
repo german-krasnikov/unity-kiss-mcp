@@ -1,9 +1,53 @@
 import asyncio
 import logging
 import os
+import threading
 import time
 os.environ.setdefault("UNITY_MCP_DISTILL", "1")
 log = logging.getLogger("unity_mcp.server")
+
+# --- Idle watchdog ---
+_last_activity: float = time.monotonic()
+
+
+def _touch_activity() -> None:
+    """Update last-activity timestamp. Call before every MCP tool dispatch."""
+    global _last_activity
+    _last_activity = time.monotonic()
+
+
+_watchdog_stop: threading.Event = threading.Event()
+
+
+def _start_idle_watchdog() -> threading.Thread | None:
+    """Start daemon thread that calls os._exit(0) after UNITY_MCP_IDLE_TIMEOUT seconds of inactivity.
+    Returns None if timeout=0 (disabled)."""
+    timeout = int(os.environ.get("UNITY_MCP_IDLE_TIMEOUT", "300"))
+    if timeout <= 0:
+        return None
+
+    _watchdog_stop.clear()
+
+    def _loop():
+        # N2: check stop event for clean exit in tests (no unhandled exception warnings).
+        while not _watchdog_stop.is_set():
+            time.sleep(30)
+            if _watchdog_stop.is_set():
+                return
+            idle = time.monotonic() - _last_activity
+            if idle > timeout:
+                from .bridge_heartbeat import _ORIGINAL_PPID
+                if os.getppid() == _ORIGINAL_PPID:
+                    continue  # parent alive — don't kill; remain as orphan-reaper only
+                log.warning("idle watchdog: parent dead + idle=%.0fs >= timeout=%ds, exiting", idle, timeout)
+                logging.shutdown()
+                os._exit(0)
+
+    t = threading.Thread(target=_loop, daemon=True, name="unity-mcp-idle-watchdog")
+    t.start()
+    return t
+
+
 from contextlib import asynccontextmanager
 from mcp.server.fastmcp import FastMCP
 
@@ -163,6 +207,7 @@ async def _send_raw(cmd: str, args: dict, timeout: float = 0) -> str:
 
 
 async def _send(cmd: str, args: dict, timeout: float = 30.0) -> str:
+    _touch_activity()
     if _wrapped_send is not None:
         return await _wrapped_send(cmd, args, timeout=timeout)
     return await _send_raw(cmd, args, timeout)
@@ -320,6 +365,9 @@ install_list_tools_filter(mcp, lambda: _disabled_tools_cache)
 
 
 def main():
+    global _last_activity
+    _last_activity = time.monotonic()
+    _start_idle_watchdog()
     import signal
     if hasattr(signal, "SIGPIPE"):
         try:
