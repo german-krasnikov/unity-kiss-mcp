@@ -61,26 +61,90 @@ namespace UnityMCP.Editor.Chat
         }
 
         /// <summary>Writes opencode MCP config JSON and returns the absolute path.</summary>
-        public static string WriteConfig(string configDir, int port = 9500)
+        /// <param name="userConfigPath">
+        /// Path to global ~/.opencode/config.json; null = default location.
+        /// External (non-unity) MCP entries are merged in. Unity entries are stripped.
+        /// Injectable for tests.
+        /// </param>
+        public static string WriteConfig(string configDir, int port = 9500,
+            string userConfigPath = null)
         {
             if (!Directory.Exists(configDir))
                 Directory.CreateDirectory(configDir);
 
+            var globalPath = userConfigPath ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".opencode", "config.json");
+
             var path    = Path.Combine(configDir, ConfigFileName(port));
             var content = BuildConfigBlock(port);
+            content = MergeGlobalOpenCodeConfig(content, globalPath);
             File.WriteAllText(path, content, new UTF8Encoding(false));
             return path;
         }
 
-        /// <summary>Returns env dict to merge into spawn env.</summary>
+        /// <summary>Returns env dict to merge into spawn env.
+        /// Only OPENCODE_CONFIG is needed — UNITY_MCP_PORT is already in the JSON config
+        /// and injecting it here would violate the CliBackendBase rule (no port in process env).
+        /// </summary>
         public static Dictionary<string, string> BuildEnv(string configDir, int port = 9500)
         {
             var configPath = Path.Combine(configDir ?? Path.GetTempPath(), ConfigFileName(port));
             return new Dictionary<string, string>
             {
                 { "OPENCODE_CONFIG", configPath },
-                { "UNITY_MCP_PORT",  port.ToString() },
             };
+        }
+
+        // ── Unity-key filter ─────────────────────────────────────────────────
+
+        private static readonly string[] _unityKeys = { "unity", "unity-mcp", "unity-kiss-mcp" };
+
+        private static bool IsNonUnityKey(string key) =>
+            !Array.Exists(_unityKeys, k => key.Equals(k, StringComparison.OrdinalIgnoreCase));
+
+        // ── Merge logic ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Merges external (non-unity) MCP server entries from the user's global opencode config
+        /// into the base config's "mcp" block. Gracefully returns baseConfig on
+        /// missing/empty/corrupt/non-object-value input. Non-object entries (arrays, strings)
+        /// in the user "mcp" block are skipped — MCP servers are always objects by spec.
+        /// </summary>
+        internal static string MergeGlobalOpenCodeConfig(string baseConfig, string userConfigPath)
+        {
+            if (!File.Exists(userConfigPath)) return baseConfig;
+
+            string userJson;
+            try { userJson = File.ReadAllText(userConfigPath, Encoding.UTF8); }
+            catch { return baseConfig; }
+
+            if (string.IsNullOrWhiteSpace(userJson)) return baseConfig;
+
+            // Locate "mcp" block in user config — matches FIRST "mcp" key, assumes top-level placement.
+            var mcpKey = "\"mcp\"";
+            var mcpIdx = userJson.IndexOf(mcpKey, StringComparison.Ordinal);
+            if (mcpIdx < 0) return baseConfig;
+
+            var mcpBraceStart = userJson.IndexOf('{', mcpIdx + mcpKey.Length);
+            if (mcpBraceStart < 0) return baseConfig;
+
+            // Walk brace-depth to extract content between "mcp": { ... }
+            int depth = 1, pos = mcpBraceStart + 1;
+            while (pos < userJson.Length && depth > 0)
+            {
+                if (userJson[pos] == '{') depth++;
+                else if (userJson[pos] == '}') depth--;
+                pos++;
+            }
+            var mcpBlockContent = userJson.Substring(mcpBraceStart + 1, pos - mcpBraceStart - 2);
+
+            // Extract object-valued entries whose keys are not unity-related
+            var extra = JsonMergeHelper.ExtractObjectEntries(mcpBlockContent, IsNonUnityKey);
+
+            // Inject into base config's "mcp" block using the shared primitive.
+            // FindBlockClose matches FIRST "mcp" key in baseConfig — top-level placement assumed.
+            return JsonMergeHelper.InjectBeforeBlockClose(baseConfig, "mcp", extra);
         }
 
         // ── Config JSON ───────────────────────────────────────────────────────
@@ -94,8 +158,7 @@ namespace UnityMCP.Editor.Chat
             if (serverDir != null)
             {
                 var (cmd, cmdArgs) = ChatMcpConfigWriter.ResolvePythonCommand(serverDir, null);
-                commandArray = JsonHelper.BuildJsonStringArray(
-                    PrependCommand(cmd, cmdArgs));
+                commandArray = JsonHelper.BuildJsonStringArray(PrependCommand(cmd, cmdArgs));
             }
             else
             {
@@ -129,6 +192,5 @@ namespace UnityMCP.Editor.Chat
             Array.Copy(args, 0, result, 1, args.Length);
             return result;
         }
-
     }
 }

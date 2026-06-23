@@ -311,5 +311,57 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsTrue(parseLineCalled, "ParseLine must be called for non-error lines");
             Assert.AreEqual(1, out_.Count);
         }
+
+        // ── SpawnNewProcess env var regression gate ────────────────────────────
+        // EnvCapturingCliBackend calls the REAL base.BuildSpawnEnv() to capture envVars.
+        // Verifies that base class never injects UNITY_MCP_PORT/CHAT into process env.
+
+        [Test]
+        public void SpawnNewProcess_EnvVars_DoesNotContainUnityMcpPort()
+        {
+            var backend = new EnvCapturingCliBackend();
+            var env = backend.GetSpawnEnv();
+            Assert.IsFalse(env.ContainsKey("UNITY_MCP_PORT"),
+                "UNITY_MCP_PORT must NOT be in process env — deliver via scoped config only");
+        }
+
+        [Test]
+        public void SpawnNewProcess_EnvVars_DoesNotContainUnityMcpChat()
+        {
+            var backend = new EnvCapturingCliBackend();
+            var env = backend.GetSpawnEnv();
+            Assert.IsFalse(env.ContainsKey("UNITY_MCP_CHAT"),
+                "UNITY_MCP_CHAT must NOT be in process env — deliver via scoped config only");
+        }
+
+        [Test]
+        public void SpawnNewProcess_EnvVars_ContainsSessionTimeout()
+        {
+            var backend = new EnvCapturingCliBackend();
+            var env = backend.GetSpawnEnv();
+            Assert.IsTrue(env.ContainsKey("UNITY_MCP_SESSION_TIMEOUT"),
+                "UNITY_MCP_SESSION_TIMEOUT must be present");
+            Assert.AreEqual("300", env["UNITY_MCP_SESSION_TIMEOUT"]);
+        }
+    }
+
+    /// <summary>
+    /// Uses the internal BuildSpawnEnv() seam to verify what CliBackendBase puts into process env.
+    /// </summary>
+    public sealed class EnvCapturingCliBackend : CliBackendBase
+    {
+        protected override string BinaryName          => "test-capture";
+        protected override bool   IsPersistentProcess => false;
+
+        protected override (string[] args, string[] stripEnvKeys) BuildArgs(string binaryPath, string resumeId)
+            => (new[] { "arg1" }, new string[0]);
+
+        protected override void ParseLine(string line, List<ChatEvent> sink) { }
+
+        protected override void SpawnNewProcess(string binary, string[] args, string[] strip)
+        { /* no-op — prevents real process spawn */ }
+
+        /// <summary>Exposes the base env dict for assertion.</summary>
+        public Dictionary<string, string> GetSpawnEnv() => BuildSpawnEnv();
     }
 }

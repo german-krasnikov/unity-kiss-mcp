@@ -329,5 +329,27 @@ namespace UnityMCP.Editor.Chat.Tests
             int emptyCount = System.Array.FindAll(args, s => s == "").Length;
             Assert.AreEqual(0, emptyCount);
         }
+
+        // ── env leak regression: strip must include UNITY_MCP_PORT + UNITY_MCP_CHAT ─
+
+        [Test]
+        public void Build_StripEnvKeys_ContainsUnityMcpPort()
+        {
+            var (_, strip) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "plan", null);
+
+            Assert.Contains("UNITY_MCP_PORT", strip,
+                "UNITY_MCP_PORT must be stripped so global unity-mcp bridge cannot inherit chat port");
+        }
+
+        [Test]
+        public void Build_StripEnvKeys_ContainsUnityMcpChat()
+        {
+            var (_, strip) = ClaudeArgBuilder.Build(
+                "/usr/local/bin/claude", "/tmp/mcp.json", "plan", null);
+
+            Assert.Contains("UNITY_MCP_CHAT", strip,
+                "UNITY_MCP_CHAT must be stripped to prevent global bridge leaking chat-port flag");
+        }
     }
 }

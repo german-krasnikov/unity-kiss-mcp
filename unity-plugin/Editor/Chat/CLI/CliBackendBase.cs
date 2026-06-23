@@ -167,14 +167,26 @@ namespace UnityMCP.Editor.Chat
         protected virtual void SpawnNewProcess(string binary, string[] args, string[] strip)
         {
             _proc = new ChatProcess();
-            var envVars = new Dictionary<string, string>
+            _proc.Spawn(binary, args, strip, BuildSpawnEnv());
+        }
+
+        /// <summary>
+        /// Builds the process env dict. Extracted for testability.
+        /// RULE: UNITY_MCP_PORT must be delivered via each backend's scoped config
+        /// (--mcp-config JSON, TOML flag, ~/.kimi-code/mcp.json env block, etc.) — NEVER
+        /// via process env. Injecting it here leaks the chat port to ~/.claude/mcp.json's
+        /// "unity-kiss-mcp" entry (which reads UNITY_MCP_PORT from env), causing a duplicate
+        /// bridge on the chat port.
+        /// UNITY_MCP_CHAT has a Windows-only role: when UNITY_MCP_PORT is unset, Python
+        /// scans *.chat-port files instead of *.port. On macOS/Linux UNITY_MCP_PORT takes
+        /// priority so UNITY_MCP_CHAT absence is harmless; on Windows it is a pre-existing gap.
+        /// Future backends: deliver BOTH vars in your scoped config env block.
+        /// </summary>
+        protected virtual Dictionary<string, string> BuildSpawnEnv() =>
+            new Dictionary<string, string>
             {
-                { "UNITY_MCP_PORT",            MCPServer.ServerChatPort.ToString() },
-                { "UNITY_MCP_CHAT",            "1" },
                 { "UNITY_MCP_SESSION_TIMEOUT", "300" },
             };
-            _proc.Spawn(binary, args, strip, envVars);
-        }
 
         protected virtual void WriteLineToProc(string line) => _proc?.WriteLine(line);
 

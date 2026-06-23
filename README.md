@@ -185,7 +185,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 7244 Tests (2728 Python · 4432 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 7274 Tests (2728 Python · 4462 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -244,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.55.0</b> — 2026-06-24 — **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, …</summary>
+
+**Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, Agy automatically expose installed MCP servers (Blender, Luna, etc.) …
+
+</details>
+
+<details>
 <summary><b>v0.54.1</b> — 2026-06-23 — **Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when …</summary>
 
 **Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when Unity loses/regains focus with multiple CLI tools connected.
@@ -272,15 +279,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.52.5</b> — 2026-06-22 — **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.</summary>
-
-**Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.52.5** — 2026-06-22 — **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.
 - **v0.52.0** — 2026-06-21 — **Arcade Animation System** — Unified animation primitives for consistent UI …
 - **v0.51.0** — 2026-06-21 — **Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation …
 - **v0.50.3** — 2026-06-21 — **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass …

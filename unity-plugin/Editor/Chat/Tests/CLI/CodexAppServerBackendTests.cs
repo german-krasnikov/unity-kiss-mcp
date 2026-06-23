@@ -197,6 +197,65 @@ namespace UnityMCP.Editor.Chat.Tests
             StringAssert.Contains("\"action\":\"accept\"", backend.LastWrittenLine);
         }
 
+        // ── Dedup regression gate: explicit TOML flag assertions ─────────────
+
+        private static List<string> GetCValues(string[] args)
+        {
+            var cValues = new List<string>();
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == "-c") cValues.Add(args[i + 1]);
+            return cValues;
+        }
+
+        private static string[] InvokeBuildArgs(CodexAppServerBackend backend)
+        {
+            var method = typeof(CodexAppServerBackend)
+                .GetMethod("BuildArgs", BindingFlags.NonPublic | BindingFlags.Instance);
+            var result = ((string[] args, string[] stripEnvKeys))method.Invoke(
+                backend, new object[] { "/fake/codex", null });
+            return result.args;
+        }
+
+        [Test]
+        public void BuildArgs_HasUnityMcpPortTomlFlag()
+        {
+            var backend = new CodexAppServerBackend();
+            var cValues = GetCValues(InvokeBuildArgs(backend));
+            Assert.IsTrue(cValues.Exists(v => v.Contains("unity_chat.env.UNITY_MCP_PORT=")),
+                "UNITY_MCP_PORT must be delivered via TOML -c flag (scoped config), not process env");
+            backend.Stop();
+        }
+
+        [Test]
+        public void BuildArgs_HasUnityMcpChatTomlFlag()
+        {
+            var backend = new CodexAppServerBackend();
+            var cValues = GetCValues(InvokeBuildArgs(backend));
+            Assert.IsTrue(cValues.Exists(v => v.Contains("unity_chat.env.UNITY_MCP_CHAT=")),
+                "UNITY_MCP_CHAT must be delivered via TOML -c flag (scoped config), not process env");
+            backend.Stop();
+        }
+
+        [Test]
+        public void BuildArgs_DisablesOldUnityEntry()
+        {
+            var backend = new CodexAppServerBackend();
+            var cValues = GetCValues(InvokeBuildArgs(backend));
+            Assert.IsTrue(cValues.Exists(v => v == "mcp_servers.unity.enabled=false"),
+                "Old 'unity' entry must be disabled to prevent duplicate bridge");
+            backend.Stop();
+        }
+
+        [Test]
+        public void BuildArgs_DisablesOldUnityMcpEntry()
+        {
+            var backend = new CodexAppServerBackend();
+            var cValues = GetCValues(InvokeBuildArgs(backend));
+            Assert.IsTrue(cValues.Exists(v => v == "mcp_servers.unity-mcp.enabled=false"),
+                "Old 'unity-mcp' entry must be disabled to prevent duplicate bridge");
+            backend.Stop();
+        }
+
         // ── BuildArgs with model must emit model via -c, NOT --model ─────────
 
         [Test]

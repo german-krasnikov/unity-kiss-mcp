@@ -202,6 +202,36 @@ namespace UnityMCP.Editor.Chat.Tests
                 "Brace count must be balanced");
         }
 
+        // ── External server preservation (mirror KimiArgBuilderTests:203) ─────
+
+        [Test]
+        public void Build_StalePort_PreservesExternalServers()
+        {
+            // Arrange: existing settings.json has blender + stale unity-mcp port
+            var path = Path.Combine(_tempDir, "settings.json");
+            var stale =
+                "{\n" +
+                "  \"mcpServers\": {\n" +
+                "    \"blender\": { \"command\": \"blender-mcp\", \"args\": [] },\n" +
+                "    \"unity-mcp\": { \"command\": \"python3\", \"args\": [\"-m\",\"unity_mcp.server\"], \"env\": { \"UNITY_MCP_PORT\": \"9501\" }, \"trust\": true }\n" +
+                "  }\n" +
+                "}\n";
+            File.WriteAllText(path, stale);
+
+            // Act
+            AgyArgBuilder.Build("test", settingsDir: _tempDir, port: 9900);
+
+            // Assert: blender must survive, port updated, braces balanced
+            var content = File.ReadAllText(path);
+            StringAssert.Contains("\"blender\"", content,
+                "External blender-mcp server must be preserved after port update");
+            StringAssert.Contains("blender-mcp", content);
+            StringAssert.Contains("9900", content);
+            StringAssert.DoesNotContain("9501", content);
+            Assert.AreEqual(content.Count(c => c == '{'), content.Count(c => c == '}'),
+                "Brace count must be balanced");
+        }
+
         // ── BuildMcpBlock ─────────────────────────────────────────────────────
 
         [Test]

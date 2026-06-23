@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.55.0] — 2026-06-24
+
+**External MCP — Multi-Backend Integration & Port Scoping:**
+- **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, Agy automatically expose installed MCP servers (Blender, Luna, etc.) in chat sessions via additive config discovery. OpenCode absorbs non-Unity MCP entries via `MergeGlobalOpenCodeConfig`. Enables external AI tools (browser, code search, files) alongside Unity-MCP in single turn.
+- **Churn-Dedup & Port Scoping Fix** — Killed environment-variable data leak. `CliBackendBase.BuildSpawnEnv()` now sends ONLY `UNITY_MCP_SESSION_TIMEOUT`. Port and chat flags delivered via scoped --mcp-config (per-backend JSON/TOML/env files), never injected into process env. Prevents cross-connect churn when multiple projects open simultaneously.
+
 ## [v0.54.1] — 2026-06-23
 
 **Connection Stability — Focus Loss CPU Storm Fix:**
