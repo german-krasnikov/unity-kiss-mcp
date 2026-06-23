@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.54.1] — 2026-06-23
+
+**Connection Stability — Focus Loss CPU Storm Fix:**
+- **Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when Unity loses/regains focus with multiple CLI tools connected. Root cause: All socket I/O in `MCPServer.cs` captured `UnitySynchronizationContext` (18 awaits without `ConfigureAwait(false)`). When editor loses focus, `EditorApplication.update` throttles → task continuations freeze → heartbeat timeout → reconnect storm on focus regain.
+  * **C# Threading Model (v0.54.1):** Added `ConfigureAwait(false)` to all 18 socket-awaits in `RunAcceptLoop` and `HandleClientAsync`. Continuations now execute on ThreadPool, not main thread. Added invariant: **Unity Editor API is only called on main thread** — all `Debug.Log*`, `EditorApplication.QueuePlayerLoopUpdate()`, and `RefManager.Invalidate()` marshaled via `_mainThreadQueue` using `_mainThreadQueue.Enqueue()`. Cached domain stamp in volatile `_domainStamp` field (read on main thread in `StartAsync`, used by fast-path get_version on ThreadPool). Added comments marking threading boundaries.
+  * **Python Defense-in-Depth (v0.54.1):** Added reconnect cooldown gate to both `send()` and `_send_with_retry()` paths (was only on heartbeat), preventing burst storms. Added jitter (±10%) to retry delays. Enriched crash log with `bridge_id` (unique per instance), `reconnect_reason`, and `path` (send vs heartbeat) for observability. Incremented METRICS.reconnect.send_path counter. Atomic `_on_port_change` lock swap prevents race during port re-discovery.
+- **Tests:** Added 3 new C# NUnit tests (ConnectionStabilityTests: focus loss reconnect, multi-CLI single socket, rapid focus toggle). Added 2 new Python tests (test_send_path_cooldown: gate on first attempt, test_focus_loss_stability: multi-CLI scenario). All tests green.
+
 ## [v0.53.1] — 2026-06-23
 
 **Chat Bug Fixes:**

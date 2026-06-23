@@ -85,6 +85,19 @@ Key features:
 - asyncio.Lock serializes them — heartbeat ping can never interleave with a tool-call response
 - ID collision is impossible by design
 
+**v0.54.1 — Focus-Loss CPU Storm Fix (Multi-CLI Reconnect Storm Prevention)**
+- **Root Cause:** All socket I/O awaits in `MCPServer.cs` captured `UnitySynchronizationContext` (18 awaits, no `ConfigureAwait(false)`). Focus loss → `EditorApplication.update` throttle → task continuations freeze → heartbeat timeout → reconnect storm on focus regain.
+- **Fix — C# Threading Model (MCPServer.cs, v0.54.1):**
+  - **Socket I/O (RunAcceptLoop, HandleClientAsync):** All 18 awaits now use `ConfigureAwait(false)`. Continuations execute on ThreadPool, not main thread.
+  - **Invariant: Unity API only on main thread** — No direct Editor API calls after ThreadPool continuations. All `Debug.Log*`, `EditorApplication.QueuePlayerLoopUpdate()`, and `RefManager.Invalidate()` marshaled via `_mainThreadQueue.Enqueue()` lambda.
+  - **Domain Stamp Cache:** Volatile `_domainStamp` field cached on main thread in `StartAsync()`, read on ThreadPool by fast-path `get_version` (SessionState not thread-safe).
+  - **Comments:** Added `// WARNING: All awaits here use ConfigureAwait(false)...` at method boundary (RunAcceptLoop, HandleClientAsync).
+- **Fix — Python Reconnect Cooldown (bridge.py, v0.54.1):**
+  - **Dual-gate:** `send()` and `_send_with_retry()` both check `_reconnect_cooldown_ok()` before first reconnect attempt. Prevents burst storms when multiple CLIs reconnect simultaneously.
+  - **Jitter:** Retry delays now include ±10% random jitter to desynchronize reconnect attempts across multiple bridge instances.
+  - **Observability:** Crash log enriched with `bridge_id` (unique per instance), `reconnect_reason`, `path` ("send" vs "heartbeat"). METRICS.inc("reconnect.send_path") for telemetry.
+- **Defense-in-depth:** Atomic `_on_port_change` lock swap in server.py prevents race during port re-discovery. No socket thundering herd (max 3 retries at 30s+ intervals per policy).
+
 ### ConnectionSlot (connection_slot.py)
 
 Single-connection manager (replaces former multi-connection BridgeManager):

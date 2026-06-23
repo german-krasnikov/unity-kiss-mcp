@@ -109,6 +109,10 @@ class MetricsRegistry:
             "costs_usd": dict(self._costs_usd),
         }
 
+    def reset_counter(self, key: str) -> None:
+        """Reset a single counter to zero. Useful in tests for baseline isolation."""
+        self._counters[key] = 0
+
     def reset(self) -> None:
         self._counters.clear()
         self._observations.clear()

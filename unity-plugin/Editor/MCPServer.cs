@@ -201,6 +201,9 @@ namespace UnityMCP.Editor
         private static volatile bool _shuttingDown;
         private static volatile bool _starting;
         private static volatile bool _isCompiling;
+        // Cached domain stamp — read from main thread in StartAsync, used in get_version fast-path
+        // (which runs on ThreadPool after ConfigureAwait(false); SessionState not thread-safe).
+        private static volatile string _domainStamp = "";
         // Set on first compilationStarted; never cleared. Distinguishes real compile-in-progress
         // from post-domain-reload stale EditorApplication.isCompiling on Windows.
         private static volatile bool _compileStartedThisDomain;
@@ -371,6 +374,7 @@ namespace UnityMCP.Editor
             if (IsRunning || _starting) return;
             _starting = true;
             _shuttingDown = false;
+            _domainStamp = SyncHelper.CurrentDomainStamp;  // cache on main thread — safe here, ThreadPool reads below
             CommandRouter.EnsureEnabledToolsCacheWarm();  // #29: warm tool cache on main thread before serving the read-thread fast-path
             // Tier 0: re-register idempotently so restart after Stop() works
             EditorApplication.update -= ProcessMainThreadQueue;
@@ -405,7 +409,7 @@ namespace UnityMCP.Editor
                         _listener.Start();
                         if (bindPort != Port)
                         {
-                            Debug.LogWarning($"[MCP] Port {Port} in TIME_WAIT, switched to {bindPort}");
+                            var bp = bindPort; _mainThreadQueue.Enqueue(() => Debug.LogWarning($"[MCP] Port {Port} in TIME_WAIT, switched to {bp}"));
                             SavePorts(bindPort, ChatPort);
                         }
                         break;
@@ -415,8 +419,8 @@ namespace UnityMCP.Editor
                         try { _listener?.Stop(); } catch { }
                         _listener = null;
                         if (attempt == 3) throw;
-                        Debug.LogWarning($"[MCP] Port {bindPort} busy, retry {attempt + 1}/3...");
-                        await Task.Delay(400 * (attempt + 1), token);
+                        var bp2 = bindPort; var at = attempt; _mainThreadQueue.Enqueue(() => Debug.LogWarning($"[MCP] Port {bp2} busy, retry {at + 1}/3..."));
+                        await Task.Delay(400 * (attempt + 1), token).ConfigureAwait(false);
                     }
                 }
 
@@ -435,7 +439,7 @@ namespace UnityMCP.Editor
                         _chatListener.Start();
                         if (bindPort != ChatPort)
                         {
-                            Debug.LogWarning($"[MCP] Chat port {ChatPort} in TIME_WAIT, switched to {bindPort}");
+                            var bp = bindPort; _mainThreadQueue.Enqueue(() => Debug.LogWarning($"[MCP] Chat port {ChatPort} in TIME_WAIT, switched to {bp}"));
                             SavePorts(Port, bindPort);
                         }
                         break;
@@ -446,21 +450,21 @@ namespace UnityMCP.Editor
                         _chatListener = null;
                         if (attempt == 2)
                         {
-                            Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable after fallback: {se.Message}");
+                            var msg = se.Message; _mainThreadQueue.Enqueue(() => Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable after fallback: {msg}"));
                             break;
                         }
-                        Debug.LogWarning($"[MCP] Chat port {bindPort} busy, retry {attempt + 1}/2...");
-                        await Task.Delay(300 * (attempt + 1), token);
+                        var bp2 = bindPort; var at = attempt; _mainThreadQueue.Enqueue(() => Debug.LogWarning($"[MCP] Chat port {bp2} busy, retry {at + 1}/2..."));
+                        await Task.Delay(300 * (attempt + 1), token).ConfigureAwait(false);
                     }
                     catch (SocketException se)
                     {
-                        Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable: {se.Message}");
+                        var msg = se.Message; _mainThreadQueue.Enqueue(() => Debug.LogWarning($"[MCP] Chat port {ChatPort} unavailable: {msg}"));
                         _chatListener = null;
                         break;
                     }
                 }
 
-                Debug.Log($"[MCP] Server started on port {Port} (chat: {ChatPort})");
+                _mainThreadQueue.Enqueue(() => Debug.Log($"[MCP] Server started on port {Port} (chat: {ChatPort})"));
                 WritePortFile(Port);
                 WriteStateFile("ready");
 
@@ -469,13 +473,13 @@ namespace UnityMCP.Editor
                 var chatLoop = _chatListener != null
                     ? RunAcceptLoop(_chatListener, _chatSlot, "Chat", cts, token)
                     : Task.CompletedTask;
-                await Task.WhenAll(mainLoop, chatLoop);
+                await Task.WhenAll(mainLoop, chatLoop).ConfigureAwait(false);
             }
             catch (Exception e)
             {
                 if (!_shuttingDown)
                 {
-                    Debug.LogError($"[MCP] Server error: {e.Message}");
+                    var msg = e.Message; _mainThreadQueue.Enqueue(() => Debug.LogError($"[MCP] Server error: {msg}"));
                 }
                 // Clean up on bind failure — prevent CTS/listener leak
                 if (!IsRunning)
@@ -490,20 +494,23 @@ namespace UnityMCP.Editor
             finally { _starting = false; }
         }
 
+        // WARNING: All awaits in RunAcceptLoop use ConfigureAwait(false).
+        // Code after any await here runs on ThreadPool, NOT main thread.
+        // Do NOT call Unity Editor APIs directly — use _mainThreadQueue.Enqueue().
         private static async Task RunAcceptLoop(TcpListener listener, ClientSlot slot, string label,
             CancellationTokenSource masterCts, CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
                 TcpClient client;
-                try { client = await listener.AcceptTcpClientAsync(); }
+                try { client = await listener.AcceptTcpClientAsync().ConfigureAwait(false); }
                 catch (ObjectDisposedException) { break; }
                 catch (Exception e)
                 {
                     if (token.IsCancellationRequested) break;
-                    Debug.LogError($"[MCP] {label} accept error: {e.Message}");
+                    var msg = e.Message; _mainThreadQueue.Enqueue(() => Debug.LogError($"[MCP] {label} accept error: {msg}"));
                     if (_cts != masterCts || !IsRunning) break;
-                    await Task.Delay(100, token);
+                    await Task.Delay(100, token).ConfigureAwait(false);
                     continue;
                 }
 
@@ -543,11 +550,18 @@ namespace UnityMCP.Editor
 #endif
         }
 
+        // WARNING: All awaits in HandleClientAsync use ConfigureAwait(false).
+        // Code after any await here runs on ThreadPool, NOT main thread.
+        // Do NOT call Unity Editor APIs directly — use _mainThreadQueue.Enqueue().
         private static async Task HandleClientAsync(TcpClient client, ClientSlot slot, int index, long generation,
             string label, CancellationToken clientToken)
         {
-            Debug.Log($"[MCP] {label} client connected");
-            RefManager.Invalidate();
+            var endPoint = client.Client.RemoteEndPoint?.ToString() ?? "unknown";
+            _mainThreadQueue.Enqueue(() =>
+            {
+                Debug.Log($"[MCP] {label} client connected from {endPoint}");
+                RefManager.Invalidate();
+            });
             try
             {
                 using (client)
@@ -557,18 +571,18 @@ namespace UnityMCP.Editor
 
                     while (client.Connected && !clientToken.IsCancellationRequested)
                     {
-                        if (!await ReadExactAsync(stream, header, clientToken))
+                        if (!await ReadExactAsync(stream, header, clientToken).ConfigureAwait(false))
                             break;
 
                         var length = BinaryPrimitives.ReadUInt32BigEndian(header);
                         if (length > MaxMessageSize)
                         {
-                            Debug.LogWarning($"[MCP] Protocol desync: length prefix {length} bytes (0x{length:X8}) exceeds {MaxMessageSize} — reconnecting");
+                            var len = length; _mainThreadQueue.Enqueue(() => Debug.LogWarning($"[MCP] Protocol desync: length prefix {len} bytes (0x{len:X8}) exceeds {MaxMessageSize} — reconnecting"));
                             break;
                         }
 
                         var payload = new byte[length];
-                        if (!await ReadExactAsync(stream, payload, clientToken))
+                        if (!await ReadExactAsync(stream, payload, clientToken).ConfigureAwait(false))
                             break;
 
                         var json = Encoding.UTF8.GetString(payload);
@@ -578,28 +592,29 @@ namespace UnityMCP.Editor
                         var msgId = JsonHelper.ExtractString(json, "id");
                         if (cmdName == "ping")
                         {
-                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, "pong", null), clientToken);
+                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, "pong", null), clientToken).ConfigureAwait(false);
                             continue;
                         }
                         if (cmdName == "get_version")
                         {
                             // RC-5: include domain stamp so reconnect can detect stale DLL.
-                            var stamp = SyncHelper.CurrentDomainStamp;
+                            // Use cached stamp — SyncHelper.CurrentDomainStamp is SessionState (main-thread only).
+                            var stamp = _domainStamp;
                             var ver = BuildVersionString(stamp, PluginVersion);
-                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, ver, null), clientToken);
+                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, ver, null), clientToken).ConfigureAwait(false);
                             continue;
                         }
                         if (cmdName == "status")
                         {
                             var isCompiling = _isCompiling;
                             var elapsed = isCompiling ? (DateTime.UtcNow - _compileStartTime).TotalSeconds : 0.0;
-                            await SendAsync(stream, FormatStatusResponse(msgId, isCompiling, elapsed), clientToken);
+                            await SendAsync(stream, FormatStatusResponse(msgId, isCompiling, elapsed), clientToken).ConfigureAwait(false);
                             continue;
                         }
                         if (cmdName == "get_enabled_tools")
                         {
                             var tools = CommandRouter.ExecGetEnabledToolsCached();
-                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, tools, null), clientToken);
+                            await SendAsync(stream, JsonHelper.FormatResponse(msgId, true, tools, null), clientToken).ConfigureAwait(false);
                             continue;
                         }
 
@@ -625,7 +640,10 @@ namespace UnityMCP.Editor
                                 tcs.TrySetException(e);
                             }
                         });
-                        EditorApplication.QueuePlayerLoopUpdate();
+                        // QueuePlayerLoopUpdate wakes the main thread to drain _mainThreadQueue.
+                        // Wrapped in Enqueue so it runs on main thread — closes the invariant
+                        // "zero Unity API on ThreadPool" (even if it were thread-safe, the pattern is consistent).
+                        _mainThreadQueue.Enqueue(() => EditorApplication.QueuePlayerLoopUpdate());
 
                         // Stop() / client replacement / per-command timeout unblocks this await
                         using var reg = linkedCts.Token.Register(() =>
@@ -636,8 +654,8 @@ namespace UnityMCP.Editor
                                 tcs.TrySetResult(
                                     $"{{\"id\":\"{JsonHelper.EscapeJson(msgId)}\",\"ok\":false,\"err\":\"Command '{JsonHelper.EscapeJson(cmdName)}' timed out after {timeoutSec}s (Unity main thread blocked). Retry.\",\"retry\":2000}}");
                         });
-                        var result = await tcs.Task;
-                        await SendAsync(stream, result, clientToken);
+                        var result = await tcs.Task.ConfigureAwait(false);
+                        await SendAsync(stream, result, clientToken).ConfigureAwait(false);
                     }
                 }
             }
@@ -646,22 +664,24 @@ namespace UnityMCP.Editor
             {
                 if (!_shuttingDown && !clientToken.IsCancellationRequested)
                 {
-                    Debug.LogError($"[MCP] Client error: {e.Message}");
+                    var msg = e.Message; _mainThreadQueue.Enqueue(() => Debug.LogError($"[MCP] Client error: {msg}"));
                 }
             }
             finally
             {
                 slot.Clear(index, generation);
-                Debug.Log($"[MCP] {label} client disconnected (gen={generation})");
+                var lbl = label; var gen = generation;
+                _mainThreadQueue.Enqueue(() => Debug.Log($"[MCP] {lbl} client disconnected (gen={gen})"));
             }
         }
 
-        private static async Task<bool> ReadExactAsync(NetworkStream stream, byte[] buffer, CancellationToken token)
+        // internal (not private) so UnityMCP.Editor.Tests can call directly for seam tests.
+        internal static async Task<bool> ReadExactAsync(Stream stream, byte[] buffer, CancellationToken token)
         {
             int totalRead = 0;
             while (totalRead < buffer.Length)
             {
-                var read = await stream.ReadAsync(buffer, totalRead, buffer.Length - totalRead, token);
+                var read = await stream.ReadAsync(buffer, totalRead, buffer.Length - totalRead, token).ConfigureAwait(false);
                 if (read == 0)
                     return false;
                 totalRead += read;
@@ -669,14 +689,16 @@ namespace UnityMCP.Editor
             return true;
         }
 
-        private static async Task SendAsync(NetworkStream stream, string json, CancellationToken token)
+        // internal (not private) so UnityMCP.Editor.Tests can call directly for seam tests.
+        // ConfigureAwait(false) on BOTH awaits below is mandatory — GREEN state.
+        internal static async Task SendAsync(Stream stream, string json, CancellationToken token)
         {
             var payload = Encoding.UTF8.GetBytes(json);
             var frame = new byte[4 + payload.Length];
             BinaryPrimitives.WriteUInt32BigEndian(frame, (uint)payload.Length);
             Buffer.BlockCopy(payload, 0, frame, 4, payload.Length);
-            await stream.WriteAsync(frame, 0, frame.Length, token);
-            await stream.FlushAsync(token);
+            await stream.WriteAsync(frame, 0, frame.Length, token).ConfigureAwait(false);
+            await stream.FlushAsync(token).ConfigureAwait(false);
         }
 
         private static void ProcessMainThreadQueue()

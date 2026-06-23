@@ -3,6 +3,7 @@ import enum
 import json
 import logging
 import os
+import random
 import re
 import select
 import socket
@@ -124,6 +125,7 @@ class UnityBridge(HeartbeatMixin):
         self._ppid_mismatch_count: int = 0
         self._pinned_port: Optional[int] = None
         self._pinned_pid: Optional[int] = None
+        self._bridge_id: str = f"br-{os.getpid():x}-{id(self) & 0xFFFF:04x}"
 
     @property
     def _startup_grace_expired(self) -> bool:
@@ -187,6 +189,9 @@ class UnityBridge(HeartbeatMixin):
 
     async def send(self, cmd: str, args: dict, timeout: float = 30.0) -> dict:
         if self._state == BridgeState.FAILED:
+            if not self._reconnect_cooldown_ok():
+                raise ConnectionError("Reconnect cooldown active — retry in a moment")
+            self._last_reconnect_at = time.monotonic()
             try:
                 async with self._lock:
                     await self._reconnect(fire_callbacks=False)
@@ -206,6 +211,10 @@ class UnityBridge(HeartbeatMixin):
                                msg_id: str, timeout: float, session_deadline: float) -> dict:
         attempt = 0
         result = None
+        # Cooldown gate: fail-fast on FIRST attempt only — prevent burst reconnect storms.
+        # Retries within this call are already gated by the sleep(delay) in the retry loop.
+        if not self.connected and not self._reconnect_cooldown_ok():
+            raise ConnectionError("Reconnect cooldown active — retry in a moment")
         while attempt <= MAX_RETRIES:
             if time.monotonic() > session_deadline:
                 raise TimeoutError(f"Session deadline ({SESSION_TIMEOUT}s) exceeded")
@@ -213,7 +222,9 @@ class UnityBridge(HeartbeatMixin):
             try:
                 async with self._lock:
                     if not self.connected:
+                        self._last_reconnect_at = time.monotonic()
                         await self._reconnect(fire_callbacks=False)
+                        METRICS.inc("reconnect.send_path")
                     self._writer.write(header + payload)
                     await self._writer.drain()
                     try:
@@ -233,10 +244,13 @@ class UnityBridge(HeartbeatMixin):
                 self._crash_log.log_disconnect(cmd=cmd, retry=attempt,
                                                error_type=type(e).__name__,
                                                unity_busy=reason in ("busy", "domain_reload"),
-                                               port=self._port)
+                                               port=self._port,
+                                               bid=self._bridge_id,
+                                               reason=reason,
+                                               path="send")
                 if do_retry:
                     attempt += 1
-                    await asyncio.sleep(delay)
+                    await asyncio.sleep(delay + random.uniform(0, delay * 0.1))
                     continue
                 raise ConnectionError(self._describe_failure(cmd, e)) from e
 
@@ -271,7 +285,8 @@ class UnityBridge(HeartbeatMixin):
                 outage = time.monotonic() - self._first_failure_ts
                 METRICS.observe("recompile.duration_ms", outage * 1000)
                 self._crash_log.log_reconnect(outage_s=outage, retries=attempt,
-                                              port=self._port)
+                                              port=self._port, bid=self._bridge_id,
+                                              path="send")
                 self._first_failure_ts = None
             return result
         return result  # type: ignore[return-value]

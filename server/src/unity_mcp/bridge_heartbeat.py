@@ -124,7 +124,9 @@ class HeartbeatMixin:
                     if self.connected:
                         return
                     try:
+                        from unity_mcp.metrics import METRICS
                         await self._reconnect()
+                        METRICS.inc("reconnect.heartbeat")
                         self._ping_failures = 0
                         # B1: success — reset backoff for fast recovery after Unity returns.
                         self._reconnect_backoff = BACKOFF_MIN_S

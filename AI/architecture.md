@@ -831,6 +831,10 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 - [ ] Token efficiency: text format, not JSON
 - [ ] Thread safety: Unity API only on main thread
+  - [ ] **C# Socket I/O (v0.54.1):** All socket awaits use `ConfigureAwait(false)` (RunAcceptLoop, HandleClientAsync, HandleConnectionAsync). No Editor API on ThreadPool continuations.
+  - [ ] **C# Main-Thread Marshaling:** All `Debug.Log*`, `RefManager.Invalidate()`, `EditorApplication.QueuePlayerLoopUpdate()` wrapped in `_mainThreadQueue.Enqueue()` lambda.
+  - [ ] **C# Domain Stamp Cache:** Volatile `_domainStamp` field for ThreadPool fast-path `get_version` (SessionState not thread-safe).
+  - [ ] **Python Reconnect Cooldown:** Both `send()` and `_send_with_retry()` gate on `_reconnect_cooldown_ok()` before reconnect (no burst storms).
 - [ ] Error handling: graceful degradation
 - [ ] Reconnection: heartbeat-driven reconnect
 - [ ] Guards: compile, play mode, runtime, tool enable

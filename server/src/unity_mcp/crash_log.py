@@ -68,13 +68,28 @@ class CrashLogger:
             pass
 
     def log_disconnect(self, *, cmd: str, retry: int, error_type: str,
-                       unity_busy: bool, port: int) -> None:
-        self._write({"ev": "disconnect", "cmd": cmd, "retry": retry,
-                     "err": error_type, "busy": unity_busy, "port": port})
+                       unity_busy: bool, port: int,
+                       bid: str = "", reason: str = "", path: str = "") -> None:
+        entry = {"ev": "disconnect", "cmd": cmd, "retry": retry,
+                 "err": error_type, "busy": unity_busy, "port": port}
+        if bid:
+            entry["bid"] = bid
+        if reason:
+            entry["reason"] = reason
+        if path:
+            entry["path"] = path
+        self._write(entry)
 
-    def log_reconnect(self, *, outage_s: float, retries: int, port: int) -> None:
-        self._write({"ev": "reconnect", "outage_s": outage_s,
-                     "retries": retries, "port": port})
+    def log_reconnect(self, *, outage_s: float, retries: int, port: int,
+                      bid: str = "", reason: str = "", path: str = "") -> None:
+        entry = {"ev": "reconnect", "outage_s": outage_s, "retries": retries, "port": port}
+        if bid:
+            entry["bid"] = bid
+        if reason:
+            entry["reason"] = reason
+        if path:
+            entry["path"] = path
+        self._write(entry)
 
     def close(self) -> None:
         self._closed = True

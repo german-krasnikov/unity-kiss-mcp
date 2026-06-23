@@ -231,15 +231,17 @@ async def lifespan(app):
 
     def _on_port_change(old_port: int, new_port: int):
         nonlocal lock_fd
-        old_fd, lock_fd = lock_fd, None
+        # Atomic: acquire new lock BEFORE releasing old — no lockless window.
+        try:
+            new_fd = acquire_lock(port=new_port)
+        except Exception as exc:
+            log.warning("Failed to acquire lock for new port %d — keeping old: %s", new_port, exc)
+            return
+        old_fd, lock_fd = lock_fd, new_fd
         try:
             release_lock(old_fd)
         except Exception:
             pass
-        try:
-            lock_fd = acquire_lock(port=new_port)
-        except Exception as exc:
-            log.warning("Failed to acquire lock for new port %d: %s", new_port, exc)
 
     import threading
     def _bg_update_check():
