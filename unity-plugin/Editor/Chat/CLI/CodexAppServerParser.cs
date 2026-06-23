@@ -115,9 +115,48 @@ namespace UnityMCP.Editor.Chat
                     break;
                 }
 
-                // mcpServer/*, thread/status/changed, turn/started, item/agentMessage/*, etc. — ignore
+                case "mcpServer/elicitation/request":
+                {
+                    // Codex gates MCP tool calls with elicitation; auto-accept so we never hang.
+                    // id is at TOP-LEVEL (sibling of "method"), not inside params.
+                    var rpcId = JsonHelper.ExtractString(line, "id") ?? "0";
+                    sink.Add(ChatEvent.AutoReply(ControlResponseBuilder.CodexElicitationAccept(rpcId)));
+                    break;
+                }
+
+                // Shell/file approvals — surface visibly; do NOT auto-accept (safety).
+                case "item/commandExecution/requestApproval":
+                case "item/fileChange/requestApproval":
+                    sink.Add(ChatEvent.Error($"Unexpected approval request: {method}"));
+                    break;
+
+                default:
+                    // Layer 3 invariant: any message with an "id" field expects a reply.
+                    // Unknown server requests are surfaced visibly and declined — unblocks codex
+                    // without granting permission for something we don't understand.
+                    // Pure notifications (no "id") are intentionally ignored silently.
+                    if (HasRpcId(line))
+                    {
+                        var rpcId = JsonHelper.ExtractString(line, "id") ?? "0";
+                        var m = JsonHelper.ExtractString(line, "method") ?? "unknown";
+                        sink.Add(ChatEvent.Error($"[MCP Chat] Unhandled server request: {m} — auto-declined"));
+                        sink.Add(ChatEvent.AutoReply(ControlResponseBuilder.CodexElicitationDecline("codex:" + rpcId)));
+                    }
+                    // else: benign notification — ignore silently
+                    break;
+                // Safely ignored notifications: thread/status/changed, turn/started,
+                // item/agentMessage/*, mcpServer/status/updated, mcpServer/oauth/*,
+                // serverRequest/resolved, deprecation/notice, remoteControl/status/changed,
+                // guardian/*, context/compacted
             }
         }
+
+        // True when JSON-RPC request: has "id" at TOP LEVEL only (depth-0 key of root object).
+        // Notifications are allowed to have nested "id" fields (e.g. params.turn.id) — those must
+        // NOT trigger the unknown-request path. JsonHelper.FindKeyIndex checks depth <= 1,
+        // so it returns only root-level keys, never nested ones.
+        private static bool HasRpcId(string line) =>
+            line != null && JsonHelper.ExtractString(line, "id") != null;
 
         // ── Item dispatch ────────────────────────────────────────────────────
 

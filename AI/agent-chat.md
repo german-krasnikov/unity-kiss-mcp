@@ -89,6 +89,25 @@ Each CLI-based backend is a strategy over **4 variation axes:**
 
 **Result:** Adding a new backend = 1 new CliBackendBase subclass + parser file. No changes to window, dispatcher, or lifecycle code.
 
+### Codex Backend — Version-Specific Integration (v0.141.0+)
+
+**Problem (OpenAI issue #11816, OPEN):** Codex 0.141.0 sends `mcp_elicitation` (approval-kind) events without timeout, causing indefinite blocking in headless stream-json mode. Unlike Claude which distinguishes request (top-level `id`) from notification (nested `id`), Codex doesn't signal request context cleanly.
+
+**Layered Mitigation:**
+
+1. **Layer 1 — Suppression + Sandbox:** `CodexArgBuilder` injects `--disallowedTools approval` (prevents Codex from emitting approval requests). Paired with `--permission-mode acceptEdits` for auto-accept on mutations (no approval needed). Sandbox: all tool calls pass immutable `args` dict to CommandRouter — no approval-mutation races.
+
+2. **Layer 2 — Auto-Accept:** If approval leaks through Layer 1, `ControlResponseBuilder.CodexElicitationAccept()` auto-responds with status=accepted (never silent-drop). Prevents indefinite block but signals bug upstream.
+
+3. **Layer 3 — Request/Notification Invariant:** `CodexAppServerParser.HasRpcId()` distinguishes top-level request `id` (field present, type string) from notification (field absent or null). Parser NEVER silent-drops: every incoming JSON-RPC frame must match this invariant or logs error + continues. Enables future version diffs.
+
+**Files:**
+- `CodexArgBuilder.cs` — line with `--disallowedTools approval`
+- `CodexAppServerParser.cs` — HasRpcId check in frame dispatch
+- `ControlResponseBuilder.cs` — CodexElicitationAccept entry point
+
+**Details:** See `AI/mcp-server.md` § "Codex App-Server Elicitation Handling" for architectural explanation and code snippets.
+
 ## IChatBackend Abstraction
 
 Single interface for pluggable chat backends:

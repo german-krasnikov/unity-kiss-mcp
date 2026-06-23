@@ -189,6 +189,61 @@ Returns a plain-text schema block (no JSON), one tool per section. Backwards-com
 
 **Token impact:** ~58-68% per-turn schema-token reduction. Enabled by default; discovery-gated tools show stub until explicitly enabled in session.
 
+### Codex App-Server Elicitation Handling (Chat CLI backends, v0.53.1+)
+
+**Problem:** Codex app-server gates MCP tool invocations with `mcpServer/elicitation/request` JSON-RPC (OpenAI issue #11816, no timeout) before executing mutating tools (e.g., `set_property`). Codex sets no timeout on the request, causing infinite spinner when the elicitation is silently dropped or not auto-accepted. Read-only tools don't trigger elicitation, so they pass through normally.
+
+**Solution:** Layered handling in **asmdef `UnityMCP.Editor.Chat.CLI`** distinguishes requests (expect replies) from notifications (fire-and-forget).
+
+**Layer 1: Approval Policy Suppression (Performance)**
+
+Configure `approvalPolicy` in MCP client to suppress elicitation prompts:
+- In `thread/start` request: `"sandbox":"danger-full-access"` (string)
+- In `turn/start` request: `sandboxPolicy:{type:"dangerFullAccess"}` (object)
+
+**Layer 2: Parser Auto-Accept (Correctness)**
+
+**CodexAppServerParser.cs** detects the elicitation request and auto-replies immediately:
+```csharp
+case "mcpServer/elicitation/request":
+{
+    var rpcId = JsonHelper.ExtractString(line, "id") ?? "0";
+    sink.Add(ChatEvent.AutoReply(ControlResponseBuilder.CodexElicitationAccept(rpcId)));
+    break;
+}
+```
+
+**ControlResponseBuilder.cs** formats the JSON-RPC 2.0 accept response:
+```csharp
+public static string CodexElicitationAccept(string rpcId) =>
+    $"{{\"jsonrpc\":\"2.0\",\"id\":{FormatRpcId(rpcId)},\"result\":{{\"action\":\"accept\",\"content\":{{}}}}}}";
+```
+
+**Layer 3: Request vs Notification Invariant (Safety)**
+
+**Critical distinction:** JSON-RPC requests have a top-level `"id"` field; notifications don't. Parser correctly ignores nested `id` fields (e.g., `params.turn.id`) via `JsonHelper.ExtractString(line, "id")` which is depth-aware (returns top-level keys only).
+
+Unknown server requests with top-level `id` are auto-declined (not auto-accepted) to avoid granting unintended permissions:
+```csharp
+if (HasRpcId(line))  // top-level id present
+{
+    var rpcId = JsonHelper.ExtractString(line, "id") ?? "0";
+    sink.Add(ChatEvent.Error($"[MCP Chat] Unhandled server request: {m} — auto-declined"));
+    sink.Add(ChatEvent.AutoReply(ControlResponseBuilder.CodexElicitationDecline("codex:" + rpcId)));
+}
+// else: benign notification → ignore silently
+```
+
+**ChatEvent.cs** defines `AutoReply` kind (not rendered, transparent to UI; text holds raw JSON-RPC response).
+
+**Why This Works**
+- Mutating tools trigger elicitation → caught at parser, auto-accepted immediately → no spinner
+- Read-only tools don't trigger elicitation → no request sent → passes through
+- Unknown requests (safety net) → declined, never silently dropped → visible warning
+- Shell/file approvals (safety gate) → surfaced as Error, never auto-accepted
+
+**Files:** `CodexAppServerParser.cs`, `ControlResponseBuilder.cs`, `ChatEvent.cs` (all in `unity-plugin/Editor/Chat/CLI/`)
+
 ### Middleware (23 layers, `UNITY_MCP_MIDDLEWARE=1`)
 
 Retry Watchdog, Confidence Decay (gated <0.5), Taint Tracking, Periodic State Injection (staleness-gated), Path Cache, Dead Write Elimination, Starvation Monitor, Blast Radius Tags, Incremental Verification, Workflow Phase FSM, Visual Verification (Haiku), Play Mode Auto-Routing, find_objects Cache Bypass, Batch Conflict Scan, Post-mutation Snapshot, Component Cache, Console Error Categorization, PrefetchCache (TTL 12s), HierarchyDiff, Distiller, Disambiguator, SchemaGuard, Asymmetric Reflection

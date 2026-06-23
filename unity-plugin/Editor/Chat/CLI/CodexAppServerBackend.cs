@@ -103,15 +103,12 @@ namespace UnityMCP.Editor.Chat
                 // First turn: send thread/start and queue the actual turn text until
                 // sessionId (threadId) arrives in DrainEvents via ParseLine.
                 _pendingTurnText = text;
-                var id       = ++_nextId;
                 var snapshot = EditorStateSnapshot.Capture();
                 var instr    = string.IsNullOrEmpty(snapshot)
                     ? "null"
                     : $"\"{JsonHelper.EscapeJson(snapshot)}\"";
-                var cwd      = JsonHelper.EscapeJson(CodexArgBuilder.ProjectRoot());
-                base.WriteLineToProc(
-                    $"{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"thread/start\"," +
-                    $"\"params\":{{\"cwd\":\"{cwd}\",\"baseInstructions\":{instr}}}}}");
+                var cwd = JsonHelper.EscapeJson(CodexArgBuilder.ProjectRoot());
+                base.WriteLineToProc(BuildThreadStartJson(++_nextId, cwd, instr));
             }
             else
             {
@@ -139,13 +136,23 @@ namespace UnityMCP.Editor.Chat
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private void SendTurnStart(string text, string threadId)
-        {
-            var id = ++_nextId;
-            base.WriteLineToProc(
-                $"{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"turn/start\"," +
-                $"\"params\":{{\"threadId\":\"{threadId}\"," +
-                $"\"input\":[{{\"type\":\"text\",\"text\":\"{JsonHelper.EscapeJson(text)}\"}}]}}}}");
-        }
+            => base.WriteLineToProc(BuildTurnStartJson(++_nextId, threadId, text));
+
+        // ── Testable JSON builders (internal for NUnit, not part of public API) ──
+
+        // Layer 1 suppression is embedded here so tests assert the exact strings in prod paths.
+        internal static string BuildTurnStartJson(int id, string threadId, string text) =>
+            $"{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"turn/start\"," +
+            $"\"params\":{{\"threadId\":\"{threadId}\"," +
+            $"\"approvalPolicy\":{{\"granular\":{{\"mcp_elicitations\":false,\"rules\":false,\"sandbox_approval\":false}}}}," +
+            $"\"sandboxPolicy\":{{\"type\":\"dangerFullAccess\"}}," +
+            $"\"input\":[{{\"type\":\"text\",\"text\":\"{JsonHelper.EscapeJson(text)}\"}}]}}}}";
+
+        internal static string BuildThreadStartJson(int id, string cwd, string instr) =>
+            $"{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"thread/start\"," +
+            $"\"params\":{{\"cwd\":\"{cwd}\",\"baseInstructions\":{instr}," +
+            $"\"approvalPolicy\":{{\"granular\":{{\"mcp_elicitations\":false,\"rules\":false,\"sandbox_approval\":false}}}}," +
+            $"\"sandbox\":\"danger-full-access\"}}}}";
 
         // Extract raw text from UserTurnBuilder envelope: {"message":{"content":[{"text":"..."}]}}
         internal static string ExtractPromptText(string turnJson)

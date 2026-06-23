@@ -145,5 +145,73 @@ namespace UnityMCP.Editor.Chat.Tests
             var json = ControlResponseBuilder.CodexUserInputResponse("raw-id", "[{\"answer\":\"B\"}]");
             StringAssert.Contains("\"id\":0", json);
         }
+
+        // ── CodexElicitationAccept ─────────────────────────────────────────────
+
+        [Test]
+        public void CodexElicitationAccept_NumericId_UnquotedInJson()
+        {
+            var json = ControlResponseBuilder.CodexElicitationAccept("5");
+            StringAssert.Contains("\"jsonrpc\":\"2.0\"", json);
+            StringAssert.Contains("\"id\":5", json);          // unquoted integer
+            StringAssert.Contains("\"action\":\"accept\"", json);
+            StringAssert.Contains("\"content\":{}", json);
+        }
+
+        [Test]
+        public void CodexElicitationAccept_StringId_QuotedInJson()
+        {
+            var json = ControlResponseBuilder.CodexElicitationAccept("abc-uuid");
+            StringAssert.Contains("\"id\":\"abc-uuid\"", json);
+        }
+
+        [Test]
+        public void CodexElicitationAccept_NullId_DefaultsToZero()
+        {
+            var json = ControlResponseBuilder.CodexElicitationAccept(null);
+            StringAssert.Contains("\"id\":0", json);
+        }
+
+        [Test]
+        public void CodexElicitationAccept_NoDeclineOrCancel()
+        {
+            var json = ControlResponseBuilder.CodexElicitationAccept("1");
+            StringAssert.DoesNotContain("\"decline\"", json);
+            StringAssert.DoesNotContain("\"cancel\"", json);
+        }
+
+        // ── CodexElicitationDecline ────────────────────────────────────────────
+
+        [Test]
+        public void CodexElicitationDecline_NumericId_UnquotedInJson()
+        {
+            var json = ControlResponseBuilder.CodexElicitationDecline("codex:7");
+            StringAssert.Contains("\"jsonrpc\":\"2.0\"", json);
+            StringAssert.Contains("\"id\":7", json);          // unquoted integer
+            StringAssert.Contains("\"action\":\"decline\"", json);
+        }
+
+        [Test]
+        public void CodexElicitationDecline_StringId_QuotedInJson()
+        {
+            var json = ControlResponseBuilder.CodexElicitationDecline("codex:abc-uuid");
+            StringAssert.Contains("\"id\":\"abc-uuid\"", json);
+            StringAssert.Contains("\"action\":\"decline\"", json);
+        }
+
+        [Test]
+        public void CodexElicitationDecline_NullId_DefaultsToZero()
+        {
+            var json = ControlResponseBuilder.CodexElicitationDecline(null);
+            StringAssert.Contains("\"id\":0", json);
+        }
+
+        [Test]
+        public void CodexElicitationDecline_NoAcceptOrContent()
+        {
+            var json = ControlResponseBuilder.CodexElicitationDecline("codex:1");
+            StringAssert.DoesNotContain("\"accept\"", json);
+            StringAssert.DoesNotContain("\"content\"", json);
+        }
     }
 }

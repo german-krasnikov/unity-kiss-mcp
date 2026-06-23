@@ -28,6 +28,12 @@ namespace UnityMCP.Editor.Chat
         SessionState,
         /// <summary>Keepalive ping — resets inactivity watchdog without rendering anything.</summary>
         Heartbeat,
+        /// <summary>
+        /// Auto-reply JSON to write back to CLI stdin (e.g. mcpServer/elicitation/request).
+        /// NOT forwarded to UI — transparent to output consumers.
+        /// Text holds the raw JSON-RPC 2.0 response string.
+        /// </summary>
+        AutoReply,
     }
 
     /// <summary>Immutable event emitted by ChatStreamParser.</summary>
@@ -112,5 +118,12 @@ namespace UnityMCP.Editor.Chat
 
         public static ChatEvent Heartbeat() =>
             new ChatEvent(ChatEventKind.Heartbeat);
+
+        /// <summary>
+        /// Auto-reply to write to CLI stdin (e.g. elicitation accept).
+        /// json is the complete JSON-RPC 2.0 response string.
+        /// </summary>
+        public static ChatEvent AutoReply(string json) =>
+            new ChatEvent(ChatEventKind.AutoReply, text: json);
     }
 }

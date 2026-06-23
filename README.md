@@ -185,7 +185,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6364 Tests (2723 Python · 3558 Unity · 83 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 6399 Tests (2723 Python · 3593 Unity · 83 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -244,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.53.1</b> — 2026-06-23 — **Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP …</summary>
+
+**Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP tools (`set_property`, etc.) in Codex chat.
+
+</details>
+
+<details>
 <summary><b>v0.53.0</b> — 2026-06-23 — **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + …</summary>
 
 **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + jitter; hard-coded 9500 fallback removed (read_unity_port now returns …
@@ -272,15 +279,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.51.0</b> — 2026-06-21 — **Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation …</summary>
-
-**Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation modes: Point (location + label), Polyline (multi-vertex path with …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.51.0** — 2026-06-21 — **Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation …
 - **v0.50.3** — 2026-06-21 — **Unstructured MCP Output** — Introduced `_UnstructuredMCP(FastMCP)` subclass …
 - **v0.50.2** — 2026-06-21 — **WizardConfigWriter visibility** — changed class and `GitInstallUrl` from …
 - **v0.50.1** — 2026-06-21 — **Update Cache Loop** — `UpdateChecker` now clears EditorPrefs cache after …

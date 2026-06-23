@@ -108,6 +108,10 @@ namespace UnityMCP.Editor.Chat
 
                     switch (ev.Kind)
                     {
+                        case ChatEventKind.AutoReply:
+                            // Write back to CLI stdin — transparent to UI output.
+                            WriteLineToProc(ev.Text);
+                            break;
                         case ChatEventKind.TextDelta:
                         case ChatEventKind.TurnDone:
                         case ChatEventKind.SessionInit:

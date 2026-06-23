@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.53.1] — 2026-06-23
+
+**Chat Bug Fixes:**
+- **Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP tools (`set_property`, etc.) in Codex chat. Root cause: Codex 0.141.0 sends `mcpServer/elicitation/request` JSON-RPC without timeout (OpenAI issue #11816); parser silently dropped it instead of auto-accepting. Read-only tools don't trigger elicitation, so they passed through normally.
+  * **Layer 1 (Performance)** — Added approval suppression (`approvalPolicy`, `sandbox`:"danger-full-access", `sandboxPolicy`:{type:"dangerFullAccess"}) in `thread/start` and `turn/start` payloads via CodexAppServerBackend to suppress elicitation at source.
+  * **Layer 2 (Correctness)** — CodexAppServerParser now auto-accepts our MCP-elicitation via ControlResponseBuilder.CodexElicitationAccept (JSON-RPC 2.0 reply); prevents hang even if Layer 1 suppression fails.
+  * **Layer 3 (Invariant)** — Distinguish request (top-level `id` field) vs notification (no top-level `id`) using depth-aware `JsonHelper.ExtractString()`. Unknown requests auto-declined (safety net), benign notifications ignored. **Prevented regression:** `turn/started` notification with nested `params.turn.id` was falsely detected as request; now correctly ignored.
+- **Improved Request Dispatch** — CliBackendBase now respects `ChatEvent.autoReply` field (AutoReply enum: None, CodexElicitationAccept, CodexElicitationDecline) to auto-submit JSON-RPC responses for inbound requests without user interaction.
+- **DRY FormatRpcId** — Extracted `ControlResponseBuilder.FormatRpcId()` helper reused by both CodexElicitationAccept and CodexUserInputResponse for consistent numeric id formatting.
+
+**Tests:**
+- Added 18 new C# NUnit tests in CodexElicitationTests covering all Layer 1/2/3 paths (elicitation accept, unknown-request decline, benign-notification ignore, top-level vs nested id distinction). ControlResponseBuilderTests +4 tests (id formatting: int, string, null). CodexAppServerBackendTests +8 tests (sandbox/approval field presence in payloads).
+- Total suite now 4,429 EditMode tests. All new tests green; 11 pre-existing failures in other asmdef (unrelated to this fix).
+
 ## [v0.53.0] — 2026-06-23
 
 **Reliability & Stability:**

@@ -125,6 +125,78 @@ namespace UnityMCP.Editor.Chat.Tests
             backend.Stop();
         }
 
+        // ── Layer 1: thread/start JSON must contain approvalPolicy + sandbox ──────
+
+        [Test]
+        public void BuildThreadStartJson_ContainsApprovalPolicy()
+        {
+            var json = CodexAppServerBackend.BuildThreadStartJson(1, "cwd", "null");
+            StringAssert.Contains("\"approvalPolicy\":", json);
+            StringAssert.Contains("\"mcp_elicitations\":false", json);
+        }
+
+        [Test]
+        public void BuildThreadStartJson_ContainsSandboxDangerFullAccess()
+        {
+            var json = CodexAppServerBackend.BuildThreadStartJson(1, "cwd", "null");
+            StringAssert.Contains("\"sandbox\":\"danger-full-access\"", json);
+        }
+
+        [Test]
+        public void BuildThreadStartJson_ContainsMethod()
+        {
+            var json = CodexAppServerBackend.BuildThreadStartJson(1, "cwd", "null");
+            StringAssert.Contains("\"method\":\"thread/start\"", json);
+        }
+
+        // ── Layer 1: turn/start JSON must contain approvalPolicy + sandboxPolicy ──
+
+        [Test]
+        public void BuildTurnStartJson_ContainsApprovalPolicy()
+        {
+            var json = CodexAppServerBackend.BuildTurnStartJson(2, "thread-1", "hello");
+            StringAssert.Contains("\"approvalPolicy\":", json);
+            StringAssert.Contains("\"mcp_elicitations\":false", json);
+        }
+
+        [Test]
+        public void BuildTurnStartJson_ContainsSandboxPolicy()
+        {
+            var json = CodexAppServerBackend.BuildTurnStartJson(2, "thread-1", "hello");
+            StringAssert.Contains("\"sandboxPolicy\":", json);
+            StringAssert.Contains("dangerFullAccess", json);
+        }
+
+        [Test]
+        public void BuildTurnStartJson_ContainsInputText()
+        {
+            var json = CodexAppServerBackend.BuildTurnStartJson(3, "t1", "say hello");
+            StringAssert.Contains("\"text\":\"say hello\"", json);
+        }
+
+        // ── Layer 2: AutoReply event routed to WriteLineToProc by CliBackendBase ──
+
+        [Test]
+        public void DrainEvents_AutoReply_WritesToProc_NotToOutput()
+        {
+            var backend = new TestCliBackend();
+
+            backend.ParseLineFunc = (_, sink) =>
+            {
+                sink.Add(ChatEvent.AutoReply("{\"jsonrpc\":\"2.0\",\"id\":42,\"result\":{\"action\":\"accept\",\"content\":{}}}"));
+                return true;
+            };
+            backend.LinesToDrain.Enqueue("elicitation-line");
+            backend._proc = new ChatProcess();
+
+            var output = new List<ChatEvent>();
+            backend.DrainEvents(output);
+
+            Assert.AreEqual(0, output.Count, "AutoReply must NOT be forwarded to output");
+            Assert.AreEqual(1, backend.WriteLineCallCount, "AutoReply must be written to proc");
+            StringAssert.Contains("\"action\":\"accept\"", backend.LastWrittenLine);
+        }
+
         // ── BuildArgs with model must emit model via -c, NOT --model ─────────
 
         [Test]
