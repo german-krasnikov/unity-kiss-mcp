@@ -535,3 +535,43 @@ def test_stale_reload_port_cleanup_no_dir():
     from pathlib import Path
     with patch.object(Path, "home", return_value=Path("/nonexistent_xyz_abc")):
         assert cleanup_stale_port_files() == 0
+
+
+# ---------------------------------------------------------------------------
+# Task 3: Plugin subcategory — per-tool disabled semantics
+# ---------------------------------------------------------------------------
+
+async def test_plugin_tool_disabled_removes_only_it():
+    """Disabling one plugin tool removes only that tool; sibling stays visible."""
+    import unity_mcp.server as srv
+    import unity_mcp.tools.gating as gating
+    gating.reset()
+    orig = srv._disabled_tools_cache
+    try:
+        srv._disabled_tools_cache = {"blender_do"}
+        tools = [_tool("blender_do"), _tool("blender_info")]
+        result = await _filter_tools(tools, None)
+        names = {t.name for t in result}
+        assert "blender_do" not in names, "Disabled plugin tool must be hidden"
+        assert "blender_info" in names, "Sibling plugin tool must remain visible"
+    finally:
+        srv._disabled_tools_cache = orig
+        gating.reset()
+
+
+async def test_plugin_tool_csv_roundtrip():
+    """CSV from Unity containing plugin tool names is parsed into _disabled_tools_cache correctly."""
+    import unity_mcp.server as srv
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": "blender_do,blender_render"})
+    orig = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
+    try:
+        srv._disabled_tools_cache = None
+        srv._refresh_tools_lock = None
+        await srv._refresh_tools_cache(bridge)
+        assert srv._disabled_tools_cache == {"blender_do", "blender_render"}
+    finally:
+        srv._disabled_tools_cache = orig
+        srv._refresh_tools_lock = orig_lock

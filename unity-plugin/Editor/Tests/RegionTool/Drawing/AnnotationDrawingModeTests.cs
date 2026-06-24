@@ -234,6 +234,56 @@ namespace UnityMCP.Editor.Tests.RegionTool
             Assert.AreEqual(AnnotationModeId.Measurement, mode.Id);
         }
 
+        // ── ConfirmPending ──────────────────────────────────────────────────────
+
+        [Test]
+        public void PolylineMode_CanConfirm_WhileDrawingWithVertex_IsTrue()
+        {
+            var mode = new PolylineMode();
+            mode.Begin(Vector2.zero, false);
+            mode.OnEvent(MouseDown(), new Vector2(5f, 0f));
+            Assert.IsTrue(mode.CanConfirm);
+        }
+
+        [Test]
+        public void PolylineMode_CanConfirm_AfterComplete_IsFalse()
+        {
+            var mode = new PolylineMode();
+            mode.Begin(Vector2.zero, false);
+            mode.OnEvent(MouseDown(), new Vector2(5f, 0f));
+            mode.OnEvent(MouseDown(), new Vector2(5f, 5f));
+            mode.OnEvent(Enter(), Vector2.zero);
+            Assert.IsFalse(mode.CanConfirm);
+        }
+
+        [Test]
+        public void PolylineMode_ConfirmPending_AppendsVertex()
+        {
+            var mode = new PolylineMode();
+            mode.Begin(Vector2.zero, false);
+            mode.OnEvent(MouseDown(), new Vector2(5f, 0f));
+            mode.OnEvent(MouseMove(), new Vector2(8f, 3f));
+            int before = RealVertexCount(mode);
+            mode.ConfirmPending();
+            Assert.AreEqual(before + 1, RealVertexCount(mode));
+        }
+
+        [Test]
+        public void PointMode_CanConfirm_AlwaysFalse()
+        {
+            var mode = new PointMode();
+            mode.Begin(Vector2.zero, false);
+            Assert.IsFalse(mode.CanConfirm);
+        }
+
+        [Test]
+        public void MeasurementMode_CanConfirm_AlwaysFalse()
+        {
+            var mode = new MeasurementMode();
+            mode.Begin(Vector2.zero, false);
+            Assert.IsFalse(mode.CanConfirm);
+        }
+
         // ── AnnotationModeFactory ────────────────────────────────────────────
 
         [Test]

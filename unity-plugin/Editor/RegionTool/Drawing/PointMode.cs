@@ -57,5 +57,8 @@ namespace UnityMCP.Editor.RegionTool
             IsComplete = false;
             FinalizedPoints = System.Array.Empty<Vector2>();
         }
+
+        public bool CanConfirm => false;
+        public void ConfirmPending() { }
     }
 }

@@ -181,6 +181,47 @@ namespace UnityMCP.Editor.Tests.RegionTool
             Assert.AreEqual(0, _mode.PreviewVertices.Count);
         }
 
+        // ── ConfirmPending ───────────────────────────────────────────────────────
+
+        [Test]
+        public void CanConfirm_WhileDrawing_IsTrue()
+        {
+            _mode.Begin(Vector2.zero, false);
+            Assert.IsTrue(_mode.CanConfirm);
+        }
+
+        [Test]
+        public void CanConfirm_AfterComplete_IsFalse()
+        {
+            _mode.Begin(Vector2.zero, false);
+            _mode.OnEvent(MakeMouseDown(), new Vector2(5f, 0f));
+            _mode.OnEvent(MakeMouseDown(), new Vector2(5f, 5f));
+            _mode.OnEvent(MakeMouseDown(clickCount: 2), new Vector2(2f, 3f));
+            Assert.IsFalse(_mode.CanConfirm);
+        }
+
+        [Test]
+        public void ConfirmPending_AppendsVertex()
+        {
+            _mode.Begin(Vector2.zero, false);
+            _mode.OnEvent(MakeMouseMove(), new Vector2(3f, 3f));
+            int before = CountRealVertices();
+            _mode.ConfirmPending();
+            Assert.AreEqual(before + 1, CountRealVertices());
+        }
+
+        [Test]
+        public void ConfirmPending_WhenComplete_NoOp()
+        {
+            _mode.Begin(Vector2.zero, false);
+            _mode.OnEvent(MakeMouseDown(), new Vector2(5f, 0f));
+            _mode.OnEvent(MakeMouseDown(), new Vector2(5f, 5f));
+            _mode.OnEvent(MakeMouseDown(clickCount: 2), new Vector2(2f, 3f));
+            int count = CountRealVertices();
+            _mode.ConfirmPending();
+            Assert.AreEqual(count, CountRealVertices());
+        }
+
         // ── Helpers ─────────────────────────────────────────────────────────────
 
         int CountRealVertices()

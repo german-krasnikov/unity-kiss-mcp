@@ -27,6 +27,10 @@ namespace UnityMCP.Editor.RegionTool
         public static Action<string, string> OnAnnotationCommitted; // (id, shortLabel)
         internal static Action                        CommitAction;
         internal static Action<AnnotationModeId>      SetModeAction;
+        internal static Action       ConfirmPointAction;
+        internal static Func<bool>   CanConfirmQuery;
+        internal static Func<bool>   CanCommitQuery;
+        internal static Action       CancelAction;
         public static AnnotationModeId  CurrentModeId  { get; private set; }
         public static bool              GridSnap        { get; private set; }
         public static string            PendingLabel
@@ -50,8 +54,12 @@ namespace UnityMCP.Editor.RegionTool
             _state        = State.Idle;
             _pendingLabel = "";
 
-            CommitAction  = CommitAnnotation;
-            SetModeAction = SwitchMode;
+            CommitAction       = CommitAnnotation;
+            SetModeAction      = SwitchMode;
+            ConfirmPointAction = () => { if (_mode?.CanConfirm == true) _mode.ConfirmPending(); };
+            CanConfirmQuery    = () => _state == State.Drawing && (_mode?.CanConfirm ?? false);
+            CanCommitQuery     = () => _state == State.Drawing && (_mode?.IsComplete ?? false);
+            CancelAction       = CancelToIdle;
             SceneView.duringSceneGui += OnSceneGUI;
         }
 
@@ -59,8 +67,12 @@ namespace UnityMCP.Editor.RegionTool
         {
             _instance = null;
             SceneView.duringSceneGui -= OnSceneGUI;
-            CommitAction  = null;
-            SetModeAction = null;
+            CommitAction       = null;
+            SetModeAction      = null;
+            ConfirmPointAction = null;
+            CanConfirmQuery    = null;
+            CanCommitQuery     = null;
+            CancelAction       = null;
             CancelToIdle();
         }
 

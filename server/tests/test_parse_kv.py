@@ -57,3 +57,53 @@ def test_parse_kv_line_with_parens_and_spaces():
     assert cmd == "set_property"
     assert kv["value"] == "(1, 0, 0)"
     assert kv["component"] == "Transform"
+
+
+# ── BUG B: unquoted values with spaces ───────────────────────────────────────
+
+def test_parse_kv_unquoted_value_with_spaces():
+    # Value "Assets/bubble blue small.png" is unquoted but multi-word
+    result = parse_kv("path=/Obj value=Assets/bubble blue small.png component=Image")
+    assert result["value"] == "Assets/bubble blue small.png"
+    assert result["component"] == "Image"
+    assert "blue" not in result  # regression: "blue" was becoming a spurious key
+
+
+def test_parse_kv_unquoted_two_spaced_tokens():
+    result = parse_kv("a=foo bar b=baz")
+    assert result["a"] == "foo bar"
+    assert result["b"] == "baz"
+
+
+def test_parse_kv_quoted_value_with_spaces_still_works():
+    # Regression: quoted branch must not break
+    result = parse_kv('key="hello world" other=simple')
+    assert result["key"] == "hello world"
+    assert result["other"] == "simple"
+
+
+def test_parse_kv_unquoted_single_word_unchanged():
+    # Baseline: single-word values must not change behavior
+    result = parse_kv("path=/Player value=true")
+    assert result["path"] == "/Player"
+    assert result["value"] == "true"
+
+
+def test_parse_kv_value_with_multiple_spaces():
+    result = parse_kv("value=Assets/a b c.png comp=SpriteRenderer")
+    assert result["value"] == "Assets/a b c.png"
+    assert result["comp"] == "SpriteRenderer"
+
+
+# ── MINOR 3: trailing space handling (symmetric with C# TrimEnd) ──────────────
+
+def test_parse_kv_no_trailing_spaces_in_unquoted_value():
+    # Unquoted value with trailing spaces must be rstripped (symmetric with C# TrimEnd)
+    result = parse_kv("value=hello   ")
+    assert result["value"] == "hello", f"got {result['value']!r}"
+
+
+def test_parse_kv_quoted_preserves_internal_and_edge_spaces():
+    # Quoted values: internal and trailing spaces inside quotes must be preserved
+    result = parse_kv('value="hello   " other=x')
+    assert result["value"] == "hello   ", f"got {result['value']!r}"

@@ -87,6 +87,15 @@ namespace UnityMCP.Editor.RegionTool
             FinalizedPoints = System.Array.Empty<Vector2>();
         }
 
+        public bool CanConfirm => IsActive && !IsComplete;
+
+        public void ConfirmPending()
+        {
+            if (!CanConfirm) return;
+            _vertices.Add(_cursor);
+            RebuildPreview();
+        }
+
         void Commit()
         {
             FinalizedPoints = _vertices.ToArray();

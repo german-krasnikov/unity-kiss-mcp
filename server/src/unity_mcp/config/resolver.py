@@ -1,5 +1,6 @@
 """Discover MCP server command and Unity port."""
 import pathlib
+import re
 import shutil
 import sys
 from typing import Optional
@@ -36,6 +37,23 @@ def find_python() -> str:
 
 
 GIT_INSTALL_URL = "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server"
+
+_REPO_BASE = "git+https://github.com/german-krasnikov/unity-kiss-mcp.git"
+_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+
+
+def server_git_url(ref: str | None = None) -> str:
+    """Return uvx --from URL with optional @vX.Y.Z pin.
+
+    ref=None → HEAD (default branch, GIT_INSTALL_URL unchanged).
+    ref accepts 'X.Y.Z' or 'vX.Y.Z'. Raises ValueError on malformed ref.
+    """
+    if ref is None:
+        return GIT_INSTALL_URL
+    clean = ref.lstrip("v")
+    if not _SEMVER_RE.match(clean):
+        raise ValueError(f"Invalid version ref: {ref!r} — expected X.Y.Z")
+    return f"{_REPO_BASE}@v{clean}#subdirectory=server"
 
 
 def find_server_command() -> list[str]:

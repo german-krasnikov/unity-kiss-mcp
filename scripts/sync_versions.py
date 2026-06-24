@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Sync version across pyproject.toml, package.json, and __version__.py.
+"""Sync version across pyproject.toml, package.json, __version__.py, _meta.json, MCPServer.cs.
 
 Usage: python sync_versions.py 0.38.0
 """
+import json
 import os
 import re
 import sys
@@ -37,6 +38,25 @@ def _update_version_py(path: Path, version: str) -> str:
     return f'__version__ = "{version}"\n'
 
 
+def _update_meta_json(path: Path, version: str) -> str:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["server_version"] = version
+    data["plugin_version"] = version
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+
+
+def _update_plugin_version_cs(path: Path, version: str) -> str:
+    text = path.read_text(encoding="utf-8")
+    new_text, count = re.subn(
+        r'(internal static string PluginVersion => ")[^"]*(")',
+        rf'\g<1>{version}\g<2>',
+        text, count=1,
+    )
+    if count == 0:
+        raise ValueError(f"PluginVersion pattern not found in {path}")
+    return new_text
+
+
 def _atomic_write(path: Path, content: str) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(content, encoding="utf-8")
@@ -61,6 +81,8 @@ def main() -> None:
         "pyproject.toml": (root / "server" / "pyproject.toml", _update_pyproject),
         "package.json": (root / "unity-plugin" / "package.json", _update_package_json),
         "__version__.py": (root / "server" / "src" / "unity_mcp" / "__version__.py", _update_version_py),
+        "_meta.json": (root / "docs" / "assets" / "_meta.json", _update_meta_json),
+        "MCPServer.cs": (root / "unity-plugin" / "Editor" / "MCPServer.cs", _update_plugin_version_cs),
     }
 
     # Collect all updates first — fail fast before writing anything

@@ -85,6 +85,8 @@ namespace UnityMCP.Editor.Chat
             ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
             RegionTool.SceneRegionTool.OnRegionCommitted = (id, label) =>
                 ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0));
+            RegionTool.SceneAnnotationTool.OnAnnotationCommitted = (id, label) =>
+                ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0));
             ScreenshotToolbarButton.OnScreenshotCaptured = path =>
                 ProcessExternalPath(path, InsertInlineChip);
             Annotation.AnnotationEditorWindow.OnAnnotationReady = (path, displayName) =>
@@ -125,7 +127,8 @@ namespace UnityMCP.Editor.Chat
             _autoFix.OnErrorsDetected -= InjectCompileErrors;
             _autoFix.Unsubscribe();
             ChipPillFactory.AddToContextAction = null;
-            RegionTool.SceneRegionTool.OnRegionCommitted = null; // clear seam when chat closes
+            RegionTool.SceneRegionTool.OnRegionCommitted = null;
+            RegionTool.SceneAnnotationTool.OnAnnotationCommitted = null;
             ScreenshotToolbarButton.OnScreenshotCaptured = null;
             Annotation.AnnotationEditorWindow.OnAnnotationReady = null;
             CopyFlash.ShowAction = null;

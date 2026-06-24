@@ -2,6 +2,7 @@
 """Unity MCP installer. stdlib only, Python 3.10+."""
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -63,13 +64,34 @@ def cmd_setup(_args: argparse.Namespace) -> None:
     ui.ok("Done. Run 'python install.py doctor' to verify.")
 
 
-def cmd_update(_args: argparse.Namespace) -> None:
+def cmd_update(_args: argparse.Namespace, _stop_fn=None) -> None:
     ui.box(["Unity MCP update"])
+
+    # Stop the running server BEFORE swapping files (avoids file-lock / port-hold).
+    # Explicit --port required for safety: we NEVER wildcard-kill all servers.
+    port = getattr(_args, "port", 0) or 0
+    if port:
+        ui.info(f"Stopping server on port {port} before update ...")
+        stop = _stop_fn or _load_stop_server()
+        if stop is not None:
+            try:
+                stopped = stop(port=port, timeout=15.0)
+                if stopped:
+                    ui.ok("Server stopped.")
+                else:
+                    ui.info("No running server found on that port — proceeding.")
+            except Exception as e:
+                ui.info(f"Could not stop server: {e} — proceeding with update anyway.")
+        else:
+            ui.info("server_control not available — skipping stop (server not installed yet).")
+    else:
+        ui.info("No --port given; skipping server stop. Pass --port PORT to stop before update.")
+
     stale = _venv_stale()
     if stale:
         ui.info("Stale venv detected (folder moved).")
     _setup_env(force_recreate=stale)
-    ui.ok("Done.")
+    ui.ok("Done. To reconnect: run /mcp in your Claude session.")
 
 
 def cmd_doctor(_args: argparse.Namespace) -> None:
@@ -125,6 +147,29 @@ def cmd_configure(args: argparse.Namespace) -> None:
         ui.ok(f"{client.name} configured at {client.config_path}")
 
 
+def _load_stop_server():
+    """Import stop_server from unity_mcp. Returns None if not installed yet."""
+    try:
+        _add_server_to_path()
+        from unity_mcp.server_control import stop_server
+        return stop_server
+    except ImportError:
+        return None
+
+
+def cmd_stop(_args: argparse.Namespace) -> None:
+    stop = _load_stop_server()
+    if stop is None:
+        ui.fail("unity_mcp not installed. Run: python install.py setup")
+        sys.exit(1)
+    ui.info(f"Stopping server on port {_args.port} ...")
+    stopped = stop(port=_args.port, timeout=getattr(_args, "timeout", 10.0))
+    if stopped:
+        ui.ok(f"Server on port {_args.port} stopped.")
+    else:
+        ui.info(f"No running server found on port {_args.port} (or already stopped).")
+
+
 def _project_config_path(project: Path, tool_key: str) -> Path:
     """Return per-tool project-scoped config path."""
     paths = {
@@ -133,6 +178,110 @@ def _project_config_path(project: Path, tool_key: str) -> Path:
         "vscode": project / ".vscode" / "mcp.json",
     }
     return paths.get(tool_key, project / ".mcp.json")
+
+
+_CHANGELOG_HEADING = re.compile(
+    r'^## \[v?([\d.]+)(?:[^\]]+)?\]\s*(?:[—-]\s*([\d-]+))?', re.MULTILINE
+)
+_SEMVER_RE_INSTALL = re.compile(r"^\d+\.\d+\.\d+$")
+_CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
+
+
+def _version_list_offline(changelog_path: Path) -> list[tuple[str, str]]:
+    """Return [(version, date), ...] newest-first, excluding Unreleased."""
+    text = changelog_path.read_text(encoding="utf-8")
+    result = []
+    for m in _CHANGELOG_HEADING.finditer(text):
+        ver = m.group(1).lstrip("v")
+        if "unreleased" in ver.lower():
+            continue
+        date = m.group(2) or ""
+        result.append((ver, date))
+    return result
+
+
+def build_server_entry_for_ref(version: str) -> dict:
+    """Build MCP server entry with pinned @vX.Y.Z URL."""
+    from unity_mcp.config.resolver import server_git_url
+    url = server_git_url(ref=version)
+    return {"command": "uvx", "args": ["--from", url, "unity-mcp"]}
+
+
+def _plugin_upm_url(version: str) -> str:
+    return f"https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin#v{version}"
+
+
+def cmd_version(args: argparse.Namespace) -> None:
+    """Handle 'version --list' and 'version --set X.Y.Z'."""
+    if getattr(args, "list", False):
+        versions = _version_list_offline(_CHANGELOG_PATH)
+        ui.info("Available versions (from CHANGELOG.md):")
+        for ver, date in versions:
+            suffix = f"  {date}" if date else ""
+            print(f"  v{ver}{suffix}")
+        return
+
+    set_version = getattr(args, "set_version", None)
+    if not set_version:
+        ui.fail("Specify --list or --set X.Y.Z")
+        sys.exit(1)
+
+    if not _SEMVER_RE_INSTALL.match(set_version):
+        ui.fail(f"Invalid semver: {set_version!r} — expected X.Y.Z")
+        sys.exit(1)
+
+    if getattr(args, "force_print_plugin_url", False):
+        print(_plugin_upm_url(set_version))
+        return
+
+    # Stop server first
+    _add_server_to_path()
+    from unity_mcp.config.resolver import find_port
+    port = getattr(args, "port", 0) or find_port()
+    stop = _load_stop_server()
+    if stop is not None:
+        try:
+            stopped = stop(port=port, timeout=10.0)
+            if stopped:
+                ui.ok(f"Server on port {port} stopped.")
+        except Exception as e:
+            ui.info(f"Could not stop server: {e} — proceeding.")
+    else:
+        ui.info("server_control not available — skipping stop.")
+
+    # Build pinned entry
+    entry = build_server_entry_for_ref(set_version)
+
+    # Re-pin all (or one) detected configs
+    tool_key = getattr(args, "tool", None)
+    tools = [tool_key] if tool_key else list(CLIENT_REGISTRY.keys())
+
+    for key in tools:
+        client = CLIENT_REGISTRY.get(key)
+        if client is None:
+            continue
+        if client.stdout_only:
+            continue
+        try:
+            if backup is not None:
+                backup(client.config_path)
+            if client.is_toml:
+                merge_toml_mcp(client.config_path, entry)
+            else:
+                merge_mcp_config(
+                    client.config_path, entry,
+                    root_key=client.root_key,
+                    entry_transformer=client.entry_transformer,
+                )
+            ui.ok(f"{key} repinned to v{set_version}")
+        except Exception as e:
+            ui.info(f"Could not update {key}: {e}")
+
+    ui.ok(f"Server side pinned to v{set_version}.")
+    print(f"\nPlugin re-pin: open Unity → MCP → Updates → Version Picker → select v{set_version} → Roll Back")
+    print(f"  OR: python install.py version --set {set_version} --force-print-plugin-url")
+    print(f"Plugin UPM URL: {_plugin_upm_url(set_version)}")
+    print(f"\nIf the server doesn't start correctly, run: uvx cache clean unity-mcp")
 
 
 def cmd_pull(_args: argparse.Namespace) -> None:
@@ -161,8 +310,18 @@ def main() -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("setup", help="First-time setup")
-    sub.add_parser("update", help="Re-sync after folder move")
+
+    p_update = sub.add_parser("update", help="Re-sync after folder move")
+    p_update.add_argument("--port", type=int, default=0,
+                          help="Port of running server to stop before update")
+
     sub.add_parser("doctor", help="Diagnose installation")
+
+    p_stop = sub.add_parser("stop", help="Stop a running Unity MCP server")
+    p_stop.add_argument("--port", type=int, required=True,
+                        help="Port of the server to stop (e.g. 9515)")
+    p_stop.add_argument("--timeout", type=float, default=10.0,
+                        help="Seconds to wait before SIGKILL fallback")
 
     cfg = sub.add_parser("configure", help="Configure AI tools or write .mcp.json")
     cfg.add_argument("--project", help="Path to Unity project root (legacy alias for --project-dir)")
@@ -170,6 +329,17 @@ def main() -> None:
     cfg.add_argument("--tool", choices=list(CLIENT_REGISTRY) or
                      ["claude-desktop", "claude-code", "cursor", "windsurf", "generic"])
     cfg.add_argument("--port", type=int, default=0)
+
+    p_ver = sub.add_parser("version", help="List or pin a specific release version")
+    p_ver.add_argument("--list", action="store_true", help="Show available versions from CHANGELOG")
+    p_ver.add_argument("--online", action="store_true", help="Fetch tag list from GitHub (requires network)")
+    p_ver.add_argument("--set", metavar="X.Y.Z", dest="set_version", help="Pin server + print plugin URL")
+    p_ver.add_argument("--tool", choices=list(CLIENT_REGISTRY) or
+                       ["claude-desktop", "claude-code", "cursor", "windsurf"],
+                       default=None, help="Only re-pin config for this AI tool")
+    p_ver.add_argument("--port", type=int, default=0, help="Port of running server to stop first")
+    p_ver.add_argument("--force-print-plugin-url", action="store_true",
+                       help="Print plugin UPM git URL for the pinned version and exit")
 
     sub.add_parser("pull", help="Pull latest code (git clone installs only)")
     sub.add_parser("uninstall", help="Remove Unity MCP")
@@ -184,7 +354,8 @@ def main() -> None:
     dispatch = {
         "setup": cmd_setup, "update": cmd_update, "doctor": cmd_doctor,
         "configure": cmd_configure, "pull": cmd_pull, "uninstall": cmd_uninstall,
-        "connect": cmd_connect, "disconnect": cmd_disconnect,
+        "connect": cmd_connect, "disconnect": cmd_disconnect, "stop": cmd_stop,
+        "version": cmd_version,
     }
     dispatch[args.cmd](args)
 

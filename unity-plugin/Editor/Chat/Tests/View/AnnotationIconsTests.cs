@@ -73,5 +73,27 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             Assert.Throws<UnityException>(() => AnnotationIcons.Pen.GetPixel(0, 0));
         }
+
+        [Test]
+        public void Icons_AllFifteenUnique()
+        {
+            var all = new[]
+            {
+                AnnotationIcons.Pen, AnnotationIcons.Line, AnnotationIcons.Arrow,
+                AnnotationIcons.Rect, AnnotationIcons.Ellipse, AnnotationIcons.Text,
+                AnnotationIcons.Erase, AnnotationIcons.Undo, AnnotationIcons.Redo,
+                AnnotationIcons.Clear, AnnotationIcons.Cube3D, AnnotationIcons.Send,
+                AnnotationIcons.WidthS, AnnotationIcons.WidthM, AnnotationIcons.WidthL
+            };
+            Assert.AreEqual(15, new HashSet<Texture2D>(all).Count, "All 15 icons must be distinct instances");
+        }
+
+        [Test]
+        public void Icons_AllHaveCorrectHideFlags()
+        {
+            Assert.AreEqual(HideFlags.HideAndDontSave, AnnotationIcons.Line.hideFlags);
+            Assert.AreEqual(HideFlags.HideAndDontSave, AnnotationIcons.Cube3D.hideFlags);
+            Assert.AreEqual(HideFlags.HideAndDontSave, AnnotationIcons.WidthL.hideFlags);
+        }
     }
 }

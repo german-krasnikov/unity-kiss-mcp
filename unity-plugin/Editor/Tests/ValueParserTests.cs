@@ -275,5 +275,47 @@ namespace UnityMCP.Editor.Tests
         // Note: Bounds/RectInt/BoundsInt integration tests omitted — no built-in
         // component exposes those as serialized properties in EditMode.
         // Parse coverage is provided by ParseFloats tests above.
+
+        // ── BUG B: SetObjectReference quote stripping ─────────────────────────
+
+        [Test]
+        public void SetObjectReference_StripsSurroundingQuotes_BeforeAssetLookup()
+        {
+            // When value arrives with literal surrounding quotes, the strip guard
+            // must remove them. Asset won't exist — verify error message has bare path.
+            var go = new GameObject("VP_ObjRefQuoteStrip");
+            go.AddComponent<MeshFilter>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<MeshFilter>());
+                var prop = so.FindProperty("m_Mesh");
+                Assert.IsNotNull(prop, "m_Mesh must exist on MeshFilter");
+                // Pass value with literal surrounding quotes
+                var ex = Assert.Throws<System.ArgumentException>(() =>
+                    ValueParser.SetPropertyValue(prop, "\"Assets/nonexistent.mesh\""));
+                // Error must mention the bare path, NOT the quoted path
+                StringAssert.Contains("Assets/nonexistent.mesh", ex.Message);
+                StringAssert.DoesNotContain("\\\"Assets", ex.Message);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void SetObjectReference_NoQuotes_PassesThrough()
+        {
+            // Bare path (no surrounding quotes) must also work: error contains bare path
+            var go = new GameObject("VP_ObjRefNoQuote");
+            go.AddComponent<MeshFilter>();
+            try
+            {
+                var so = new SerializedObject(go.GetComponent<MeshFilter>());
+                var prop = so.FindProperty("m_Mesh");
+                Assert.IsNotNull(prop, "m_Mesh must exist on MeshFilter");
+                var ex = Assert.Throws<System.ArgumentException>(() =>
+                    ValueParser.SetPropertyValue(prop, "Assets/somepath.mesh"));
+                StringAssert.Contains("Assets/somepath.mesh", ex.Message);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
     }
 }

@@ -1,10 +1,35 @@
 import asyncio
 import logging
 import os
+import sys
 import threading
 import time
 os.environ.setdefault("UNITY_MCP_DISTILL", "1")
 log = logging.getLogger("unity_mcp.server")
+
+# SIGTERM graceful shutdown state — populated from lifespan, read by signal handler.
+_sigterm_state: dict = {"loop": None, "task": None, "requested": False, "lock_fd": None}
+
+
+def _handle_sigterm(signum, frame) -> None:
+    """SIGTERM handler: release lockfile synchronously, then os._exit(0).
+
+    Extracted to module level so it can be unit-tested without running main().
+    The async lifespan finally cannot be used — anyio's stdio_server blocks on
+    to_thread.run_sync(readline, cancellable=False), which ignores task
+    cancellation while stdin is open.
+    """
+    if _sigterm_state["requested"]:
+        return
+    _sigterm_state["requested"] = True
+    lock_fd = _sigterm_state.get("lock_fd")
+    if lock_fd is not None:
+        try:
+            release_lock(lock_fd)
+        except Exception:
+            pass
+        _sigterm_state["lock_fd"] = None
+    os._exit(0)
 
 # --- Idle watchdog ---
 _last_activity: float = time.monotonic()
@@ -220,6 +245,9 @@ def _args(**kwargs) -> dict:
 @asynccontextmanager
 async def lifespan(app):
     global slot, manager, _middleware, _wrapped_send, _budget_tracker, _budget_router
+    # Register loop + task so the SIGTERM handler can cancel us and find the lock.
+    _sigterm_state["loop"] = asyncio.get_event_loop()
+    _sigterm_state["task"] = asyncio.current_task()
     try:
         unity_port = _read_unity_port()
     except (ValueError, OSError):
@@ -228,6 +256,7 @@ async def lifespan(app):
     from .server_filtering import cleanup_stale_port_files as _cleanup_ports
     _cleanup_ports()
     lock_fd = acquire_lock(port=unity_port)  # raises on failure — do not swallow
+    _sigterm_state["lock_fd"] = lock_fd  # expose for SIGTERM synchronous release
 
     def _on_port_change(old_port: int, new_port: int):
         nonlocal lock_fd
@@ -238,6 +267,7 @@ async def lifespan(app):
             log.warning("Failed to acquire lock for new port %d — keeping old: %s", new_port, exc)
             return
         old_fd, lock_fd = lock_fd, new_fd
+        _sigterm_state["lock_fd"] = lock_fd
         try:
             release_lock(old_fd)
         except Exception:
@@ -376,6 +406,23 @@ def main():
             signal.signal(signal.SIGPIPE, signal.SIG_IGN)
         except (OSError, ValueError):
             pass
+
+    # SIGTERM -> graceful shutdown.
+    # POSIX only: on Windows, TerminateProcess (taskkill) does NOT invoke Python
+    # signal handlers, so this path is unreachable on Windows. The Windows path
+    # relies on parent-death / stdio-close to trigger lifespan cleanup.
+    #
+    # The handler releases the lockfile synchronously (the critical operation that
+    # stop_server polls for), then calls os._exit(0). The async lifespan finally
+    # block cannot be used because anyio's stdio_server uses to_thread.run_sync
+    # (without cancellable=True) for readline(), which deadlocks under task
+    # cancellation when stdin is still open.
+    if hasattr(signal, "SIGTERM"):
+        try:
+            signal.signal(signal.SIGTERM, _handle_sigterm)
+        except (OSError, ValueError):
+            pass  # restricted environments
+
     from unity_mcp.crash_log import log_crash
     transport = os.environ.get("UNITY_MCP_TRANSPORT", "stdio")
     try:
@@ -391,8 +438,8 @@ def main():
             import errno
             if e.errno != errno.EPIPE:
                 raise
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
+        pass  # graceful shutdown paths: Ctrl-C, SystemExit, SIGTERM-cancel
     except BaseException as exc:
         log_crash(exc)
         raise

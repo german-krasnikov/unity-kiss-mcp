@@ -76,6 +76,9 @@ namespace UnityMCP.Editor.RegionTool
             FinalizedPoints = System.Array.Empty<Vector2>();
         }
 
+        public bool CanConfirm => false;
+        public void ConfirmPending() { }
+
         void UpdatePreview()
         {
             _preview.Clear();

@@ -200,3 +200,39 @@ async def test_setup_objects_uses_full_path_when_parent_given():
     assert "path=/Root/Child" in cmds or "path=Root/Child" in cmds
 
     ab._send = None
+
+
+# ── BUG B: spaced values in autobatch ────────────────────────────────────────
+
+async def test_set_properties_value_with_spaces_is_quoted(mock_send):
+    """set_properties must wrap spaced values in quotes so the batch line parses correctly."""
+    from unity_mcp.tools.autobatch import set_properties
+    await set_properties("/UI", "Image.sprite=Assets/bubble blue small.png")
+    cmds = _batch_cmds(mock_send)
+    assert 'value="Assets/bubble blue small.png"' in cmds
+
+
+async def test_configure_objects_value_with_spaces_is_quoted(mock_send):
+    """configure_objects must quote spaced values in the generated batch line."""
+    from unity_mcp.tools.autobatch import configure_objects
+    await configure_objects('/UI Image.sprite=Assets/bubble blue small.png')
+    cmds = _batch_cmds(mock_send)
+    assert 'value="Assets/bubble blue small.png"' in cmds
+
+
+async def test_configure_objects_value_already_quoted_not_double_quoted(mock_send):
+    """Already-quoted values must not be wrapped in an extra pair of quotes."""
+    from unity_mcp.tools.autobatch import configure_objects
+    await configure_objects('/UI Image.sprite="Assets/bubble blue small.png"')
+    cmds = _batch_cmds(mock_send)
+    assert 'value=""' not in cmds
+    assert '"Assets/bubble blue small.png"' in cmds
+
+
+async def test_set_properties_no_space_value_not_quoted(mock_send):
+    """Paren values (no space issue) must NOT be wrapped in extra quotes."""
+    from unity_mcp.tools.autobatch import set_properties
+    await set_properties("/NPC1", "Transform.m_LocalPosition=(1,0,0)")
+    cmds = _batch_cmds(mock_send)
+    assert 'value=(1,0,0)' in cmds
+    assert 'value="(1,0,0)"' not in cmds

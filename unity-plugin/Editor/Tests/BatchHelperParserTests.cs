@@ -96,5 +96,47 @@ namespace UnityMCP.Editor.Tests
             var result = BatchHelper.ParseLines(null);
             Assert.AreEqual(0, result.Count);
         }
+
+        // ── BUG B: unquoted values with spaces ───────────────────────────────
+
+        [Test]
+        public void ParseLine_UnquotedValue_WithSpaces_ConsumesFullValue()
+        {
+            // Regression: "blue" must NOT appear as a separate key
+            var (cmd, args) = BatchHelper.ParseLine(
+                "set_property path=/Obj value=Assets/bubble blue small.png component=Image");
+            Assert.AreEqual("set_property", cmd);
+            StringAssert.Contains("\"Assets/bubble blue small.png\"", args);
+            StringAssert.Contains("\"component\"", args);
+            StringAssert.Contains("\"Image\"", args);
+            StringAssert.DoesNotContain("\"blue\"", args);
+        }
+
+        [Test]
+        public void ParseLine_UnquotedValue_TrailingSpaceOnly_BaselineUnchanged()
+        {
+            var (cmd, args) = BatchHelper.ParseLine("set_property path=/Obj value=Assets/Simple.png");
+            Assert.AreEqual("set_property", cmd);
+            StringAssert.Contains("Assets/Simple.png", args);
+        }
+
+        [Test]
+        public void ParseLine_UnquotedValue_TwoSpacedTokens()
+        {
+            var (cmd, args) = BatchHelper.ParseLine("cmd a=foo bar b=baz");
+            Assert.AreEqual("cmd", cmd);
+            StringAssert.Contains("\"foo bar\"", args);
+            StringAssert.Contains("\"baz\"", args);
+        }
+
+        [Test]
+        public void ParseLine_UnquotedValue_MultipleSpaces()
+        {
+            var (cmd, args) = BatchHelper.ParseLine(
+                "cmd path=/O value=Assets/a b c.png comp=SpriteRenderer");
+            Assert.AreEqual("cmd", cmd);
+            StringAssert.Contains("\"Assets/a b c.png\"", args);
+            StringAssert.Contains("\"SpriteRenderer\"", args);
+        }
     }
 }

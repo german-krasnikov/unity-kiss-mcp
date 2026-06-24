@@ -55,6 +55,9 @@ namespace UnityMCP.Editor.RegionTool
             IsComplete = false;
         }
 
+        public bool CanConfirm => false;
+        public void ConfirmPending() { }
+
         void AppendIfFar(Vector2 xz)
         {
             if (_points.Count > 0)

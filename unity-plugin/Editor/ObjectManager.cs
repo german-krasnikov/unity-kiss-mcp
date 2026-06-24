@@ -167,7 +167,13 @@ namespace UnityMCP.Editor
             {
                 var componentType = FindType(type);
                 if (componentType == null)
-                    throw new ArgumentException($"Component type not found: {type}");
+                {
+                    var candidates = ErrorHelper.ClosestComponentTypes(type);
+                    var hint = candidates.Count > 0
+                        ? $" Did you mean: {string.Join(", ", candidates)}?"
+                        : "";
+                    throw new ArgumentException($"Component type not found: {type}.{hint}");
+                }
                 if (go.GetComponent(componentType) != null)
                     throw new ArgumentException(
                         $"'{type}' already exists on '{go.name}'. " +

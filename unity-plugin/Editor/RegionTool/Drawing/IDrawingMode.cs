@@ -27,6 +27,12 @@ namespace UnityMCP.Editor.RegionTool
         Polygon2D? Finalize();
 
         void Reset();
+
+        // True when clicking "Confirm Point" makes sense (click-by-click modes only)
+        bool CanConfirm { get; }
+
+        // Place next vertex at current cursor XZ — no-op if !CanConfirm or IsComplete
+        void ConfirmPending();
     }
 
     internal enum DrawingModeId { Lasso, Rectangle, Circle, PointByPoint }
@@ -62,6 +68,12 @@ namespace UnityMCP.Editor.RegionTool
         bool IsActive { get; }
         Vector2[] FinalizedPoints { get; }
         void Reset();
+
+        // True when clicking "Confirm Point" makes sense (click-by-click modes only)
+        bool CanConfirm { get; }
+
+        // Place next vertex at current cursor — no-op if !CanConfirm or IsComplete
+        void ConfirmPending();
     }
 
     internal static class AnnotationModeFactory

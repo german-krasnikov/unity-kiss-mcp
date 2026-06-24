@@ -172,6 +172,22 @@ namespace UnityMCP.Editor.Tests.RegionTool
             Assert.IsFalse(_mode.IsComplete);
         }
 
+        // ── ConfirmPending ───────────────────────────────────────────────────────
+
+        [Test]
+        public void CanConfirm_AlwaysFalse()
+        {
+            _mode.Begin(Vector2.zero, false);
+            Assert.IsFalse(_mode.CanConfirm);
+        }
+
+        [Test]
+        public void ConfirmPending_IsNoOp()
+        {
+            _mode.Begin(Vector2.zero, false);
+            Assert.DoesNotThrow(() => _mode.ConfirmPending());
+        }
+
         // ── Helpers ─────────────────────────────────────────────────────────────
 
         static Event MakeDrag() => new Event { type = EventType.MouseDrag };

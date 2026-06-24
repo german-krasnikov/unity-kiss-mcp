@@ -266,10 +266,23 @@ namespace UnityMCP.Editor
                 return text.Substring(pStart, i - pStart).TrimEnd();
             }
 
-            // Unquoted value (up to space or end)
+            // Unquoted value: consume until " identifier=" boundary or end-of-string
             var start = i;
-            while (i < text.Length && text[i] != ' ') i++;
-            return text.Substring(start, i - start);
+            while (i < text.Length)
+            {
+                if (text[i] == ' ')
+                {
+                    // Peek ahead: is the next non-space sequence "word=" ?
+                    int j = i + 1;
+                    while (j < text.Length && text[j] == ' ') j++;
+                    int k = j;
+                    while (k < text.Length && text[k] != '=' && text[k] != ' ') k++;
+                    if (k < text.Length && text[k] == '=' && k > j)
+                        break; // next key=value pair starts here
+                }
+                i++;
+            }
+            return text.Substring(start, i - start).TrimEnd();
         }
 
         private static string BuildJsonObject(Dictionary<string, string> args)

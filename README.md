@@ -244,6 +244,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.56.0</b> — 2026-06-24 — **Unified Scene View Overlay** — Merged 2 separate overlays …</summary>
+
+**Unified Scene View Overlay** — Merged 2 separate overlays (SceneRegionOverlay, SceneAnnotationOverlay) into single `SceneMcpOverlay` with dynamic …
+
+</details>
+
+<details>
 <summary><b>v0.55.0</b> — 2026-06-24 — **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, …</summary>
 
 **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, Agy automatically expose installed MCP servers (Blender, Luna, etc.) …
@@ -272,15 +279,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.52.6</b> — 2026-06-22 — **Multi-Unity Port Race Conditions** — Fixed port file collision and …</summary>
-
-**Multi-Unity Port Race Conditions** — Fixed port file collision and reconnection storms when multiple CLI tools (Cursor, Codex, Windsurf, etc.) …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.52.6** — 2026-06-22 — **Multi-Unity Port Race Conditions** — Fixed port file collision and …
 - **v0.52.5** — 2026-06-22 — **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.
 - **v0.52.0** — 2026-06-21 — **Arcade Animation System** — Unified animation primitives for consistent UI …
 - **v0.51.0** — 2026-06-21 — **Scene Annotation Primitives** — Expanded RegionTool with 3 new annotation …

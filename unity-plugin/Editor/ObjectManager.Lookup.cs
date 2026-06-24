@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using UnityEngine;
@@ -39,47 +41,64 @@ namespace UnityMCP.Editor
 
         internal static Type FindType(string typeName)
         {
-            // Fast path: common Unity types
+            // Fast path: common Unity types.
+            // Skip abstract/open-generic — AddComponent rejects them.
             var quick = Type.GetType("UnityEngine." + typeName + ", UnityEngine")
                      ?? Type.GetType(typeName + ", Assembly-CSharp");
-            if (quick != null) return quick;
+            if (quick != null && !quick.IsAbstract && !quick.IsGenericTypeDefinition) return quick;
 
-            // Full scan by full name
+            // Full scan by full name — SafeGetTypes preserves partial loads.
+            // Skip abstract/open-generic here too for consistency.
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                try
-                {
-                    var type = assembly.GetType(typeName) ?? assembly.GetType("UnityEngine." + typeName);
-                    if (type != null) return type;
-                }
-                catch (ReflectionTypeLoadException) { }
+                var type = SafeGetTypes(assembly)
+                    .FirstOrDefault(t => !t.IsAbstract && !t.IsGenericTypeDefinition &&
+                                         (t.FullName == typeName ||
+                                          t.FullName == "UnityEngine." + typeName));
+                if (type != null) return type;
             }
 
-            // Short-name scan (no dot in typeName = unqualified)
+            // Short-name scan (no dot = unqualified)
             if (!typeName.Contains('.'))
             {
+                // Fast path: TypeCache avoids full reflection load.
+                // Filter abstract/open-generic: AddComponent rejects them with an
+                // uncontrolled InvalidOperationException; return null so hint-logic runs.
+                var cached = UnityEditor.TypeCache.GetTypesDerivedFrom<Component>()
+                    .Where(t => t.Name == typeName && !t.IsAbstract && !t.IsGenericTypeDefinition)
+                    .ToList();
+                if (cached.Count == 1) return cached[0];
+                if (cached.Count > 1)
+                    throw new ArgumentException(
+                        $"Ambiguous: '{typeName}' = {cached[0].FullName} and {cached[1].FullName}. Use full namespace.");
+
+                // Full scan fallback
                 Type found = null;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    try
+                    foreach (var t in SafeGetTypes(asm))
                     {
-                        foreach (var t in asm.GetTypes())
+                        if (t.Name == typeName && typeof(Component).IsAssignableFrom(t)
+                            && !t.IsAbstract && !t.IsGenericTypeDefinition)
                         {
-                            if (t.Name == typeName && typeof(Component).IsAssignableFrom(t))
-                            {
-                                if (found != null)
-                                    throw new ArgumentException(
-                                        $"Ambiguous: '{typeName}' = {found.FullName} and {t.FullName}. Use full namespace.");
-                                found = t;
-                            }
+                            if (found != null)
+                                throw new ArgumentException(
+                                    $"Ambiguous: '{typeName}' = {found.FullName} and {t.FullName}. Use full namespace.");
+                            found = t;
                         }
                     }
-                    catch (ReflectionTypeLoadException) { }
                 }
                 if (found != null) return found;
             }
 
             return null;
+        }
+
+        internal static IEnumerable<Type> SafeGetTypes(Assembly asm)
+        {
+            try { return asm.GetTypes(); }
+            catch (ReflectionTypeLoadException ex)
+            { return ex.Types.Where(t => t != null); }
         }
     }
 }

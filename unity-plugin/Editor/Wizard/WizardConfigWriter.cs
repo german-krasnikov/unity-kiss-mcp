@@ -83,6 +83,29 @@ namespace UnityMCP.Editor.Wizard
         public const string GitInstallUrl =
             "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server";
 
+        /// <summary>
+        /// Returns a uvx --from URL pinned to a specific git tag.
+        /// ref = "0.54.1" or "v0.54.1" — both accepted.
+        /// Returns the unpinned default URL when ref is null/empty.
+        /// </summary>
+        public static string GitInstallUrlFor(string @ref)
+        {
+            if (string.IsNullOrEmpty(@ref)) return GitInstallUrl;
+            var clean = @ref.TrimStart('v');
+            var parts = clean.Split('.');
+            if (parts.Length != 3 || !AllDigits(parts))
+                throw new ArgumentException($"Invalid version ref: {@ref}");
+            const string RepoBase = "git+https://github.com/german-krasnikov/unity-kiss-mcp.git";
+            return $"{RepoBase}@v{clean}#subdirectory=server";
+        }
+
+        private static bool AllDigits(string[] arr)
+        {
+            foreach (var p in arr)
+                if (!int.TryParse(p, out _)) return false;
+            return true;
+        }
+
         private static string Entry(int port) =>
             "\"unity-mcp\": {\n" +
             "      \"command\": \"uvx\",\n" +

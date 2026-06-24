@@ -2,12 +2,27 @@
 import re
 
 # Paren group matches flat tuples: (1, 0, 0). Nested parens NOT supported.
-_KV_RE = re.compile(r'(\w+)=("(?:[^"\\]|\\.)*"|\((?:[^)]*)\)|[^\s]+)')
+# Unquoted alt `(?:(?!\s+\w+=).)+` stops at next <space><identifier>= boundary.
+# Keys must be simple identifiers (no dots); for dotted keys use _DOTTED_KV_RE
+# (defined in autobatch.py).
+_KV_RE = re.compile(
+    r'(\w+)=("(?:[^"\\]|\\.)*"|\((?:[^)]*)\)|(?:(?!\s+\w+=).)+)'
+)
+
+
+def _kv_value(raw: str) -> str:
+    """Extract value from a raw matched group: strip quotes for quoted branch,
+    rstrip trailing whitespace for unquoted branch (symmetric with C# TrimEnd)."""
+    if raw.startswith('"') and raw.endswith('"'):
+        return raw[1:-1]  # quoted: remove outer quotes, preserve inner spaces
+    # unquoted and paren: rstrip trailing whitespace only
+    return raw.rstrip()
 
 
 def parse_kv(text: str) -> dict[str, str]:
-    """Parse key=value pairs. Handles quotes and parens: value=(1, 0, 0)"""
-    return {m.group(1): m.group(2).strip('"') for m in _KV_RE.finditer(text)}
+    """Parse key=value pairs. Handles quotes and parens: value=(1, 0, 0).
+    Keys must be simple identifiers (no dots); for dotted keys use _DOTTED_KV_RE."""
+    return {m.group(1): _kv_value(m.group(2)) for m in _KV_RE.finditer(text)}
 
 
 def parse_kv_line(line: str) -> tuple[str, dict[str, str]]:

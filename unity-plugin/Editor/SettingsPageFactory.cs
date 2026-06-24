@@ -64,6 +64,9 @@ namespace UnityMCP.Editor
         internal static VisualElement BuildUpdatesPage(Action onBack) =>
             UpdatesPage.Build(onBack);
 
+        internal static VisualElement BuildVersionPickerPage(Action onBack) =>
+            VersionPickerPage.Build(onBack);
+
         internal static VisualElement BuildSamplingPage(Action onBack)
         {
             var page = new VisualElement();

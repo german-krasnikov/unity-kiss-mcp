@@ -2,10 +2,27 @@
 
 Reduces multi-step setup to a single tool call.
 """
+import re
 from ._annotations import RW as _RW
 from ..utils import parse_kv
 
 _send = None
+
+# Matches dotted keys like Component.prop — used in configure_objects where
+# keys contain dots (\w+ alone can't match "Transform.m_LocalPosition").
+# Value uses same lookahead as _KV_RE: stops at next <space><word>= boundary.
+_DOTTED_KV_RE = re.compile(
+    r'([\w.]+)=("(?:[^"\\]|\\.)*"|\((?:[^)]*)\)|(?:(?!\s+[\w.]+=).)+)'
+)
+
+
+def _quote_if_spaces(v: str) -> str:
+    """Wrap value in quotes if it contains spaces and is not already quoted/parened."""
+    if ' ' not in v:
+        return v
+    if (v.startswith('"') and v.endswith('"')) or (v.startswith('(') and v.endswith(')')):
+        return v
+    return f'"{v}"'
 
 
 async def setup_objects(specs: str) -> str:
@@ -67,7 +84,7 @@ async def set_properties(path: str, props: str) -> str:
         component = component.strip()
         prop = prop.strip()
         lines.append(
-            f"set_property path={path} component={component} prop={prop} value={value.strip()}"
+            f"set_property path={path} component={component} prop={prop} value={_quote_if_spaces(value.strip())}"
         )
         components.add(component)
 
@@ -93,19 +110,22 @@ async def configure_objects(config: str) -> str:
         line = line.strip()
         if not line:
             continue
-        first_token = line.split()[0]
-        if not first_token.startswith("/") and ":/" not in first_token:
+        first_space = line.find(' ')
+        if first_space == -1:
             continue
-        parts = line.split()
-        obj_path = parts[0]
+        obj_path = line[:first_space]
+        if not obj_path.startswith("/") and ":/" not in obj_path:
+            continue
         paths.add(obj_path)
-        for part in parts[1:]:
-            if "=" not in part or "." not in part.split("=")[0]:
+        rest = line[first_space + 1:]
+        for m in _DOTTED_KV_RE.finditer(rest):
+            key = m.group(1)
+            value = m.group(2).strip('"')
+            if "." not in key:
                 continue
-            left, value = part.split("=", 1)
-            component, prop = left.rsplit(".", 1)
+            component, prop = key.rsplit(".", 1)
             lines.append(
-                f"set_property path={obj_path} component={component} prop={prop} value={value}"
+                f"set_property path={obj_path} component={component} prop={prop} value={_quote_if_spaces(value)}"
             )
 
     if not lines:

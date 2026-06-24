@@ -73,6 +73,9 @@ namespace UnityMCP.Editor.RegionTool
             IsComplete = false;
         }
 
+        public bool CanConfirm => false;
+        public void ConfirmPending() { }
+
         void UpdatePreview()
         {
             float minX = Mathf.Min(_start.x, _current.x), maxX = Mathf.Max(_start.x, _current.x);

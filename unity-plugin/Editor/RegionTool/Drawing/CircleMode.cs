@@ -70,6 +70,9 @@ namespace UnityMCP.Editor.RegionTool
             IsComplete = false;
         }
 
+        public bool CanConfirm => false;
+        public void ConfirmPending() { }
+
         void UpdateRadius(Vector2 xz)
         {
             float r = Vector2.Distance(_center, xz);

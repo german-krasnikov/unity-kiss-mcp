@@ -33,6 +33,9 @@ namespace UnityMCP.Editor
             home.Add(HubCardButton.Build("🔄", "Updates",
                 UpdateChecker.HasUpdate ? $"v{UpdateChecker.AvailableVersion} available" : "Check for updates",
                 () => nav.Push(SettingsPageFactory.BuildUpdatesPage(() => nav.Pop()))));
+            home.Add(HubCardButton.Build("⏪", "Version Picker",
+                "Roll back to any release",
+                () => nav.Push(SettingsPageFactory.BuildVersionPickerPage(() => nav.Pop()))));
             home.Add(MCPHubDivider.Build(root));
 
             var cards = new List<VisualElement>();

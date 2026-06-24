@@ -37,6 +37,10 @@ namespace UnityMCP.Editor.RegionTool
         internal static Action<DrawingModeId> SetModeAction;
         internal static Action  RequestResimplify;
         internal static Action<bool> SetGridSnapAction;
+        internal static Action       ConfirmPointAction;
+        internal static Func<bool>   CanConfirmQuery;
+        internal static Func<bool>   CanCommitQuery;
+        internal static Action       CancelAction;
         public   static DrawingModeId CurrentModeId   { get; private set; }
         public   static bool          GridSnap         { get; private set; }
 
@@ -56,17 +60,25 @@ namespace UnityMCP.Editor.RegionTool
             SetModeAction     = SwitchMode;
             RequestResimplify = Resimplify;
             SetGridSnapAction = v => { _gridSnap = v; GridSnap = v; EditorPrefs.SetBool("MCP_RegionSnap", v); };
+            ConfirmPointAction = () => { if (_activeMode?.CanConfirm == true) _activeMode.ConfirmPending(); };
+            CanConfirmQuery    = () => _state == State.Drawing && (_activeMode?.CanConfirm ?? false);
+            CanCommitQuery     = () => _state == State.Preview || (_state == State.Drawing && (_activeMode?.IsComplete ?? false));
+            CancelAction       = CancelToIdle;
             SceneView.duringSceneGui += OnSceneGUI;
         }
 
         public override void OnWillBeDeactivated()
         {
             SceneView.duringSceneGui -= OnSceneGUI;
-            CommitAction      = null;
-            SetModeAction     = null;
-            RequestResimplify = null;
-            SetGridSnapAction = null;
-            PreviewState      = null;
+            CommitAction       = null;
+            SetModeAction      = null;
+            RequestResimplify  = null;
+            SetGridSnapAction  = null;
+            ConfirmPointAction = null;
+            CanConfirmQuery    = null;
+            CanCommitQuery     = null;
+            CancelAction       = null;
+            PreviewState       = null;
             CancelToIdle();
         }
 

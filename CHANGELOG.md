@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v0.56.0] — 2026-06-24
+
+**Level-Design Tools, Unified Overlay, Icon System, Plugin Gating, MCP Capability Fixes & Version Management:**
+- **Unified Scene View Overlay** — Merged 2 separate overlays (SceneRegionOverlay, SceneAnnotationOverlay) into single `SceneMcpOverlay` with dynamic mode switching, fixed annotation chip delivery via `OnAnnotationCommitted` hook.
+- **IconCanvas Design System** — Procedural icon builder (18×18 canvas, 2px stroke, near-white ink for theme-agnostic rendering) consolidates AnnotationIcons + RegionIcons. Reduces LOC and ensures visual consistency across regions/annotations.
+- **Plugin Tool Subcategories** — IMCPPlugin.GetToolSubcategory() optional method enables per-tool grouping (default: plugin name). PluginToolGrouping.GroupBySubcategory() stateless processor. MCPSettingsUI search filter respects subcategories. DRY consolidation in PluginRegistry.
+- **Paths with Spaces** — BatchHelper lookahead parser, ValueParser quote-strip, autobatch `_quote_if_spaces()`, utils._KV_RE lookahead support.
+- **Custom Component Namespaces** — ObjectManager.Lookup SafeGetTypes() + TypeCache + abstract filter. ErrorHelper.ClosestComponentTypes for custom components.
+- **Prefab Action=Edit** — PrefabHelper.Edit (LoadPrefabContents → SerializedObject → SetPropertyValue → SaveAsPrefabAsset → UnloadPrefabContents try/finally). Python asset.py prefab() action extended.
+- **Graceful Server Shutdown** — server_control.py list_servers/stop_server (SIGTERM/taskkill with timeouts). Module-level _handle_sigterm synchronous cleanup. install.py stop --port command.
+- **Version Rollback** — resolver.server_git_url(ref) split @v before #subdirectory. install.py version --list/--set/--force-print-plugin-url. sync_versions.py dual patchera (_meta.json + PluginVersion.cs). C# VersionPickerPage + VersionCoherenceChecker.
+
+**Tests:**
+- All tests pass: 2,784 Python unit tests (pytest -m "not live"), 4,532 C# EditMode NUnit (12 pre-existing failures, no regressions).
 
 ## [v0.55.0] — 2026-06-24
 

@@ -1,5 +1,7 @@
+using System;
 using System.Linq;
 using System.Text;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -36,6 +38,14 @@ namespace UnityMCP.Editor
             if (closest != null)
                 sb.Append($". Did you mean '{closest}'?");
 
+            if (path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase) &&
+                path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                sb.Append(" To edit a prefab asset directly, use: " +
+                          "prefab(action=\"edit\", asset_path=\"" + path + "\", ...)");
+            else if (path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                sb.Append(" Asset paths are not scene objects. " +
+                          "Use asset(action=find) or prefab(action=edit) for prefab assets.");
+
             sb.Append(". Use get_hierarchy to see children.");
             return sb.ToString();
         }
@@ -57,6 +67,21 @@ namespace UnityMCP.Editor
                 }
             }
             return best;
+        }
+
+        /// <summary>Returns top-5 candidate full names from TypeCache for a mistyped component name.
+        /// Guards against short queries (length &lt; 4) that would match almost everything.</summary>
+        public static System.Collections.Generic.List<string> ClosestComponentTypes(string typeName)
+        {
+            if (typeName.Length < 4) return new System.Collections.Generic.List<string>();
+            int threshold = System.Math.Max(3, typeName.Length * 2 / 5);
+            string lower = typeName.ToLower();
+            return UnityEditor.TypeCache.GetTypesDerivedFrom<Component>()
+                .Where(t => StringDistance.Levenshtein(t.Name.ToLower(), lower) <= threshold ||
+                            t.FullName.EndsWith("." + typeName, StringComparison.OrdinalIgnoreCase))
+                .Select(t => t.FullName)
+                .Take(5)
+                .ToList();
         }
 
         public static string ComponentNotFound(string type, GameObject go)

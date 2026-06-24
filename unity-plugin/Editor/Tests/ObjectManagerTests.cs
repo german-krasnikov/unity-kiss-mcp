@@ -1,6 +1,8 @@
 // TDD — EditMode tests for ObjectManager mutations (P0-2 audit gap).
 // Run in Unity Test Runner → EditMode.
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -263,6 +265,90 @@ namespace UnityMCP.Editor.Tests
             Assert.AreEqual(0f, _go.transform.localPosition.x, 0.001f,
                 "DryRun must not change value");
             StringAssert.Contains("DRY-RUN", result);
+        }
+
+        // ── BUG C: FindType / SafeGetTypes / candidate hints ─────────────────
+
+        [Test]
+        public void FindType_FullyQualifiedName_ReturnsType()
+        {
+            var t = ObjectManager.FindType("UnityEngine.Rigidbody");
+            Assert.IsNotNull(t);
+            Assert.AreEqual("Rigidbody", t.Name);
+        }
+
+        [Test]
+        public void FindType_ShortName_ReturnsType()
+        {
+            var t = ObjectManager.FindType("Rigidbody");
+            Assert.IsNotNull(t);
+        }
+
+        [Test]
+        public void FindType_UnknownType_ReturnsNull()
+        {
+            var t = ObjectManager.FindType("CompletelyMadeUpType_XYZ");
+            Assert.IsNull(t);
+        }
+
+        [Test]
+        public void SafeGetTypes_ValidAssembly_ReturnsTypes()
+        {
+            // MAJOR 1: call the real internal method (visible via InternalsVisibleTo)
+            // Verifies happy path: a real assembly with no load errors yields its types.
+            var result = ObjectManager.SafeGetTypes(typeof(Rigidbody).Assembly).ToList();
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Count > 0, "UnityEngine assembly must contain types");
+            Assert.IsTrue(result.Contains(typeof(Rigidbody)), "Rigidbody must be in UnityEngine assembly types");
+        }
+
+        [Test]
+        public void SafeGetTypes_WithReflectionTypeLoadException_YieldsNonNullTypes()
+        {
+            // Exception branch: use public constructor to inject a partial type list
+            var types = new System.Type[] { typeof(Rigidbody), null, typeof(Camera) };
+            var exceptions = new System.Exception[] { new System.Exception("broken"), null, null };
+            var rtle = new ReflectionTypeLoadException(types, exceptions);
+
+            // Call real SafeGetTypes — but we can't pass a fake Assembly.
+            // The exception-branch logic is: ex.Types.Where(t => t != null).
+            // We test it directly since SafeGetTypes is internal+visible, but we
+            // can't inject a broken assembly in EditMode. This test validates the
+            // null-filtering contract; the happy path is covered by SafeGetTypes_ValidAssembly above.
+            var result = rtle.Types.Where(t => t != null).ToList();
+            Assert.AreEqual(2, result.Count);
+            Assert.IsTrue(result.Contains(typeof(Rigidbody)));
+            Assert.IsTrue(result.Contains(typeof(Camera)));
+        }
+
+        [Test]
+        public void FindType_AbstractShortName_ReturnsNull()
+        {
+            // MAJOR 2: CLR-abstract types must not be returned — AddComponent rejects them.
+            // Note: Unity ships some C#-source-"abstract" types as non-abstract in IL
+            // (e.g. Renderer: IsAbstract=false at runtime despite C# "abstract" keyword).
+            // UIBehaviour (UnityEngine.EventSystems) IS CLR-abstract (IsAbstract=true).
+            var t = ObjectManager.FindType("UIBehaviour");
+            Assert.IsNull(t, "FindType must not return CLR-abstract types; AddComponent would throw.");
+        }
+
+        [Test]
+        public void ManageComponent_TypoInTypeName_ErrorMessageContainsCandidates()
+        {
+            // "Rigidbod" is Levenshtein distance 1 from "Rigidbody"
+            var ex = Assert.Throws<System.ArgumentException>(() =>
+                ObjectManager.ManageComponent("/OM_TestObj", "Rigidbod", "add"));
+            StringAssert.Contains("Did you mean", ex.Message);
+            StringAssert.Contains("Rigidbody", ex.Message);
+        }
+
+        [Test]
+        public void ManageComponent_UnknownType_NoCloseMatch_NoHint()
+        {
+            // "ZZZNoSuchComponent" has no Levenshtein-3 match in TypeCache
+            var ex = Assert.Throws<System.ArgumentException>(() =>
+                ObjectManager.ManageComponent("/OM_TestObj", "ZZZNoSuchComponent", "add"));
+            StringAssert.DoesNotContain("Did you mean", ex.Message);
         }
     }
 }

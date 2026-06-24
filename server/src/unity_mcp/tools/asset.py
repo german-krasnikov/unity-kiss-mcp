@@ -37,11 +37,19 @@ async def material(action: str, path: str | None = None, object_path: str | None
 
 async def prefab(action: str, path: str | None = None, asset_path: str | None = None,
                  base_path: str | None = None, variant_path: str | None = None,
+                 component: str | None = None, prop: str | None = None,
+                 value: str | None = None, add_component: str | None = None,
+                 remove_component: str | None = None,
                  recursive: bool = False) -> str:
-    """Prefab. action: save|create_variant|apply|revert|get_overrides|unpack. save: path (scene) + asset_path. create_variant: base_path + variant_path."""
+    """Prefab. action: save|create_variant|apply|revert|get_overrides|unpack|edit.
+    edit: asset_path + component + prop + value (set property on prefab asset).
+    edit: asset_path + add_component or remove_component (manage components).
+    save: path (scene) + asset_path. create_variant: base_path + variant_path."""
     return await _send("prefab", _args(
         action=action, path=path, asset_path=asset_path,
         base_path=base_path, variant_path=variant_path,
+        component=component, prop=prop, value=value,
+        add_component=add_component, remove_component=remove_component,
         recursive="true" if recursive else None))
 
 

@@ -21,6 +21,7 @@ unity-kiss-mcp/
 │   │   │   ├── resolver.py     # build_server_entry(port) — MCP server entry generator; GIT_INSTALL_URL constant (v0.47.1: shared with C#)
 │   │   │   └── validator.py    # Config validation + path detection per tool; v0.47.1: skips json.loads for TOML clients, respects root_key
 │   │   ├── server_filtering.py # Port discovery + TCP probe (v0.23.0), chat-port fallback (v0.36.0), catalog push, tool filtering
+│   │   ├── server_control.py   # Graceful shutdown: list_servers, stop_server SIGTERM/taskkill (v0.55.10)
 │   │   ├── lockfile.py         # Cross-platform exclusive locking + zombie detection (v0.23.0)
 │   │   ├── diagnose.py         # Shared diagnose parser + verdict logic (_parse_diagnose, _verdict, _DiagnoseFields)
 │   │   ├── _update_check.py    # Version checker — GitHub releases API (v0.47.1: switched from PyPI), 24h cache, includes --reinstall flag in banner
@@ -94,7 +95,7 @@ unity-kiss-mcp/
 │   │   │   ├── animation.py    # animation, timeline, animator, particle
 │   │   │   ├── asset.py        # asset, material, prefab, scriptable_object, project_settings, validate_move (v0.30.4)
 │   │   │   ├── connection.py   # list_connections, reconnect_unity
-│   │   │   ├── autobatch.py    # setup_objects, set_properties, configure_objects
+│   │   │   ├── autobatch.py    # setup_objects, set_properties, configure_objects (v0.55.10: _quote_if_spaces, _DOTTED_KV_RE lookahead)
 │   │   │   ├── gating.py       # TIER1 + category-based capability filtering (permission_prompt in CORE_TOOLS, v0.29.37)
 │   │   │   ├── do_tool.py      # NL intent → Haiku plan → batch execute
 │   │   │   ├── ask_tool.py     # NL read-only → route → Haiku summarize
@@ -111,7 +112,7 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # ~2555 unit tests + 78 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests in test_config_gaps.py)
+│   └── tests/                  # 2784 unit tests + 78 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
@@ -137,6 +138,10 @@ unity-kiss-mcp/
 │       ├── test_read_unity_port.py      # Port discovery waterfall + UNITY_MCP_PROJECT_DIR (7 tests, v0.52.6)
 │       ├── test_bridge_port_rediscovery.py # Bridge port pinning + reconnect stability (6 tests, v0.52.6)
 │       ├── test_lockfile.py             # PID lockfile + cleanup_stale_port_files (additions, v0.52.6)
+│       ├── test_server_control.py       # list_servers, stop_server SIGTERM/taskkill (v0.55.10)
+│       ├── test_autobatch.py            # _quote_if_spaces, _DOTTED_KV_RE, setup/set/configure_objects (v0.55.10)
+│       ├── test_parse_kv.py             # parse_kv quote-strip, lookahead _KV_RE (v0.55.10)
+│       ├── test_server_filtering.py     # Port discovery edge cases (v0.55.10)
 │       └── ... + domain tests (186+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
 │   ├── Editor/
@@ -159,15 +164,16 @@ unity-kiss-mcp/
 │   ├── UnityMCP.Reload.asmdef                # Core assembly (no references)
 │   ├── package.json                          # v0.1.4, "com.unity-mcp.reload"
 │   └── package.json.meta
-├── unity-plugin/               # Unity Editor Plugin (130+ C# files, ~14000 LOC, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests)
+├── unity-plugin/               # Unity Editor Plugin (165+ C# files, ~17200 LOC, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests, v0.55.10: +346 tests for gating/subcategories/icons)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, SaveProjectSettings) + 35 tests (v0.35.0: 4-arg chain env→ProjectSettings→Library→FindFreePort)
 │       ├── CommandRouter.cs                # RegisterAll(), guards, core dispatch (partial class)
 │       ├── CommandRouter.ObjectHandlers.cs # Object mutation handlers (partial class)
 │       ├── CommandRouter.MediaHandlers.cs  # Media/asset handlers (partial class)
-│       ├── IMCPPlugin.cs                   # Plugin interface (Name, CommandPrefix, RegisterCommands, OnDomainReload)
-│       ├── PluginRegistry.cs               # Static plugin registry (Register, RegisterAllPlugins, OnDomainReload)
+│       ├── IMCPPlugin.cs                   # Plugin interface (Name, CommandPrefix, RegisterCommands, OnDomainReload, GetToolSubcategory)
+│       ├── PluginRegistry.cs               # Static plugin registry (Register, RegisterAllPlugins, OnDomainReload, GetCommandsForPlugin, BelongsToPlugin)
+│       ├── PluginToolGrouping.cs           # Stateless grouping by subcategory (v0.55.10)
 │       ├── CommandRegistry.cs              # Command registration + runtime flag
 │       ├── CommandSchema.cs                # Parameter validation + fuzzy matching
 │       ├── ObjectManager.cs                # CRUD + Undo + SetActive + WireEvent + SetParent
@@ -235,6 +241,8 @@ unity-kiss-mcp/
 │       ├── ArcadeAnim.uss                 # Shared USS keyframes + transitions (v0.52.0)
 │       ├── SamplingHeaderAnim.cs          # 7-bar frequency analyzer for Sampling page (v0.52.0)
 │       ├── StatusAmbientAnim.cs           # Scanline + grid + sonar ring overlay for Status window (v0.52.0)
+│       ├── UI/                             # UI design system (v0.55.10)
+│       │   └── IconCanvas.cs              # Procedural icon builder (18×18, 2px stroke, theme-agnostic)
 │       ├── MCPStatusWindow.cs             # Connection status monitor (heartbeat animation)
 │       ├── MCPActions.cs                  # Shared actions (Restart, Kill, Reimport)
 │       ├── MCPStatusModel.cs              # Pure state logic (no deps) — maps connection state → display
@@ -286,6 +294,15 @@ unity-kiss-mcp/
 │       │   ├── SamplingHeaderAnimTests.cs # 3 NUnit tests (frequency bar animation) (v0.52.0)
 │       │   ├── StatusAmbientAnimTests.cs  # 5 NUnit tests (scanline + grid + sonar effects) (v0.52.0)
 │       │   ├── WizardStepAnimTests.cs     # 5 NUnit tests (slide transitions, progress bar) (v0.52.0)
+│       │   ├── AnnotationIconsTests.cs    # Icon rendering tests (v0.55.10)
+│       │   ├── IconCanvasTests.cs         # Canvas drawing API, rasterization tests (v0.55.10)
+│       │   ├── PluginToolGroupingTests.cs # Subcategory grouping tests (v0.55.10)
+│       │   ├── PluginSubcategorySettingsTests.cs # Subcategory discovery + filtering tests (v0.55.10)
+│       │   ├── ValueParserTests.cs        # Quote-strip, spaces in values tests (v0.55.10)
+│       │   ├── BatchHelperParserTests.cs  # Lookahead parsing tests (v0.55.10)
+│       │   ├── ObjectManagerTests.cs      # SafeGetTypes, TypeCache, custom namespace tests (v0.55.10)
+│       │   ├── PluginDisabledToolsTests.cs # Per-tool gating tests (v0.55.10)
+│       │   ├── PluginRegistryTests.cs     # Plugin registry tests (v0.55.10)
 │       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+, v0.42.0: 3-screen flow, 9 backends, asmdef split; v0.47.1: AiConfigScreen fallback, removed dead screens)
 │       │   ├── SetupWizard.cs             # Auto-launch on first run, 3 screens (Welcome → PickBackend → Configure)
 │       │   ├── SetupWizard.uss            # Wizard stylesheet (layout, animations)

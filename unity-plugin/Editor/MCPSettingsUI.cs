@@ -35,7 +35,7 @@ namespace UnityMCP.Editor
                 allGroups.Add(group);
             }
 
-            var pluginGroup = BuildPluginsSection();
+            var pluginGroup = BuildPluginsSection(allGroups);
             if (pluginGroup != null) root.Add(pluginGroup);
 
             searchField.RegisterValueChangedCallback(evt =>
@@ -95,7 +95,7 @@ namespace UnityMCP.Editor
         }
 
         // ── Plugins section ───────────────────────────────────────────────────
-        private static VisualElement BuildPluginsSection()
+        private static VisualElement BuildPluginsSection(List<CategoryGroup> allGroups)
         {
             var plugins = PluginRegistry.GetAll();
             if (plugins.Count == 0) return null;
@@ -108,14 +108,19 @@ namespace UnityMCP.Editor
 
             foreach (var plugin in plugins)
             {
-                var pluginTools = CommandRegistry.GetAllCommands()
-                    .Where(c => (!string.IsNullOrEmpty(plugin.CommandPrefix) &&
-                                 (c == plugin.CommandPrefix || c.StartsWith(plugin.CommandPrefix + "_")))
-                             || plugin.AdditionalCommands.Contains(c))
-                    .ToArray();
+                var pluginTools = PluginRegistry.GetCommandsForPlugin(plugin);
                 if (pluginTools.Length == 0) continue;
-                var group = new CategoryGroup(plugin.Name, pluginTools);
-                section.Add(group.Element);
+
+                var groups = PluginToolGrouping.GroupBySubcategory(plugin, pluginTools);
+                foreach (var (subLabel, tools) in groups)
+                {
+                    var displayLabel = groups.Count == 1
+                        ? subLabel
+                        : $"{plugin.Name} / {subLabel}";
+                    var group = new CategoryGroup(displayLabel, tools);
+                    section.Add(group.Element);
+                    allGroups.Add(group);  // wire into search filter
+                }
             }
             return section;
         }

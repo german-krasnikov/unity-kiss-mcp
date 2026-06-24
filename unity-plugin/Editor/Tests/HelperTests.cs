@@ -134,6 +134,85 @@ namespace UnityMCP.Editor.Tests
                 PrefabHelper.Execute("invalid_action", "{}"));
             StringAssert.Contains("invalid_action", ex.Message);
         }
+
+        [Test]
+        public void Execute_EditAction_MissingAssetPath_ThrowsArgumentException()
+        {
+            var ex = Assert.Throws<ArgumentException>(() =>
+                PrefabHelper.Execute("edit", "{}"));
+            StringAssert.Contains("asset_path is required", ex.Message);
+        }
+
+        [Test]
+        public void Execute_EditAction_InvalidPrefabPath_ThrowsArgumentException()
+        {
+            // PrefabUtility.LoadPrefabContents throws ArgumentException if path doesn't exist
+            var ex = Assert.Throws<ArgumentException>(() =>
+                PrefabHelper.Execute("edit",
+                    "{\"asset_path\":\"Assets/DoesNotExist.prefab\",\"component\":\"BoxCollider\"}"));
+            StringAssert.Contains("DoesNotExist.prefab", ex.Message);
+        }
+
+        [Test]
+        public void Execute_EditAction_RoundTrip_PersistsPropertyChange()
+        {
+            var tmpPath = "Assets/MCPTests/EditRoundTrip.prefab";
+            AssetHelper.EnsureDirectory(tmpPath);
+
+            var go = new GameObject("EditTarget");
+            go.AddComponent<BoxCollider>();
+            PrefabUtility.SaveAsPrefabAsset(go, tmpPath);
+            UnityEngine.Object.DestroyImmediate(go);
+            AssetDatabase.Refresh();
+
+            try
+            {
+                var argsJson = "{\"asset_path\":\"" + tmpPath + "\"," +
+                               "\"component\":\"BoxCollider\"," +
+                               "\"prop\":\"m_IsTrigger\",\"value\":\"true\"}";
+                var result = PrefabHelper.Execute("edit", argsJson);
+                StringAssert.Contains("ok", result);
+
+                AssetDatabase.ImportAsset(tmpPath, ImportAssetOptions.ForceUpdate);
+                var loaded = AssetDatabase.LoadAssetAtPath<GameObject>(tmpPath);
+                var col = loaded.GetComponent<BoxCollider>();
+                Assert.IsTrue(col.isTrigger, "isTrigger should be true after prefab edit");
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(tmpPath);
+            }
+        }
+    }
+
+    // ── ErrorHelper — prefab asset hint ─────────────────────────────────────
+
+    [TestFixture]
+    public class ErrorHelperPrefabHintTests
+    {
+        [Test]
+        public void ObjectNotFound_AssetsPrefabPath_ContainsPrefabHint()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var msg = ErrorHelper.ObjectNotFound("Assets/Prefabs/Enemy.prefab");
+            StringAssert.Contains("prefab(action=\"edit\"", msg);
+        }
+
+        [Test]
+        public void ObjectNotFound_AssetPathNonPrefab_ContainsGenericAssetHint()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var msg = ErrorHelper.ObjectNotFound("Assets/Data/Config.asset");
+            StringAssert.Contains("Asset paths are not scene objects", msg);
+        }
+
+        [Test]
+        public void ObjectNotFound_ScenePath_NoAssetHint()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var msg = ErrorHelper.ObjectNotFound("Player/Health");
+            StringAssert.DoesNotContain("Assets/", msg);
+        }
     }
 
     // ── SceneHelper — pure guard branches ───────────────────────────────────

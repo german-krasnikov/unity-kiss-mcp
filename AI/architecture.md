@@ -106,7 +106,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **Reconnect (v0.30.3, v0.52.7)**: exponential backoff throttling (MIN=5s → MAX=60s, reset on success, jitter ±10%). v0.52.7: cooldown re-armed on every attempt (not only success), preventing retry spam when port unavailable. Heartbeat debounce=30s. send() reconnect no longer fires callbacks (only heartbeat does) — breaks reconnect feedback loop. push_catalog skips if already locked.
    - Max message: 10MB, timeouts: 30s default, 60s compile_preflight/batch, 120s run_tests/run_playtest/fuzz_playtest
 
-3. **Unity Plugin** (C#: 160+ files, ~16500 LOC, v0.42.0: Wizard asmdef split, Updates folder, MarkdownInlineFormatter extraction, v0.44.0: LevelUp UX, v0.45.0: InstallSourceDetector + async updaters)
+3. **Unity Plugin** (C#: 165+ files, ~17200 LOC, v0.42.0: Wizard asmdef split, Updates folder, MarkdownInlineFormatter extraction, v0.44.0: LevelUp UX, v0.45.0: InstallSourceDetector + async updaters, v0.55.10: unified SceneMcpOverlay + IconCanvas + PluginToolGrouping)
    - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, **v0.23.0: SO_REUSEPORT** (macOS/Linux) for rapid reconnect recovery, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections. **v0.37.0: IsReallyCompiling** — managed flag replaces EditorApplication.isCompiling latching, 120s wedge guard prevents false-positive "backgrounded" state. **v0.36.0: WritePortFile** writes both {pid}.port (main) + {pid}.chat-port (Windows env fallback). **v0.52.6: ShouldStartServer guard** — static ctor checks `ShouldStartServer(isBatchMode)` to prevent AssetImportWorker from creating conflicting port files during batch asset reimports. Detects batch mode via `EditorApplication.isBatchMode` OR `-nographics` args.
    - **PortResolver.cs**: Pure testable helpers (ResolvePort, ResolveChatPort, FindFreePort, SavePorts, IsValidPort, ParsePortFromJson) with 25 NUnit tests. Validates 1024–65535 range, skips reserved ports, fallback to OS-assigned via port 0. **v0.52.6: Chat port collision guard** — ResolveChatPort ensures chat port ≠ main port (prevents accidental self-binding). FindFreePort ceiling raised 9599→9699 to accommodate dual-port scanning.
    - **CommandRouter.cs**: RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutatingCommand/IsRuntimeCommand. **v0.37.0: DefaultIsCompiling** — two-layer check (IsReallyCompiling + 120s wedge guard) prevents false-positive compile blocks.
@@ -119,7 +119,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **BatchHelper.cs**: multi-command text parser + executor (on_error=continue/stop). **v0.37.0:** testable IsCompiling seam via CommandRouter (supports reload-latch testing)
    - **7 Serializers**: HierarchySerializer (tree, MAX_NODES=3000, incremental, summary), ComponentSerializer (key-value, UnityEvent expansion, PrefabStage-aware, **v0.23.0: #instanceID in all path tools**), AnimationSerializer, TimelineSerializer, AnimatorControllerSerializer, ParticleSerializer, ShaderSerializer
    - **ScenePathParser (v0.31.0)**: Shared struct for multi-scene path parsing (`"SceneName:/"` prefix extraction). Used by SceneObjectFinder + ComponentSerializer.Finder. Replaces inline string parsing, prevents multi-scene reference bugs.
-   - **ObjectManager (v0.23.0 fixes)**: Properties.cs auto-redirects `set_property("active")` to SetActive. Lookup.cs adds FindType + short-name fallback for custom components.
+   - **ObjectManager (v0.23.0 fixes, v0.55.10 custom namespace support)**: Properties.cs auto-redirects `set_property("active")` to SetActive. Lookup.cs adds FindType + short-name fallback for custom components. **v0.55.10**: SafeGetTypes() preserves partial ReflectionTypeLoadException, TypeCache + abstract/generic filter for AddComponent safety.
    - **FileOutputHelper (v0.23.0)**: ScreenshotsDir now `<ProjectRoot>/ScreenShots/` (project-local, not shared cache)
    - **RefManager**: short refs $a-$zz (702 slots), invalidated on scene change
    - **ErrorHelper**: contextual errors with did-you-mean hints
@@ -130,7 +130,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      * **SceneRegionState**: LRU registry (8 slots) + EditorPrefs persistence, CSV export for later use
      * **Drawing Modes (v0.51.0: expanded)** (IDrawingMode + IAnnotationMode): LassoMode, RectangleMode, CircleMode, PointByPointMode (region selection); PointMode (single point + label), PolylineMode (polyline with auto-length), MeasurementMode (distance measurement). Each mode tracks active state, completion, grid snap tolerance. DrawingUtils shared snapping logic.
      * **RegionSnapshot (v0.51.0: expanded)**: Unified model with `AnnotationType` field ("region"|"point"|"polyline"|"measurement", null=legacy). Factory methods: `CreatePoint()`, `CreatePolyline()`, `CreateMeasurement()`. Labels + LengthOrDistance + Direction support per type.
-     * **Rendering (v0.51.0)**: RegionRenderer (GL wireframe + fill + annotation overlays), RenderState (+3 annotation fields), UIToolkit SceneRegionOverlay + SceneAnnotationOverlay. Multi-layer display: regions (wireframe+fill), points (radius marker), polylines (vertices+length), measurements (dimension line).
+     * **Rendering (v0.51.0, v0.55.10 unified overlay)**: RegionRenderer (GL wireframe + fill + annotation overlays), RenderState (+3 annotation fields), UIToolkit SceneMcpOverlay (merged SceneRegionOverlay + SceneAnnotationOverlay with mode-dynamic rendering). Multi-layer display: regions (wireframe+fill), points (radius marker), polylines (vertices+length), measurements (dimension line). Annotation chip delivery via OnAnnotationCommitted hook.
      * **SceneAnnotationTool (v0.51.0)**: Unified entry point (Shift+A) for all annotation modes. Mode switching via menu. SceneAnnotationShortcut wires hotkeys. SceneAnnotationUtils for common validation/snapping.
      * **Chat Integration**: RegionChipProvider for region+annotation selection in chat (format methods: FormatRegion, FormatPoint, FormatPolyline, FormatMeasurement)
      * **Tests**: 104 C# NUnit tests (v0.46.0) + 67 new annotation tests (v0.51.0): RegionSnapshotAnnotationTests (27), AnnotationDrawingModeTests (23), RegionChipProviderAnnotationTests (17)
@@ -327,6 +327,16 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 - ReloadStabilityTests (Wizard, Editor): full pipeline integration (91 tests)
 
 **Verification**: 39 new regression tests all green on macOS/Windows (domain reload stress: 100+ recompile cycles)
+
+## Icon Canvas Design System (v0.55.10)
+
+**Unified procedural icon rendering for theme-agnostic UI:**
+
+- **IconCanvas.cs** (163 LOC): Procedural builder (18×18 canvas, 2px strokes, near-white ink 0.92). Fluent API: Line/Poly/Closed/Circle/Disc/Point/Rect/RoundRect. Distance-to-segment rasterizer with round-cap lines. Theme-invariant: readable on both Unity dark (#383838) and light (#C8C8C8) backgrounds.
+- **AnnotationIcons.cs refactor** (v0.55.10): Reduced from 480→285 LOC by migrating to IconCanvas API. Procedurally renders Pen/Line/Arrow/Rect/Ellipse/Text/Erase/Save toolbar icons + region mode indicators (Lasso/Rectangle/Circle/PointByPoint).
+- **RegionIcons.cs refactor** (v0.55.10): Unified regional Lasso/Rect/Circle indicators into IconCanvas pattern.
+- **Tests**: 144 IconCanvasTests covering all drawing primitives, rasterization edge cases, pixel correctness.
+- **Architecture**: Single-source-of-truth for visual identity. Eliminates asset drift (icon.png hardcoded colors vs. theme change). Cached after first render (no per-frame cost).
 
 ## Arcade Animation System (v0.52.0+)
 

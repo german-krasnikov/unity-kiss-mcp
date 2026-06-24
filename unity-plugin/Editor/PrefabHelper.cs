@@ -17,8 +17,9 @@ namespace UnityMCP.Editor
                 "revert"         => Revert(argsJson),
                 "get_overrides"  => GetOverrides(argsJson),
                 "unpack"         => Unpack(argsJson),
+                "edit"           => Edit(argsJson),
                 _ => throw new ArgumentException(ErrorHelper.InvalidAction(action,
-                    new[] { "save", "create_variant", "apply", "revert", "get_overrides", "unpack" }))
+                    new[] { "save", "create_variant", "apply", "revert", "get_overrides", "unpack", "edit" }))
             };
         }
 
@@ -129,6 +130,57 @@ namespace UnityMCP.Editor
             if (!PrefabUtility.IsPartOfPrefabInstance(go))
                 throw new InvalidOperationException($"{go.name} is not a prefab instance");
             return go;
+        }
+
+        private static string Edit(string args)
+        {
+            var assetPath = JsonHelper.ExtractString(args, "asset_path")
+                ?? throw new ArgumentException("asset_path is required (e.g. Assets/Prefabs/Foo.prefab)");
+            var component  = JsonHelper.ExtractString(args, "component");
+            var prop       = JsonHelper.ExtractString(args, "prop");
+            var value      = JsonHelper.ExtractString(args, "value");
+            var addComp    = JsonHelper.ExtractString(args, "add_component");
+            var removeComp = JsonHelper.ExtractString(args, "remove_component");
+
+            var contents = PrefabUtility.LoadPrefabContents(assetPath);
+            if (contents == null)
+                throw new ArgumentException($"Prefab not found: {assetPath}");
+            try
+            {
+                if (!string.IsNullOrEmpty(addComp))
+                {
+                    var t = ObjectManager.FindType(addComp)
+                        ?? throw new ArgumentException($"Component type not found: {addComp}");
+                    if (contents.GetComponent(t) == null)
+                        contents.AddComponent(t);
+                }
+                if (!string.IsNullOrEmpty(removeComp))
+                {
+                    var t = ObjectManager.FindType(removeComp);
+                    var c = t != null ? contents.GetComponent(t) : null;
+                    if (c != null) UnityEngine.Object.DestroyImmediate(c);
+                }
+                if (!string.IsNullOrEmpty(prop) && !string.IsNullOrEmpty(component))
+                {
+                    var comp = ComponentSerializer.FindComponent(contents, component)
+                        ?? throw new ArgumentException(
+                            ErrorHelper.ComponentNotFound(component, contents));
+                    var so = new UnityEditor.SerializedObject(comp);
+                    var normProp = InputNormalizer.NormalizeProperty(prop, so);
+                    var sp = so.FindProperty(normProp)
+                        ?? throw new ArgumentException(
+                            ErrorHelper.PropertyNotFound(prop, component, assetPath));
+                    ValueParser.SetPropertyValue(sp, InputNormalizer.NormalizeValue(value));
+                    so.ApplyModifiedPropertiesWithoutUndo();
+                }
+                PrefabUtility.SaveAsPrefabAsset(contents, assetPath);
+                AssetDatabase.SaveAssets();
+                return $"ok: {assetPath}";
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
         }
     }
 }

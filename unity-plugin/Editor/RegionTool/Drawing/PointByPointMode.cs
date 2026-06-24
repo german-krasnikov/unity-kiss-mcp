@@ -98,6 +98,15 @@ namespace UnityMCP.Editor.RegionTool
             IsComplete = false;
         }
 
+        public bool CanConfirm => IsActive && !IsComplete;
+
+        public void ConfirmPending()
+        {
+            if (!CanConfirm) return;
+            _vertices.Add(_cursor);
+            RebuildPreview();
+        }
+
         void RebuildPreview()
         {
             _preview.Clear();

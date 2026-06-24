@@ -32,23 +32,20 @@ namespace UnityMCP.Editor
             }
         }
 
-        public static bool IsPluginCommand(string cmd)
-        {
-            return _plugins.Any(p =>
-                (!string.IsNullOrEmpty(p.CommandPrefix)
-                    && (cmd == p.CommandPrefix || cmd.StartsWith(p.CommandPrefix + "_")))
-                || p.AdditionalCommands.Contains(cmd));
-        }
+        public static bool IsPluginCommand(string cmd) =>
+            _plugins.Any(p => BelongsToPlugin(p, cmd));
 
-        public static string[] GetAllPluginToolNames()
-        {
-            return _plugins
-                .SelectMany(p => CommandRegistry.GetAllCommands()
-                    .Where(c => (!string.IsNullOrEmpty(p.CommandPrefix)
-                            && (c == p.CommandPrefix || c.StartsWith(p.CommandPrefix + "_")))
-                        || p.AdditionalCommands.Contains(c)))
-                .ToArray();
-        }
+        /// <summary>Returns all registered commands that belong to this plugin.</summary>
+        public static string[] GetCommandsForPlugin(IMCPPlugin plugin) =>
+            CommandRegistry.GetAllCommands().Where(c => BelongsToPlugin(plugin, c)).ToArray();
+
+        public static string[] GetAllPluginToolNames() =>
+            _plugins.SelectMany(p => GetCommandsForPlugin(p)).ToArray();
+
+        private static bool BelongsToPlugin(IMCPPlugin plugin, string cmd) =>
+            (!string.IsNullOrEmpty(plugin.CommandPrefix)
+                && (cmd == plugin.CommandPrefix || cmd.StartsWith(plugin.CommandPrefix + "_")))
+            || plugin.AdditionalCommands.Contains(cmd);
 
         public static IReadOnlyList<IMCPPlugin> GetAll() => _plugins;
 
