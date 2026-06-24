@@ -86,12 +86,15 @@ namespace UnityMCP.Editor
         }
 
         /// <summary>
-        /// Saves the current scene. If path is null, saves to current path.
+        /// Saves the specified scene (or active scene if identifier is null).
+        /// If path is null, saves to the scene's current path.
         /// For untitled scenes, path is required.
         /// </summary>
-        public static string SaveScene(string path)
+        public static string SaveScene(string path, string identifier = null)
         {
-            var scene = SceneManager.GetActiveScene();
+            var scene = string.IsNullOrEmpty(identifier)
+                ? SceneManager.GetActiveScene()
+                : FindScene(identifier);
             if (!string.IsNullOrEmpty(path))
             {
                 EditorSceneManager.SaveScene(scene, path);
@@ -124,20 +127,31 @@ namespace UnityMCP.Editor
         }
 
         /// <summary>
-        /// Discards all changes by reloading from disk or creating new scene.
-        /// Never shows a save dialog.
+        /// Discards changes. When identifier is provided, reloads only that scene (additive).
+        /// Without identifier: single-scene discard (legacy behavior).
         /// </summary>
-        public static string DiscardChanges()
+        public static string DiscardChanges(string identifier = null)
         {
+            if (!string.IsNullOrEmpty(identifier))
+            {
+                var target = FindScene(identifier);
+                var path = target.path;
+                if (string.IsNullOrEmpty(path))
+                    throw new System.ArgumentException($"Scene '{identifier}' has no path, cannot discard");
+                EditorSceneManager.CloseScene(target, true);
+                EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+                return "reloaded";
+            }
+
             var scene = SceneManager.GetActiveScene();
-            var path = scene.path;
+            var scenePath = scene.path;
 
             // NewScene silently discards dirty state — no save dialog
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            if (!string.IsNullOrEmpty(path))
+            if (!string.IsNullOrEmpty(scenePath))
             {
-                EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
                 return "reloaded";
             }
             return "new scene";

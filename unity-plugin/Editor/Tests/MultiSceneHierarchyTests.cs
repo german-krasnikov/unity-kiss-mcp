@@ -40,6 +40,11 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void MultiScene_EmitsHeaders()
         {
+            // Need at least one root in each scene so phantom-header stripping keeps the headers.
+            CreateIn(_additiveScene, "EmitHeaders_AdditiveObj");
+            var go = new GameObject("EmitHeaders_MainObj");
+            _toDestroy.Add(go);
+
             var result = HierarchySerializer.Serialize();
             Assert.That(result, Does.Match(@"(?m)^\["));
         }
@@ -261,6 +266,8 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void ThreeScenes_AllHaveHeaders()
         {
+            // Add objects to ALL scenes so phantom-header stripping preserves each scene header.
+            CreateIn(_additiveScene, "Obj_Additive");
             var s1 = AddScene(); var s2 = AddScene();
             CreateIn(s1, "Obj_S1"); CreateIn(s2, "Obj_S2");
             var result = HierarchySerializer.Serialize();

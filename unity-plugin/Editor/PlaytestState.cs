@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using UnityEditor;
 
 namespace UnityMCP.Editor
 {
@@ -13,8 +14,8 @@ namespace UnityMCP.Editor
         readonly List<(string query, string op, string expected, string rawLine)> _invariants = new();
         public List<string> Violations { get; } = new();
 
-        // conserved trackers: (queries, initialSum, rawLine)
-        readonly List<(string[] queries, float initialSum, string rawLine)> _conserved = new();
+        // conserved trackers: (queries, initialSum, rawLine, duration, startTime)
+        readonly List<(string[] queries, float initialSum, string rawLine, float duration, double startTime)> _conserved = new();
         public List<string> ConservedViolations { get; } = new();
 
         // ─── Capture ───
@@ -85,7 +86,7 @@ namespace UnityMCP.Editor
                         initialSum += v;
                 }
             }
-            _conserved.Add((queries, initialSum, string.Join("+", queries)));
+            _conserved.Add((queries, initialSum, string.Join("+", queries), duration, EditorApplication.timeSinceStartup));
         }
 
         /// <summary>Check all conserved trackers. readValue(query) → actual string value.</summary>
@@ -93,7 +94,9 @@ namespace UnityMCP.Editor
         {
             for (int i = 0; i < _conserved.Count; i++)
             {
-                var (queries, initialSum, rawLine) = _conserved[i];
+                var (queries, initialSum, rawLine, duration, startTime) = _conserved[i];
+                if (duration > 0 && EditorApplication.timeSinceStartup - startTime < duration)
+                    continue;
                 try
                 {
                     float currentSum = 0f;

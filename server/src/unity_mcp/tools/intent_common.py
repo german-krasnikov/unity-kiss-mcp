@@ -1,9 +1,9 @@
 """Shared DSL utilities for Tier B intent tools."""
-from typing import Optional
+from typing import Callable, Optional
 from ..sampling_postproc import strip_fences  # backward-compat re-export
 from ..utils import parse_kv  # consolidated — was local copy
 
-__all__ = ["strip_fences", "parse_kv", "parse_indent_tree", "sanitize_intent", "build_batch_line"]
+__all__ = ["strip_fences", "parse_kv", "parse_indent_tree", "sanitize_intent", "build_batch_line", "run_intent_pipeline"]
 
 
 def parse_indent_tree(dsl: str) -> list[dict]:
@@ -38,3 +38,27 @@ def build_batch_line(cmd: str, **kwargs) -> str:
             sv = str(v)
             parts.append(f'{k}="{sv}"' if " " in sv else f"{k}={sv}")
     return " ".join(parts)
+
+
+async def run_intent_pipeline(
+    send: Callable,
+    sampling,
+    prompt: str,
+    feature: str,
+    parse_fn: Callable,
+    build_fn: Callable,
+    dry_run: bool,
+) -> str:
+    """Common tail shared by all intent tools: generate → strip → parse → build → execute."""
+    dsl_raw = await sampling.generate(prompt, feature=feature)
+    if not dsl_raw:
+        return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
+    parsed = parse_fn(strip_fences(dsl_raw))
+    lines = build_fn(parsed)
+    if not lines:
+        return "ERROR: DSL produced no commands"
+    batch_text = "\n".join(lines)
+    if dry_run:
+        return batch_text
+    result = await send("batch", {"commands": batch_text})
+    return f"{feature}: {len(lines)} ops\n{result}"

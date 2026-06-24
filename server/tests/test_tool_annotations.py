@@ -73,3 +73,10 @@ def test_non_idempotent_tool_lacks_idempotentHint(mod, fn):
     ann = _get_annotation(mod, fn)
     assert ann is not None, f"{mod.__name__}.{fn}: no annotation found"
     assert ann.idempotentHint is not True, f"{mod.__name__}.{fn}: should NOT have idempotentHint=True"
+
+
+def test_run_tests_not_marked_read_only():
+    """run_tests triggers domain reload — must NOT have readOnlyHint=True."""
+    ann = _get_annotation(scene, "run_tests")
+    assert ann is not None, "run_tests: no annotation found"
+    assert ann.readOnlyHint is not True, "run_tests causes domain reload — readOnlyHint must be False"

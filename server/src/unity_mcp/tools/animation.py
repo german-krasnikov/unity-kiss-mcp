@@ -6,12 +6,15 @@ _args = None
 
 async def animation(action: str, path: str, clip: str | None = None, clip_name: str | None = None,
                     property: str | None = None, keys: str | None = None,
-                    time: float | None = None) -> str:
+                    time: float | None = None,
+                    component_type: str | None = None) -> str:
     """Animate GameObject properties via AnimationClip. Use when you need to read or author keyframe animation on a specific object (not an Animator state machine — use `animator` for that, not this).
     action: get (list clips/keys) | create (new AnimationClip on object) | edit (add/replace keyframes) | preview (scrub to time).
-    clip=clip name, keys='t:0 v:(0,0,0); t:1 v:(0,2,0)', property=e.g. localPosition.x."""
+    clip=clip name, keys='t:0 v:(0,0,0); t:1 v:(0,2,0)', property=e.g. localPosition.x.
+    component_type: Unity component to animate (default: Transform). Examples: Light, Camera, Rigidbody."""
     return await _send("animation", _args(action=action, path=path, clip=clip, clip_name=clip_name,
-                                          property=property, keys=keys, time=time))
+                                          property=property, keys=keys, time=time,
+                                          component_type=component_type))
 
 
 async def timeline(path: str, action: str, track: str | None = None, track_type: str | None = None,

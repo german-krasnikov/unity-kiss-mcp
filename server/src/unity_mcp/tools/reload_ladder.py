@@ -215,8 +215,9 @@ async def run_ladder(send, *, send_reload=None, bump_file: "Path | None" = None,
         v = _tier_result("T5-guard", baseline, await _t5(eff, baseline))
         return v or "MANUAL-REQUIRED: guard wedged and T5 failed"
 
-    v = _tier_result("T3", baseline, await _t3(eff, baseline, bump_file))
-    if v: return v
+    if not main_dead:
+        v = _tier_result("T3", baseline, await _t3(eff, baseline, bump_file))
+        if v: return v
     if osascript_runner is not None:
         new_mvid, ok = await _t4(eff, baseline, osascript_runner)
         if not ok:

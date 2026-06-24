@@ -2,9 +2,9 @@
 
 ## Overview
 
-Python MCP сервер с 99 core registered tools для управления Unity Editor. `_UnstructuredMCP(FastMCP)` subclass (v0.50.3) + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically. Structured output disabled on all tools to eliminate duplicate `content` + `structuredContent` in MCP responses (reduces size & parsing overhead).
+Python MCP server with 99 core registered tools for controlling Unity Editor. `_UnstructuredMCP(FastMCP)` subclass (v0.50.3) + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically. Structured output disabled on all tools to eliminate duplicate `content` + `structuredContent` in MCP responses (reduces size & parsing overhead).
 
-## Architecture (для Architect)
+## Architecture (for Architect)
 
 ```
 server/src/unity_mcp/
@@ -47,15 +47,19 @@ server/src/unity_mcp/
 
 ### Tools (99 core)
 
-**TIER1 — always visible (41 core):**
+**TIER1 — always visible (42 tools):**
 
-Core (26): get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, set_parent, transfer_object, object_diff, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, do, ask, get_metrics
+Core (20): get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects
+
+Meta (4): do, ask, ask_user, permission_prompt
 
 Intent (3): animator_intent, vfx_intent, ui_intent
 
-Code Intel (4): find_references, compile_preflight, semantic_at, await_compile
+Code Intel (5): find_references, compile_preflight, semantic_at, await_compile, sync_unity
 
 Runtime (8): invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
+
+Other (2): get_metrics, set_parent
 
 ### Compile-Tool Corroboration (v0.7.0+)
 
@@ -63,20 +67,20 @@ Runtime (8): invoke_method, set_runtime_property, wait_until, move_to, query_sta
 
 **Ungated (always visible, not in TIER1 or categories — pass through as "unknown"):**
 
-get_test_results, budget_status
+get_test_results, budget_status, diagnose
 
 **Category-gated (enabled via `discover_tools`):**
 
 | Category | Tools |
 |----------|-------|
-| object | find_objects, get_object_detail, get_components_list, set_active, set_material, wire_event, unwire_event, set_property_delta |
+| object | find_objects, get_object_detail, get_components_list, set_active, set_material, wire_event, unwire_event, set_property_delta, object_diff, transfer_object |
 | animation | animation, timeline, animator, particle |
-| asset | asset, material, prefab, scriptable_object, project_settings |
-| advanced | shader, references, validate_references, menu, checkpoint, recompile, execute_code, check_colliders, get_schema, scan_scene, spatial_query, auto_fix, smart_build, apply_template, save_template, list_templates, await_compile |
-| ui | create_ui, set_rect, validate_layout, get_spatial_context |
-| runtime | invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest |
-| connection | list_connections, reconnect_unity |
-| session | fingerprint, scene_diff, get_changes, save_session, load_session, screenshot_baseline, screenshot_compare, save_skill, use_skill, list_skills |
+| asset | asset, material, prefab, scriptable_object, project_settings, shader, references |
+| advanced | auto_fix, await_compile, check_colliders, checkpoint, compile_preflight, execute_code, find_references, get_schema, menu, recompile, scan_scene, semantic_at, smart_build, spatial_query, validate_references, validate_layout, diagnose |
+| ui | create_ui, set_rect, get_spatial_context, ui_intent, vfx_intent |
+| runtime | run_tests, get_test_results, run_playtest, fuzz_playtest |
+| connection | (empty — list_connections + reconnect_unity are in TIER1/CORE) |
+| session | fingerprint, scene_diff, get_changes, save_session, load_session, screenshot, screenshot_baseline, screenshot_compare, save_skill, use_skill, list_skills, apply_template, save_template, list_templates |
 
 ### Capability Gating (gating.py)
 
@@ -86,6 +90,12 @@ get_test_results, budget_status
 - Unknown (plugin) tools pass through by default
 - Plugin self-registration: `gating.register_tools("category", tools_set, tier1=subset)` lets plugins add to CATEGORIES + TIER1
 
+**Tool Visibility Logic (v0.57.0, commit 2fac0bd)** — fixed AND logic in `server_filtering.py`:
+- Previously: tool visibility had OR bug; disabled tools remained visible
+- Fixed: tool is hidden only if explicitly in disabled set (AND logic: visible = `name not in disabled`)
+- Impact: `is_visible=false` checkbox in MCPSettings now correctly hides tools
+- Implementation: `_apply_gating()` calls `filter_by_tier()` which respects disabled tool set correctly
+
 ### Server Startup
 
 ```python
@@ -94,6 +104,11 @@ get_test_results, budget_status
 mcp = _UnstructuredMCP("UnityMCP", lifespan=lifespan)
 register_all(mcp, _send, _args, get_slot=lambda: slot, get_middleware=lambda: _middleware)
 load_plugins(mcp, _send, _args)
+
+# Port configuration (v0.57.0)
+# - DEFAULT_PORT = 9500 centralized in constants.py (replaces magic strings)
+# - Auto-discovered from ~/.unity-mcp/ports/*.port or UNITY_MCP_PORT env
+# - Used throughout: lockfile creation, bridge connection, test harnesses
 
 @asynccontextmanager
 async def lifespan(app):
@@ -133,6 +148,11 @@ def main():
   - Reconnect backoff (v0.52.7): exponential (5s→60s, reset on success, ±10% jitter), cooldown re-armed on every attempt. Ping verification, fires callbacks
   - DomainReloadError on Unity `going_away` event frame
 
+### Server Control (server_control.py)
+
+- `list_servers` — list all running MCP server PIDs/ports (reads ~/.unity-mcp/server-{port}.lock files)
+- `stop_server(port)` — graceful SIGTERM (Unix) or taskkill (Windows) shutdown of running server
+
 ### Compile State Probe (compile_state.py)
 
 Simplified detector for Unity C# compile/domain-reload:
@@ -159,6 +179,24 @@ Simplified detector for Unity C# compile/domain-reload:
 - `unity://console/errors` — recent console errors
 - `unity://editor/state` — editor state (play mode, scene, selection)
 - `unity://tools/categories` — available tool categories
+
+### SamplingService Singleton (v0.57.0, commit 787a397)
+
+**Refactored from instance to module-level singleton:**
+```python
+# sampling.py — module-level singleton
+sampling_service = SamplingService()
+```
+
+**Usage:** `SamplingService._get_semaphore()` returns shared asyncio.Semaphore across all callers.
+
+**Benefits:**
+- Centralized concurrency control: UNITY_MCP_VISUAL_CONCURRENCY (default 4) enforced globally
+- Clean shared state: no instance passing required
+- Testability: pytest can mutate module-level `sampling_service` directly (no dependency injection)
+- Memory efficiency: single instance, reused for all claude CLI calls
+
+**Related:** Budget tracking in `sampling.py` (metrics, latency tracking) — wired from server.py lifespan.
 
 ### Plugin System
 
@@ -248,6 +286,19 @@ if (HasRpcId(line))  // top-level id present
 
 Retry Watchdog, Confidence Decay (gated <0.5), Taint Tracking, Periodic State Injection (staleness-gated), Path Cache, Dead Write Elimination, Starvation Monitor, Blast Radius Tags, Incremental Verification, Workflow Phase FSM, Visual Verification (Haiku), Play Mode Auto-Routing, find_objects Cache Bypass, Batch Conflict Scan, Post-mutation Snapshot, Component Cache, Console Error Categorization, PrefetchCache (TTL 12s), HierarchyDiff, Distiller, Disambiguator, SchemaGuard, Asymmetric Reflection
 
+**Middleware Pipeline Order (v0.57.0, commit 85c03bf):**
+
+Guard conditions and reroute logic have been reordered for correctness:
+
+1. **Cache-above-circuit check** (PrefetchCache, must run first even when circuit HALF_OPEN)
+2. **Circuit breaker check** (prevents requests during outage)
+3. **Pre-call checks first** (retry, taint, dead-write, blast-radius, verification, batch conflicts) — **guards see ORIGINAL cmd before reroute**
+4. **Play mode auto-routing** (`reroute_cmd` — applied AFTER guards)
+5. **Tier C features** (speculation tracking, lessons, inference)
+6. **Command execution** (actual send to Unity)
+
+**The fix:** Previously reroute was applied BEFORE guards, allowing Play Mode reroutes to bypass safety checks (taint, dead-write detection). Now guards check original command intent, then reroute applies. Example: `update_player_pos` in Play Mode would reroute to `set_runtime_property`, but taint checks now see `update_player_pos` intention first.
+
 ### Additional Env-Gated Features
 
 | Env Var | Default | Feature |
@@ -262,7 +313,7 @@ Retry Watchdog, Confidence Decay (gated <0.5), Taint Tracking, Periodic State In
 | `UNITY_MCP_DISTILL` | `1` (on) | ResponseDistiller — heuristic response compression (set in server.py via setdefault); strip_defaults now always applies to {get_component, inspect, get_object_detail} regardless of this flag (use `_no_strip=1` arg to opt-out) |
 | `UNITY_MCP_FULL_SCHEMAS` | off | Deferred Schema Loading — set `=1` to disable schema stripping (return full inputSchema for all tools instead of stubs) |
 
-## Implementation Notes (для Developer)
+## Implementation Notes (for Developer)
 
 ### Tool Pattern
 
@@ -309,7 +360,7 @@ def register(mcp, send_fn, args_fn):
 - Resources: `server/src/unity_mcp/resources.py`
 - Tests: `server/tests/`
 
-## TDD Scenarios (для Developer)
+## TDD Scenarios (for Developer)
 
 Tests organized by module in `server/tests/`:
 - `test_server.py` — tool registration, _send helper, ToolError handling
@@ -322,7 +373,7 @@ Tests organized by module in `server/tests/`:
 - `test_plugins.py` — plugin loader, skip env, error handling
 - `test_tools_*.py` — per-tool argument validation and response parsing
 
-## Review Checklist (для Reviewer)
+## Review Checklist (for Reviewer)
 
 - [ ] Tool descriptions < 20 tokens each
 - [ ] All tools async

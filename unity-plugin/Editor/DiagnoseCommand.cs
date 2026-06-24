@@ -169,12 +169,13 @@ namespace UnityMCP.Editor
         // C10: Detect reload-failed markers in Editor.log.
         // Matches the same substrings as Python editor_log_parser.py _RELOAD_FAILED / _RELOAD_ABORTED.
         // Returns true when "Reloading assemblies failed." OR "Editor compiler errors found.
-        // Will not reload assemblies." is present in the log.
+        // Will not reload assemblies." appears AFTER the last "Reload assemblies complete." (currency check).
         // Testable overload — accepts injected logPath for NUnit coverage.
         internal static bool DetectReloadFailed(string logPath)
         {
-            const string reloadFailed  = "Reloading assemblies failed.";
-            const string reloadAborted = "Editor compiler errors found. Will not reload assemblies.";
+            const string reloadFailed   = "Reloading assemblies failed.";
+            const string reloadAborted  = "Editor compiler errors found. Will not reload assemblies.";
+            const string reloadComplete = "Reload assemblies complete.";
             try
             {
                 if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath))
@@ -183,13 +184,25 @@ namespace UnityMCP.Editor
                 using (var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 using (var reader = new StreamReader(fs))
                     text = reader.ReadToEnd();
-                return text.IndexOf(reloadFailed,  StringComparison.Ordinal) >= 0
-                    || text.IndexOf(reloadAborted, StringComparison.Ordinal) >= 0;
+
+                // Find position of last failure marker
+                int lastFailed  = text.LastIndexOf(reloadFailed,  StringComparison.Ordinal);
+                int lastAborted = text.LastIndexOf(reloadAborted, StringComparison.Ordinal);
+                int lastFailure = Math.Max(lastFailed, lastAborted);
+                if (lastFailure < 0) return false;
+
+                // If a success marker appears after the last failure, the error is stale
+                int lastSuccess = text.LastIndexOf(reloadComplete, StringComparison.Ordinal);
+                return lastSuccess < lastFailure;
             }
             catch (Exception) { return false; }
         }
 
         internal static bool DetectReloadFailed() => DetectReloadFailed(GetEditorLogPath());
+
+        static string _cachedLogResult;
+        static long   _cachedLogMtime;
+        static string _cachedLogPath;
 
         static string ParseEditorLog()
         {
@@ -198,6 +211,11 @@ namespace UnityMCP.Editor
                 var logPath = GetEditorLogPath();
                 if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath))
                     return "absent";
+
+                // Mtime-guarded cache: skip re-read when file hasn't changed
+                var mtime = new FileInfo(logPath).LastWriteTimeUtc.Ticks;
+                if (logPath == _cachedLogPath && mtime == _cachedLogMtime && _cachedLogResult != null)
+                    return _cachedLogResult;
 
                 // Read full file (not tail — P1 fix teaches full-file is correct)
                 string text;
@@ -208,12 +226,12 @@ namespace UnityMCP.Editor
                 // Find last failure header (rfind equivalent via LastIndexOf)
                 const string failHeader = "## Script Compilation Error for:";
                 var idx = text.LastIndexOf(failHeader, StringComparison.Ordinal);
-                if (idx < 0) return "clean";
+                if (idx < 0) return CacheAndReturn(logPath, mtime, "clean");
 
                 // Extract CS#### codes from the failure block
                 var block = text.Substring(idx, Math.Min(8192, text.Length - idx));
                 var matches = Regex.Matches(block, @"error (CS\d+)");
-                if (matches.Count == 0) return "clean";
+                if (matches.Count == 0) return CacheAndReturn(logPath, mtime, "clean");
 
                 var seen = new System.Collections.Generic.HashSet<string>();
                 var codes = new StringBuilder();
@@ -226,12 +244,20 @@ namespace UnityMCP.Editor
                         codes.Append(code);
                     }
                 }
-                return codes.ToString();
+                return CacheAndReturn(logPath, mtime, codes.ToString());
             }
             catch (Exception e)
             {
                 return $"error:{e.GetType().Name}";
             }
+        }
+
+        static string CacheAndReturn(string logPath, long mtime, string result)
+        {
+            _cachedLogPath   = logPath;
+            _cachedLogMtime  = mtime;
+            _cachedLogResult = result;
+            return result;
         }
 
         static string GetEditorLogPath()

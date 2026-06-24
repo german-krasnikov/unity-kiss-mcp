@@ -29,10 +29,10 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 
 One match per line:
 ```
-Name #InstanceID [Component1,Component2] !
+/Path/To/Object #InstanceID [Component1,Component2] !
 ```
 
-- `Name` — GameObject.name
+- `/Path/To/Object` — full hierarchy path via `ComponentSerializer.GetPath()` (includes scene prefix in multi-scene: `SceneName:/Path/To/Object`)
 - `#ID` — decimal instance ID
 - `[Comp1,Comp2]` — list of component types (excluding Transform, comma-separated, no spaces)
 - `!` — suffix if GameObject inactive
@@ -57,35 +57,44 @@ Name #InstanceID [Component1,Component2] !
 
 **Parameters:**
 - `query` (required) — search expression
-- `root` (optional) — scope search to subtree (object path); `None` searches whole scene
+- `root` (optional) — scope search to subtree (object path); `None` searches whole scene; limits results to children of this object
 - `limit` (optional, default 50) — cap results; `0` = unlimited. Default not sent over wire for token savings.
+- `scene` (optional, multi-scene only) — filter to a single scene by name
 
 Search GameObject hierarchy by name, component, tag, layer, active state.
 
 ```
 # Search by component
 search_scene(query="t:Rigidbody")
-→ Player #2000 [Rigidbody,PlayerController]
-  Enemy #3000 [Rigidbody,EnemyAI] !
+→ /Player #2000 [Rigidbody,PlayerController]
+  /Enemy #3000 [Rigidbody,EnemyAI] !
 
 # Search by name (substring, case-insensitive)
 search_scene(query="Player")
-→ Player #2000 [Rigidbody,PlayerController]
-  PlayerUI #1302 [Canvas,PlayerUIScript]
+→ /Player #2000 [Rigidbody,PlayerController]
+  /UI/PlayerUI #1302 [Canvas,PlayerUIScript]
 
 # Combine filters
 search_scene(query="t:Light active=true")
-→ Directional Light #1200 [Light]
-  Spotlight #1201 [Light]
+→ /Lights/Directional Light #1200 [Light]
+  /Lights/Spotlight #1201 [Light]
 
 # Scoped search — within subtree, limit results
 search_scene(query="t:Renderer", root="/Level/Cave", limit=10)
-→ Rock_1 #4050 [Renderer]
-  Rock_2 #4051 [Renderer]
+→ /Level/Cave/Rock_1 #4050 [Renderer]
+  /Level/Cave/Rock_2 #4051 [Renderer]
   ...+8 more (limit=10)
+
+# Multi-scene search — filter to specific scene
+search_scene(query="t:Light", scene="Forest")
+→ Forest:/Lights/Directional Light #1200 [Light]
 ```
 
 **Overflow marker:** When results exceed limit, the final line is `...+{N} more (limit={L})` showing remaining count.
+
+**Path format (v0.57.0+):** Paths returned via `ComponentSerializer.GetPath()` (full hierarchy, not just name). Single-scene paths: `/Path/To/Object`. Multi-scene paths: `SceneName:/Path/To/Object`. **These paths are directly usable in `get_component`, `set_property`, etc.** — no transformation needed.
+
+**PrefabStage support:** If Prefab Stage is open, search roots in that stage's prefabContentsRoot instead of scenes.
 
 ## TDD Scenarios
 

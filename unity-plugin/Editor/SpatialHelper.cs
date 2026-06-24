@@ -236,6 +236,54 @@ namespace UnityMCP.Editor
                    $"max=({F(b.max.x,"F2")},{F(b.max.y,"F2")},{F(b.max.z,"F2")})";
         }
 
+        /// <summary>
+        /// Delete (or preview) objects inside a polygon region.
+        /// dry_run=true → list; dry_run=false → Undo.DestroyObjectImmediate each.
+        /// </summary>
+        public static string RegionClear(string args)
+        {
+            var vertices = JsonHelper.ExtractString(args, "vertices");
+            var dryRunStr = JsonHelper.ExtractString(args, "dry_run") ?? "true";
+            var filter = JsonHelper.ExtractString(args, "filter");
+            var capStr = JsonHelper.ExtractString(args, "cap");
+
+            bool dryRun = !string.Equals(dryRunStr, "false", System.StringComparison.OrdinalIgnoreCase);
+            int cap = 50;
+            if (capStr != null && int.TryParse(capStr, out var pc)) cap = System.Math.Min(System.Math.Max(1, pc), 200);
+
+            if (string.IsNullOrEmpty(vertices))
+                throw new System.ArgumentException("vertices required for region_clear");
+
+            var poly = UnityMCP.Editor.RegionTool.Polygon2D.FromCsv(vertices);
+            var objects = UnityMCP.Editor.RegionTool.SceneRegionQuery.FindInside(poly, cap);
+
+            // Apply name filter if provided
+            var targets = new System.Collections.Generic.List<GameObject>(objects.Length);
+            foreach (var go in objects)
+            {
+                if (filter != null && !go.name.Contains(filter)) continue;
+                targets.Add(go);
+            }
+
+            if (dryRun)
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"DRY: {targets.Count} object{(targets.Count == 1 ? "" : "s")} would be deleted:");
+                foreach (var go in targets)
+                    sb.AppendLine($"  {ComponentSerializer.GetPath(go)}");
+                return sb.ToString().TrimEnd();
+            }
+
+            int deleted = 0;
+            foreach (var go in targets)
+            {
+                if (go == null) continue;
+                UnityEditor.Undo.DestroyObjectImmediate(go);
+                deleted++;
+            }
+            return $"DELETED: {deleted} object{(deleted == 1 ? "" : "s")}";
+        }
+
         public static string Execute(string args)
         {
             var action = JsonHelper.ExtractString(args, "action");

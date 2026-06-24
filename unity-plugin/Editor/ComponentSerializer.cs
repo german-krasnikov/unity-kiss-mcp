@@ -185,6 +185,26 @@ namespace UnityMCP.Editor
                         }
                         return TryInlineStruct(prop, 0) ?? $"<{prop.type}>";
                     }
+                case SerializedPropertyType.Rect:
+                {
+                    var r = prop.rectValue;
+                    return $"({r.x.ToString("G4", CultureInfo.InvariantCulture)}, {r.y.ToString("G4", CultureInfo.InvariantCulture)}, {r.width.ToString("G4", CultureInfo.InvariantCulture)}, {r.height.ToString("G4", CultureInfo.InvariantCulture)})";
+                }
+                case SerializedPropertyType.Bounds:
+                {
+                    var b = prop.boundsValue;
+                    return $"({b.center.x.ToString("G4", CultureInfo.InvariantCulture)}, {b.center.y.ToString("G4", CultureInfo.InvariantCulture)}, {b.center.z.ToString("G4", CultureInfo.InvariantCulture)}, {b.size.x.ToString("G4", CultureInfo.InvariantCulture)}, {b.size.y.ToString("G4", CultureInfo.InvariantCulture)}, {b.size.z.ToString("G4", CultureInfo.InvariantCulture)})";
+                }
+                case SerializedPropertyType.RectInt:
+                {
+                    var r = prop.rectIntValue;
+                    return $"({r.x}, {r.y}, {r.width}, {r.height})";
+                }
+                case SerializedPropertyType.BoundsInt:
+                {
+                    var b = prop.boundsIntValue;
+                    return $"({b.position.x}, {b.position.y}, {b.position.z}, {b.size.x}, {b.size.y}, {b.size.z})";
+                }
                 default:
                     return $"<{prop.propertyType}>";
             }

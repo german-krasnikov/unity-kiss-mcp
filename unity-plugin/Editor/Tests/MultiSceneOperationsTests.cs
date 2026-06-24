@@ -295,6 +295,7 @@ namespace UnityMCP.Editor.Tests
         {
             EditorSceneManager.CloseScene(_additiveScene, true);
             _additiveScene = default;
+            SceneContext.InvalidateCache();
 
             var go = new GameObject("SingleSceneObj_Bug1");
             _toDestroy.Add(go);
@@ -342,6 +343,96 @@ namespace UnityMCP.Editor.Tests
             Assert.That(result, Does.Contain("Referencer_Single_Bug2"));
             Assert.That(result, Does.Contain("found: 1"));
         }
+
+        // ── Item 33: DiscardChanges with identifier (multi-scene) ────────────
+
+        [Test]
+        public void DiscardChanges_WithIdentifier_ReloadsOnlyTargetScene()
+        {
+            // Add a GO to the additive scene and dirty it
+            CreateIn(_additiveScene, "DirtyObj_Discard33");
+            EditorSceneManager.MarkSceneDirty(_additiveScene);
+
+            var mainName = SceneManager.GetActiveScene().name;
+            var additiveName = _additiveScene.name;
+
+            var result = SceneHelper.DiscardChanges(additiveName);
+
+            // Reassign so TearDown tracks the reloaded scene
+            _additiveScene = SceneManager.GetSceneByName(additiveName);
+
+            // Main scene must still be loaded
+            Assert.IsTrue(SceneManager.GetSceneByName(mainName).IsValid(),
+                "Main scene must survive DiscardChanges on additive scene");
+            Assert.AreEqual(2, SceneManager.sceneCount,
+                "Scene count must remain 2 after targeted discard");
+            StringAssert.Contains("reloaded", result);
+        }
+
+        [Test]
+        public void DiscardChanges_WithIdentifier_UnknownScene_Throws()
+        {
+            var ex = Assert.Throws<System.ArgumentException>(
+                () => SceneHelper.DiscardChanges("SceneThatDoesNotExist_DiscardTest_XYZ"));
+            StringAssert.Contains("not found", ex.Message);
+        }
+
+        [Test]
+        public void DiscardChanges_NoIdentifier_CreatesNewScene()
+        {
+            // Without identifier on an unsaved scene: returns "new scene" (legacy behavior)
+            EditorSceneManager.CloseScene(_additiveScene, true);
+            _additiveScene = default;
+            // Create a fresh unsaved scene so path is empty — guarantees "new scene" branch
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var result = SceneHelper.DiscardChanges(null);
+
+            Assert.AreEqual("new scene", result);
+        }
+
+        // ── Item 34: SaveScene with identifier (multi-scene) ─────────────────
+
+        [Test]
+        public void SaveScene_WithIdentifier_SavesTargetScene()
+        {
+            // _additiveScene was saved to disk — just mark dirty and re-save
+            EditorSceneManager.MarkSceneDirty(_additiveScene);
+
+            var result = SceneHelper.SaveScene(null, _additiveScene.name);
+
+            Assert.AreEqual(_additiveTempPath, result);
+            Assert.IsFalse(SceneManager.GetSceneByName(_additiveScene.name).isDirty,
+                "Scene must not be dirty after save");
+        }
+
+        [Test]
+        public void SaveScene_WithIdentifier_NoActiveSceneChange()
+        {
+            var mainName = SceneManager.GetActiveScene().name;
+
+            SceneHelper.SaveScene(null, _additiveScene.name);
+
+            Assert.AreEqual(mainName, SceneManager.GetActiveScene().name,
+                "Active scene must not change when saving a non-active scene");
+        }
+
+        [Test]
+        public void SaveScene_NoIdentifier_KeepsCurrentBehavior()
+        {
+            // Without identifier: saves active scene (current behavior unchanged)
+            var active = SceneManager.GetActiveScene();
+            // active scene has a path from base.SetUp
+            Assert.IsFalse(string.IsNullOrEmpty(active.path));
+
+            var result = SceneHelper.SaveScene(null, null);
+
+            Assert.AreEqual(active.path, result);
+        }
+
+        // Expose _additiveTempPath for tests above
+        private string _additiveTempPath =>
+            TestPaths.TempFolder + $"/{GetType().Name}_additive_temp.unity";
 
         // ── Helper component ──────────────────────────────────────────────────
 

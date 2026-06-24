@@ -12,6 +12,9 @@ namespace UnityMCP.Editor
     {
         public static SceneContext Current => new SceneContext(HierarchySerializer.GetAllLoadedSceneRoots());
 
+        // Keep for callers that already call InvalidateCache() — now a no-op.
+        internal static void InvalidateCache() { }
+
         public readonly List<(string name, GameObject[] roots)> Scenes;
         public bool IsMulti => Scenes.Count > 1;
 

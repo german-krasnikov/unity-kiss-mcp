@@ -77,7 +77,7 @@ ToolError: <tool_name> requires typed MCP tool (Python DSL expansion), not batch
 
 ## Code Locations
 
-- Python tool: `server/src/unity_mcp/tools/advanced.py` (batch tool)
+- Python tool: `server/src/unity_mcp/tools/batch.py` (batch tool)
 - Auto-batch: `server/src/unity_mcp/tools/autobatch.py` (setup_objects, set_properties, configure_objects)
 - C# executor: `unity-plugin/Editor/BatchHelper.cs` (Execute + CommandSchema.Validate, ParseLines, ParseLine, ParseKeyValuePairs, ParseValue, BuildJsonObject; uses JsonHelper.EscapeJson, JsonHelper.UnescapeJsonString)
 - Validation layer: `unity-plugin/Editor/CommandSchema.cs` (schema dict, Validate, ExtractKeys)

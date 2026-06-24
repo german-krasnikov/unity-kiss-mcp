@@ -2,7 +2,7 @@
 
 ## Overview
 
-An optional Editor window that brings agentic chat directly into Unity, spawning the user's local `claude` CLI as a child process. Zero new MCP tools — reuses all ~90 existing tools via the spawn-the-CLI architecture.
+An optional Editor window that brings agentic chat directly into Unity, spawning the user's local `claude` CLI as a child process. Zero new MCP tools — reuses all 99 existing tools via the spawn-the-CLI architecture.
 
 **Isolation:** Behind the `UNITY_MCP_CHAT` scripting define in `UnityMCP.Editor.Chat.asmdef`. OFF by default; deleting the `Chat/` folder leaves core untouched.
 
@@ -45,6 +45,8 @@ Key details:
 **Subprocess Environment (v0.36.0, v0.55.0: scoped config delivery)** — CliBackendBase injects only:
 - **UNITY_MCP_SESSION_TIMEOUT=300** — extended session deadline for reasoning models (Codex o3/o3-pro may think for 2–5 min)
 
+**RULE (v0.55.0):** NEVER inject UNITY_MCP_PORT into process env — port comes via scoped config only. BuildSpawnEnv() returns only UNITY_MCP_SESSION_TIMEOUT. Each CLI backend delivers port via its --mcp-config JSON/TOML environment block.
+
 **v0.55.0 Breaking Rule:** UNITY_MCP_PORT is **never** injected into process env. Instead, each backend delivers the port via scoped --mcp-config (JSON/TOML/env block per CLI):
 - **Claude**: `--mcp-config <path>.json` with `"environment": { "UNITY_MCP_PORT": "<port>" }` block
 - **Codex**: `--mcp-config <path>.json` with `"environment": { "UNITY_MCP_PORT": "<port>" }` block
@@ -84,6 +86,8 @@ Each CLI-based backend is a strategy over **4 variation axes:**
 **ClaudeBackend** (ported): Zero behavior change (−65 lines net). Now a thin wrapper over the base. Regression anchor proving the abstraction doesn't alter existing behavior.
 
 **CodexAppServerBackend** (v0.14.0, simplified in v0.20.0 as only Codex option): Implements the 4 axes for OpenAI Codex via persistent `codex app-server` (JSON-RPC 2.0). One process per chat session (IsPersistentProcess=true), eliminates spawn-per-turn churn. Protocol: `initialize` → `thread/start` → repeated `turn/start` with `mcpToolCall` items + real token streaming via `item/agentMessage/delta`.
+
+**AntigravityBackend** (v0.41.0, external LLM service): Implements the 4 axes for Antigravity with model selection and stream-json protocol.
 
 **CodexArgBuilder** (v0.14.0): Constructs `codex app-server` argv + init args. Three `-c mcp_servers.unity*` flags passed at initialization. Format: `-c mcp_servers.{unity,unity_auth,unity_plugins}=<value>`.
 
@@ -998,4 +1002,4 @@ Two paired changes guarantee the model receives full object/file paths and the U
 - **Core Architecture:** `AI/architecture.md` (CommandRouter, TCP bridge, tools catalog)
 - **TCP Bridge:** `AI/tcp-bridge.md` (4-byte framing, heartbeat, SO_KEEPALIVE)
 - **MCP Server:** `AI/mcp-server.md` (Python _UnstructuredMCP(FastMCP), structured_output=False on all tools, deferred schema loading, plugin system, tool gating)
-- **Changelog:** `AI/changelog.md` (feature timeline)
+- **Changelog:** `CHANGELOG.md` (feature timeline)

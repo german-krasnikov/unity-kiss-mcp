@@ -76,8 +76,7 @@ namespace UnityMCP.Editor
                 RenderTexture.active = null;
 
                 // If result is all black, fall back to already-rendered URP buffer
-                var pixels = tex.GetPixels(0, 0, 1, 1);
-                bool allBlack = pixels[0].r < 0.01f && pixels[0].g < 0.01f && pixels[0].b < 0.01f;
+                bool allBlack = IsAllBlack(tex);
 
                 if (allBlack)
                 {
@@ -152,6 +151,18 @@ namespace UnityMCP.Editor
                 catch { /* fallback to Camera.Render for pipelines that don't support StandardRequest */ }
             }
             camera.Render();
+        }
+
+        private static bool IsAllBlack(Texture2D tex)
+        {
+            int w = tex.width, h = tex.height;
+            var corners = tex.GetPixels(0, 0, Math.Min(4, w), Math.Min(4, h));
+            var center  = tex.GetPixels(w / 2 - Math.Min(2, w / 2), h / 2 - Math.Min(2, h / 2),
+                                        Math.Min(4, w), Math.Min(4, h));
+            float max = 0f;
+            foreach (var p in corners) max = Math.Max(max, p.r + p.g + p.b);
+            foreach (var p in center)  max = Math.Max(max, p.r + p.g + p.b);
+            return max < 0.01f;
         }
 
         private static Camera FindCamera(string cameraName)

@@ -11,6 +11,7 @@ import struct
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional
+from .constants import DEFAULT_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +100,9 @@ class UnityBridge(HeartbeatMixin):
                  port_discoverer: Optional[Callable[[], int]] = None):
         self._host = host
         try:
-            self._port = port or int(os.environ.get("UNITY_MCP_PORT", "9500"))
+            self._port = port or int(os.environ.get("UNITY_MCP_PORT", str(DEFAULT_PORT)))
         except ValueError:
-            self._port = 9500
+            self._port = DEFAULT_PORT
         self._reader = None
         self._writer = None
         self._counter = 0
@@ -111,6 +112,7 @@ class UnityBridge(HeartbeatMixin):
         )
         self._first_failure_ts: Optional[float] = None
         self._reconnect_started_at: Optional[float] = None
+        self._hard_deadline_started_at: Optional[float] = None
         self._state: BridgeState = BridgeState.DISCONNECTED
         self._on_reconnect_callbacks: list = []
         self._crash_log = CrashLogger()
@@ -289,7 +291,7 @@ class UnityBridge(HeartbeatMixin):
                                               path="send")
                 self._first_failure_ts = None
             return result
-        return result  # type: ignore[return-value]
+        raise RuntimeError(f"_send_with_retry exhausted {MAX_RETRIES} retries without result for cmd={cmd!r}")
 
     def _describe_failure(self, cmd: str, exc: Exception) -> str:
         try:
@@ -392,6 +394,7 @@ class UnityBridge(HeartbeatMixin):
         self._writer = writer
         self._first_failure_ts = None
         self._reconnect_started_at = None
+        self._hard_deadline_started_at = None
         self._state = BridgeState.CONNECTED
         self._reload.clear()
         self._last_reconnect_at = time.monotonic()

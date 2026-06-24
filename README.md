@@ -32,7 +32,7 @@
 
 </div>
 
-> **Let any MCP-compatible AI assistant control your Unity Editor** — inspect scenes, edit GameObjects, run playtests, and capture screenshots without leaving the chat. Binary TCP protocol with 10–15× token compression and 80–95% batch savings.
+> **Let any MCP-compatible AI assistant control your Unity Editor** — inspect scenes, edit GameObjects, run playtests, and capture screenshots without leaving the chat. JSON-framed TCP protocol; batch delivers 80–95% token savings (5–20× compression) on multi-step work.
 
 <sub>MCP (Model Context Protocol) is Anthropic's open standard for giving AI assistants structured tool access.</sub>
 
@@ -46,9 +46,9 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 99 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 101 MCP tools with 80–95% token compression.
 
-💬 **In-Unity Chat** — open `Window → MCP Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Antigravity, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
+💬 **In-Unity Chat** — open `MCP → Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Antigravity, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
 **Before / after — creating and configuring 3 objects:**
 
@@ -56,20 +56,32 @@
 # Before: 9 separate MCP calls (~1800 tokens)
 create_object("Enemy")
 set_property("Enemy", "Transform", "position", "0,1,0")
-manage_component("Enemy", "add", "Health")
+manage_component("Enemy", "Health", "add")
 set_property("Enemy", "Health", "maxHp", "100")
 # ... 5 more calls
 ```
 
 ```python
 # After: 1 batch call (~120 tokens, 93% savings)
-batch([
-  {"cmd": "create_object",    "path": "Enemy", "type": "Empty"},
-  {"cmd": "set_property",     "path": "Enemy", "component": "Transform", "property": "position", "value": "0,1,0"},
-  {"cmd": "manage_component", "path": "Enemy", "action": "add", "component": "Health"},
-  {"cmd": "set_property",     "path": "Enemy", "component": "Health", "property": "maxHp", "value": "100"},
-])
+batch("""
+create_object name=Enemy
+set_property path=Enemy component=Transform prop=position value=0,1,0
+manage_component path=Enemy type=Health action=add
+set_property path=Enemy component=Health prop=maxHp value=100
+""")
 ```
+
+### What you can say
+
+> "Create a player character with health component and position it at the center of the scene"
+
+> "Find all enemies without colliders and add BoxCollider to each"
+
+> "Take a multi-view screenshot and compare it with the last one"
+
+> "Run a playtest: move the player to the door, wait for it to open, assert the score increased"
+
+> "Show me what changed since my last checkpoint"
 
 <img src="docs/assets/divider-heartbeat.svg" width="100%" alt="">
 
@@ -96,16 +108,44 @@ iex (iwr https://raw.githubusercontent.com/german-krasnikov/unity-kiss-mcp/maste
 <details>
 <summary>Windows: antivirus blocked the script?</summary>
 
-Run these commands manually in a **new PowerShell window**:
+**Option 1: Install via install.py**
 
-```powershell
-winget install astral-sh.uv
-git clone https://github.com/german-krasnikov/unity-kiss-mcp.git "$HOME\.unity-mcp\server"
-cd "$HOME\.unity-mcp\server"
-uv run python install.py setup
-```
+1. Install `uv`:
+   ```powershell
+   winget install astral-sh.uv
+   ```
 
-(The new window ensures `uv` is available in PATH after installation.)
+2. Clone the repo:
+   ```powershell
+   git clone https://github.com/german-krasnikov/unity-kiss-mcp.git "$HOME\.unity-mcp\server"
+   cd "$HOME\.unity-mcp\server"
+   ```
+
+3. Run setup:
+   ```powershell
+   uv run python install.py setup
+   ```
+
+4. Configure your AI tool:
+   ```powershell
+   uv run python install.py configure --tool claude-code
+   ```
+
+**Option 2: Manual setup**
+
+1. Install `uv`: Open PowerShell and run:
+   ```powershell
+   winget install astral-sh.uv
+   ```
+
+2. Add the Unity plugin via **Package Manager → Add package from git URL:**
+   ```
+   https://github.com/german-krasnikov/unity-kiss-mcp.git?path=unity-plugin
+   ```
+
+3. Configure your AI tool manually (see "Manual MCP configuration" above).
+
+4. Open the **Setup Wizard** in Unity via **MCP → Setup Wizard** to complete setup.
 
 </details>
 
@@ -153,23 +193,20 @@ Add this to your MCP config file:
    - One-click configure: pick your tool → choose Global or Project scope → done
    - Supports 9 backends: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity
 
-**Configure an AI tool manually:**
+<details>
+<summary>Alternative: full local clone</summary>
 
 ```bash
+git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
+cd unity-kiss-mcp
+python install.py setup
 python install.py configure --tool claude-code
-# Project-scoped config (writes .mcp.json to project root):
-python install.py configure --tool claude-code --project-dir /path/to/unity/project
-```
-
-Supported tools: `claude-code`, `claude-desktop`, `cursor`, `windsurf`, `vscode`, `codex`, `kimi`, `opencode`
-
-**Verify installation:**
-
-```bash
 python install.py doctor
 ```
 
-Shows Python version, venv status, config validity, and TCP port connectivity.
+This clones the repo, creates a venv, installs dependencies, configures your AI tool, and verifies the setup. Supported tools: `claude-code`, `claude-desktop`, `cursor`, `windsurf`, `vscode`, `codex`, `kimi`, `opencode`
+
+</details>
 
 <details>
 <summary><b>Compatibility</b></summary>
@@ -185,7 +222,7 @@ Shows Python version, venv status, config validity, and TCP port connectivity.
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="99 MCP Tools · 7274 Tests (2728 Python · 4462 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="101 MCP Tools · 211 Tests (0 Python · 211 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -232,7 +269,7 @@ def register(mcp, send, args):
         return await send("find_objects", args(path=path, active="false"))
 ```
 
-Drop the file in `tools/` — it's auto-discovered on next server start.
+Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on next server start.
 
 </details>
 
@@ -243,6 +280,13 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 <div><sub>Full history: <a href="CHANGELOG.md"><b>CHANGELOG.md</b></a></sub></div>
 
 <!-- CHANGELOG_START -->
+<details>
+<summary><b>v0.57.0</b> — 2026-06-24 — **Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool …</summary>
+
+**Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool filter.
+
+</details>
+
 <details>
 <summary><b>v0.56.0</b> — 2026-06-24 — **Unified Scene View Overlay** — Merged 2 separate overlays …</summary>
 
@@ -272,15 +316,9 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 </details>
 
 <details>
-<summary><b>v0.53.0</b> — 2026-06-23 — **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + …</summary>
-
-**Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + jitter; hard-coded 9500 fallback removed (read_unity_port now returns …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.53.0** — 2026-06-23 — **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + …
 - **v0.52.6** — 2026-06-22 — **Multi-Unity Port Race Conditions** — Fixed port file collision and …
 - **v0.52.5** — 2026-06-22 — **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.
 - **v0.52.0** — 2026-06-21 — **Arcade Animation System** — Unified animation primitives for consistent UI …
@@ -368,19 +406,118 @@ Drop the file in `tools/` — it's auto-discovered on next server start.
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 
+## Documentation
+
+**User Guides & Troubleshooting:** [`docs/README.md`](docs/README.md)
+- Installation guides for macOS, Windows, Linux
+- Troubleshooting TCP connection issues
+- MCP configuration for all AI tools
+- Chat feature reference (context chips, undo, domain-reload safety)
+- PlayTest DSL tutorial with examples
+- Multi-scene workflows
+- Animation, VFX, and shader graph integration
+
+**Developer Reference:**
+- **Architecture & Design:** [`AI/architecture.md`](AI/architecture.md) — high-level system design, component responsibilities, serialization formats, test organization
+- **MCP Tool Catalog:** [`AI/mcp-server.md`](AI/mcp-server.md) — complete tool reference with signatures, examples, and token costs
+- **Token Optimization:** [`docs/tools/batch.md`](docs/tools/batch.md) — batch patterns, deferred schemas, per-session cost analytics
+- **Multi-Scene Guide:** [`.claude/skills/multi-scene.md`](.claude/skills/multi-scene.md) — cross-scene queries, path resolution, component serialization
+
+<img src="docs/assets/divider.svg" width="100%" alt="">
+
+## FAQ
+
+<details>
+<summary><b>How is this different from Unity 6.2's built-in AI assistant?</b></summary>
+
+Unity's built-in AI is limited to code generation. Unity MCP gives full editor control: scene CRUD, animation, VFX, playtesting, screenshots. 99 tools vs basic code completion.
+
+</details>
+
+<details>
+<summary><b>Does this work with Unity 5 / Unity 2022?</b></summary>
+
+No, requires Unity 6000.0+ (Unity 6). Uses modern Editor APIs not available in older versions.
+
+</details>
+
+<details>
+<summary><b>How much does it cost?</b></summary>
+
+Unity MCP is free and open source (MIT). You only pay for the AI tool you use (Claude, Codex, etc.). In-Unity Chat uses CLI tools directly — no separate API key needed.
+
+</details>
+
+<details>
+<summary><b>Is my code/project data sent to the cloud?</b></summary>
+
+MCP server runs locally. TCP communication is localhost-only (127.0.0.1). Your project data goes only to the AI provider you choose (Claude, Codex, etc.) through their standard API.
+
+</details>
+
+<details>
+<summary><b>Can I use this with Cursor/Windsurf/VS Code?</b></summary>
+
+Yes. Any MCP-compatible tool works. Setup Wizard auto-configures: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Kimi, OpenCode, Antigravity.
+
+</details>
+
+<details>
+<summary><b>What happens during Unity domain reload?</b></summary>
+
+The TCP bridge reconnects automatically. In-Unity Chat is domain-reload safe (survives recompilation). Connection recovery with exponential backoff.
+
+</details>
+
+<details>
+<summary><b>Can I add my own tools?</b></summary>
+
+Yes. Drop a Python file in `tools/`, add it to `__init__.py`, implement the `register(mcp, send, args)` pattern. Auto-discovered on server restart.
+
+</details>
+
+<details>
+<summary><b>Comparison with other Unity AI tools</b></summary>
+
+| Feature | Unity MCP | CoplayDev | IvanMurzak | CoderGamester |
+|---------|-----------|-----------|------------|---------------|
+| MCP Tools | 99 | ~40 | 70+ | 28 |
+| In-Editor Chat | ✅ 5 backends | ❌ | ❌ | ❌ |
+| Token Optimization | 80-95% batch savings | ❌ | ❌ | ❌ |
+| One-Liner Install | ✅ curl/iex | ❌ | ❌ | ❌ |
+| PlayTest DSL | ✅ 21 commands | ❌ | ❌ | ❌ |
+| Multi-Scene Support | ✅ | ❌ | ✅ | ❌ |
+| AI Backends | 9 (Claude, Codex, Kimi, Antigravity, OpenCode, etc.) | 1 | 4 | 9 |
+| Tests | 7,274 | — | — | — |
+| Code Intelligence | ✅ Roslyn-powered | ❌ | ❌ | ❌ |
+| Cross-Platform | ✅ Win/Mac/Linux | ✅ | ✅ | ✅ |
+| License | MIT | MIT | MIT | MIT |
+
+</details>
+
+<img src="docs/assets/divider.svg" width="100%" alt="">
+
 ## Contributing
 
 ```bash
-# Python tests (no Unity needed)
-cd server && pytest -m "not live" -v
+# Python unit tests (no Unity, 2728 tests)
+cd server && pytest -m "not live" -q
 
-# With Unity running on :9500
-pytest -m "live"
+# Python live integration tests (Unity running on :9500, 78 tests)
+pytest -m "live and not live_cli" -q
 
-# C# tests — Unity Test Runner → EditMode
+# C# EditMode tests (no play mode)
+# Open Unity Test Runner → EditMode → Run All
 ```
 
+**Test Tiers:**
+- **Tier 1 (Unit):** Mocked Python (230 tests, $0) + C# EditMode (2389 tests, $0)
+- **Tier 2 (Integration):** Python live (78 tests, $0) + NUnit PlayMode (73 tests, $0) + reload stability (39 tests, $0)
+- **Tier 3 (CLI):** Real `claude` CLI with interactive I/O (4 tests, ~$0.004)
+
 Architecture overview: [`AI/architecture.md`](AI/architecture.md) · Full tool catalog: [`AI/mcp-server.md`](AI/mcp-server.md)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=german-krasnikov/unity-kiss-mcp&type=Date)](https://star-history.com/#german-krasnikov/unity-kiss-mcp&Date)
 
 <img src="docs/assets/divider.svg" width="100%" alt="">
 

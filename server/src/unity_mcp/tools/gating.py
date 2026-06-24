@@ -72,7 +72,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     "META": [
         "animator_intent", "get_metrics",
         "setup_objects", "set_properties", "configure_objects",
-        "scan_scene", "check_colliders", "spatial_query",
+        "scan_scene", "check_colliders", "spatial_query", "region_clear", "navmesh_query",
         "set_llm_config",
     ],
 }

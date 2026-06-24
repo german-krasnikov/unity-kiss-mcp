@@ -26,7 +26,8 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "path"),
                 JsonHelper.ExtractString(args, "clip_name"),
                 JsonHelper.ExtractString(args, "property") ?? "localPosition",
-                JsonHelper.ExtractString(args, "keys") ?? "");
+                JsonHelper.ExtractString(args, "keys") ?? "",
+                JsonHelper.ExtractString(args, "component_type"));
         }
 
         private static string ExecEditAnimation(string args)
@@ -36,7 +37,8 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "clip"),
                 JsonHelper.ExtractString(args, "action"),
                 JsonHelper.ExtractString(args, "property"),
-                JsonHelper.ExtractString(args, "keys"));
+                JsonHelper.ExtractString(args, "keys"),
+                JsonHelper.ExtractString(args, "component_type"));
         }
 
         private static string ExecPreviewAnimation(string args)
@@ -95,8 +97,8 @@ namespace UnityMCP.Editor
             {
                 "new" => SceneHelper.NewScene(),
                 "open" => SceneHelper.OpenScene(JsonHelper.ExtractString(args, "path")),
-                "save" => SceneHelper.SaveScene(JsonHelper.ExtractString(args, "path")),
-                "discard" => SceneHelper.DiscardChanges(),
+                "save" => SceneHelper.SaveScene(JsonHelper.ExtractString(args, "path"), JsonHelper.ExtractString(args, "scene")),
+                "discard" => SceneHelper.DiscardChanges(JsonHelper.ExtractString(args, "scene")),
                 "open_additive" => SceneHelper.OpenAdditive(JsonHelper.ExtractString(args, "path")),
                 "close" => SceneHelper.CloseScene(JsonHelper.ExtractString(args, "path")),
                 "set_active" => SceneHelper.SetActiveScene(JsonHelper.ExtractString(args, "path")),

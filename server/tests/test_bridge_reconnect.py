@@ -334,18 +334,23 @@ async def test_grace_not_expired_after_becoming_idle_post_busy():
     bridge._startup_grace_expired = False
 
     now = 1000.0  # fixed base time
-    # Sequence: t=1000 (set _reconnect_started_at), t=1000 (busy tick 1),
-    # t=1200 (busy tick 2 — 200s elapsed total, > STARTUP_GRACE_S=90s),
-    # t=1200 (reset should move _reconnect_started_at to ~1200),
-    # t=1250 (idle tick — elapsed from reset = ~50s, < 90s → should NOT latch)
+    # Each tick now makes up to 4 monotonic() calls:
+    #   (a) set _reconnect_started_at (first tick only)
+    #   (b) set _hard_deadline_started_at (first tick only — never reset while busy)
+    #   (c) busy=True → reset _reconnect_started_at
+    #   (d) elapsed = monotonic() - _reconnect_started_at
+    #   (e) hard_elapsed = monotonic() - _hard_deadline_started_at
     time_seq = iter([
-        1000.0,  # tick 1: set _reconnect_started_at
-        1000.0,  # tick 1: probe_busy=True → reset _reconnect_started_at to 1000
-        1000.0,  # tick 1: elapsed calc → 0s (under grace)
-        1200.0,  # tick 2: probe_busy=True → reset _reconnect_started_at to 1200
-        1200.0,  # tick 2: elapsed calc → 0s (just reset)
-        1250.0,  # tick 3: probe_busy=False → elapsed = 1250-1200 = 50s < 90s → no latch
-        1250.0,  # tick 3: elapsed calc
+        1000.0,  # tick 1(a): set _reconnect_started_at = 1000
+        1000.0,  # tick 1(b): set _hard_deadline_started_at = 1000
+        1000.0,  # tick 1(c): busy → reset _reconnect_started_at = 1000
+        1000.0,  # tick 1(d): elapsed = 1000-1000 = 0s (under grace)
+        1000.0,  # tick 1(e): hard_elapsed = 1000-1000 = 0s (under hard deadline)
+        1200.0,  # tick 2(c): busy → reset _reconnect_started_at = 1200
+        1200.0,  # tick 2(d): elapsed = 1200-1200 = 0s (just reset)
+        1200.0,  # tick 2(e): hard_elapsed = 1200-1000 = 200s (under 450s deadline)
+        1250.0,  # tick 3(d): elapsed = 1250-1200 = 50s < 90s → no grace latch
+        1250.0,  # tick 3(e): hard_elapsed = 1250-1000 = 250s < 450s → no hard latch
     ])
 
     with patch("unity_mcp.bridge_heartbeat.time.monotonic", side_effect=lambda: next(time_seq)):

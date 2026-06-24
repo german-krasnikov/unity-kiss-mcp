@@ -112,3 +112,70 @@ def test_build_batch_line_no_extra_args():
     from unity_mcp.tools.intent_common import build_batch_line
     line = build_batch_line("create_object", name="Cube")
     assert line == "create_object name=Cube"
+
+
+# ---------------------------------------------------------------------------
+# 5. run_intent_pipeline
+# ---------------------------------------------------------------------------
+
+async def test_run_intent_pipeline_haiku_unavailable():
+    """None from sampling.generate → ERROR message, no send/parse/build calls."""
+    from unittest.mock import AsyncMock, MagicMock
+    from unity_mcp.tools.intent_common import run_intent_pipeline
+    sampling = MagicMock()
+    sampling.generate = AsyncMock(return_value=None)
+    result = await run_intent_pipeline(
+        send=AsyncMock(), sampling=sampling, prompt="p", feature="f",
+        parse_fn=MagicMock(), build_fn=MagicMock(), dry_run=False,
+    )
+    assert "ERROR" in result and "unavailable" in result.lower()
+
+
+async def test_run_intent_pipeline_calls_parse_and_build():
+    """Happy path: generate → strip → parse_fn → build_fn called in order."""
+    from unittest.mock import AsyncMock, MagicMock, call
+    from unity_mcp.tools.intent_common import run_intent_pipeline
+    sampling = MagicMock()
+    sampling.generate = AsyncMock(return_value="```\nDSL line\n```")
+    parse_fn = MagicMock(return_value=["parsed"])
+    build_fn = MagicMock(return_value=["batch line"])
+    send = AsyncMock(return_value="ok")
+    result = await run_intent_pipeline(
+        send=send, sampling=sampling, prompt="p", feature="f",
+        parse_fn=parse_fn, build_fn=build_fn, dry_run=False,
+    )
+    parse_fn.assert_called_once_with("DSL line")
+    build_fn.assert_called_once_with(["parsed"])
+    send.assert_called_once_with("batch", {"commands": "batch line"})
+    assert "f:" in result and "1 ops" in result
+
+
+async def test_run_intent_pipeline_dry_run_skips_send():
+    """dry_run=True returns batch text without calling send."""
+    from unittest.mock import AsyncMock, MagicMock
+    from unity_mcp.tools.intent_common import run_intent_pipeline
+    sampling = MagicMock()
+    sampling.generate = AsyncMock(return_value="DSL")
+    parse_fn = MagicMock(return_value=["x"])
+    build_fn = MagicMock(return_value=["cmd1", "cmd2"])
+    send = AsyncMock()
+    result = await run_intent_pipeline(
+        send=send, sampling=sampling, prompt="p", feature="f",
+        parse_fn=parse_fn, build_fn=build_fn, dry_run=True,
+    )
+    send.assert_not_called()
+    assert result == "cmd1\ncmd2"
+
+
+async def test_run_intent_pipeline_empty_build_returns_error():
+    """build_fn returning [] → ERROR message."""
+    from unittest.mock import AsyncMock, MagicMock
+    from unity_mcp.tools.intent_common import run_intent_pipeline
+    sampling = MagicMock()
+    sampling.generate = AsyncMock(return_value="DSL")
+    result = await run_intent_pipeline(
+        send=AsyncMock(), sampling=sampling, prompt="p", feature="f",
+        parse_fn=MagicMock(return_value=[]), build_fn=MagicMock(return_value=[]),
+        dry_run=False,
+    )
+    assert "ERROR" in result

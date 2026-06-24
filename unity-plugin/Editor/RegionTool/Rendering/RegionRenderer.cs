@@ -161,7 +161,7 @@ namespace UnityMCP.Editor.RegionTool
 
         public static void Draw(RenderState state)
         {
-            if (Event.current.type != EventType.Repaint) return;
+            if (Event.current == null || Event.current.type != EventType.Repaint) return;
             var verts = state.Vertices;
             if (verts == null || verts.Count < 2) return;
 

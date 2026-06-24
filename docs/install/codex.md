@@ -40,11 +40,7 @@ brew install openai/tap/codex
 
 ### Install Python Server
 
-```bash
-git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
-cd unity-kiss-mcp
-python install.py setup
-```
+The Python MCP server runs on-demand via `uvx` — no installation needed. The setup wizard will auto-discover it.
 
 ### Add Plugin to Unity
 
@@ -66,18 +62,61 @@ codex login status
 
 ### Configure Codex (Automatic)
 
-Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Select **Codex** and follow the prompts.
+Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Select **Codex** and follow the prompts. The wizard will configure Codex automatically.
 
 **Manual configuration:**
 
+Edit your Codex config file and ensure the MCP section includes:
+
+```json
+{
+  "mcpServers": {
+    "unity": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server", "unity-mcp"],
+      "env": { "UNITY_MCP_PORT": "9500" }
+    }
+  }
+}
+```
+
+Restart Codex for the changes to take effect.
+
+<details>
+<summary><b>Alternative: Manual Installation (git clone)</b></summary>
+
+```bash
+git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
+cd unity-kiss-mcp
+python install.py setup
+```
+
+This clones the repository locally, creates a Python venv, and installs dependencies. After setup, verify:
+
+```bash
+uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help
+```
+
+Then configure your AI tool:
+
 ```bash
 python install.py configure --tool codex
+# Or project-scoped:
+python install.py configure --tool codex --project-dir /path/to/unity/project
 ```
+
+Verify installation:
+
+```bash
+python install.py doctor
+```
+
+</details>
 
 ## 3. Use Codex From the Editor (Primary Workflow)
 
 1. Open Unity and wait for `[MCP] Server started on port <XXXX>` in the Console.
-2. Open **Window → MCP Chat**.
+2. Open **MCP → Chat**.
 3. Select **Codex** from the backend dropdown.
 4. Type a prompt and press Enter.
 
@@ -104,20 +143,18 @@ The server key is `unity` (not `unity-mcp`).
 
 ## 5. Verify Installation
 
-```bash
-python install.py doctor
-```
+Open the **Setup Wizard** in Unity (**MCP → Setup Wizard**) and select **Diagnostics**. It will check Python version, MCP server responsiveness, and TCP connectivity.
 
-Checks Python version, server package, config validity, and TCP connectivity.
+Alternatively, call the `doctor` tool from Codex to verify the setup.
 
 ## 6. Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | `codex: command not found` | Ensure `npm install -g @openai/codex` completed. Check `which codex` or `where.exe codex`. |
-| `unknown MCP server 'unity'` | The `-c` flags are missing — they must be passed on every turn. Setup Wizard should have configured this. |
-| `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or clone and setup manually. |
+| `unknown MCP server 'unity'` | Run Setup Wizard to auto-configure Codex MCP settings. |
+| MCP server fails to start | Run Setup Wizard → Diagnostics to check Python version and TCP port availability. |
 | Setup Wizard doesn't open in Unity | (1) Verify plugin is in Package Manager. (2) Close/reopen Unity. (3) Check Console for errors. |
-| Tools don't respond in Chat | Confirm Unity is open and Console shows `[MCP] Server started on port <XXXX>`. Check `python install.py doctor`. |
+| Tools don't respond in Chat | Confirm Unity is open and Console shows `[MCP] Server started on port <XXXX>`. Run Setup Wizard → Diagnostics. |
 | `codex exec` blocks at startup (macOS/Linux) | Redirect stdin: append `</dev/null`. The plugin handles this automatically. |
 | Binary path resolution fails in Settings | Override manually: **Settings > Agent Chat > Codex Binary Path** — enter absolute path. |

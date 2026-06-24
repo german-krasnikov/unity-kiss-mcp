@@ -6,6 +6,7 @@ import sys
 from typing import Optional
 
 from unity_mcp.paths import ports_dir as _ports_dir_canonical
+from unity_mcp.constants import DEFAULT_PORT
 
 
 def _which(name: str) -> Optional[str]:
@@ -73,7 +74,7 @@ def find_port() -> int:
             return int(port_file.read_text(encoding="utf-8").split("\n")[0])
         except (ValueError, OSError):
             continue
-    return 9500
+    return DEFAULT_PORT
 
 
 def build_server_entry(port: int = 0) -> dict:

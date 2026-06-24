@@ -76,6 +76,34 @@ def test_connect_creates_backup(tmp_path):
     assert (tmp_path / "Packages" / "manifest.json.bak").exists()
 
 
+def test_connect_adds_reload_to_existing_editor_project(tmp_path):
+    """Item 26: editor present, reload missing → both added, returns 0."""
+    editor_path = (Path(__file__).parent.parent.parent / "unity-plugin").resolve()
+    _make_manifest(tmp_path, extra_deps={
+        "com.unity-mcp.editor": f"file:{editor_path.as_posix()}"
+    })
+    ui = _ui()
+    rc = cmds.cmd_connect(_args(tmp_path), ui)
+    assert rc == 0
+    data = json.loads((tmp_path / "Packages" / "manifest.json").read_text("utf-8"))
+    assert "com.unity-mcp.reload" in data["dependencies"]
+    assert data["dependencies"]["com.unity-mcp.reload"].startswith("file:")
+
+
+def test_connect_skips_when_both_present(tmp_path):
+    """Item 26: both packages present → return 0 with ok message, no backup needed."""
+    editor_path = (Path(__file__).parent.parent.parent / "unity-plugin").resolve()
+    reload_path = (Path(__file__).parent.parent.parent / "unity-plugin-reload").resolve()
+    _make_manifest(tmp_path, extra_deps={
+        "com.unity-mcp.editor": f"file:{editor_path.as_posix()}",
+        "com.unity-mcp.reload": f"file:{reload_path.as_posix()}",
+    })
+    ui = _ui()
+    rc = cmds.cmd_connect(_args(tmp_path), ui)
+    assert rc == 0
+    ui.ok.assert_called()
+
+
 def test_connect_invalid_path(tmp_path):
     ui = _ui()
     rc = cmds.cmd_connect(_args(tmp_path), ui)  # No Packages/ dir

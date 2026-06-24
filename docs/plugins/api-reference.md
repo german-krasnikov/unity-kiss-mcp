@@ -82,8 +82,18 @@ public interface IMCPPlugin
     string CommandPrefix { get; }     // Prefix for filtering (e.g. "myext_")
     void RegisterCommands();          // Called on registration + domain reload
     void OnDomainReload();            // Cleanup hook on script recompile
+    
+    // Optional: Organize tools into subcategories (v0.56.0+)
+    string GetToolSubcategory(string toolName) => null;  // Return subcategory string or null
+    
+    // Optional: Register additional commands beyond CommandPrefix matching
+    List<string> AdditionalCommands => null;  // Return list of command names, or null
 }
 ```
+
+**Subcategories:** Tools can be organized in the UI by returning a category string like `"Animation"` or `"Physics"`. Return `null` or empty string for top-level placement.
+
+**Tool Grouping:** The `PluginToolGrouping` table allows fine-grained organization of tool visibility per subcategory.
 
 ### `PluginRegistry`
 

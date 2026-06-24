@@ -1,11 +1,10 @@
 """ui_intent — NL → UI DSL → create_ui/set_rect batch commands."""
 from typing import Optional
-from ..sampling import SamplingService
-from .intent_common import strip_fences, parse_indent_tree, parse_kv, build_batch_line
+from ..sampling import sampling_service as _sampling
+from .intent_common import strip_fences, parse_indent_tree, parse_kv, build_batch_line, run_intent_pipeline
 from ._annotations import RW as _RW
 
 _send = None
-_sampling: SamplingService = SamplingService()
 
 _TEMPLATES = {
     "hud": """\
@@ -140,27 +139,29 @@ async def ui_intent(intent: str, parent: Optional[str] = None, template: Optiona
         dsl = get_template_dsl(template)
         if dsl is None:
             return f"ERROR: Unknown template '{template}'. Valid: {', '.join(_TEMPLATES)}"
-    else:
-        from .intent_common import sanitize_intent
-        prompt = _PROMPT_TEMPLATE.format(parent=sanitize_intent(parent or "root"), intent=sanitize_intent(intent))
-        dsl_raw = await _sampling.generate(prompt, feature='ui_intent')
-        if not dsl_raw:
-            return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
-        dsl = strip_fences(dsl_raw)
+        nodes = parse_ui_dsl(dsl)
+        if not nodes:
+            return "ERROR: DSL produced no nodes"
+        batch_lines = build_ui_batch(nodes, parent=parent)
+        if not batch_lines:
+            return "ERROR: Builder produced no commands"
+        if dry_run:
+            return "\n".join(batch_lines)
+        result = await _send("batch", {"commands": "\n".join(batch_lines)})
+        return f"ui_intent: {len(batch_lines)} ops\n{result}"
 
-    nodes = parse_ui_dsl(dsl)
-    if not nodes:
-        return "ERROR: DSL produced no nodes"
+    from .intent_common import sanitize_intent
+    prompt = _PROMPT_TEMPLATE.format(parent=sanitize_intent(parent or "root"), intent=sanitize_intent(intent))
 
-    batch_lines = build_ui_batch(nodes, parent=parent)
-    if not batch_lines:
-        return "ERROR: Builder produced no commands"
+    def _parse_and_validate(dsl: str):
+        nodes = parse_ui_dsl(dsl)
+        return nodes  # empty list handled by pipeline's empty-build check
 
-    if dry_run:
-        return "\n".join(batch_lines)
-
-    result = await _send("batch", {"commands": "\n".join(batch_lines)})
-    return f"ui_intent: {len(batch_lines)} ops\n{result}"
+    return await run_intent_pipeline(
+        send=_send, sampling=_sampling, prompt=prompt, feature="ui_intent",
+        parse_fn=_parse_and_validate, build_fn=lambda nodes: build_ui_batch(nodes, parent=parent),
+        dry_run=dry_run,
+    )
 
 
 def register(mcp, send, args):

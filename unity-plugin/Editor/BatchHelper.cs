@@ -65,6 +65,7 @@ namespace UnityMCP.Editor
                     for (int j = i + 1; j < commands.Count; j++)
                         sb.AppendLine($"[{j}] skip");
                     timeoutCount = commands.Count - i;
+                    if (atomic) AtomicFail(i);
                     break;
                 }
 

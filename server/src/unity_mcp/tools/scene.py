@@ -213,7 +213,7 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RO)(get_compile_errors)
     mcp.tool(annotations=_RO)(screenshot)
     mcp.tool(annotations=_RW_IDEM)(recompile)
-    mcp.tool(annotations=_RO)(run_tests)
+    mcp.tool(annotations=_RW_IDEM)(run_tests)
     mcp.tool(annotations=_RO)(get_test_results)
     mcp.tool(annotations=_DEL)(scene)
     mcp.tool(annotations=_RO)(search_scene)

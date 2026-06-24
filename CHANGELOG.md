@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.57.0] — 2026-06-24 <!-- 35 fixes, 3 features, security hardening -->
+
+**35 Bug Fixes, Architecture Wins, Security Hardening & Strategic Features — 8-Architect Review:**
+
+- **Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool filter. Now correctly distinguishes `None` (no filtering) from `set()` (hide all disabled). Saves ~5,800 tokens/turn.
+- **Middleware Guard Order** — `reroute_cmd` moved after guards so Play Mode safety checks see the original command, not the rerouted alias.
+- **RegisterAsync Dispatch Table** — `ProcessAsync` refactored from 148-line if/else chain to 27-line dispatch via `CommandRegistry.RegisterAsync()`. Adding async commands no longer requires editing the router (OCP).
+- **[MCPTool] Attribute** — Zero-boilerplate custom tool registration: `[MCPTool("my_tool")] public static string MyTool(string args)`. AttributeScanner auto-discovers at domain reload with `ReflectionTypeLoadException` guard.
+- **NavMesh Query Tools** — `navmesh_query` tool with sample/path/raycast operations via `UnityEngine.AI.NavMesh`. Guarded with `#if UNITY_MODULE_AI`.
+- **region_clear** — First mutating spatial operation: delete objects within polygon region. `dry_run=True` default, full Undo support.
+- **AnimationHelper component_type** — Animate any component property (Light.m_Intensity, Camera.fieldOfView), not just Transform.
+- **Security Hardening** — Blocked `CSharpCodeProvider`/`CodeDomProvider`/`CompileAssemblyFrom` dynamic compilation bypass + `GetRuntimeMethod`/`DynamicInvoke` reflection vectors. Duplicate command registration rejected to prevent tool hijacking.
+- **Multi-Scene Save/Discard** — `SaveScene` and `DiscardChanges` accept optional scene identifier for targeted operations without destroying other loaded scenes.
+- **Context-Aware strip_defaults** — `mass:1` on Rigidbody no longer falsely stripped. Field-specific `_FIELD_DEFAULTS` dict for Unity internal properties.
+- **OnWantsToQuit Data Loss Fix** — Removed auto-discard of dirty scenes on quit. Unity's native save dialog now handles this correctly.
+- **Rect/Bounds Round-Trip** — `GetPropertyValueString` now serializes Rect, Bounds, RectInt, BoundsInt with InvariantCulture formatting.
+- **Screenshot Cleanup** — `CleanupScreenshots(keepCount=20)` prevents disk leak. Multi-pixel black detection (4×4 grid) reduces false positives on dark scenes.
+- **Contract Tests** — 6 cross-language tests verify reload guard key, port offset, and wire protocol constants between Python and C#.
+
+**Docs:**
+- Full 61-file documentation audit with 3 review cycles. CONTRIBUTING.md, SECURITY.md, 30+ tool/feature guides added.
+
 ## [v0.56.0] — 2026-06-24
 
 **Level-Design Tools, Unified Overlay, Icon System, Plugin Gating, MCP Capability Fixes & Version Management:**

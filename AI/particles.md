@@ -120,7 +120,7 @@ renderer: Billboard
 | `MCPParticleTests.cs` (C#) | 29 tests | toggle modules (color/trails/size), workflow (create→set→get), presets, renderer stretch, shape collider |
 | Live scenarios (25-29) | 5 scenarios | Fire preset + variations, smoke with noise, sparks color override, rain shape config, snow trails |
 
-**Total:** Python ~1533 tests, C# ~727 tests (project-wide). Particle-specific tests in both suites.
+**Total:** See AI/structure.md for current test counts (project-wide). Particle-specific tests in both suites.
 
 ## Error Handling
 
@@ -149,3 +149,8 @@ renderer: Billboard
 - Verify ParticleHelper apply() disables unused modules (keeps scene clean)
 - Confirm presets have sensible defaults (visible, useful, not extreme)
 - Ensure text output format matches architecture.md for consistency
+
+## Related
+
+- Tool: `vfx_intent` — NL intent tool for visual effects (See `AI/intent-tools.md`)
+- Architecture: `AI/architecture.md` — System-wide structure

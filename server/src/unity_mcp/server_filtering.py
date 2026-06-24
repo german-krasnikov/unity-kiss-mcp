@@ -8,6 +8,7 @@ import os
 import socket
 import sys
 from pathlib import Path
+from .constants import DEFAULT_PORT
 
 from .paths import ports_dir as _ports_dir
 from .tools.gating import filter_by_tier, FORCE_VISIBLE, get_catalog, _CORE_TOOLS
@@ -73,7 +74,7 @@ def filter_tools(tools: list, disabled: set | None) -> list:
     disabled=None → gating-only fallback.
     """
     result = _apply_gating(tools)
-    if disabled:
+    if disabled is not None:
         result = [t for t in result if t.name not in disabled or t.name in FORCE_VISIBLE]
     return _strip_deferred_schemas(result)
 
@@ -147,7 +148,7 @@ def read_unity_port(skip_probe: bool = False) -> int | None:
             pass
     ports_dir = _ports_dir()
     if not ports_dir.exists():
-        return 9500
+        return DEFAULT_PORT
 
     # Windows fallback: UNITY_MCP_CHAT=1 means we're the chat MCP instance.
     # Scan *.chat-port files (written by C# with the chat port) instead of *.port.
@@ -176,7 +177,7 @@ def read_unity_port(skip_probe: bool = False) -> int | None:
     if not candidates:
         # B3: skip_probe reconnect → no live targets → None (caller preserves self._port).
         # Cold-start (skip_probe=False) → fallback 9500 for backward compat.
-        return None if skip_probe else 9500
+        return None if skip_probe else DEFAULT_PORT
 
     # CWD-based selection: prefer project whose path is a prefix of cwd.
     # Waterfall: UNITY_MCP_PROJECT_DIR > CLAUDE_PROJECT_DIR > CWD.

@@ -114,9 +114,10 @@ def test_strip_defaults_removes_none_string():
 # ─── F08: expanded defaults ───────────────────────────────────────────────────
 
 def test_strip_defaults_removes_mass_one():
+    # Item 22: "mass: 1" is a user field — NOT stripped. Only "m_mass: 1" is stripped.
     data = "[C]\nmass: 1\ndrag: 5\n"
     result = strip_defaults(data)
-    assert "mass" not in result
+    assert "mass: 1" in result
     assert "drag: 5" in result
 
 
@@ -220,9 +221,10 @@ def test_strip_defaults_removes_float_zero():
 
 
 def test_strip_defaults_removes_float_one():
+    # Item 22: "1.0" removed from _DEFAULTS; plain "volume: 1.0" is now kept.
     data = "[C]\nvolume: 1.0\npitch: 2.0\n"
     result = strip_defaults(data)
-    assert "volume" not in result
+    assert "volume: 1.0" in result
     assert "pitch: 2.0" in result
 
 
@@ -275,8 +277,9 @@ def test_strip_defaults_empty_string_returns_empty():
 
 # single-line input (no newlines)
 def test_strip_defaults_single_line_default_removed():
+    # Item 22: "mass: 1" is not a Unity internal field — kept.
     result = strip_defaults("[C]\nmass: 1")
-    assert "mass" not in result
+    assert "mass: 1" in result
 
 
 def test_strip_defaults_single_line_nondefault_kept():
@@ -374,3 +377,29 @@ def test_alias_mixed_canonical_and_alias():
 def test_alias_case_insensitive():
     result = project_fields(SERIALIZED_DATA, "POSITION")
     assert "m_LocalPosition.x: 5" in result
+
+
+# ─── Item 22: context-aware strip_defaults ───────────────────────────────────
+
+def test_strip_defaults_keeps_mass_one():
+    """'mass: 1' must NOT be stripped — 'mass' is not a known-default field."""
+    data = "[C]\nmass: 1\ndrag: 5\n"
+    result = strip_defaults(data)
+    assert "mass: 1" in result
+    assert "drag: 5" in result
+
+
+def test_strip_defaults_strips_m_mass_default():
+    """'m_mass: 1' IS stripped — m_mass Unity internal field defaults to 1."""
+    data = "[C]\nm_mass: 1\ndrag: 5\n"
+    result = strip_defaults(data)
+    assert "m_mass" not in result
+    assert "drag: 5" in result
+
+
+def test_strip_defaults_still_strips_zero():
+    """'x: 0' still stripped — 0 remains in _DEFAULTS unconditionally."""
+    data = "[C]\nx: 0\ny: 5\n"
+    result = strip_defaults(data)
+    assert "x: 0" not in result
+    assert "y: 5" in result

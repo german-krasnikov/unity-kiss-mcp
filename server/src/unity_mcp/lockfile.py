@@ -1,6 +1,7 @@
 """PID lockfile — per-session presence file, no SIGTERM."""
 import logging
 import os
+from .constants import DEFAULT_PORT
 import socket
 import sys
 from pathlib import Path
@@ -76,7 +77,7 @@ def is_pid_alive(pid: Optional[int]) -> bool:
         return False
 
 
-def acquire_lock(lock_dir=None, port: int = 9500) -> int:
+def acquire_lock(lock_dir=None, port: int = DEFAULT_PORT) -> int:
     """Create a per-PID presence file and take exclusive flock on it.
 
     Each session uses server-{port}-{pid}.lock — multiple sessions coexist.

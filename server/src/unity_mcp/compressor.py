@@ -16,9 +16,17 @@ _DEFAULTS = frozenset({
     "[]", "#00000000",
     # F08: additional common Unity defaults. "Default"/"Untagged" are context-dependent
     # (layer vs tag field); use _no_strip=True escape hatch if a real value collides.
-    "1", "1.0", "Untagged", "Default",
+    "Untagged", "Default",
     "(0, 0)", "(0, 0, 0, 0)", "#FFFFFFFF",
 })
+
+# Item 22: "1"/"1.0" only stripped for known Unity internal fields that default to 1.
+# Prevents false-positive stripping of user fields like "mass: 1" on Rigidbody.
+_FIELD_DEFAULTS: dict[str, frozenset[str]] = {
+    "m_mass": frozenset({"1", "1.0"}),
+    "m_layer": frozenset({"0"}),
+    "m_isstatic": frozenset({"false", "False"}),
+}
 
 
 def project_fields(text: str, fields: str) -> str:
@@ -61,8 +69,12 @@ def strip_defaults(text: str) -> str:
             continue
         # Check value after colon
         if ": " in stripped:
-            value = stripped.split(": ", 1)[1].strip()
+            key, value = stripped.split(": ", 1)
+            value = value.strip()
             if value in _DEFAULTS:
+                continue
+            field_defaults = _FIELD_DEFAULTS.get(key.strip().lower())
+            if field_defaults and value in field_defaults:
                 continue
         out.append(line)
     return "\n".join(out)

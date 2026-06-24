@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 namespace UnityMCP.Editor
@@ -47,9 +48,20 @@ namespace UnityMCP.Editor
 
         public static string WritePng(byte[] pngData, string prefix = "screenshot")
         {
+            CleanupScreenshots();
             var path = Path.Combine(ScreenshotsDir, $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss}_{prefix}.png");
             File.WriteAllBytes(path, pngData);
             return path;
+        }
+
+        public static void CleanupScreenshots(int keepCount = 20)
+        {
+            if (!Directory.Exists(ScreenshotsDir)) return;
+            var files = Directory.GetFiles(ScreenshotsDir, "*.png")
+                .OrderByDescending(f => File.GetCreationTime(f))
+                .ToArray();
+            for (int i = keepCount; i < files.Length; i++)
+                try { File.Delete(files[i]); } catch { }
         }
 
         public static void Cleanup()

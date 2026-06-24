@@ -75,6 +75,7 @@ namespace UnityMCP.Editor
 
         public static string Process(string json)
         {
+            SceneContext.InvalidateCache();
             try
             {
                 var id = JsonHelper.ExtractString(json, "id");
@@ -123,139 +124,19 @@ namespace UnityMCP.Editor
 
         public static void ProcessAsync(string json, TaskCompletionSource<string> tcs)
         {
+            SceneContext.InvalidateCache();
             try
             {
                 var cmd = JsonHelper.ExtractString(json, "cmd");
                 var id = JsonHelper.ExtractString(json, "id");
 
-                if (cmd == "run_tests")
+                if (CommandRegistry.HasAsyncHandler(cmd, out var asyncHandler))
                 {
                     var guard = CheckGuards(id, cmd);
                     if (guard != null) { tcs.TrySetResult(guard); return; }
-                    var argsJson = JsonHelper.ExtractObject(json, "args");
                     UndoGroupHelper.SetCommandFallback(cmd);
-                    var mode = JsonHelper.ExtractString(argsJson, "mode");
-                    var group = JsonHelper.ExtractString(argsJson, "group");
-                    var filter = JsonHelper.ExtractString(argsJson, "filter");
-                    TestRunner.Execute(mode, result =>
-                    {
-                        UndoGroupHelper.EndGroup();
-                        if (result.StartsWith("Error:"))
-                            tcs.TrySetResult(JsonHelper.FormatResponse(id, false, null, result.Substring(7)));
-                        else
-                            tcs.TrySetResult(BuildResponse(id, result));
-                    }, group, filter);
-                    return;
-                }
-
-                if (cmd == "wait_until")
-                {
-                    var guard = CheckGuards(id, cmd);
-                    if (guard != null) { tcs.TrySetResult(guard); return; }
                     var argsJson = JsonHelper.ExtractObject(json, "args");
-                    var path = JsonHelper.ExtractString(argsJson, "path");
-                    var component = JsonHelper.ExtractString(argsJson, "component");
-                    var field = JsonHelper.ExtractString(argsJson, "field");
-                    var value = JsonHelper.ExtractString(argsJson, "value");
-                    var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout");
-                    var negate = JsonHelper.ExtractString(argsJson, "negate") == "true";
-                    float timeout = 5f;
-                    if (timeoutStr != null)
-                        float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out timeout);
-                    var waitTcs = new TaskCompletionSource<string>();
-                    RuntimeHelper.WaitUntil(path, component, field, value, timeout, negate, waitTcs);
-                    waitTcs.Task.ContinueWith(t =>
-                        tcs.TrySetResult(t.IsFaulted
-                            ? BuildResponse(id, $"wait_until error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
-                            : BuildResponse(id, t.Result)));
-                    return;
-                }
-
-                if (cmd == "move_to")
-                {
-                    var guard = CheckGuards(id, cmd);
-                    if (guard != null) { tcs.TrySetResult(guard); return; }
-                    var argsJson = JsonHelper.ExtractObject(json, "args");
-                    var path = JsonHelper.ExtractString(argsJson, "path");
-                    var position = JsonHelper.ExtractString(argsJson, "position");
-                    var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout");
-                    float timeout = 15f;
-                    if (timeoutStr != null)
-                        float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out timeout);
-                    var moveTcs = new TaskCompletionSource<string>();
-                    RuntimeHelper.MoveTo(path, position, timeout, moveTcs);
-                    moveTcs.Task.ContinueWith(t =>
-                        tcs.TrySetResult(t.IsFaulted
-                            ? BuildResponse(id, $"move_to error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
-                            : BuildResponse(id, t.Result)));
-                    return;
-                }
-
-                if (cmd == "test_step")
-                {
-                    var guard = CheckGuards(id, cmd);
-                    if (guard != null) { tcs.TrySetResult(guard); return; }
-                    var argsJson = JsonHelper.ExtractObject(json, "args");
-                    var path = JsonHelper.ExtractString(argsJson, "path");
-                    var position = JsonHelper.ExtractString(argsJson, "position");
-                    var checksBefore = JsonHelper.ExtractString(argsJson, "checks_before") ?? "";
-                    var checksAfter = JsonHelper.ExtractString(argsJson, "checks_after") ?? "";
-                    var waitStr = JsonHelper.ExtractString(argsJson, "wait_after");
-                    var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout");
-                    float waitAfter = 0.5f;
-                    float timeout = 15f;
-                    if (waitStr != null)
-                        float.TryParse(waitStr, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out waitAfter);
-                    if (timeoutStr != null)
-                        float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
-                            System.Globalization.CultureInfo.InvariantCulture, out timeout);
-                    var stepTcs = new TaskCompletionSource<string>();
-                    RuntimeHelper.TestStep(path, position, checksBefore, checksAfter, waitAfter, timeout, stepTcs);
-                    stepTcs.Task.ContinueWith(t =>
-                        tcs.TrySetResult(t.IsFaulted
-                            ? BuildResponse(id, $"test_step error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
-                            : BuildResponse(id, t.Result)));
-                    return;
-                }
-
-                if (cmd == "run_playtest")
-                {
-                    var guard = CheckGuards(id, cmd);
-                    if (guard != null) { tcs.TrySetResult(guard); return; }
-                    var argsJson = JsonHelper.ExtractObject(json, "args");
-                    var script = JsonHelper.ExtractString(argsJson, "script");
-                    var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout") ?? "120";
-                    float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out float timeout);
-                    if (timeout <= 0) timeout = 120f;
-                    var runTcs = new TaskCompletionSource<string>();
-                    PlaytestRunner.Run(script, timeout, runTcs);
-                    runTcs.Task.ContinueWith(t =>
-                        tcs.TrySetResult(t.IsFaulted
-                            ? BuildResponse(id, $"run_playtest error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
-                            : BuildResponse(id, t.Result)));
-                    return;
-                }
-
-                if (cmd == "ask_user")
-                {
-                    var guard = CheckGuards(id, cmd);
-                    if (guard != null) { tcs.TrySetResult(guard); return; }
-                    var argsJson = JsonHelper.ExtractObject(json, "args");
-                    var questionsJson = JsonHelper.ExtractString(argsJson, "questions") ?? "[]";
-                    var requestId = System.Guid.NewGuid().ToString("N");
-                    PendingAskRegistry.Register(requestId);
-                    if (OnAskUser == null)
-                        Debug.LogWarning("[MCP] ask_user: no listener — is chat window open?");
-                    OnAskUser?.Invoke(requestId, questionsJson);
-                    var askTcs = PendingAskRegistry.GetTcs(requestId);
-                    askTcs.Task.ContinueWith(t =>
-                        tcs.TrySetResult(t.IsFaulted || t.IsCanceled
-                            ? BuildResponse(id, "{\"cancelled\":true}")
-                            : BuildResponse(id, t.Result)));
+                    asyncHandler(id, argsJson, tcs);
                     return;
                 }
 
@@ -267,6 +148,112 @@ namespace UnityMCP.Editor
                 var id = JsonHelper.ExtractString(json, "id") ?? "unknown";
                 tcs.TrySetResult(JsonHelper.FormatResponse(id, false, null, e.Message));
             }
+        }
+
+        private static void AsyncRunTests(string id, string argsJson, TaskCompletionSource<string> tcs)
+        {
+            var mode = JsonHelper.ExtractString(argsJson, "mode");
+            var group = JsonHelper.ExtractString(argsJson, "group");
+            var filter = JsonHelper.ExtractString(argsJson, "filter");
+            TestRunner.Execute(mode, result =>
+            {
+                UndoGroupHelper.EndGroup();
+                if (result.StartsWith("Error:"))
+                    tcs.TrySetResult(JsonHelper.FormatResponse(id, false, null, result.Substring(7)));
+                else
+                    tcs.TrySetResult(BuildResponse(id, result));
+            }, group, filter);
+        }
+
+        private static void AsyncWaitUntil(string id, string argsJson, TaskCompletionSource<string> tcs)
+        {
+            var path = JsonHelper.ExtractString(argsJson, "path");
+            var component = JsonHelper.ExtractString(argsJson, "component");
+            var field = JsonHelper.ExtractString(argsJson, "field");
+            var value = JsonHelper.ExtractString(argsJson, "value");
+            var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout");
+            var negate = JsonHelper.ExtractString(argsJson, "negate") == "true";
+            float timeout = 5f;
+            if (timeoutStr != null)
+                float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out timeout);
+            var inner = new TaskCompletionSource<string>();
+            RuntimeHelper.WaitUntil(path, component, field, value, timeout, negate, inner);
+            inner.Task.ContinueWith(t =>
+                tcs.TrySetResult(t.IsFaulted
+                    ? BuildResponse(id, $"wait_until error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                    : BuildResponse(id, t.Result)));
+        }
+
+        private static void AsyncMoveTo(string id, string argsJson, TaskCompletionSource<string> tcs)
+        {
+            var path = JsonHelper.ExtractString(argsJson, "path");
+            var position = JsonHelper.ExtractString(argsJson, "position");
+            var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout");
+            float timeout = 15f;
+            if (timeoutStr != null)
+                float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out timeout);
+            var inner = new TaskCompletionSource<string>();
+            RuntimeHelper.MoveTo(path, position, timeout, inner);
+            inner.Task.ContinueWith(t =>
+                tcs.TrySetResult(t.IsFaulted
+                    ? BuildResponse(id, $"move_to error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                    : BuildResponse(id, t.Result)));
+        }
+
+        private static void AsyncTestStep(string id, string argsJson, TaskCompletionSource<string> tcs)
+        {
+            var path = JsonHelper.ExtractString(argsJson, "path");
+            var position = JsonHelper.ExtractString(argsJson, "position");
+            var checksBefore = JsonHelper.ExtractString(argsJson, "checks_before") ?? "";
+            var checksAfter = JsonHelper.ExtractString(argsJson, "checks_after") ?? "";
+            var waitStr = JsonHelper.ExtractString(argsJson, "wait_after");
+            var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout");
+            float waitAfter = 0.5f;
+            float timeout = 15f;
+            if (waitStr != null)
+                float.TryParse(waitStr, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out waitAfter);
+            if (timeoutStr != null)
+                float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out timeout);
+            var inner = new TaskCompletionSource<string>();
+            RuntimeHelper.TestStep(path, position, checksBefore, checksAfter, waitAfter, timeout, inner);
+            inner.Task.ContinueWith(t =>
+                tcs.TrySetResult(t.IsFaulted
+                    ? BuildResponse(id, $"test_step error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                    : BuildResponse(id, t.Result)));
+        }
+
+        private static void AsyncRunPlaytest(string id, string argsJson, TaskCompletionSource<string> tcs)
+        {
+            var script = JsonHelper.ExtractString(argsJson, "script");
+            var timeoutStr = JsonHelper.ExtractString(argsJson, "timeout") ?? "120";
+            float.TryParse(timeoutStr, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float timeout);
+            if (timeout <= 0) timeout = 120f;
+            var inner = new TaskCompletionSource<string>();
+            PlaytestRunner.Run(script, timeout, inner);
+            inner.Task.ContinueWith(t =>
+                tcs.TrySetResult(t.IsFaulted
+                    ? BuildResponse(id, $"run_playtest error: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}")
+                    : BuildResponse(id, t.Result)));
+        }
+
+        private static void AsyncAskUser(string id, string argsJson, TaskCompletionSource<string> tcs)
+        {
+            var questionsJson = JsonHelper.ExtractString(argsJson, "questions") ?? "[]";
+            var requestId = System.Guid.NewGuid().ToString("N");
+            PendingAskRegistry.Register(requestId);
+            if (OnAskUser == null)
+                Debug.LogWarning("[MCP] ask_user: no listener — is chat window open?");
+            OnAskUser?.Invoke(requestId, questionsJson);
+            var askTcs = PendingAskRegistry.GetTcs(requestId);
+            askTcs.Task.ContinueWith(t =>
+                tcs.TrySetResult(t.IsFaulted || t.IsCanceled
+                    ? BuildResponse(id, "{\"cancelled\":true}")
+                    : BuildResponse(id, t.Result)));
         }
 
         internal static string ExecuteCommand(string cmd, string args)
@@ -367,10 +354,8 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "type")));
             CommandRegistry.Register("get_changes", args => ChangeWatcher.GetChanges(
                 JsonHelper.ExtractString(args, "clear") != "false"));
-            // run_tests is intercepted by ProcessAsync before ExecuteCommand; this entry exists for IsMutating/IsRegistered only
-            CommandRegistry.Register("run_tests", _ => throw new InvalidOperationException("run_tests requires async dispatch via ProcessAsync"));
-            // ask_user is intercepted by ProcessAsync; entry exists for IsRegistered/IsAllowedDuringCompile only
-            CommandRegistry.Register("ask_user", _ => throw new InvalidOperationException("ask_user requires async dispatch via ProcessAsync"));
+            CommandRegistry.RegisterAsync("run_tests", AsyncRunTests);
+            CommandRegistry.RegisterAsync("ask_user", AsyncAskUser);
             CommandRegistry.Register("get_test_results", _ => TestRunner.GetResults());
             CommandRegistry.Register("get_test_count", _ => TestRunner.GetTestCount());
 
@@ -385,11 +370,10 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "component"),
                 JsonHelper.ExtractString(args, "field"),
                 JsonHelper.ExtractString(args, "value")), runtime: true);
-            // wait_until, move_to, test_step, run_playtest intercepted by ProcessAsync; entries exist for IsRuntime guard
-            CommandRegistry.Register("wait_until", _ => throw new InvalidOperationException("wait_until requires async dispatch via ProcessAsync"), runtime: true);
-            CommandRegistry.Register("move_to", _ => throw new InvalidOperationException("move_to requires async dispatch via ProcessAsync"), runtime: true);
-            CommandRegistry.Register("test_step", _ => throw new InvalidOperationException("test_step requires async dispatch via ProcessAsync"), runtime: true);
-            CommandRegistry.Register("run_playtest", _ => throw new InvalidOperationException("run_playtest requires async dispatch via ProcessAsync"), runtime: true);
+            CommandRegistry.RegisterAsync("wait_until", AsyncWaitUntil, runtime: true);
+            CommandRegistry.RegisterAsync("move_to", AsyncMoveTo, runtime: true);
+            CommandRegistry.RegisterAsync("test_step", AsyncTestStep, runtime: true);
+            CommandRegistry.RegisterAsync("run_playtest", AsyncRunPlaytest, runtime: true);
             CommandRegistry.Register("query_state", args => GameStateHelper.Snapshot(
                 JsonHelper.ExtractString(args, "queries")), runtime: true);
 
@@ -455,6 +439,12 @@ namespace UnityMCP.Editor
 
             // Spatial queries (read-only)
             CommandRegistry.Register("spatial_query", args => SpatialHelper.Execute(args));
+#if UNITY_MODULE_AI || UNITY_AI_NAVIGATION
+            CommandRegistry.Register("navmesh", NavMeshHelper.Execute);
+#endif
+
+            // Spatial mutation: region_clear (delete objects inside polygon)
+            CommandRegistry.Register("region_clear", args => SpatialHelper.RegionClear(args), mutating: true);
 
             // Code execution via Roslyn (mutating)
             CommandRegistry.Register("execute_code", args => CodeExecutor.Execute(
@@ -462,6 +452,7 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "undo_label") ?? "execute_code"), mutating: true);
 
             PluginRegistry.RegisterAllPlugins();
+            AttributeScanner.ScanAndRegister();
 
             // Eager-populate after ALL tools are registered (including plugins).
             // This is the correct site: RegisterAll is the last step in CommandRegistry.InitDefaults

@@ -83,6 +83,16 @@ namespace MyPlugin.Editor
         }
 
         public void OnDomainReload() { }
+
+        // Organize tools into subcategories (v0.56.0+)
+        public string GetToolSubcategory(string toolName)
+        {
+            return toolName switch
+            {
+                "my_count_objects" => "Scene",
+                _ => null  // Top-level placement
+            };
+        }
     }
 }
 ```
@@ -90,7 +100,7 @@ namespace MyPlugin.Editor
 ## 3. Install and Test
 
 ```bash
-# Python
+# Python (make it discoverable)
 cd my-unity-plugin/python && pip install -e .
 
 # C# — symlink into game project (Unix/macOS)
@@ -100,10 +110,13 @@ ln -s /path/to/my-unity-plugin/unity/Editor /path/to/game-project/Assets/MyPlugi
 # mklink /D "C:\path\to\game-project\Assets\MyPlugin\Editor" "C:\path\to\my-unity-plugin\unity\Editor"
 # Or just copy the Editor folder directly instead of symlinking.
 
-# Restart MCP server, focus Unity to recompile
+# Force MCP server reload
+# Restart MCP server via MCP → Reconnect in Unity, or restart the Claude Code CLI session
 ```
 
-Verify: call `my_count_objects` from Claude Code.
+**Plugin Discovery:** Plugins are discovered from 3 sources in order: (1) built-in plugins, (2) pip entry points in `pyproject.toml`, (3) `UNITY_MCP_PLUGIN_DIRS` environment variable. Your plugin is auto-loaded when the MCP server starts or reconnects.
+
+Verify: call `my_count_objects` from Claude Code. If tools don't appear, run the Setup Wizard to diagnose.
 
 ## 4. Testing Your Plugin
 

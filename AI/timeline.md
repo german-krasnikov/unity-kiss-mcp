@@ -4,7 +4,7 @@
 
 Phase 8 adds 1 consolidated MCP tool (`timeline`) with 4 actions (get|create|edit|preview) for Unity Timeline assets. Follows existing patterns: Python tool → bridge.send(cmd) → CommandRouter → TimelineSerializer/TimelineHelper → text response.
 
-## Architecture (для Architect)
+## Architecture (for Architect)
 
 ```
 Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Editor Plugin
@@ -38,7 +38,7 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 - TimelineClip: Playable clip on track (start, duration, blends, asset)
 - Markers: Events on tracks (e.g., SignalEmitter for event signals)
 
-## Implementation Notes (для Developer)
+## Implementation Notes (for Developer)
 
 **Key APIs used:**
 - `TimelineAsset.GetRootTracks()` / `GetOutputTracks()` — iterate tracks (RootTracks excludes nested, OutputTracks flattens)
@@ -64,7 +64,7 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 5. SignalTrack — emits signals/events (no binding)
 6. GroupTrack — container (no clips, has child tracks)
 
-**Edit Sub-Actions (10):**
+**Edit Sub-Actions (11):**
 - add_track — create track (requires track_type + track name)
 - remove_track — delete track
 - add_clip — add clip to track (track + clip path required; start/duration optional)
@@ -75,6 +75,7 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 - unmute — unset track muted
 - lock — set track locked
 - unlock — unset track locked
+- preview — sample timeline at time T (requires time parameter; action=sample|start|stop)
 
 **Constraints:**
 - asmdef must reference `Unity.Timeline` and `Unity.Timeline.Editor` (from UPM)
@@ -111,7 +112,7 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
   - `server/tests/test_server_edge_cases.py` — 6 timeline tests with sub-action passthrough (Phase 16)
   - `unity-test-project/Assets/Tests/Editor/MCPTimelineTests.cs` — 9 C# EditMode tests
 
-## TDD Scenarios (для Developer)
+## TDD Scenarios (for Developer)
 
 ### Red Phase (write failing tests first)
 
@@ -159,7 +160,7 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 - Validate error messages are clear and actionable (e.g., "Track 'Char' not found. Available: Character, BGM")
 - Ensure token efficiency in output format (verify ~50 tokens for 4 tracks)
 
-## Review Checklist (для Reviewer)
+## Review Checklist (for Reviewer)
 
 - [ ] **Security**: asmdef references validated (Timeline package exists in manifest), no reflection exploits
 - [ ] **Performance**: No expensive O(n²) loops on large timelines; clip output limited to 30 per track

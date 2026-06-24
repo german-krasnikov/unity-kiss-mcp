@@ -20,6 +20,6 @@ namespace UnityMCP.Editor
         public SamplingConfig VisualDiff         = new SamplingConfig { Timeout = 25f };
         public SamplingConfig Summarize          = new SamplingConfig { MaxTurns = 1, Timeout = 15f };
         public SamplingConfig DoIntent           = new SamplingConfig { MaxTurns = 1, Timeout = 15f };
-        public SamplingConfig Distiller          = new SamplingConfig { MaxTurns = 1, Timeout = 15f };
+        public SamplingConfig Distiller          = new SamplingConfig { MaxTurns = 1, Timeout = 15f, MaxTokens = 500 };
     }
 }

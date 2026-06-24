@@ -24,14 +24,10 @@ namespace UnityMCP.Editor
 
             int overflow = (limit > 0 && results.Count >= limit) ? totalCount - results.Count : 0;
 
-            var ctx = SceneContext.Current;
-            bool multi = ctx.IsMulti;
             var sb = new StringBuilder();
             foreach (var go in results)
             {
-                if (multi && go.scene.IsValid())
-                    sb.Append(go.scene.name).Append(":/");
-                sb.Append(go.name).Append(" #").Append(go.GetInstanceID());
+                sb.Append(ComponentSerializer.GetPath(go)).Append(" #").Append(go.GetInstanceID());
                 var compNames = new List<string>();
                 foreach (var c in go.GetComponents<Component>())
                     if (c != null && !(c is Transform)) compNames.Add(c.GetType().Name);

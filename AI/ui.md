@@ -53,7 +53,7 @@ bottom-left, bottom-center, bottom-right, top-stretch, bottom-stretch, left-stre
 - `UIHelper.cs` (~298 lines) — CreateUI, SetRect, anchor presets, auto-Canvas, TMPro detection
 - `CommandRouter.cs` — 2 cases (ExecCreateUI, ExecSetRect)
 - `MCPSettings.cs` — create_ui, set_rect in CoreToolNames
-- `tools/advanced.py` — 2 MCP tools with _RW annotation
+- `tools/ui.py` — 2 MCP tools with _RW annotation
 
 ### Dependencies
 - `ValueParser.ParseVector2()` — (x,y) parsing
@@ -76,3 +76,6 @@ set_rect path=/MenuCanvas/ExitBtn anchor=center pos=(0,-40)
 ## Tests
 - C#: 15 tests in `MCPUITests.cs` (Canvas, Panel, Button, Text, Image, SetRect, errors, batch, play mode guard)
 - Python: 8 tests in `test_server_ui.py` (bridge calls, args, errors)
+
+## Related
+- Knowledge: `AI/intent-tools.md` (ui_intent DSL tool for layout automation)

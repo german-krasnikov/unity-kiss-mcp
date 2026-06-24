@@ -53,6 +53,18 @@ MCP Status Bar Widget
 | `execute` | `path` (required) | Run menu item by full path |
 | `list` | `path` (optional) | List sub-items; omit for all roots |
 
+### Editor Command (Editor State & Control)
+
+Python-side `editor` command (wraps EditorStateHelper.cs methods):
+| Action | Args | Description |
+|--------|------|-------------|
+| `state` | none | Get editor state (playing, paused, compiling, scene, dirty, selected, prefab stage) |
+| `play` | none | Start play mode |
+| `pause` | none | Toggle pause |
+| `stop` | none | Exit play mode |
+| `select` | `path` (required) | Set active selection to GameObject path |
+| `project_path` | none | Get project root directory path |
+
 ### Examples
 ```
 menu action=execute path="GameObject/3D Object/Cube"
@@ -75,7 +87,17 @@ menu action=list  # lists all root menus
 - Python: `server/tests/test_server_menu.py` (8 tests)
 - C#: `unity-test-project/Assets/Tests/Editor/MCPMenuTests.cs` (10 tests)
 
+## Static Unity Menu Items
+
+**MCPActions.cs** provides shared static methods used by status window and status bar widget:
+- `Restart()` — Stop + StartAsync
+- `Kill()` / `KillAll()` — Kill MCP server process(es) via lockfile PID
+- `Reimport()` — Force plugin reimport + recompile (finds com.unity-mcp.editor asmdef)
+
+These are invoked directly from editor UI without going through MCP protocol.
+
 ## Senior Developer Notes
 - Reflection cached in static constructor for performance
 - Graceful fallback when internal APIs unavailable
 - `Debug.LogWarning` on startup if reflection fails
+- MCPActions used for UI-driven restarts (not MCP tool-invoked)

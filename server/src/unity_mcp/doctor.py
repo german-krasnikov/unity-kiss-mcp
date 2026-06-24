@@ -8,6 +8,7 @@ from pathlib import Path
 from .lockfile import is_pid_alive
 from .paths import ports_dir as _ports_dir_canonical
 from .doctor_report import CheckResult, USER_MESSAGES, format_report  # re-exported
+from .constants import DEFAULT_PORT
 
 __all__ = ["CheckResult", "USER_MESSAGES", "format_report",
            "check_python_version", "check_port_file", "check_lockfile",
@@ -120,9 +121,9 @@ def _resolve_port(port: int) -> int:
     try:
         # B3: read_unity_port may return None when skip_probe=True and no live Unity.
         discovered = read_unity_port(skip_probe=True)
-        return discovered if discovered is not None else 9500
+        return discovered if discovered is not None else DEFAULT_PORT
     except Exception:
-        return 9500
+        return DEFAULT_PORT
 
 
 async def check_tcp_connection(port: int = 0) -> CheckResult:

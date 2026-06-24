@@ -273,6 +273,21 @@ def test_merge_toml_backup_not_overwritten_on_second_call(tmp_path):
     assert (tmp_path / "config.bak").read_text(encoding="utf-8") == "original"
 
 
+def test_merger_handles_crlf_toml(tmp_path):
+    """CRLF line endings (Windows) must not cause duplicate sections."""
+    from unity_mcp.config import merger
+    cfg = tmp_path / "config.toml"
+    # Write TOML with Windows CRLF line endings
+    cfg.write_bytes(
+        b'[mcp_servers.unity-mcp]\r\ncommand = \'/old\'\r\nargs = []\r\n'
+    )
+    merger.merge_toml_mcp(cfg, {"command": "/new", "args": ["-m", "unity_mcp.server"]})
+    text = cfg.read_text(encoding="utf-8")
+    assert text.count("[mcp_servers.unity-mcp]") == 1, "CRLF caused duplicate section"
+    assert "/new" in text
+    assert "/old" not in text
+
+
 # ─── backup.py ──────────────────────────────────────────────────────────────
 
 def test_backup_creates_timestamped_copy(tmp_path):

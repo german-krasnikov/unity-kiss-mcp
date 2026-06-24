@@ -35,6 +35,8 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 - No Animator/Animation component: return clear error
 - AnimationMode already active: check `InAnimationMode()` before starting
 - Legacy Animation vs Animator: support both (check Animator first, then Animation)
+- Invalid component_type (v0.57+): "Component type not found: {typeName}" — check ResolveComponentType logic (searches UnityEngine.*, custom assemblies)
+- Custom component not found: verify type name matches Assembly-CSharp definition exactly (e.g., "Health", not "MyGame.Health" for Assembly-CSharp types)
 
 ### Sub-Actions Flattening (Bug Fix)
 - Phase 16 fix: `animation action=edit` was broken — sub-actions (add_key, remove_key, etc.) were passed as separate args but re-extracted, losing the actual sub-action
@@ -55,7 +57,7 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 
 ### `animation` (single consolidated tool)
 
-**Parameters:** `action` (required), `path` (required), `clip` (optional), `clip_name` (optional), `property` (optional), `keys` (optional), `time` (optional)
+**Parameters:** `action` (required), `path` (required), `clip` (optional), `clip_name` (optional), `property` (optional), `keys` (optional), `time` (optional), `component_type` (optional, v0.57+)
 
 #### action=get — List clips or show details
 ```
@@ -81,7 +83,7 @@ animation(action="get", path="/Player", clip="Walk", time=0.4)
 ```
 
 #### action=create — Create new AnimationClip
-**Params:** `path`, `clip_name`, `property` (default="localPosition"), `keys` (keyframe string)
+**Params:** `path`, `clip_name`, `property` (default="localPosition"), `keys` (keyframe string), `component_type` (optional, default="Transform")
 
 Creates new AnimationClip with curves, saves to `Assets/Animations/{clip_name}.anim`, attaches to object's Animator.
 
@@ -89,8 +91,15 @@ Key format: `t:<time> v:<value>` separated by `;`
 - Vector3: `t:0 v:(0,0,0); t:1 v:(0,2,0)`
 - Float: `t:0 v:0; t:0.5 v:1; t:1 v:0`
 
+**component_type** (v0.57+): Specifies the component containing the property. Defaults to Transform (for localPosition, rotation, scale). Other examples:
+- `Light` — animate intensity, color, range
+- `Camera` — animate fieldOfView, nearClipPlane, farClipPlane
+- `Rigidbody` — animate mass, drag, velocity
+- Custom components — full type name or short name if in Assembly-CSharp
+- Error handling: non-existent component type returns "Component type not found" error
+
 #### action=edit (or sub-action directly: add_key|remove_key|remove_curve|set_keys|set_loop)
-**Params:** `path`, `clip`, `action`, `property` (optional), `keys` (optional)
+**Params:** `path`, `clip`, `action`, `property` (optional), `keys` (optional), `component_type` (optional, default="Transform")
 
 Modify existing clip. Sub-actions passed as `action` value:
 - `add_key` — insert keyframes (property + keys required)
@@ -99,6 +108,8 @@ Modify existing clip. Sub-actions passed as `action` value:
 - `set_keys` — replace all keyframes (property + keys required)
 - `set_loop` — toggle clip looping (keys="false" to disable, anything else to enable)
 
+**component_type** (v0.57+): Required when editing non-Transform properties (e.g., Light.intensity). Must match the component type used when creating the clip. See create section for full list of examples.
+
 #### action=preview — Preview in Edit Mode
 **Params:** `path`, `clip`, `time` (optional, default=0.0)
 
@@ -106,6 +117,43 @@ The `action` value is one of: `sample` (default on C# side), `start`, `stop`.
 - `sample` — pose object at time, return sampled values
 - `start` — enter AnimationMode
 - `stop` — exit AnimationMode, restore original pose
+
+#### Example: Animate Custom Component (v0.57+)
+```
+# Animate Light intensity from 0.5 to 2.0 over 2 seconds
+animation(
+  action="create",
+  path="/MyLight",
+  clip_name="LightFade",
+  property="intensity",
+  component_type="Light",
+  keys="t:0 v:0.5; t:2 v:2.0"
+)
+→ created: LightFade | 2.0s | 1 curves | saved: Assets/Animations/LightFade.anim
+
+# Edit the clip: add keyframe at 1 second (midpoint)
+animation(
+  action="add_key",
+  path="/MyLight",
+  clip="LightFade",
+  component_type="Light",
+  property="intensity",
+  keys="t:1 v:1.25"
+)
+→ edited: LightFade | add_key intensity
+```
+
+**Non-existent component error:**
+```
+animation(
+  action="create",
+  path="/Player",
+  clip_name="BadClip",
+  component_type="NonExistentComponent",
+  property="someField"
+)
+→ [error] Component type not found: NonExistentComponent
+```
 
 ## TDD Scenarios
 
@@ -118,20 +166,25 @@ The `action` value is one of: `sample` (default on C# side), `start`, `stop`.
 6. **test_edit_animation_calls_bridge**: edits clip → sends correct action
 7. **test_preview_animation_calls_bridge**: preview with time → sends correct args
 8. **test_preview_animation_defaults**: action/time defaults applied
+9. **test_animation_component_type_arg** (v0.57+): component_type param passed to bridge
+10. **test_animation_component_type_defaults** (v0.57+): component_type=None by default
 
-C# tests (6 total):
+C# tests (8 total):
 1. **CreateAnimation_CreatesClipWithKeyframes**: create → get_animation → verify clip listed
 2. **GetAnimation_ListsAllClips**: list clips → verify names in output
 3. **GetAnimation_ClipDetail_ShowsCurvesAndKeyframes**: clip detail → verify curves + keyframes
 4. **EditAnimation_AddKey_InsertsKeyframe**: add_key → get_animation → verify keyframe added
 5. **EditAnimation_RemoveCurve_DeletesCurve**: remove_curve → verify count reduced
 6. **PreviewAnimation_Sample_ReturnsSampledValues**: sample at time → verify interpolated values
+7. **CreateAnimation_CustomComponent_Light** (v0.57+): create with Light.intensity → verify binding uses Light type
+8. **EditAnimation_CustomComponent_InvalidType_ReturnsError** (v0.57+): non-existent component_type → "Component type not found" error
 
 ### Green Phase
-- Python: 1 tool function (`animation`) + 8 tests (all passing)
+- Python: 1 tool function (`animation`) with 8 params (v0.57: +1 component_type) + 10 tests (v0.57: +2)
 - C#: AnimationSerializer (Serialize, SerializeClipList, SerializeClipDetail, SerializeClipAtTime)
-- C#: AnimationHelper (CreateClip, EditClip, Preview, ParseKeys methods)
+- C#: AnimationHelper (CreateClip, EditClip, Preview, SetCurvesFromKeys + v0.57: ResolveComponentType helper)
 - CommandRouter: 1 registered command (`animation`) → ExecAnimationConsolidated switch → 4 Exec methods
+- v0.57 addition: ResolveComponentType(typeName) resolves UnityEngine.* types, custom Assembly-CSharp types, or throws "Component type not found"
 
 ## Review Checklist
 
@@ -142,5 +195,6 @@ C# tests (6 total):
 
 ## Related
 
+- Tool: `animator_intent` — NL intent tool for animation (See `AI/intent-tools.md`)
 - Skill: `.claude/skills/csharp-unity.md` (Editor API)
 - Knowledge: `AI/architecture.md`

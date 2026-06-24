@@ -2,13 +2,13 @@
 
 ## Overview
 
-Сериализация Unity данных в компактный текстовый формат:
-- **HierarchySerializer**: сцена → текстовое дерево (11x сжатие)
-- **ComponentSerializer**: компоненты → ключ-значение (90% vs JSON)
-- **ConsoleCapture**: логи → форматированный текст
-- **ScreenshotCapture**: окно → base64 PNG
+Serialization of Unity data into compact text format:
+- **HierarchySerializer**: scene → text tree (11x compression)
+- **ComponentSerializer**: components → key-value (90% vs JSON)
+- **ConsoleCapture**: logs → formatted text
+- **ScreenshotCapture**: window → base64 PNG
 
-## Architecture (для Architect)
+## Architecture (for Architect)
 
 ### Output Format (default, components=false)
 
@@ -85,12 +85,32 @@ Player [Rigidbody,PlayerController] $c
 | MAX_NODES | 3000, truncates with message | `... truncated at 3000 nodes` |
 | Sibling truncation | when MAX_NODES hit mid-children | `... +5 siblings` |
 
+### Compression Mode (compress=True)
+
+Groups consecutive slot_N/point_N sequences into compact summaries:
+- `WeaponSlot $i [5 slots]` instead of listing all 5 children
+- Reduces token count for large hierarchies (~60–100 tokens for 50-object scene)
+- Usage: `get_hierarchy(compress=True)`
+
+### Summary Mode (summary=True)
+
+Root-only overview with per-scene node counts. Useful for quick navigation.
+- Output: `[MainScene] 1200 nodes, [AdditiveScene] 45 nodes`
+- Token cost: 60–100 tokens
+- Usage: `get_hierarchy(summary=True)`
+
+### Scene Filter (scene="SceneName")
+
+Isolates serialization to a single scene in multi-scene projects.
+- Usage: `get_hierarchy(scene="MainScene")`
+- Omit to serialize all loaded scenes
+
 ### Token Budget
 
 - 50 objects: ~350 tokens (vs ~4000 JSON)
 - Compression: **11x**
 
-## Implementation Notes (для Developer)
+## Implementation Notes (for Developer)
 
 ### HierarchySerializer.cs
 
@@ -250,6 +270,21 @@ public static class VersionTracker
 `ResetIncrementalCache()` clears stored state.
 No Python-side cache — all calls go to Unity via `bridge.send("get_hierarchy", {...})`.
 
+### ScenePathParser Struct (v0.31.0+)
+
+Multi-scene path parsing utility: handles `"SceneName:/"` prefix extraction.
+- Prevents hallucination of hand-built scene paths
+- Used internally by ComponentSerializer + HierarchySerializer
+- Public static method: `ScenePathParser.ExtractSceneName(path) → (sceneName, path)`
+
+### RefManager Ring (702 Slots)
+
+Ephemeral short references ($a–$zz) valid within a single scene serialization.
+- Slot allocation: wraps around at 702 (eviction on wrap)
+- Prune() on refresh: clears all slots on hierarchy change
+- Thread-safe: lock-based access
+- Useful for quick object reference in LLM prompts
+
 ## Code Locations
 
 **C#:**
@@ -343,7 +378,7 @@ Base64-encoded PNG or file path.
 - `highlight`: Draw markers on specific objects
 - Saves to file or returns base64
 
-## TDD Scenarios (для Developer)
+## TDD Scenarios (for Developer)
 
 ### Implemented Tests (all passing)
 
@@ -387,7 +422,7 @@ Base64-encoded PNG or file path.
 - Export as PNG
 - Support custom dimensions
 
-## Review Checklist (для Reviewer)
+## Review Checklist (for Reviewer)
 
 - [ ] Transform always omitted from component list
 - [ ] Tree chars render correctly

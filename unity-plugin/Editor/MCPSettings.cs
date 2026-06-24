@@ -1,8 +1,5 @@
 using System.Collections.Generic;
 using UnityEditor;
-using UnityEditor.SceneManagement;
-using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace UnityMCP.Editor
 {
@@ -76,15 +73,6 @@ namespace UnityMCP.Editor
             EditorApplication.wantsToQuit += OnWantsToQuit;
         }
 
-        private static bool OnWantsToQuit()
-        {
-            var scene = SceneManager.GetActiveScene();
-            if (scene.isDirty)
-            {
-                Debug.LogWarning("[MCP] Auto-discarding dirty scene on quit");
-                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            }
-            return true;
-        }
+        private static bool OnWantsToQuit() => true;
     }
 }

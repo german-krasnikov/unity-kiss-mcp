@@ -1,12 +1,11 @@
 """animator_intent — NL → animator DSL → batch commands."""
 import re
 from typing import Optional
-from ..sampling import SamplingService
+from ..sampling import sampling_service as _sampling
 from .intent_common import strip_fences, build_batch_line
 from ._annotations import RW as _RW
 
 _send = None
-_sampling: SamplingService = SamplingService()
 
 _PROMPT_TEMPLATE = """\
 Generate an animator DSL for Unity. Use ONLY these keywords:

@@ -38,7 +38,7 @@ def merge_toml_mcp(config_path: pathlib.Path, server_entry: dict) -> None:
     if config_path.exists():
         if not bak.exists():
             shutil.copy2(config_path, bak)
-        text = config_path.read_text(encoding="utf-8")
+        text = config_path.read_text(encoding="utf-8").replace("\r\n", "\n")
     else:
         text = ""
 

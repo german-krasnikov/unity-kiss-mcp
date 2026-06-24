@@ -15,6 +15,7 @@ namespace UnityMCP.Editor
             "System.IO.Path", "System.Net.", "WebClient", "HttpClient",
             "Assembly.Load", "AppDomain", "DllImport", "extern ", "unsafe ",
             "System.Reflection.Assembly", "Type.GetType", ".GetMethod(",
+            "GetRuntimeMethod", "DynamicInvoke",
             ".Invoke(", "System.Threading", "System.Runtime.InteropServices",
             "Environment.GetEnvironmentVariable",
             "System.Reflection.Emit", "DynamicMethod", "ILGenerator", "OpCodes",
@@ -35,6 +36,8 @@ namespace UnityMCP.Editor
             "EditorApplication.OpenProject", "ProjectWindowUtil",
             // Using-alias bypass (= NS form not caught by "using NS" entries)
             "= System.IO", "= System.Diagnostics", "= System.Net", "= System.Reflection",
+            // Dynamic compilation bypass — attacker could compile+exec arbitrary code
+            "CSharpCodeProvider", "CodeDomProvider", "CompileAssemblyFrom",
         };
 
         // Pre-densified blocked patterns (whitespace stripped) for O(1) SecurityScan matching

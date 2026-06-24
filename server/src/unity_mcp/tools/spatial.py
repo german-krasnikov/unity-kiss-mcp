@@ -1,5 +1,5 @@
 """Spatial / scene-analysis queries: layout, context, scan, raycast, colliders."""
-from ._annotations import RO as _RO
+from ._annotations import RO as _RO, RW as _RW
 
 _send = None
 _args = None
@@ -62,7 +62,7 @@ async def spatial_query(action: str, path: str | None = None, target: str | None
     bounds_info: detailed bounds/dimensions of object.
     raycast: cast ray from path/pos to target, returns hits sorted by distance.
     spatial_map: ASCII grid map of objects in XZ plane. cell_size in meters.
-    objects_in_polygon: objects whose XZ pivot is inside polygon. vertices='x1,z1;x2,z2;...' (>=3 pairs). cap=max results (default 50)."""
+    objects_in_polygon: objects whose XZ pivot is inside polygon. vertices='x1,z1;x2,z2;...' (>=3 pairs). cap=max results (default 50). region_id=optional tag forwarded to Unity (e.g. for named zones)."""
     if action == "objects_in_polygon":
         _validate_polygon(vertices)
     return await _send("spatial_query", _args(
@@ -78,6 +78,41 @@ async def spatial_query(action: str, path: str | None = None, target: str | None
         cap=str(cap) if cap is not None else None))
 
 
+async def region_clear(vertices: str, dry_run: bool = True,
+                       filter: str | None = None, cap: int = 50) -> str:
+    """Delete (or preview) all objects whose XZ pivot is inside the polygon region.
+
+    vertices: CSV polygon 'x1,z1;x2,z2;...' (>=3 pairs).
+    dry_run: True = list objects that WOULD be deleted (safe default). False = delete them.
+    filter: optional name-pattern substring; only matching objects are affected.
+    cap: max objects processed (default 50, hard max 200).
+    """
+    _validate_polygon(vertices)
+    return await _send("region_clear", _args(
+        vertices=vertices,
+        dry_run="true" if dry_run else "false",
+        filter=filter,
+        cap=str(cap)))
+
+
+async def navmesh_query(action: str, center: str | None = None,
+                        from_pos: str | None = None, to: str | None = None,
+                        max_distance: float = 5.0, area_mask: int = -1) -> str:
+    """NavMesh queries. action: sample|path|raycast.
+    sample: find nearest walkable point to center.
+    path: calculate path from from_pos to to.
+    raycast: NavMesh raycast from from_pos toward to."""
+    d: dict = {"action": action, "area_mask": str(area_mask)}
+    if center: d["center"] = center
+    if from_pos: d["from"] = from_pos
+    if to: d["to"] = to
+    if action == "sample": d["max_distance"] = str(max_distance)
+    result = await _send("navmesh", _args(**d))
+    if "Command not registered: navmesh" in result:
+        return "NavMesh unavailable: AI Navigation package not installed in this project."
+    return result
+
+
 def register(mcp, send, args):
     global _send, _args
     _send = send
@@ -87,3 +122,5 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RO)(scan_scene)
     mcp.tool(annotations=_RO)(check_colliders)
     mcp.tool(annotations=_RO)(spatial_query)
+    mcp.tool(annotations=_RW)(region_clear)
+    mcp.tool(annotations=_RO)(navmesh_query)

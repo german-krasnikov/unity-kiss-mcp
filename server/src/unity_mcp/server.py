@@ -251,7 +251,8 @@ async def lifespan(app):
     try:
         unity_port = _read_unity_port()
     except (ValueError, OSError):
-        unity_port = 9500
+        from .constants import DEFAULT_PORT
+        unity_port = DEFAULT_PORT
     cleanup_stale_locks(port=unity_port)
     from .server_filtering import cleanup_stale_port_files as _cleanup_ports
     _cleanup_ports()
@@ -270,8 +271,8 @@ async def lifespan(app):
         _sigterm_state["lock_fd"] = lock_fd
         try:
             release_lock(old_fd)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("Failed to release old port lock fd=%s: %s", old_fd, exc)
 
     import threading
     def _bg_update_check():

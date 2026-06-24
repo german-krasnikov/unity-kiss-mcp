@@ -56,25 +56,10 @@ def wrap_send(send_fn, mw: Optional["Middleware"] = None):
                 mw.circuit.record_success()
             return val
 
-        # Play mode auto-routing
-        cmd, args = mw.reroute_cmd(cmd, args)
-
-        # Tier C: speculation hit tracking
-        if mw.speculation is not None:
-            mw.speculation.record_actual_next(cmd)
-
-        # Tier C: lessons hint (prepend to result later)
-        lessons_hint = mw.lessons.hint_for(cmd, args) if mw.lessons else None
-
-        # Tier C: argument inference
-        inferred_tags: list = []
-        if mw.inferrer is not None and mw.session is not None:
-            args, inferred_tags = mw.inferrer.infer(cmd, args, mw.session)
-
         # Tier C: watchdog pending alert
         watchdog_alert = mw.watchdog.consume_alert() if mw.watchdog else None
 
-        # Pre-call checks
+        # Pre-call checks — guards see ORIGINAL cmd/args (before any rerouting)
         retry_warn = mw.check_retry(cmd, args)
         if retry_warn:
             return _early_return(retry_warn)
@@ -83,6 +68,21 @@ def wrap_send(send_fn, mw: Optional["Middleware"] = None):
         blast_warn = mw.check_blast_radius(cmd)
         verif_warn = mw.check_verification_needed(cmd)
         batch_warn = mw.scan_batch_conflicts(args.get("commands", "")) if cmd == "batch" else None
+
+        # Play mode auto-routing — AFTER guards so they see original cmd
+        cmd, args = mw.reroute_cmd(cmd, args)
+
+        # Tier C: speculation hit tracking — sees rerouted cmd (what's actually sent)
+        if mw.speculation is not None:
+            mw.speculation.record_actual_next(cmd)
+
+        # Tier C: lessons hint (prepend to result later) — sees rerouted cmd
+        lessons_hint = mw.lessons.hint_for(cmd, args) if mw.lessons else None
+
+        # Tier C: argument inference
+        inferred_tags: list = []
+        if mw.inferrer is not None and mw.session is not None:
+            args, inferred_tags = mw.inferrer.infer(cmd, args, mw.session)
 
         # find_objects cache bypass
         if cmd == "find_objects" and not args.get("tag") and not args.get("layer") and not args.get("component"):

@@ -38,11 +38,7 @@ gemini --version
 
 ### Install Python Server
 
-```bash
-git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
-cd unity-kiss-mcp
-python install.py setup
-```
+The Python MCP server runs on-demand via `uvx` — no installation needed. The setup wizard will auto-discover it.
 
 ### Add Plugin to Unity
 
@@ -60,18 +56,62 @@ Gemini opens a browser for Google OAuth. Credentials are stored in `~/.gemini/oa
 
 ### Configure Gemini (Automatic)
 
-Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Select **Gemini** and follow the prompts.
+Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Select **Gemini** and follow the prompts. The wizard will merge the `unity-mcp` entry into `~/.gemini/settings.json` automatically.
 
 **Manual configuration:**
 
+Edit `~/.gemini/settings.json` and add:
+
+```json
+{
+  "mcpServers": {
+    "unity-mcp": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server", "unity-mcp"],
+      "env": { "UNITY_MCP_PORT": "9500" },
+      "trust": true
+    }
+  }
+}
+```
+
+If the file already exists, merge only the `unity-mcp` entry — preserve other MCP servers.
+
+<details>
+<summary><b>Alternative: Manual Installation (git clone)</b></summary>
+
+```bash
+git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
+cd unity-kiss-mcp
+python install.py setup
+```
+
+This clones the repository locally, creates a Python venv, and installs dependencies. After setup, verify:
+
+```bash
+uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help
+```
+
+Then configure your AI tool:
+
 ```bash
 python install.py configure --tool gemini
+# Or project-scoped:
+python install.py configure --tool gemini --project-dir /path/to/unity/project
 ```
+
+Verify installation:
+
+```bash
+python install.py doctor
+```
+
+</details>
 
 ## 3. Use From the Editor (Primary Workflow)
 
 1. Open Unity and wait for `[MCP] Server started on port <XXXX>` in the Console.
-2. Open **Window → MCP Chat**.
+2. Open **MCP → Chat**.
 3. Select **Gemini** from the backend dropdown.
 4. Optionally choose a model from the dropdown (defaults to Gemini CLI default).
 5. Type a prompt and press Send.
@@ -103,9 +143,7 @@ gemini -p "<prompt>" --output-format stream-json [--model <id>] [--yolo] [--sand
 
 ## 5. Verify Installation
 
-```bash
-python install.py doctor
-```
+Open the **Setup Wizard** in Unity (**MCP → Setup Wizard**) and select **Diagnostics**.
 
 Or check manually:
 
@@ -128,6 +166,6 @@ Expected: NDJSON stream with `tool_use` line containing `"tool_name": "mcp_unity
 | `gemini: command not found` | Check `which gemini`. On macOS, run `brew install gemini-cli`. Restart terminal after install. |
 | Setup Wizard doesn't open | (1) Verify plugin is in Package Manager. (2) Close/reopen Unity. (3) Check Console for errors. |
 | MCP tools not available in Chat | Verify `~/.gemini/settings.json` contains `unity-mcp` entry. Check Unity Console shows `[MCP] Server started on port <XXXX>`. Restart Chat session. |
-| `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or clone and setup manually. |
+| MCP server fails to start | Run Setup Wizard → Diagnostics to verify Python 3.10+ and TCP port availability. |
 | Binary not found in Chat Settings but works in terminal | Terminal sources `~/.zshrc` but Unity doesn't. Override: **Settings > Agent Chat > Gemini Binary Path** — enter absolute path. |
 | Settings file broke other MCP servers | The plugin merges intelligently — it only modifies the `unity-mcp` entry. If other servers disappeared, they likely had malformed JSON. Restore from backup if needed. |

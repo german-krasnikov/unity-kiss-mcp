@@ -130,4 +130,6 @@ class Middleware(MiddlewareGuardsMixin, MiddlewareReadsMixin, MiddlewareAsyncMix
         self._last_hierarchy_full = None
         self._hierarchy_call_id = 0
         self._last_hierarchy_call = 0
+        for task in list(self._bg_tasks):
+            task.cancel()
         self._bg_tasks.clear()

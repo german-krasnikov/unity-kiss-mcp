@@ -1,8 +1,10 @@
 # Feature: Architecture Overview
 
+<!-- Overview doc — max 500 lines, single entry to all AI/ files -->
+
 ## Overview
 
-MCP-сервер для управления Unity Editor из Claude Code с минимизацией токенов (10-15x сжатие vs JSON).
+MCP server for controlling Unity Editor from Claude Code with token minimization (10-15x compression vs JSON).
 
 ## Installation & Distribution (v0.38.0+, v0.42.0: Setup Wizard 3-screen flow + 9 backends; v0.47.1: Windows UX + GitHub-direct install)
 
@@ -27,7 +29,7 @@ MCP-сервер для управления Unity Editor из Claude Code с м
 - **Update checker & LevelUp UX** (v0.42.0+v0.44.0): GitHub API polling (v0.47.1: switched from PyPI to GitHub releases API via api.github.com/repos/.../releases/latest) + UpdatesPage changelog viewer. **LevelUp arcade-style animation (v0.44.0)**: 4-state panel (Idle→Animating→Done→Diff), XP bar + sparkles via LevelUpAnimator, release notes diff via ReleaseDiff. **v0.45.0**: InstallSourceDetector (file: vs git: detection via PackageInfo.source), LocalPluginUpdater (git pull --tags async), UpmPluginUpdater (Client.Add chain), UpdateDispatcher (DRY routing), ChatMcpConfigWriter uvx fallback. **v0.47.1**: `_update_check.py` uses GitHub releases API with importlib.metadata for version read, 24h cache TTL, banner includes --reinstall flag. **v0.50.0+**: UpdateChecker validates git+URL in configs, ClearCache on Level Up callback chain (v0.50.1). **v0.50.2**: WizardConfigWriter GitInstallUrl made public for cross-assembly access. **v0.53.0 Chat config lifecycle**: Per-port temp configs (unity-mcp-config-{port}.json) written by ChatMcpConfigWriter.GetOrCreateConfigPath(). Python lifespan cleanup: `cleanup_stale_port_files()` deletes configs >2h old. C# OnDisable: DeleteOwnConfig() removes MCPServer.ServerChatPort config on shutdown (ChatMcpConfigWriter.DeleteConfig). ConfigFileName(port) → port>0 ? "{port}.json" : legacy bare name (backward compat).
 - **Plugin side** (C#, v0.42.0): SetupWizard 3-screen flow, BackendDescriptor with 9 backends + IsDetected, PickBackendScreen + ConfigureScreen, scope toggle, Wizard asmdef split. **Config recovery (v0.44.0)**: WizardConfigWriter.HasBackup + RestoreConfig, AiConfigScreen Restore button. **v0.45.0**: Async local plugin updates (LocalPluginUpdater.UpdateAsync), UPM registry updates (UpmPluginUpdater.UpdateAsync). **v0.47.1**: `WizardConfigWriter.GitInstallUrl` constant (shared with Python resolver.py), AiConfigScreen with fallback copyable JSON on UPM installs, `AiToolCardFactory` platform-aware path methods for Windows (ConfigDir detection, .as_posix() for TOML paths, BackendDescriptor platform-specific root_key)
 
-## Architecture (для Architect)
+## Architecture (for Architect)
 
 ```
 Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]──→ Unity Editor Plugin
@@ -35,35 +37,37 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      │  MCP Protocol          │  Binary protocol                │  Unity API
      │  (JSON-RPC 2.0)        │  [4B len BE][JSON]              │  (main thread)
      │                        │                                  │
-     │                        ├─ ConnectionSlot (dual: CLI+Chat) ├─ CommandRouter (async)
-     │                        ├─ Capability Gating (TIER1+cat)   ├─ PluginRegistry (IMCPPlugin)
-     │                        ├─ Plugin system (auto-discovery)  ├─ CommandRegistry + ValueParser
-     │                        │  - opt-in disable: env UNITY_MCP_SKIP_PLUGINS=prefix ├─ CommandSchema (validation)
-     │                        ├─ Deferred Schema Loading         ├─ 7 Serializers
-     │                        │  (stub schemas + lazy resolve)   ├─ RefManager ($a-$zz)
-     │                        ├─ 23-layer Middleware (opt-in)    ├─ PlaytestRunner + DSL
-     │                        ├─ CompileStateProbe               ├─ RuntimeHelper (Play Mode)
-     │                        ├─ PID Lockfile (exclusive)        ├─ MultiViewCapture (4-panel)
-     │                        ├─ Port discovery (CWD-based)      ├─ CodeExecutor (Roslyn)
-     │                        ├─ Config module (client detection) ├─ PortResolver (dual-port)
-     │                        ├─ Update checker (GitHub API, v0.47.1) ├─ SetupWizard (3-screen, 9 backends, AiConfigScreen fallback)
-     │                        ├─ Config TOML merger (v0.42.0)    ├─ UpdatesPage (changelog viewer)
-     │                        ├─ GIT_INSTALL_URL constant        ├─ AiToolCardFactory (platform paths)
-     │                        └─ Heartbeat (15s, reconnect)      ├─ Guards (compile/play/runtime/tool)
+     │                        ├─ ConnectionSlot (dual: CLI+Chat) ├─ CommandRouter (async, v0.57.0: switch dispatch)
+     │                        ├─ Capability Gating (TIER1+cat)   ├─ AttributeScanner → MCPToolAttribute (v0.57.0)
+     │                        ├─ Plugin system (auto-discovery)  ├─ CommandRegistry (sync+async handlers, v0.57.0)
+     │                        │  - opt-in disable: env UNITY_MCP_SKIP_PLUGINS=prefix ├─ PluginRegistry (IMCPPlugin)
+     │                        ├─ Deferred Schema Loading         ├─ CommandSchema (validation)
+     │                        │  (stub schemas + lazy resolve)   ├─ ValueParser
+     │                        ├─ 23-layer Middleware (opt-in)    ├─ 7 Serializers
+     │                        ├─ CompileStateProbe               ├─ RefManager ($a-$zz)
+     │                        ├─ PID Lockfile (exclusive)        ├─ PlaytestRunner + DSL
+     │                        ├─ Port discovery (CWD-based)      ├─ RuntimeHelper (Play Mode)
+     │                        ├─ Config module (client detection) ├─ MultiViewCapture (4-panel)
+     │                        ├─ Update checker (GitHub API, v0.47.1) ├─ CodeExecutor (Roslyn)
+     │                        ├─ Config TOML merger (v0.42.0)    ├─ PortResolver (dual-port)
+     │                        ├─ GIT_INSTALL_URL constant        ├─ SetupWizard (3-screen, 9 backends, AiConfigScreen fallback)
+     │                        └─ Heartbeat (15s, reconnect)      ├─ UpdatesPage (changelog viewer)
+     │                                                           ├─ AiToolCardFactory (platform paths)
+     │                                                           ├─ Guards (compile/play/runtime/tool)
      │                                                           └─ Python resolver (venv/uv/system)
 ```
 
-### Почему такая архитектура
+### Why This Architecture
 
-- **Python MCP**: Claude Code запускает через stdio, зрелый SDK
-- **TCP socket**: Переживает domain reload Unity (vs WebSocket)
-- **Binary framing**: 4 байта длины BE + JSON, минимальный overhead
+- **Python MCP**: Claude Code launches via stdio, mature SDK
+- **TCP socket**: Survives Unity domain reload (vs WebSocket)
+- **Binary framing**: 4-byte BE length prefix + JSON, minimal overhead
 - **No cache**: All calls go directly to Unity via bridge.send (scene changes too frequently)
 
 ### Components
 
 1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support, v0.42.0: +25 config/TOML tests, v0.47.1: +73+78 config validation tests)
-   - **99 core MCP tools registered** (v0.50.3+). Gating: TIER1=41 core (hardcoded). External plugins can add more tools dynamically. `_UnstructuredMCP(FastMCP)` subclass forces `structured_output=False` on all tools.
+   - **99 core MCP tools registered** (v0.50.3+). Gating: TIER1=42 core (hardcoded). External plugins can add more tools dynamically. `_UnstructuredMCP(FastMCP)` subclass forces `structured_output=False` on all tools. Ungated (always visible): `get_test_results`, `budget_status`, `diagnose`.
    - **Config Module (v0.42.0+v0.44.0)**: `server/src/unity_mcp/config/` extended with TOML merger for Codex backend. `merge_toml_mcp(path, section)` merges MCP config into TOML with diff-based updates (preserves user settings). Python 3.9 compat: `Optional[X]` instead of `X | None`. ValueError raised on corrupt JSON. **Stale entry cleanup (v0.44.0)**: strips `[mcp_servers.unity]` duplicates on first write, creates .bak backup. **v0.47.1**: `validator.py` skips json.loads for TOML clients, checks string presence in configs. Adds 25 new tests (v0.42.0) + 9 new tests (v0.44.0) + 151 new tests (v0.47.1: 73 Python + 78 C# in test_config_gaps.py)
    - **CodeExecutor.SecurityScan (v0.31.0)**: Hardened pipeline — (1) strip C# comments via regex (2) whitespace densification (3) OrdinalIgnoreCase matching (4) 11 new blocked patterns (EditorApplication.Exit, Application.Quit, Environment.FailFast, ExportPackage, ImportPackage, OpenProject, ProjectWindowUtil, using-aliases for System.IO/Diagnostics/Net/Reflection)
    - **In-Unity Chat Backends** (v0.29.2+): Five CLI providers with auto-discovery via TypeCache:
@@ -109,10 +113,12 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 3. **Unity Plugin** (C#: 165+ files, ~17200 LOC, v0.42.0: Wizard asmdef split, Updates folder, MarkdownInlineFormatter extraction, v0.44.0: LevelUp UX, v0.45.0: InstallSourceDetector + async updaters, v0.55.10: unified SceneMcpOverlay + IconCanvas + PluginToolGrouping)
    - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, **v0.23.0: SO_REUSEPORT** (macOS/Linux) for rapid reconnect recovery, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections. **v0.37.0: IsReallyCompiling** — managed flag replaces EditorApplication.isCompiling latching, 120s wedge guard prevents false-positive "backgrounded" state. **v0.36.0: WritePortFile** writes both {pid}.port (main) + {pid}.chat-port (Windows env fallback). **v0.52.6: ShouldStartServer guard** — static ctor checks `ShouldStartServer(isBatchMode)` to prevent AssetImportWorker from creating conflicting port files during batch asset reimports. Detects batch mode via `EditorApplication.isBatchMode` OR `-nographics` args.
    - **PortResolver.cs**: Pure testable helpers (ResolvePort, ResolveChatPort, FindFreePort, SavePorts, IsValidPort, ParsePortFromJson) with 25 NUnit tests. Validates 1024–65535 range, skips reserved ports, fallback to OS-assigned via port 0. **v0.52.6: Chat port collision guard** — ResolveChatPort ensures chat port ≠ main port (prevents accidental self-binding). FindFreePort ceiling raised 9599→9699 to accommodate dual-port scanning.
-   - **CommandRouter.cs**: RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutatingCommand/IsRuntimeCommand. **v0.37.0: DefaultIsCompiling** — two-layer check (IsReallyCompiling + 120s wedge guard) prevents false-positive compile blocks.
+   - **CommandRouter.cs** (v0.57.0 refactor): RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutating/IsRuntime. **v0.37.0: DefaultIsCompiling** — two-layer check (IsReallyCompiling + 120s wedge guard) prevents false-positive compile blocks. **v0.57.0: ProcessAsync simplified** — switch-based dispatch table via `CommandRegistry.HasAsyncHandler()` replaced inline if/else chains (148→27 lines, Open/Closed Principle). Extracted 6 async handlers: AsyncRunTests, AsyncWaitUntil, AsyncMoveTo, AsyncTestStep, AsyncRunPlaytest, AsyncAskUser.
+   - **CommandRegistry.cs** (v0.57.0 refactor): Func<string,string> handlers + `Action<string,string,TaskCompletionSource<string>>` AsyncHandler field. `Register(cmd, handler, mutating, runtime)` for sync; `RegisterAsync(cmd, handler, mutating, runtime)` for async. Duplicate registration guarded (warning log, skips). `HasAsyncHandler(cmd, out handler)` returns dispatch table entry. `Execute()` enforces Handler ≠ null, throws on async-only entries.
+   - **MCPToolAttribute** (v0.57.0 new): `[MCPTool(name, description="", Mutating=false, Runtime=false)]` attribute for user-extensible tool registration. Decorates public static methods returning `string(string args)`.
+   - **AttributeScanner.cs** (v0.57.0 new): `ScanAndRegister()` discovers MCPToolAttribute methods in user assemblies (avoids UnityMCP.* + System + Unity frameworks). Validates signature, calls `CommandRegistry.Register()` for each tool. Returns tool count. Wired into CommandRouter.RegisterAll() after core commands.
    - **PluginRegistry.cs**: Static registry for IMCPPlugin implementations. Plugins register via `[InitializeOnLoad]`. One-way asmdef dependency: external → public.
    - **IMCPPlugin.cs**: Interface — Name, CommandPrefix, RegisterCommands(), OnDomainReload(), AdditionalCommands
-   - **CommandRegistry.cs**: Func<string,string> handlers, mutating + runtime flags
    - **CommandSchema.cs**: parameter validation with fuzzy did-you-mean suggestions (79 schemas)
    - **ValueParser.cs**: vectors, quaternions, colors, arrays, 100+ types (Rect/Bounds/RectInt/BoundsInt/LayerMask + Int64/Double precision), type-aware SetPropertyValue
    - **InputNormalizer.cs**: component/property/value normalization
@@ -420,9 +426,9 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 
 **Update v0.46.0**: ChipKind registry now includes Field + AnnotatedScreenshot. ModelContextWindows presets added per LLM.
 
-### TIER1 (always visible, 41 core)
+### TIER1 (always visible, 42 core)
 
-Core (38): 24 base + 3 intent + 3 code-intel + 8 runtime = get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, set_parent, do, ask, get_metrics, animator_intent, vfx_intent, ui_intent, find_references, compile_preflight, semantic_at, invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
+Core (42): 24 base + 3 intent + 3 code-intel + 8 runtime + 4 session = get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, set_parent, do, ask, get_metrics, animator_intent, vfx_intent, ui_intent, find_references, compile_preflight, semantic_at, invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest, ask_user, permission_prompt, await_compile, sync_unity
 
 ### Category: object (8)
 find_objects, get_object_detail, get_components_list, set_active, set_material, wire_event, unwire_event, set_property_delta
@@ -468,7 +474,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 ## Key Systems
 
 ### Capability Gating (Python: `tools/gating.py`)
-- **CORE tools** (22): locked, always visible, can only be hidden via `FORCE_VISIBLE` escape hatches (discover_tools, get_enabled_tools, do, ask, editor, get_console, get_compile_errors, reconnect_unity, list_connections). Example: `is_core("get_hierarchy")` → True
+- **CORE tools** (24): locked, always visible, can only be hidden via `FORCE_VISIBLE` escape hatches (discover_tools, get_enabled_tools, do, ask, editor, get_console, get_compile_errors, reconnect_unity, list_connections, resolve_tool_schema, doctor). Example: `is_core("get_hierarchy")` → True
 - **Themed catalog** (single source of truth): `get_catalog()` returns dict with 14 categories (CORE as category, not separate key); public tools only, no NDA/plugin names. Format simplified for token economy (CORE → categories["CORE"]).
 - **Catalog serialization (v0.18.0+)**: Plain-text format sent to C# (`set_tool_catalog`): `CORE:tool1,tool2\nSCENE_EDIT:tool3,tool4\n...` via `CatalogParser.Parse()` (no JSON encoding). Reduces ~40% wire size vs JSON + eliminates C# JSON deserializer cost.
 - **Filtering pipeline**: (1) apply TIER1+session gating via `_apply_gating()`, (2) subtract disabled set from Unity MCPSettings via `_filter_tools()` (cache=None → gating-only fallback). Approach is "hide-disabled-set" (NOT allowlist — Python-only tools not in Unity's CSV wouldn't be wrongly hidden)
@@ -683,7 +689,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **F27 (shipped v0.6.1):** Atomic batch rollback (opt-in `atomic=true` param) reuses the same primitive — reverts all prior ops on first failure via `OpenNamedGroup`/`RevertToBeforeGroup`. One unified rollback system across Chat (per-turn) and Batch (per-operation).
 
 ### Spatial Queries (C#: via spatial_query command)
-- Actions: nearest, in_front_of, objects_in_radius, bounds_info, raycast, spatial_map
+- Actions: nearest, in_front_of, objects_in_radius, objects_in_polygon, bounds_info, raycast, spatial_map
 
 ### Code Intelligence (Python: `tools/code_intel.py`)
 - `find_references(symbol)` — semantic C# symbol search via Roslyn
@@ -706,7 +712,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 
 **Integration:** `sync.py _attempt_recovery()` calls `run_ladder(start_tier=2)` on REIMPORT-NEEDED verdict.
 
-## Implementation Notes (для Developer)
+## Implementation Notes (for Developer)
 
 ### Data Flow
 ```
@@ -754,8 +760,8 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 ## Test Infrastructure
 
-### Python Tests: 2450 unit tests + 78 live integration tests + 4 live CLI tests
-- Default: `PYTHONWARNDEFAULTENCODING=1 pytest -m "not live" -q` — unit tests, $0 cost (2450 tests, includes test_llm_config.py + test_ask.py + intent tests)
+### Python Tests: 2784 unit tests + 78 live integration tests + 4 live CLI tests
+- Default: `PYTHONWARNDEFAULTENCODING=1 pytest -m "not live" -q` — unit tests, $0 cost (2784 tests, includes test_llm_config.py + test_ask.py + intent tests)
 - With Unity: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> pytest -m "live and not live_cli" -q` — 78 live integration tests, $0 cost (requires Unity running, sampling disabled)
 - Real CLI: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> UNITY_MCP_VISUAL_VERIFY=1 pytest -m "live_cli" -v` — 4 real CLI tests, ~$0.001/call (requires Unity + claude CLI, visual verification enabled)
 - Test order: unit → C# EditMode → C# PlayMode → live integration → live_cli (live/live_cli always last, occupy TCP)
@@ -828,7 +834,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
     - **Styling:** MCPChatWindow.uss, ApproveButtonFactory, ApproveHelper
   - **Test Suites** (50+ NUnit files, split by assembly): CLI tests (ControlResponseBuilderTests, ChatStreamParserTests, CliBackendBaseTests, CodexArgBuilderTests, CodexAppServerParserTests, ClaudeArgBuilderTests, ToolVerbMapTests, PendingTurnStateTests, SentTextCacheTests, ArgTokenizerTests, ArgQuotingTests, BackendConfigStoreTests, BackendRegistryTests, ChatActivityStateTests, ChatMcpConfigWriterTests, ChatProcessTests, ChatBinaryResolverTests, ChipContextResolverTests, ChipKindDetectorTests, BareNameNormalizerTests); View tests (ToolApprovalCardTests, AskUserCardTests, EnterKeySendTests, RestoreButtonTests, TurnUndoTrackerTests, SlashRegistryTests, SlashPopupTests, InlineChipModelTests, InlineChipFieldTests, ChipPillFactoryTests, ChipDisplayOverrideTests, ApproveFlowTests, ResponseTagInlinerTests, ResponseTagPillTests, MixedParagraphRendererTests, NewSessionTests, TokenResetTests, SelectionSummaryTests, NormalizationPipelineTests, Markdown/Mermaid render tests, ChatLinkifyTests)
 
-## TDD Scenarios (для Developer)
+## TDD Scenarios (for Developer)
 
 ### Phase 0: TCP Skeleton
 1. **test_tcp_connect**: client connects → connection established
@@ -839,7 +845,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 1. **test_get_hierarchy_returns_text**: call tool → text tree returned
 2. **Test_Serialize_FormatsCorrectly**: scene objects → text format
 
-## Review Checklist (для Reviewer)
+## Review Checklist (for Reviewer)
 
 - [ ] Token efficiency: text format, not JSON
 - [ ] Thread safety: Unity API only on main thread
@@ -948,7 +954,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 **NUnit Test Count (v0.44.0)**
 - **Total: 3945 EditMode + PlayMode** (was 3912), +33 new tests (12 LevelUp + 9 Config + 12 misc)
 - **Green: 3945** (5 pre-existing reds, same as v0.42.0)
-- **Python pytest: 2606** (was 2597, +9 config merger tests)
+- **Python pytest: 2784** (current count; see CLAUDE.md for exact command)
 
 ## Related
 

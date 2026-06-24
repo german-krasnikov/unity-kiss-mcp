@@ -31,11 +31,7 @@ The installer adds `~/.kimi-code/bin` to PATH via `~/.zshrc` (macOS) or `~/.bash
 
 ### Install Python Server
 
-```bash
-git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
-cd unity-kiss-mcp
-python install.py setup
-```
+The Python MCP server runs on-demand via `uvx` — no installation needed. The setup wizard will auto-discover it.
 
 ### Add Plugin to Unity
 
@@ -53,18 +49,61 @@ Opens a browser for OAuth authorization. Credentials are stored in `~/.kimi-code
 
 ### Configure Kimi (Automatic)
 
-Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Select **Kimi** and follow the prompts.
+Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Select **Kimi** and follow the prompts. The wizard will write `~/.kimi-code/mcp.json` automatically.
 
 **Manual configuration:**
 
+Create or edit `~/.kimi-code/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "unity-mcp": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server", "unity-mcp"],
+      "env": { "UNITY_MCP_PORT": "9500" }
+    }
+  }
+}
+```
+
+Kimi will read this file automatically on the next startup.
+
+<details>
+<summary><b>Alternative: Manual Installation (git clone)</b></summary>
+
+```bash
+git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
+cd unity-kiss-mcp
+python install.py setup
+```
+
+This clones the repository locally, creates a Python venv, and installs dependencies. After setup, verify:
+
+```bash
+uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help
+```
+
+Then configure your AI tool:
+
 ```bash
 python install.py configure --tool kimi
+# Or project-scoped:
+python install.py configure --tool kimi --project-dir /path/to/unity/project
 ```
+
+Verify installation:
+
+```bash
+python install.py doctor
+```
+
+</details>
 
 ## 3. Use From the Editor (Primary Workflow)
 
 1. Open Unity and wait for `[MCP] Server started on port <XXXX>` in the Console.
-2. Open **Window → MCP Chat**.
+2. Open **MCP → Chat**.
 3. Select **Kimi** from the backend dropdown.
 4. Choose a model from the dropdown (K2.7 Code is the default).
 5. Type a prompt and press Send.
@@ -103,9 +142,7 @@ kimi -p "<prompt>" --output-format stream-json [--model <id>]
 
 ## 5. Verify Installation
 
-```bash
-python install.py doctor
-```
+Open the **Setup Wizard** in Unity (**MCP → Setup Wizard**) and select **Diagnostics**.
 
 Or check manually:
 
@@ -131,8 +168,8 @@ Expected: NDJSON stream with `role:assistant` content, followed by `role:meta` l
 |---------|-----|
 | `kimi: command not found` | Restart terminal; verify `~/.kimi-code/bin` is in PATH (`echo $PATH`) |
 | Setup Wizard doesn't run in Unity | (1) Check plugin is in Package Manager. (2) Close/reopen Unity. (3) Check Console for errors. |
-| `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or `git clone` and setup manually. |
+| MCP server fails to start | Run Setup Wizard → Diagnostics to verify Python 3.10+ and TCP port availability. |
 | `Model "X" is not configured` | Plugin auto-provisions K2.7 Code, K2.6, K2.5. For custom models, add `[models."X"]` to `~/.kimi-code/config.toml`. |
 | Chat connects then immediately disconnects | Check `~/.kimi-code/logs/kimi-code.log` for errors. Verify `~/.kimi-code/mcp.json` exists and is valid JSON. |
 | Binary not found in Chat Settings but works in terminal | Terminal sources `~/.zshrc` but Unity doesn't. Override manually: **Settings > Agent Chat > Kimi Binary Path** — enter absolute path. |
-| Tools fail with "Connection refused" | Ensure Unity is open and TCP port is listening. Check `python install.py doctor`. |
+| Tools fail with "Connection refused" | Ensure Unity is open and TCP port is listening. Run Setup Wizard → Diagnostics. |

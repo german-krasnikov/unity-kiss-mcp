@@ -575,3 +575,32 @@ async def test_plugin_tool_csv_roundtrip():
     finally:
         srv._disabled_tools_cache = orig
         srv._refresh_tools_lock = orig_lock
+
+
+# --- Item 1: empty disabled=set() must not be treated as falsy ---
+
+async def test_filter_tools_empty_disabled_set():
+    """disabled=set() must not skip subtraction (empty set is falsy but NOT None)."""
+    from unity_mcp.server_filtering import filter_tools
+    import unity_mcp.tools.gating as gating
+    gating.reset()
+    tools = [_tool("screenshot"), _tool("get_hierarchy")]
+    # With empty set, nothing should be hidden, but the branch still must execute.
+    result = filter_tools(tools, set())
+    names = {t.name for t in result}
+    assert "screenshot" in names, "empty disabled set must not hide screenshot"
+    assert "get_hierarchy" in names, "empty disabled set must not hide get_hierarchy"
+    gating.reset()
+
+
+async def test_filter_tools_disabled_set_hides_non_force_visible():
+    """Tool in disabled set and NOT in FORCE_VISIBLE must be hidden."""
+    from unity_mcp.server_filtering import filter_tools
+    import unity_mcp.tools.gating as gating
+    gating.reset()
+    tools = [_tool("screenshot"), _tool("get_hierarchy")]
+    result = filter_tools(tools, {"screenshot"})
+    names = {t.name for t in result}
+    assert "screenshot" not in names, "disabled non-FORCE_VISIBLE tool must be hidden"
+    assert "get_hierarchy" in names, "non-disabled tool must remain visible"
+    gating.reset()

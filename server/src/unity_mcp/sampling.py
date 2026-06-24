@@ -204,3 +204,7 @@ class SamplingService:
         if result:
             await _record_async(feature)
         return result
+
+
+# Module-level singleton — all instances are equivalent (semaphore is classvar)
+sampling_service = SamplingService()

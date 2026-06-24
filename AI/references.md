@@ -3,7 +3,7 @@
 ## Overview
 Track and remap ObjectReferences within scenes. Provides outgoing reference analysis, reverse search, and automatic/explicit remapping.
 
-## Architecture (для Architect)
+## Architecture (for Architect)
 - `ReferenceHelper.cs` (374 lines) — Core reference traversal and remapping logic
 - Three entry points: `GetReferences` (outgoing), `FindReferencesTo` (reverse), `RemapReferences` (mutate)
 - Data flow:
@@ -15,7 +15,7 @@ Track and remap ObjectReferences within scenes. Provides outgoing reference anal
 - Cycle protection: `HashSet<int> visited` tracks processed objects
 - Constraints: MAX_SCAN = 5000 objects, MAX_ARRAY = 100 array elements per field
 
-## Implementation Notes (для Developer)
+## Implementation Notes (for Developer)
 
 **Data storage:**
 - RefEntry is struct, not persisted — generated on-the-fly during traversal
@@ -36,6 +36,13 @@ Track and remap ObjectReferences within scenes. Provides outgoing reference anal
 - Deleted objects in refMap → shows "MISSING" status in output
 - Multi-level arrays → flattened iteration, reported as ArrayPath[index]
 
+**MCP Tools:**
+- `references(action, path, children, depth, source, target, mappings)` — outgoing/reverse/remap reference analysis
+- `validate_references(path, depth, verbose, ignore_optional)` — deep ObjectReference integrity check
+  - `verbose=true` includes [OK] lines (off by default to save tokens)
+  - `ignore_optional=true` skips [Optional]-marked fields (reduces noise)
+  - **RefManager internals:** $a–$zz token ring (702 slots) for reference caching
+
 **API (Python tools / C# commands):**
 ```
 get_references(path, children=false, depth=1)
@@ -55,7 +62,7 @@ set_property enhancement:
 ```
 
 ## Code Locations
-- Python: `server/src/unity_mcp/tools/advanced.py` (`references`, `validate_references`)
+- Python: `server/src/unity_mcp/tools/batch.py` (`references`, `validate_references`)
 - C#: `unity-plugin/Editor/ReferenceHelper.cs`
 - C# Router: `unity-plugin/Editor/CommandRouter.cs` (consolidated action dispatch via `ExecReferencesConsolidated`)
 - C# ObjectManager: `unity-plugin/Editor/ObjectManager.cs` (set_property enhanced)
@@ -63,7 +70,7 @@ set_property enhancement:
 - Tests Python: `server/tests/test_server_references.py` (15 tests)
 - Tests C#: `unity-test-project/Assets/Tests/Editor/MCPReferenceTests.cs` (19 tests)
 
-## TDD Scenarios (для Developer)
+## TDD Scenarios (for Developer)
 
 ### Red Phase (write failing tests first)
 1. **get_references from object with single field ref**: Input path, depth=1 → expect RefEntry for each field containing ObjectReference
@@ -90,7 +97,7 @@ set_property enhancement:
 - Cache relation type detection (child vs external vs asset)
 - Consider batch entry point for multiple source paths
 
-## Review Checklist (для Reviewer)
+## Review Checklist (for Reviewer)
 - [ ] Security: Undo.RecordObject called before mutations
 - [ ] Performance: MAX_SCAN and MAX_ARRAY limits prevent hangs on large scenes/arrays
 - [ ] Token efficiency: RefEntry struct serialized compactly, minimal output

@@ -440,14 +440,15 @@ def test_workflow_fsm_resets_on_read(mw):
 # ─── F08: strip_defaults in wrap_send ────────────────────────────────────────
 
 async def test_wrap_send_strips_defaults_for_get_component():
-    """position (0,0,0) and mass:1 stripped; localPosition (5,3,0) kept."""
+    """position (0,0,0) stripped; mass:1 kept (not a Unity internal field); localPosition kept."""
+    # Item 22: "mass: 1" is a user-facing field — NOT stripped. Only "m_mass: 1" is stripped.
     raw = "[Transform]\nposition: (0, 0, 0)\nlocalPosition: (5, 3, 0)\n[Rigidbody]\nmass: 1\n"
     mw = Middleware()
     fake_send = AsyncMock(return_value=raw)
     wrapped = wrap_send(fake_send, mw)
     result = await wrapped("get_component", {"path": "/A", "type": ""})
     assert "position: (0, 0, 0)" not in result
-    assert "mass: 1" not in result
+    assert "mass: 1" in result
     assert "localPosition: (5, 3, 0)" in result
 
 
@@ -898,3 +899,30 @@ async def test_write_command_drops_negative_path_cache():
     wrapped = wrap_send(send_fn, mw)
     await wrapped("create_object", {"name": "Ghost"})
     assert mw._negative_path_cache == {}
+
+
+# ── Item 9: reset_session must cancel bg tasks ─────────────────────────────
+
+
+async def test_reset_session_cancels_bg_tasks():
+    """reset_session must cancel asyncio tasks before clearing _bg_tasks.
+
+    Bug: old code called self._bg_tasks.clear() which drops references but
+    leaves the asyncio tasks running (uncancelled) in the event loop.
+    """
+    import asyncio as _asyncio
+    mw = Middleware()
+
+    # Create a real long-running task and register it
+    async def long_running():
+        await _asyncio.sleep(9999)
+
+    task = _asyncio.ensure_future(long_running())
+    mw._bg_tasks.add(task)
+
+    mw.reset_session()
+
+    # Give event loop one cycle to process the cancellation
+    await _asyncio.sleep(0)
+
+    assert task.cancelled(), "reset_session must cancel bg tasks, not just drop references"

@@ -1175,6 +1175,33 @@ async def test_t3_production_fallback_returns_none_on_tcp_error():
     assert result is None, f"TCP error must return None, got: {result!r}"
 
 
+# ── Item 28: T3 skipped when main_dead=True ───────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_item28_t3_skipped_when_main_dead():
+    """Item 28: when main_dead=True, T3 (sync) must NOT be called — reload mini-server
+    doesn't support 'sync' and would return 'unknown command'."""
+    async def dead_main(cmd, args=None):
+        raise ConnectionError("main dead")
+
+    sync_called = False
+
+    async def reload_send(cmd, args=None):
+        nonlocal sync_called
+        if cmd == "sync":
+            sync_called = True
+            return "unknown command"
+        if cmd == "diagnose":
+            return _diag_frozen(MVID_A)
+        if cmd == "execute_code":
+            return "False"  # guard not locked
+        return "ok"
+
+    result = await _ladder.run_ladder(dead_main, send_reload=reload_send)
+
+    assert not sync_called, "T3 sync must NOT be called when main_dead=True"
+
+
 # ── T5 max_polls=None ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio

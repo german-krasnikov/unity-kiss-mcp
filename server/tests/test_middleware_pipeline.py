@@ -1,6 +1,80 @@
 """Tests for wrap_send dict-response extraction — specifically the file+data path."""
-from unittest.mock import AsyncMock
+import os
+from unittest.mock import AsyncMock, patch
 from unity_mcp.middleware_pipeline import wrap_send
+
+
+# ── Item 2: guards see ORIGINAL cmd, speculation sees REROUTED cmd ────────────
+
+async def test_guards_see_original_cmd_before_reroute(monkeypatch):
+    """check_blast_radius must receive the original cmd, NOT the rerouted one.
+
+    Scenario: reroute_cmd renames 'set_property' → 'set_runtime_property' in play mode.
+    Guards must still evaluate 'set_property' (the original intent), not the rerouted name.
+    """
+    monkeypatch.setenv("UNITY_MCP_VALIDATE", "0")
+    monkeypatch.setenv("UNITY_MCP_REFLECT", "0")
+    monkeypatch.setenv("UNITY_MCP_PREFETCH_CACHE", "0")
+
+    from unity_mcp.middleware import Middleware, wrap_send as mw_wrap_send
+
+    mw = Middleware()
+    mw.known_paths.add("/P")
+    mw.is_playing = True  # triggers reroute set_property → set_runtime_property
+
+    blast_received = []
+    original_blast = mw.check_blast_radius
+
+    def capturing_blast(cmd):
+        blast_received.append(cmd)
+        return original_blast(cmd)
+
+    mw.check_blast_radius = capturing_blast
+
+    async def fake_send(cmd, args, timeout=30.0):
+        return "ok"
+
+    wrapped = mw_wrap_send(fake_send, mw)
+    await wrapped("set_property", {"path": "/P", "prop": "x", "value": "1"})
+
+    assert blast_received, "check_blast_radius was never called"
+    assert blast_received[0] == "set_property", (
+        f"Guards must see original 'set_property', got '{blast_received[0]}'"
+    )
+
+
+async def test_speculation_sees_rerouted_cmd(monkeypatch):
+    """speculation.record_actual_next must receive the rerouted cmd, not the original.
+
+    Speculation tracks what was ACTUALLY sent to Unity — after rerouting.
+    """
+    monkeypatch.setenv("UNITY_MCP_VALIDATE", "0")
+    monkeypatch.setenv("UNITY_MCP_REFLECT", "0")
+    monkeypatch.setenv("UNITY_MCP_PREFETCH_CACHE", "0")
+
+    from unittest.mock import MagicMock
+    from unity_mcp.middleware import Middleware, wrap_send as mw_wrap_send
+
+    mw = Middleware()
+    mw.known_paths.add("/P")
+    mw.is_playing = True  # triggers reroute set_property → set_runtime_property
+
+    recorded = []
+    spec = MagicMock()
+    spec.record_actual_next.side_effect = lambda cmd: recorded.append(cmd)
+    spec.maybe_prefetch = AsyncMock(side_effect=lambda cmd, args, result: result)
+    mw.speculation = spec
+
+    async def fake_send(cmd, args, timeout=30.0):
+        return "ok"
+
+    wrapped = mw_wrap_send(fake_send, mw)
+    await wrapped("set_property", {"path": "/P", "prop": "x", "value": "1"})
+
+    assert recorded, "record_actual_next was never called"
+    assert recorded[0] == "set_runtime_property", (
+        f"Speculation must see rerouted 'set_runtime_property', got '{recorded[0]}'"
+    )
 
 
 async def test_wrap_send_file_and_data_combined():

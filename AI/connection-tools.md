@@ -1,0 +1,225 @@
+# Connection Tools & Diagnostics
+
+TCP connection management, port discovery, health checks.
+
+## Tools
+
+### list_connections()
+
+**Read-only.** Show current TCP slot status.
+
+```python
+await list_connections()
+# → "port 9500 (connected)" or "port 9500 (disconnected)"
+```
+
+**Returns:** Single-line status string with port + connection state.
+
+---
+
+### reconnect_unity(port: int = 0)
+
+**Write-idempotent.** Reconnect to Unity via TCP.
+
+```python
+# Auto-discover port from ~/.unity-mcp/ports/*.port
+await reconnect_unity()
+
+# Manual port
+await reconnect_unity(port=9500)
+```
+
+**Port discovery waterfall:**
+1. Explicit `port` param (if > 0)
+2. `UNITY_MCP_PORT` env var
+3. First live `.port` file in `~/.unity-mcp/ports/`
+4. Default: 9500
+
+**Returns:** Connection status message or error.
+
+---
+
+### doctor(fix: bool = False)
+
+**Read-only / Write-idempotent.** Health diagnostics with optional auto-fix.
+
+```python
+# Diagnosis only
+result = await doctor()
+
+# Auto-fix stale port files, retry connection
+result = await doctor(fix=True)
+```
+
+**5 Checks:**
+
+| Check | Tests | Auto-fix? |
+|-------|-------|-----------|
+| `python_version` | Python ≥ 3.10 | ❌ Manual: Install Python 3.10+ |
+| `port_file` | ~/.unity-mcp/ports/*.port exist + PIDs alive | ✅ Remove stale files, signal if none live |
+| `lockfile` | ~/.unity-mcp/*.lock holds live PID | ✅ Clean stale files |
+| `tcp_connection` | 127.0.0.1:port reachable + responds to heartbeat | ⚠️ Reconnect attempt only |
+| `unity_state` | Editor.log accessible + recent activity | ⚠️ Diagnose compile/domain-reload wedge |
+
+**Returns:** Formatted report with summary + details.
+
+---
+
+## Port Discovery Waterfall
+
+**Problem:** Multiple Unity instances running simultaneously.
+
+**Solution:**
+1. Read `UNITY_MCP_PORT` environment variable (set by setup wizard)
+2. Scan `~/.unity-mcp/ports/{PID}.port` files (one per running instance)
+3. Check each file: `{port}\n{timestamp}\n{session_id}`
+4. Verify PID alive via `/proc/{PID}` (Linux) or `ps` (macOS) or WMI (Windows)
+5. Fall back to default 9500
+
+**Manual discovery:**
+
+```bash
+# List all running instance ports
+ls -la ~/.unity-mcp/ports/
+
+# Check single instance (macOS)
+python3 -c "
+import json,pathlib,os
+port=int(os.environ.get('UNITY_MCP_PORT','0'))
+if not port:
+    for p in pathlib.Path.home().glob('.unity-mcp/ports/*.port'):
+        try: port=int(p.read_text().split('\n')[0]); break
+        except: pass
+print(port or 9500)
+"
+```
+
+---
+
+## Troubleshooting Cheatsheet
+
+### "No connections"
+
+1. **Is Unity running?**
+   ```bash
+   lsof -i :9500  # check port bound
+   ```
+
+2. **Plugin installed?**
+   - Open Unity → `MCP → Setup Wizard` → confirm plugin loaded
+   - Check `Assets/Plugins/UnityMCP/` exists in project
+
+3. **Port file stale?**
+   ```bash
+   doctor(fix=True)  # auto-clean
+   ```
+
+4. **Firewall blocking?**
+   ```bash
+   # Test socket locally (127.0.0.1 only)
+   python3 -c "
+   import socket
+   s = socket.socket(); s.connect(('127.0.0.1', 9500))
+   print('OK'); s.close()
+   "
+   ```
+
+### "Connected but commands hang"
+
+1. **Check compile errors:**
+   ```python
+   await get_compile_errors()
+   ```
+
+2. **Check domain reload:**
+   ```python
+   await get_console(severity='error')
+   ```
+
+3. **Force reconnect with backoff:**
+   ```python
+   await reconnect_unity(port=9500)  # retries up to 3x
+   ```
+
+### "Stale assembly / tests fail but compile clean"
+
+1. **Unity using cached DLL?**
+   - Bump `package.json` version → forces reload
+   - Or: Editor → `⌘R` (macOS) or `Ctrl+Shift+R` (Windows)
+
+2. **Run compile check before tests:**
+   ```python
+   await run_tests(mode="EditMode")  # FAST gate
+   ```
+
+### "Reconnect spam (9 failed attempts)"
+
+**Root cause:** PID file alive but editor crashed → socket orphaned.
+
+**Fix:**
+```bash
+# Manual cleanup
+rm ~/.unity-mcp/ports/{PID}.port
+rm ~/.unity-mcp/{PID}.lock
+# Then:
+open -a Unity  # restart editor
+```
+
+Or auto:
+```python
+await doctor(fix=True)  # removes stale files
+await reconnect_unity()
+```
+
+### "Multiple Unity instances, wrong port"
+
+1. **Set explicitly:**
+   ```bash
+   export UNITY_MCP_PORT=9501
+   ```
+
+2. **Or discover by project name:**
+   ```bash
+   # Lists all active instances with ports
+   ls -la ~/.unity-mcp/ports/
+   cat ~/.unity-mcp/ports/{PID}.port  # see port
+   ```
+
+3. **Then reconnect:**
+   ```python
+   await reconnect_unity(port=9501)
+   ```
+
+---
+
+## Connection Slot Architecture
+
+**Single ConnectionSlot per MCP session:**
+- Maintains TCP socket to one Unity instance
+- Auto-reconnect on disconnect (5s backoff, max 60s)
+- Heartbeat every 30s to detect stale connections
+- Graceful shutdown: closes socket + cleanup on MCP exit
+
+**Blocking behavior:** All MCP tool calls block on socket I/O (TCP call-response).
+
+**Timeout:** Default 30s per command (configurable via `UNITY_MCP_TIMEOUT`).
+
+---
+
+## Integration with Tools
+
+**Every tool uses `list_connections()` implicitly:**
+- CORE tools check connection before executing
+- Disconnected state → auto-reconnect attempt
+- 3 failed attempts → raise ToolError (user must `reconnect_unity()` explicitly)
+
+**Force-reconnect in scripts:**
+
+```python
+await reconnect_unity(port=0)  # auto-discover
+result = await get_hierarchy()  # now connected
+```
+
+---
+
+**See also:** CLAUDE.md § "Run MCP server", `.claude/skills/reload-recovery.md` (domain reload strategy).

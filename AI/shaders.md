@@ -13,6 +13,9 @@ Consolidated `shader` MCP tool with 7 actions for ShaderLab code shaders, Shader
 ## Implementation Notes (for Developer)
 - **Shader Graph has NO public C# API** for graph structure — must parse MultiJson format directly
 - **MultiJson format**: multiple JSON blocks separated by `\n\n`, each with `m_Type`, `m_ObjectId`, `m_SGVersion`
+  - Example: `{ "m_ObjectId": "12345", "m_Type": "UnityEditor.Graphing.Edge", "m_Properties": {...} }\n\n{ "m_ObjectId": "12346", "m_Type": "UnityEditor.Graphing.Node", ... }`
+  - GraphData block is first (type=GraphData), contains arrays of node/edge/property IDs
+  - Each node/edge/property is separate JSON block with matching m_ObjectId
 - **GraphData root block**: contains `m_Nodes`, `m_Edges`, `m_Properties` arrays referencing other blocks by ID
 - `Create` for .shadergraph copies from Unity's package templates (`Library/PackageCache/com.unity.shadergraph*`)
 - `AssetDatabase.ImportAsset` wrapped in try/catch for node/edge edits (incomplete slot blocks cause warnings)
@@ -21,7 +24,7 @@ Consolidated `shader` MCP tool with 7 actions for ShaderLab code shaders, Shader
 - **JSON unescape** (Phase 20f): Custom shader code in `create` action requires JSON unescape (`\"` → `"`, `\\` → `\`, `\n` → newline, etc.) via new `UnescapeJsonString` method in CommandRouter
 - **RemoveNode multi-line** (Phase 20f): ShaderGraphHelper.RemoveNode now uses `ParseJsonObjects` to handle multi-line JSON format in .shadergraph files instead of single-line string.Replace
 
-### Actions
+### Actions (Shader Tool)
 | Action | Helper | Description |
 |--------|--------|-------------|
 | get | ShaderSerializer | Read shader properties (from scene object or asset path) |
@@ -32,9 +35,19 @@ Consolidated `shader` MCP tool with 7 actions for ShaderLab code shaders, Shader
 | graph_node | ShaderGraphHelper | Add/remove node in .shadergraph |
 | graph_edge | ShaderGraphHelper | Add/remove edge in .shadergraph |
 
+### Material Tool (MaterialHelper)
+| Action | Description |
+|--------|-------------|
+| create | Create new Material asset from shader template (default: Standard) |
+| get | Read material properties (from asset path or scene object) |
+| set | Set material property (Color, Float, Texture, Vector, Int) |
+| copy | Copy material to new asset (with property preservation) |
+| list_properties | Enumerate all properties of a material |
+
 ## Code Locations
-- Python: `server/src/unity_mcp/tools/advanced.py` (shader tool)
+- Python: `server/src/unity_mcp/tools/ui.py` (shader tool)
 - C#: `unity-plugin/Editor/ShaderSerializer.cs`, `ShaderHelper.cs`, `ShaderGraphHelper.cs` (331 lines)
+- C# Material: `unity-plugin/Editor/MaterialHelper.cs` — 5 actions (create, get, set, copy, list_properties)
 - Router: `unity-plugin/Editor/CommandRouter.cs` (1053 lines, ExecShaderConsolidated + UnescapeJsonString)
 - Tests: `server/tests/test_server_shader.py` (22), `unity-test-project/Assets/Tests/Editor/MCPShaderTests.cs` (41 tests incl. 2 regression)
 

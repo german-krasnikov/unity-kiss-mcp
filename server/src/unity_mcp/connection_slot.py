@@ -2,12 +2,13 @@
 import asyncio
 from typing import Optional
 from .bridge import UnityBridge
+from .constants import DEFAULT_PORT
 
 
 class ConnectionSlot:
     def __init__(self, port_discoverer=None, on_port_change=None):
         self._bridge: Optional[UnityBridge] = None
-        self._port: int = 9500
+        self._port: int = DEFAULT_PORT
         self._host: str = "127.0.0.1"
         self._reconnect_callbacks: list = []
         self._port_discoverer = port_discoverer

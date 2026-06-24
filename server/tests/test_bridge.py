@@ -1060,8 +1060,9 @@ async def test_heartbeat_hard_deadline_latches_grace_expired():
         original = _bh.HARD_DEADLINE_S
         _bh.HARD_DEADLINE_S = 0.001
         try:
-            # Simulate enough elapsed time by moving reconnect_started_at far back
+            # Simulate enough elapsed time by moving deadline clocks far back
             bridge._reconnect_started_at = _time.monotonic() - 1.0
+            bridge._hard_deadline_started_at = _time.monotonic() - 1.0
             with patch("asyncio.sleep", new=_AsyncMock(return_value=None)):
                 # One tick should latch the deadline
                 await bridge._heartbeat_tick(interval=0.01)
@@ -1191,3 +1192,46 @@ def test_should_retry_busy_delay_sequence():
         ok, delay, reason = bridge.should_retry(err, attempt, deadline)
         assert ok is True, f"attempt {attempt}: expected retry=True"
         assert delay == exp_delay, f"attempt {attempt}: expected delay={exp_delay}, got {delay}"
+
+
+# ── Item 3: _send_with_retry exhausted must raise RuntimeError, not return None ─
+
+async def test_send_with_retry_exhausted_raises():
+    """Retry loop exiting with result=None must raise RuntimeError, not return None.
+
+    Path: every attempt throws + do_retry=True → attempt increments past MAX_RETRIES
+    → while-loop exits → hits `return result` with result=None.
+    Fix: replace that line with `raise RuntimeError(...)`.
+    """
+    import unity_mcp.bridge as bmod
+
+    bridge = UnityBridge(probe=make_idle_probe())
+    writer = make_writer()
+    bridge._reader = AsyncMock()
+    bridge._writer = writer
+    bridge._writer.is_closing = Mock(return_value=False)
+
+    header = struct.pack("!I", 2)
+    payload = b"{}"
+
+    async def fake_reconnect(fire_callbacks=True):
+        bridge._reader = AsyncMock()
+        bridge._writer = writer
+
+    async def no_sleep(delay):
+        pass  # skip actual sleep to keep test fast
+
+    # Force do_retry=True so attempt increments past MAX_RETRIES, exiting while loop
+    # with result still None — the buggy `return result` returns None; fix raises RuntimeError.
+    with patch.object(bmod, "MAX_RETRIES", 1):
+        with patch("unity_mcp.bridge.asyncio.sleep", side_effect=no_sleep):
+            with patch.object(bridge, "_reconnect", side_effect=fake_reconnect):
+                with patch.object(bridge, "_read_response",
+                                  side_effect=ConnectionError("persistent fail")):
+                    with patch.object(bridge, "should_retry",
+                                      return_value=(True, 0.0, "domain_reload")):
+                        with pytest.raises((RuntimeError, ConnectionError)):
+                            await bridge._send_with_retry(
+                                "ping", header, payload, "0001", 5.0,
+                                asyncio.get_event_loop().time() + 30.0
+                            )

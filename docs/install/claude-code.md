@@ -39,19 +39,12 @@ claude --version
 
 ### Install Python Server
 
-The easiest way is via `uvx` (no installation needed):
+The Python MCP server runs on-demand via `uvx` — no installation needed. The setup wizard will auto-discover it.
+
+You can optionally verify it works:
 
 ```bash
-# Test that uvx can run the server (optional)
 uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help
-```
-
-Or clone and setup manually:
-
-```bash
-git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
-cd unity-kiss-mcp
-python install.py setup
 ```
 
 ### Add Plugin to Unity
@@ -79,28 +72,57 @@ Open Unity, then open the **Setup Wizard** via **MCP → Setup Wizard** menu. Se
 
 **Manual configuration** (if wizard fails):
 
-```bash
-# From the repository root
-python install.py configure --tool claude-code
-```
-
-This adds the unity-mcp server to your Claude Code `mcp_settings.json` file:
+Edit your Claude Code `mcp_settings.json` file (usually `~/.config/claude/mcp_settings.json` on macOS/Linux or `%APPDATA%\Anthropic\Claude\mcp_settings.json` on Windows) and add:
 
 ```json
 {
   "mcpServers": {
     "unity-mcp": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server", "unity-mcp"]
+      "args": ["--from", "git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server", "unity-mcp"],
+      "env": { "UNITY_MCP_PORT": "9500" }
     }
   }
 }
 ```
 
+Save the file, then restart Claude Code.
+
+<details>
+<summary><b>Alternative: Manual Installation (git clone)</b></summary>
+
+```bash
+git clone https://github.com/german-krasnikov/unity-kiss-mcp.git
+cd unity-kiss-mcp
+python install.py setup
+```
+
+This clones the repository locally, creates a Python venv, and installs dependencies. After setup, verify:
+
+```bash
+uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help
+```
+
+Then configure your AI tool:
+
+```bash
+python install.py configure --tool claude-code
+# Or project-scoped:
+python install.py configure --tool claude-code --project-dir /path/to/unity/project
+```
+
+Verify installation:
+
+```bash
+python install.py doctor
+```
+
+</details>
+
 ## 4. Use Claude Code From the Editor (Primary Workflow)
 
 1. Open Unity and wait for `[MCP] Server started on port <XXXX>` in the Console.
-2. Open **Window → MCP Chat**.
+2. Open **MCP → Chat**.
 3. Select **Claude** from the backend dropdown.
 4. Type a prompt and press Enter.
 
@@ -137,27 +159,27 @@ For each turn, the plugin:
 
 ## 6. Verify Installation
 
-```bash
-python install.py doctor
-```
+Open the **Setup Wizard** in Unity (**MCP → Setup Wizard**) and select **Diagnostics**. It will check:
 
-This checks:
 - Python >= 3.10
-- uv and uvx executables in PATH
-- git in PATH
-- `.venv` exists and `unity_mcp` is importable
-- Claude Code, Claude Desktop, Cursor, Windsurf, and Codex configs (if they exist)
-- TCP port connectivity to Unity (9500 or auto-discovered port)
+- TCP port connectivity to Unity
+- MCP server responsiveness
+- Plugin installation
+
+Alternatively, call the `doctor` tool from Claude Code:
+
+```
+@claude-code doctor
+```
 
 ## 7. Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
 | `claude: command not found` | Ensure Claude Code is installed and in PATH. Check `which claude` or `where.exe claude`. |
-| `ModuleNotFoundError: unity_mcp` | Run `python install.py setup` or `uvx --from git+https://github.com/german-krasnikov/unity-kiss-mcp.git#subdirectory=server unity-mcp --help` to verify. |
+| MCP server fails to start | Run Setup Wizard → Diagnostics. Check that Python 3.10+ is available and TCP port 9500 is free. |
 | Setup Wizard doesn't open in Unity | (1) Verify plugin is in Package Manager. (2) Close and reopen Unity. (3) Check Console for errors. |
 | MCP tools don't appear in Claude Code | (1) Confirm Setup Wizard configured Claude Code. (2) Restart Claude Code. (3) Check Console for MCP connection errors. |
-| Tools fail with "Connection refused" | (1) Ensure Unity is open with the plugin. (2) Check TCP port with `python install.py doctor`. (3) Restart Unity. |
+| Tools fail with "Connection refused" | (1) Ensure Unity is open with the plugin. (2) Run Setup Wizard → Diagnostics to check TCP port. (3) Restart Unity. |
 | Python path resolution fails in Chat Settings | Override manually: **Settings > Agent Chat > Claude Binary Path** — enter absolute path to `claude` binary. |
-| macOS quarantine error (`cannot open` libpydantic) | Remove quarantine attributes: `xattr -dr com.apple.quarantine <project_root>/server/.venv/lib` |
 

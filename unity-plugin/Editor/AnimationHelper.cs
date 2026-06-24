@@ -11,7 +11,23 @@ namespace UnityMCP.Editor
     {
         private static readonly string[] Vec3Suffixes = { ".x", ".y", ".z" };
 
-        public static string CreateClip(string path, string clipName, string property, string keysStr)
+        private static Type ResolveComponentType(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName)) return typeof(Transform);
+            // Check common Unity types first
+            var unityType = Type.GetType($"UnityEngine.{typeName}, UnityEngine")
+                ?? Type.GetType($"UnityEngine.{typeName}, UnityEngine.CoreModule");
+            if (unityType != null) return unityType;
+            // Full type name or Assembly-CSharp
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var t = asm.GetType(typeName, throwOnError: false);
+                if (t != null) return t;
+            }
+            throw new ArgumentException($"Component type not found: {typeName}");
+        }
+
+        public static string CreateClip(string path, string clipName, string property, string keysStr, string componentType = null)
         {
             var go = ComponentSerializer.FindObject(path);
             if (go == null) throw new InvalidOperationException(ErrorHelper.ObjectNotFound(path));
@@ -21,7 +37,7 @@ namespace UnityMCP.Editor
             clip.frameRate = 60;
 
             if (!string.IsNullOrEmpty(keysStr))
-                SetCurvesFromKeys(clip, property, keysStr);
+                SetCurvesFromKeys(clip, property, keysStr, ResolveComponentType(componentType));
 
             // Save as asset
             var assetPath = SaveClipAsset(clip, clipName);
@@ -43,7 +59,7 @@ namespace UnityMCP.Editor
             return $"created: {clipName} | {clip.length.ToString("F1", CultureInfo.InvariantCulture)}s | {bindings.Length} curves | saved: {assetPath}";
         }
 
-        public static string EditClip(string path, string clipName, string action, string property, string keysStr)
+        public static string EditClip(string path, string clipName, string action, string property, string keysStr, string componentType = null)
         {
             var go = ComponentSerializer.FindObject(path);
             if (go == null) throw new InvalidOperationException(ErrorHelper.ObjectNotFound(path));
@@ -53,20 +69,21 @@ namespace UnityMCP.Editor
 
             Undo.RecordObject(clip, "Edit Animation");
 
+            var compType = ResolveComponentType(componentType);
             switch (action)
             {
                 case "edit":
                 case "add_key":
-                    AddKeys(clip, property, keysStr);
+                    AddKeys(clip, property, keysStr, compType);
                     break;
                 case "remove_key":
-                    RemoveKey(clip, property, keysStr);
+                    RemoveKey(clip, property, keysStr, compType);
                     break;
                 case "remove_curve":
-                    RemoveCurve(clip, property);
+                    RemoveCurve(clip, property, compType);
                     break;
                 case "set_keys":
-                    SetCurvesFromKeys(clip, property, keysStr);
+                    SetCurvesFromKeys(clip, property, keysStr, compType);
                     break;
                 case "set_loop":
                     var settings = AnimationUtility.GetAnimationClipSettings(clip);
@@ -135,15 +152,16 @@ namespace UnityMCP.Editor
             return keysStr.Contains("(");
         }
 
-        internal static void SetCurvesFromKeys(AnimationClip clip, string property, string keysStr)
+        internal static void SetCurvesFromKeys(AnimationClip clip, string property, string keysStr, Type componentType = null)
         {
+            var type = componentType ?? typeof(Transform);
             var normalized = NormalizeProperty(property);
             if (IsVector3(keysStr))
             {
                 var parsed = ParseVector3Keys(keysStr);
                 for (int axis = 0; axis < 3; axis++)
                 {
-                    var binding = EditorCurveBinding.FloatCurve("", typeof(Transform), $"{normalized}{Vec3Suffixes[axis]}");
+                    var binding = EditorCurveBinding.FloatCurve("", type, $"{normalized}{Vec3Suffixes[axis]}");
                     var curve = new AnimationCurve(parsed[axis]);
                     SmoothAllTangents(curve);
                     AnimationUtility.SetEditorCurve(clip, binding, curve);
@@ -152,7 +170,7 @@ namespace UnityMCP.Editor
             else
             {
                 var keys = ParseFloatKeys(keysStr);
-                var binding = EditorCurveBinding.FloatCurve("", typeof(Transform), normalized);
+                var binding = EditorCurveBinding.FloatCurve("", type, normalized);
                 var curve = new AnimationCurve(keys);
                 SmoothAllTangents(curve);
                 AnimationUtility.SetEditorCurve(clip, binding, curve);
@@ -219,15 +237,16 @@ namespace UnityMCP.Editor
             return part.Substring(vIdx + 2).Trim();
         }
 
-        private static void AddKeys(AnimationClip clip, string property, string keysStr)
+        private static void AddKeys(AnimationClip clip, string property, string keysStr, Type componentType = null)
         {
+            var type = componentType ?? typeof(Transform);
             var normalized = NormalizeProperty(property);
             if (IsVector3(keysStr))
             {
                 var parsed = ParseVector3Keys(keysStr);
                 for (int axis = 0; axis < 3; axis++)
                 {
-                    var binding = EditorCurveBinding.FloatCurve("", typeof(Transform), $"{normalized}{Vec3Suffixes[axis]}");
+                    var binding = EditorCurveBinding.FloatCurve("", type, $"{normalized}{Vec3Suffixes[axis]}");
                     var existing = AnimationUtility.GetEditorCurve(clip, binding) ?? new AnimationCurve();
                     foreach (var k in parsed[axis])
                         existing.AddKey(k);
@@ -237,7 +256,7 @@ namespace UnityMCP.Editor
             else
             {
                 var newKeys = ParseFloatKeys(keysStr);
-                var binding = EditorCurveBinding.FloatCurve("", typeof(Transform), normalized);
+                var binding = EditorCurveBinding.FloatCurve("", type, normalized);
                 var existing = AnimationUtility.GetEditorCurve(clip, binding);
                 if (existing == null) existing = new AnimationCurve();
                 foreach (var k in newKeys)
@@ -246,8 +265,9 @@ namespace UnityMCP.Editor
             }
         }
 
-        private static void RemoveKey(AnimationClip clip, string property, string keysStr)
+        private static void RemoveKey(AnimationClip clip, string property, string keysStr, Type componentType = null)
         {
+            var type = componentType ?? typeof(Transform);
             float time = ParseTimeFromPart(keysStr ?? "t:0");
             var normalized = NormalizeProperty(property);
 
@@ -257,7 +277,7 @@ namespace UnityMCP.Editor
             {
                 foreach (var suffix in Vec3Suffixes)
                 {
-                    var b = EditorCurveBinding.FloatCurve("", typeof(Transform), normalized + suffix);
+                    var b = EditorCurveBinding.FloatCurve("", type, normalized + suffix);
                     var c = AnimationUtility.GetEditorCurve(clip, b);
                     if (c == null) continue;
                     for (int i = 0; i < c.keys.Length; i++)
@@ -269,7 +289,7 @@ namespace UnityMCP.Editor
                 return;
             }
 
-            var binding = EditorCurveBinding.FloatCurve("", typeof(Transform), normalized);
+            var binding = EditorCurveBinding.FloatCurve("", type, normalized);
             var curve = AnimationUtility.GetEditorCurve(clip, binding);
             if (curve == null) return;
             for (int i = 0; i < curve.keys.Length; i++)
@@ -279,18 +299,19 @@ namespace UnityMCP.Editor
             AnimationUtility.SetEditorCurve(clip, binding, curve);
         }
 
-        private static void RemoveCurve(AnimationClip clip, string property)
+        private static void RemoveCurve(AnimationClip clip, string property, Type componentType = null)
         {
+            var type = componentType ?? typeof(Transform);
             var normalized = NormalizeProperty(property);
 
             // Try removing single property
-            var binding = EditorCurveBinding.FloatCurve("", typeof(Transform), normalized);
+            var binding = EditorCurveBinding.FloatCurve("", type, normalized);
             AnimationUtility.SetEditorCurve(clip, binding, null);
 
             // Also try removing .x, .y, .z variants
             foreach (var suffix in Vec3Suffixes)
             {
-                var b = EditorCurveBinding.FloatCurve("", typeof(Transform), normalized + suffix);
+                var b = EditorCurveBinding.FloatCurve("", type, normalized + suffix);
                 AnimationUtility.SetEditorCurve(clip, b, null);
             }
         }

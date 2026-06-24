@@ -247,14 +247,15 @@ def cmd_connect(args: argparse.Namespace, ui) -> int:
     deps = data.setdefault("dependencies", {})
 
     editor_ref = f"file:{editor_path.as_posix()}"
-    if deps.get("com.unity-mcp.editor") == editor_ref:
+    reload_ref = f"file:{reload_path.as_posix()}"
+    if deps.get("com.unity-mcp.editor") == editor_ref and deps.get("com.unity-mcp.reload") == reload_ref:
         ui.ok("Already connected.")
         return 0
 
     shutil.copy2(manifest, manifest.with_suffix(".json.bak"))
 
     deps["com.unity-mcp.editor"] = editor_ref
-    deps["com.unity-mcp.reload"] = f"file:{reload_path.as_posix()}"
+    deps["com.unity-mcp.reload"] = reload_ref
     manifest.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", "utf-8")
     ui.ok(f"Connected to {project_dir.name}. Focus Unity to reload.")
     return 0

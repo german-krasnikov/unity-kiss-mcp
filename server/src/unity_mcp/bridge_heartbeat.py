@@ -94,6 +94,9 @@ class HeartbeatMixin:
             # Track cumulative disconnected time for startup-grace deadline.
             if self._reconnect_started_at is None:
                 self._reconnect_started_at = time.monotonic()
+            # Hard deadline uses a separate clock — set once, never reset while busy.
+            if getattr(self, "_hard_deadline_started_at", None) is None:
+                self._hard_deadline_started_at = time.monotonic()
 
             busy = self._probe_busy()
             if busy:
@@ -102,9 +105,10 @@ class HeartbeatMixin:
             await asyncio.sleep(wait)
 
             elapsed = time.monotonic() - self._reconnect_started_at
+            hard_elapsed = time.monotonic() - self._hard_deadline_started_at
 
             # P7: hard deadline — latches even while busy; prevents eternal reconnect loop.
-            if elapsed > HARD_DEADLINE_S:
+            if hard_elapsed > HARD_DEADLINE_S:
                 self._startup_grace_expired = True
                 if hasattr(self, "_on_unavailable") and self._on_unavailable:
                     self._on_unavailable()

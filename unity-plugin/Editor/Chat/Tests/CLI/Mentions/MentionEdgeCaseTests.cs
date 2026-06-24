@@ -2,6 +2,8 @@
 // Covers boundary conditions not exercised by the main test suites.
 using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
 
@@ -62,23 +64,33 @@ namespace UnityMCP.Editor.Chat.Tests
         [Test]
         public void Popup_ShowThenShowAgain_ReplacesContent()
         {
-            var anchor = new VisualElement();
-            var popup  = new MentionPopup(anchor, _ => { });
+            // MentionPopup loads icons by name — "icon" doesn't exist in test context.
+            // Suppress all icon-load errors for this test.
+            LogAssert.ignoreFailingMessages = true;
+            try
+            {
+                var anchor = new VisualElement();
+                var popup  = new MentionPopup(anchor, _ => { });
 
-            // First show: 3 items, navigate down
-            popup.Show(MakeList(3));
-            popup.MoveDown(); // index → 1
-            Assert.That(popup.SelectedIndex, Is.EqualTo(1));
+                // First show: 3 items, navigate down
+                popup.Show(MakeList(3));
+                popup.MoveDown(); // index → 1
+                Assert.That(popup.SelectedIndex, Is.EqualTo(1));
 
-            // Second show: 2 items → index resets, content replaced
-            popup.Show(MakeList(2));
-            Assert.That(popup.SelectedIndex, Is.EqualTo(0), "SelectedIndex must reset on second Show");
+                // Second show: 2 items → index resets, content replaced
+                popup.Show(MakeList(2));
+                Assert.That(popup.SelectedIndex, Is.EqualTo(0), "SelectedIndex must reset on second Show");
 
-            // Confirm only 2 items: MoveDown twice wraps to 0
-            popup.MoveDown();
-            popup.MoveDown();
-            Assert.That(popup.SelectedIndex, Is.EqualTo(0),
-                "Two MoveDowns on a 2-item popup must wrap back to 0");
+                // Confirm only 2 items: MoveDown twice wraps to 0
+                popup.MoveDown();
+                popup.MoveDown();
+                Assert.That(popup.SelectedIndex, Is.EqualTo(0),
+                    "Two MoveDowns on a 2-item popup must wrap back to 0");
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = false;
+            }
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

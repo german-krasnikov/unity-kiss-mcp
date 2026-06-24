@@ -1,12 +1,11 @@
 """vfx_intent — NL → VFX DSL → particle batch commands."""
 import re
 from typing import Optional
-from ..sampling import SamplingService
-from .intent_common import strip_fences, build_batch_line
+from ..sampling import sampling_service as _sampling
+from .intent_common import strip_fences, build_batch_line, run_intent_pipeline
 from ._annotations import RW as _RW
 
 _send = None
-_sampling: SamplingService = SamplingService()
 
 # 5 built-in presets — bypass Haiku entirely
 _PRESETS: dict[str, dict] = {
@@ -107,26 +106,23 @@ async def vfx_intent(target: str, intent: str, kind: str = "auto", dry_run: bool
     # Preset bypass
     preset = get_preset_config(intent.strip())
     if preset is not None:
-        data = preset
-    else:
-        if kind == "auto":
-            kind = detect_kind(intent)
-        from .intent_common import sanitize_intent
-        prompt = _PROMPT_TEMPLATE.format(target=sanitize_intent(target), kind=sanitize_intent(kind), intent=sanitize_intent(intent))
-        dsl_raw = await _sampling.generate(prompt, feature='vfx_intent')
-        if not dsl_raw:
-            return "ERROR: Haiku unavailable (set UNITY_MCP_VISUAL_VERIFY=1)"
-        data = parse_vfx_dsl(strip_fences(dsl_raw))
+        batch_lines = build_vfx_batch(target, preset)
+        if not batch_lines:
+            return "ERROR: DSL produced no commands"
+        if dry_run:
+            return "\n".join(batch_lines)
+        result = await _send("batch", {"commands": "\n".join(batch_lines)})
+        return f"vfx_intent: {len(batch_lines)} ops\n{result}"
 
-    batch_lines = build_vfx_batch(target, data)
-    if not batch_lines:
-        return "ERROR: DSL produced no commands"
-
-    if dry_run:
-        return "\n".join(batch_lines)
-
-    result = await _send("batch", {"commands": "\n".join(batch_lines)})
-    return f"vfx_intent: {len(batch_lines)} ops\n{result}"
+    if kind == "auto":
+        kind = detect_kind(intent)
+    from .intent_common import sanitize_intent
+    prompt = _PROMPT_TEMPLATE.format(target=sanitize_intent(target), kind=sanitize_intent(kind), intent=sanitize_intent(intent))
+    return await run_intent_pipeline(
+        send=_send, sampling=_sampling, prompt=prompt, feature="vfx_intent",
+        parse_fn=parse_vfx_dsl, build_fn=lambda d: build_vfx_batch(target, d),
+        dry_run=dry_run,
+    )
 
 
 def register(mcp, send, args):

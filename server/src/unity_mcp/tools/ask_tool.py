@@ -1,5 +1,5 @@
 """ask() meta-tool: NL question → router → Unity tools → Haiku summarize."""
-from ..sampling import SamplingService
+from ..sampling import sampling_service as _sampling
 from ..ask.router import route, is_mutating
 from ..ask.executor import AskExecutor
 from ..ask.summarizer import Summarizer
@@ -7,7 +7,6 @@ from ._annotations import RO as _RO
 
 # Module-level references — patched in tests
 _send = None
-_sampling: SamplingService = SamplingService()
 
 
 async def ask(question: str) -> str:
