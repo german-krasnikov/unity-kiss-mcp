@@ -1,5 +1,6 @@
 """permission_prompt — --permission-prompt-tool MCP handler for Claude CLI."""
 import json
+import sys
 from ._annotations import RO as _RO
 
 _send = None
@@ -20,8 +21,10 @@ async def permission_prompt(tool_name: str, input: dict, tool_use_id: str):
                 "behavior": "allow",
                 "updatedInput": {"questions": questions, "answers": answers},
             })
-        except Exception:
-            return json.dumps({"behavior": "deny", "message": "Unity not connected or user dismissed"})
+        except Exception as e:
+            print(f"[permission_prompt] ask_user failed: {e}", file=sys.stderr)
+            msg = "Unity not connected" if "connection" in str(e).lower() else "ask_user unavailable"
+            return json.dumps({"behavior": "deny", "message": msg})
     return json.dumps({"behavior": "allow", "updatedInput": input})
 
 

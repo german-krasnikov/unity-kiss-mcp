@@ -55,15 +55,26 @@ async def test_input_as_dict(monkeypatch):
     assert data["updatedInput"]["questions"] == questions
 
 
-async def test_send_raises_returns_deny(monkeypatch):
+async def test_send_raises_returns_deny_sanitized(monkeypatch):
     import unity_mcp.tools.permission_prompt_tool as mod
-    monkeypatch.setattr(mod, "_send", AsyncMock(side_effect=Exception("no connection")))
+    monkeypatch.setattr(mod, "_send", AsyncMock(side_effect=Exception("Tool 'ask_user' is disabled")))
     result = await mod.permission_prompt(
         "AskUserQuestion", {"questions": []}, "tu-err",
     )
     data = json.loads(result)
     assert data["behavior"] == "deny"
-    assert "message" in data
+    assert data["message"] == "ask_user unavailable"
+
+
+async def test_send_raises_connection_error_returns_not_connected(monkeypatch):
+    import unity_mcp.tools.permission_prompt_tool as mod
+    monkeypatch.setattr(mod, "_send", AsyncMock(side_effect=ConnectionError("connection refused")))
+    result = await mod.permission_prompt(
+        "AskUserQuestion", {"questions": []}, "tu-conn",
+    )
+    data = json.loads(result)
+    assert data["behavior"] == "deny"
+    assert data["message"] == "Unity not connected"
 
 
 def test_register_wires_send(monkeypatch):

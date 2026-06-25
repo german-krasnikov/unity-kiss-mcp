@@ -328,11 +328,12 @@ async def test_summarizer_multi_result_short_total_still_calls_haiku():
 # 16. Router — COUNT_ACTIVE returns None (plan not implemented) (P2)
 # ---------------------------------------------------------------------------
 
-def test_router_count_active_returns_none():
-    """COUNT_ACTIVE matches pattern but CANONICAL_PLANS has None → route() returns None."""
+def test_router_count_active_falls_through_to_scene_query():
+    """COUNT_ACTIVE has None plan → falls through to SCENE_QUERY fallback."""
     from unity_mcp.ask.router import route
     result = route("how many active objects are there?")
-    assert result is None
+    assert result is not None
+    assert result.key == "SCENE_QUERY"
 
 
 # ---------------------------------------------------------------------------
@@ -434,3 +435,123 @@ async def test_executor_all_steps_failing_returns_error_strings():
     results = await ex.run(plan)
     assert len(results) == 2
     assert all(r.startswith("ERROR:") for r in results)
+
+
+# ---------------------------------------------------------------------------
+# 22. Router — SPATIAL_QUERY pattern
+# ---------------------------------------------------------------------------
+
+def test_router_spatial_query_positions():
+    from unity_mcp.ask.router import route
+    plan = route("What are the world positions (x,y,z) of all waypoints?")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"
+
+
+def test_router_spatial_query_where_is():
+    from unity_mcp.ask.router import route
+    plan = route("where is the Main Camera?")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"
+
+
+def test_router_spatial_query_coordinates():
+    from unity_mcp.ask.router import route
+    plan = route("show me the coordinates of the spawn point object")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"
+
+
+# ---------------------------------------------------------------------------
+# 23. Router — OBJECT_QUERY pattern
+# ---------------------------------------------------------------------------
+
+def test_router_object_query_list_objects():
+    from unity_mcp.ask.router import route
+    plan = route("list all objects with Collider component")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"
+
+
+def test_router_object_query_children():
+    from unity_mcp.ask.router import route
+    plan = route("what children does Player gameobject have?")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"
+
+
+def test_router_object_query_find():
+    from unity_mcp.ask.router import route
+    plan = route("find all objects in the scene hierarchy")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"
+
+
+# ---------------------------------------------------------------------------
+# 24. Router — spatial nouns pass the noun gate
+# ---------------------------------------------------------------------------
+
+def test_router_spatial_noun_transform_waypoint():
+    from unity_mcp.ask.router import route
+    # "transform" and "waypoint" are now Unity nouns — should not return None from noun gate
+    plan = route("show me transform of the waypoint")
+    assert plan is not None
+
+
+# ---------------------------------------------------------------------------
+# 25. Router — non-Unity questions still rejected (regression)
+# ---------------------------------------------------------------------------
+
+def test_router_still_rejects_non_unity_weather():
+    from unity_mcp.ask.router import route
+    plan = route("what is the weather today?")
+    assert plan is None
+
+
+def test_router_still_rejects_non_unity_joke():
+    from unity_mcp.ask.router import route
+    plan = route("tell me a joke")
+    assert plan is None
+
+
+# ---------------------------------------------------------------------------
+# 26. ask e2e — spatial query does not return "no matching Unity context"
+# ---------------------------------------------------------------------------
+
+async def test_ask_e2e_spatial_query_returns_result():
+    from unity_mcp.tools.ask_tool import ask
+
+    with patch("unity_mcp.tools.ask_tool._send", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = "Waypoint1: (0,1,0), Waypoint2: (5,0,3)"
+        result = await ask("What are the world positions of all waypoints?")
+        assert result is not None
+        assert "no matching Unity context" not in result.lower()
+
+
+async def test_ask_e2e_object_query_returns_result():
+    from unity_mcp.tools.ask_tool import ask
+
+    with patch("unity_mcp.tools.ask_tool._send", new_callable=AsyncMock) as mock_send:
+        mock_send.return_value = "Player, Enemy, Cube"
+        result = await ask("list all objects with a Collider component")
+        assert result is not None
+        assert "no matching Unity context" not in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# 27. Router — fallback: Unity noun without specific pattern → SCENE_QUERY
+# ---------------------------------------------------------------------------
+
+def test_router_fallback_unity_noun_no_pattern():
+    """Question with Unity noun but no specific pattern → fallback SCENE_QUERY."""
+    from unity_mcp.ask.router import route
+    plan = route("describe the material on the terrain")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"
+
+
+def test_router_fallback_camera_question():
+    from unity_mcp.ask.router import route
+    plan = route("what settings does the camera have?")
+    assert plan is not None
+    assert plan.key == "SCENE_QUERY"

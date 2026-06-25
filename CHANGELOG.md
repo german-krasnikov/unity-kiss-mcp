@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.58.0] — 2026-06-25 <!-- ask scene queries + AskUserQuestion unblock -->
+
+- **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 spatial/hierarchy terms (transforms, colliders, waypoints, bounds). Added SCENE_QUERY pattern with fallback for any Unity-noun question. Fixes ask rejecting valid scene questions.
+- **AskUserQuestion Unblock** — `ask_user` added to `IsAlwaysAllowed` + `IsAllowedDuringCompile` in CommandRouter. Permission dialogs now work during compilation. Sanitized error messages in permission_prompt_tool.
+
 ## [v0.57.0] — 2026-06-24 <!-- 35 fixes, 3 features, security hardening -->
 
 **35 Bug Fixes, Architecture Wins, Security Hardening & Strategic Features — 8-Architect Review:**

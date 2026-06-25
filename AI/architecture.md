@@ -712,6 +712,32 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 
 **Integration:** `sync.py _attempt_recovery()` calls `run_ladder(start_tier=2)` on REIMPORT-NEEDED verdict.
 
+## Ask Tool Scene Queries + Permission Dialogs (Unreleased)
+
+**Problem:** ask tool rejected valid scene location/object queries ("where is X", "list objects", "show hierarchy") because patterns were too narrow. Additionally, `ask_user` tool was blocked during compilation despite being read-only, preventing permission dialogs at critical moments.
+
+**Solution:**
+
+1. **SCENE_QUERY Pattern Expansion (ask/router.py + ask/plans.py)**:
+   - Extended `UNITY_NOUNS_RE` with 23 spatial/hierarchy nouns: transforms, rigidbodies, colliders, renderers, lights, cameras, meshes, terrains, particles, children, parent, waypoints, coordinates, bounds, regions, etc.
+   - Added two new SCENE_QUERY patterns: (1) "positions|locations|coords|coordinates|where (is|are)" and (2) "what|which|where|list|show|find|get" + "objects|gameobjects|transforms|nodes|children|parent"
+   - Fallback: any question with a Unity noun but no specific matching pattern routes to SCENE_QUERY instead of rejection (was "no matching context")
+   - **SCENE_QUERY plan execution**: `get_hierarchy(depth="5")` → Haiku summarization for results >200 chars → hint "scene objects, positions, and transforms"
+   - Reduces hallucination by grounding answers in actual scene state
+
+2. **ask_user Guard Unblock (CommandRouter.cs + permission_prompt_tool.py)**:
+   - Moved `ask_user` to `IsAlwaysAllowed` (bypass MCPSettings.IsToolEnabled check) and `IsAllowedDuringCompile` (no assembly access needed, read-only UI card)
+   - Added to same compile-safe allow list as ping, get_version, screenshot, get_console (7 others)
+   - **Error message sanitization** in permission_prompt_tool.py: catches ask_user exceptions, simplifies to user-friendly "Unity not connected" or "ask_user unavailable" (hides TCP/socket internals)
+   - Enables Claude to show permission dialogs and user choice cards during compilation windows
+
+**Tests:**
+- Python: +15 tests in test_ask.py (spatial patterns, fallback behavior, E2E scene queries)
+- Python: +2 tests in test_permission_prompt_tool.py (ask_user routing, error handling)
+- C#: +2 NUnit tests in CommandRouterTests.cs (implicit coverage via registration checks)
+
+**Test Count Impact:** Python unit tests increased from 2,597 → 2,840 (243 net new across all modules)
+
 ## Implementation Notes (for Developer)
 
 ### Data Flow
@@ -760,8 +786,8 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 ## Test Infrastructure
 
-### Python Tests: 2784 unit tests + 78 live integration tests + 4 live CLI tests
-- Default: `PYTHONWARNDEFAULTENCODING=1 pytest -m "not live" -q` — unit tests, $0 cost (2784 tests, includes test_llm_config.py + test_ask.py + intent tests)
+### Python Tests: 2840 unit tests + 78 live integration tests + 4 live CLI tests
+- Default: `PYTHONWARNDEFAULTENCODING=1 pytest -m "not live" -q` — unit tests, $0 cost (2840 tests, includes test_llm_config.py + test_ask.py + intent tests)
 - With Unity: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> pytest -m "live and not live_cli" -q` — 78 live integration tests, $0 cost (requires Unity running, sampling disabled)
 - Real CLI: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> UNITY_MCP_VISUAL_VERIFY=1 pytest -m "live_cli" -v` — 4 real CLI tests, ~$0.001/call (requires Unity + claude CLI, visual verification enabled)
 - Test order: unit → C# EditMode → C# PlayMode → live integration → live_cli (live/live_cli always last, occupy TCP)
@@ -954,7 +980,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 **NUnit Test Count (v0.44.0)**
 - **Total: 3945 EditMode + PlayMode** (was 3912), +33 new tests (12 LevelUp + 9 Config + 12 misc)
 - **Green: 3945** (5 pre-existing reds, same as v0.42.0)
-- **Python pytest: 2784** (current count; see CLAUDE.md for exact command)
+- **Python pytest: 2840** (current count; see CLAUDE.md for exact command)
 
 ## Related
 

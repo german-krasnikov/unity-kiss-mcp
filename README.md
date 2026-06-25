@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="101 MCP Tools · 211 Tests (0 Python · 211 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="101 MCP Tools · 230 Tests (0 Python · 230 Unity · 0 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.58.0</b> — 2026-06-25 — **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 …</summary>
+
+**ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 spatial/hierarchy terms (transforms, colliders, waypoints, bounds).
+
+</details>
+
+<details>
 <summary><b>v0.57.0</b> — 2026-06-24 — **Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool …</summary>
 
 **Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool filter.
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.53.1</b> — 2026-06-23 — **Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP …</summary>
-
-**Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP tools (`set_property`, etc.) in Codex chat.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.53.1** — 2026-06-23 — **Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP …
 - **v0.53.0** — 2026-06-23 — **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + …
 - **v0.52.6** — 2026-06-22 — **Multi-Unity Port Race Conditions** — Fixed port file collision and …
 - **v0.52.5** — 2026-06-22 — **Auto-discard dirty scene on quit** — removed opt-in toggle, now always active.

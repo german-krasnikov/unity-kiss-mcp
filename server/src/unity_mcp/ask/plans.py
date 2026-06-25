@@ -36,4 +36,9 @@ CANONICAL_PLANS: dict[str, ToolPlan | None] = {
         "compile errors",
         "COMPILE_ERRORS",
     ),
+    "SCENE_QUERY": ToolPlan(
+        [("get_hierarchy", {"depth": "5"})],
+        "scene objects, positions, and transforms",
+        "SCENE_QUERY",
+    ),
 }

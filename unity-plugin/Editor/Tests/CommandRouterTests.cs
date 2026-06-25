@@ -379,6 +379,17 @@ namespace UnityMCP.Editor.Tests
         public void IsAlwaysAllowed_Diagnose_ReturnsTrue()
             => Assert.IsTrue(CommandRouter.IsAlwaysAllowed("diagnose"));
 
+        // ask_user: UI-only, read-only — must bypass MCPSettings gate and compile gate
+        [Test]
+        public void IsAlwaysAllowed_AskUser_ReturnsTrue()
+            => Assert.IsTrue(CommandRouter.IsAlwaysAllowed("ask_user"),
+                "ask_user is UI-only and must not be gated by MCPSettings");
+
+        [Test]
+        public void IsAllowedDuringCompile_AskUser_ReturnsTrue()
+            => Assert.IsTrue(CommandRouter.IsAllowedDuringCompile("ask_user"),
+                "ask_user shows a UI card only — safe during compilation");
+
         // C7: get_version is NOT registered in CommandRegistry (MCPServer fast-path owns it)
         // This ensures no caller can accidentally route to the VersionTracker counter.
         [Test]

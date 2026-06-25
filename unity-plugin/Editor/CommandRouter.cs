@@ -473,7 +473,8 @@ namespace UnityMCP.Editor
         // Commands that bypass MCPSettings.IsToolEnabled check
         internal static bool IsAlwaysAllowed(string cmd) =>
             cmd == "ping" || cmd == "get_version" || cmd == "get_enabled_tools" ||
-            cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "diagnose";  // C4: diagnose always reachable
+            cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "diagnose" ||  // C4: diagnose always reachable
+            cmd == "ask_user";  // read-only UI card — not gated by MCPSettings
 
         internal static bool IsAllowedDuringCompile(string cmd) =>
             cmd == "ping" || cmd == "get_version" || cmd == "get_console" ||
@@ -483,7 +484,8 @@ namespace UnityMCP.Editor
             cmd == "force_refresh" ||  // G11: real force-recompile must work when wedged
             cmd == "get_test_results" ||  // P1: reads SessionState only — safe during compile
             cmd == "get_test_count" ||  // discovery-only, no test run
-            cmd == "execute_code";  // T2.5: ReloadGuard probe must work when wedged
+            cmd == "execute_code" ||  // T2.5: ReloadGuard probe must work when wedged
+            cmd == "ask_user";  // shows UI card only — no assembly access
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {
