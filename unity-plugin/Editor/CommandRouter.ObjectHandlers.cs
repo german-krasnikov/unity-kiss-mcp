@@ -394,5 +394,15 @@ namespace UnityMCP.Editor
             var fpath = ScreenshotCapture.CaptureToFile(width, height, camera);
             return JsonHelper.FormatFileResponse(id, fpath);
         }
+
+        private static string ExecAutoWire(string args)
+        {
+            var path   = JsonHelper.ExtractString(args, "path");
+            var dryRun = JsonHelper.ExtractString(args, "dry_run") == "true";
+            var go     = ComponentSerializer.FindObjectOrThrow(path);
+            var (wired, skipped) = AutoWiringHelper.Scan(go);
+            if (!dryRun) AutoWiringHelper.Apply(wired);
+            return AutoWiringHelper.Format(wired, skipped, dryRun);
+        }
     }
 }

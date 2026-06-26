@@ -53,10 +53,9 @@ namespace UnityMCP.Editor
         private const string Usings =
             "using UnityEngine; using UnityEditor; using System; using System.Linq; using System.Collections.Generic;";
 
-        // Lazy-loaded Roslyn via reflection
-        private static Assembly _roslynCompiler;
-        private static Assembly _roslynCore;
-        private static bool _roslynLoaded;
+        // Delegates to RoslynLoader — single source for Roslyn DLL state.
+        private static Assembly _roslynCompiler => RoslynLoader.RoslynCompiler;
+        private static Assembly _roslynCore     => RoslynLoader.RoslynCore;
         private static int _compilationCount;
 
         public static string Execute(string code, string undoLabel)
@@ -108,37 +107,8 @@ namespace UnityMCP.Editor
 
         private static void EnsureRoslyn()
         {
-            if (_roslynLoaded) return;
-
-            var base_ = EditorApplication.applicationContentsPath;
-            // Ordered by preference — Mono 32-bit compatible (PE32) paths first.
-            // DotNetSdkRoslyn ships PE32+ (.NET 5+) which Mono runtime can't load.
-            var candidates = new[] {
-                // Unity 6 ARM/x64: MonoBleedingEdge ships PE32 Roslyn (Mono-compatible)
-                Path.Combine(base_, "MonoBleedingEdge", "lib", "mono", "msbuild", "Current", "bin", "Roslyn"),
-                // Older Unity layout
-                Path.Combine(base_, "Resources", "Scripting", "MonoBleedingEdge", "lib", "mono", "msbuild", "Current", "bin", "Roslyn"),
-                Path.Combine(base_, "Resources", "Scripting", "DotNetSdkRoslyn"),
-                // Last resort: PE32+ — fails on Mono runtime
-                Path.Combine(base_, "DotNetSdkRoslyn"),
-            };
-
-            var roslynDir = candidates.FirstOrDefault(Directory.Exists);
-            if (roslynDir == null)
-                throw new InvalidOperationException(
-                    $"Roslyn DLLs not found. Searched:\n  {string.Join("\n  ", candidates)}");
-
-            _roslynCore = LoadAssembly(roslynDir, "Microsoft.CodeAnalysis.dll");
-            _roslynCompiler = LoadAssembly(roslynDir, "Microsoft.CodeAnalysis.CSharp.dll");
-            _roslynLoaded = true;
-        }
-
-        private static Assembly LoadAssembly(string dir, string name)
-        {
-            var path = Path.Combine(dir, name);
-            if (!File.Exists(path))
-                throw new InvalidOperationException($"Roslyn DLL not found: {path}");
-            return Assembly.LoadFrom(path);
+            if (!RoslynLoader.EnsureRoslyn())
+                throw new InvalidOperationException("Roslyn DLLs not found — execute_code unavailable.");
         }
 
         private static Assembly Compile(string code)

@@ -84,10 +84,12 @@ unity-kiss-mcp/
 │   │   ├── debug/              # Debug subsystem (v0.59.0: state capture + watch system)
 │   │   │   ├── __init__.py
 │   │   │   └── snapshots.py    # State capture + diff (snapshot comparison for debugging)
-│   │   ├── tools/              # Tool modules (32 files + __init__, asset tool extended v0.30.4, v0.59.0: +3 debug tools, v0.60.0: +profiling.py, rendering.py)
+│   │   ├── tools/              # Tool modules (34 files + __init__, v0.60.0: +profiling.py, rendering.py, v0.62.0: +auto_wire.py, scene_health.py)
 │   │   │   ├── __init__.py     # Tool module registry
 │   │   │   ├── profiling.py    # Profile MCP tool: session-based profiling, frame stats, performance analysis (v0.60.0, 412 LOC)
 │   │   │   ├── rendering.py    # Render analysis MCP tools: draw calls, batching, lights, LOD culling (v0.60.0, 618 LOC)
+│   │   │   ├── auto_wire.py    # Auto-wiring tool: fill ObjectRef fields by semantic name/type matching (v0.62.0)
+│   │   │   ├── scene_health.py # Scene health audit: hierarchy depth, naming, duplicates, origins, missing scripts (v0.62.0)
 │   │   │   ├── reload_ladder.py # Reload recovery T0-T5 ladder (MVID-delta healing proof)
 │   │   │   ├── objects.py      # create/delete/find/inspect/set_parent/set_material
 │   │   │   ├── scene.py        # scene, editor, screenshot, search, spatial, scan, schema
@@ -154,6 +156,8 @@ unity-kiss-mcp/
 │       ├── test_autobatch.py            # _quote_if_spaces, _DOTTED_KV_RE, setup/set/configure_objects (v0.55.10)
 │       ├── test_parse_kv.py             # parse_kv quote-strip, lookahead _KV_RE (v0.55.10)
 │       ├── test_server_filtering.py     # Port discovery edge cases (v0.55.10)
+│       ├── test_auto_wire.py             # auto_wire tool: 3-priority matching, dry-run (v0.62.0, 5 tests)
+│       ├── test_scene_health.py          # scene_health tool: 7 checks, focus param (v0.62.0, 4 tests)
 │       └── ... + domain tests (190+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
 │   ├── Editor/
@@ -212,6 +216,8 @@ unity-kiss-mcp/
 │       ├── MultiViewCapture.cs + MultiViewOverlay.cs + OverlayDrawer.cs  # 4-panel screenshots
 │       ├── ScreenshotCapture.cs            # Camera modes: default, overview, multi_view
 │       ├── CodeExecutor.cs                 # Roslyn C# execution, 3-layer security (IsAllowedAssembly: private→internal v0.26.0)
+│       ├── AutoWiringHelper.cs             # Semantic ObjectReference matching: exact→contains→type (3-priority) (v0.62.0)
+│       ├── SceneHealthAnalyzer.cs          # Scene audit: 7 checks (hierarchy, naming, duplicates, origins, missing, empty, disabled) (v0.62.0)
 │       ├── SpatialHelper.cs                # Raycast, overlap, nearest, bounds, grid_cast
 │       ├── AnimationHelper.cs + AnimationSerializer.cs
 │       ├── AnimatorControllerHelper.cs + AnimatorControllerSerializer.cs
@@ -259,11 +265,15 @@ unity-kiss-mcp/
 │       ├── MCPActions.cs                  # Shared actions (Restart, Kill, Reimport)
 │       ├── MCPStatusModel.cs              # Pure state logic (no deps) — maps connection state → display
 │       ├── MCPStatusBarWidget.cs          # Injects MCP pill into AppStatusBar via reflection
-│       ├── Tests/                         # Editor tests asmdef (references core, v0.26.0: +[TestFixture] to 6 classes, v0.42.0: Wizard tests moved to separate asmdef)
+│       ├── Tests/                         # Editor tests asmdef (references core, v0.26.0: +[TestFixture] to 6 classes, v0.42.0: Wizard tests moved to separate asmdef, v0.62.0: +helper tests)
 │       │   ├── UnityMCP.Editor.Tests.asmdef
 │       │   ├── Helpers/                  # Test infrastructure (v0.26.0)
 │       │   │   ├── ChipTestBase.cs       # Base class: H() helpers centralized (12 shims extracted, v0.26.0)
 │       │   │   └── TestStringHelpers.cs  # CountOccurrences utility (DRY across 4+ files, v0.26.0)
+│       │   ├── AutoWiringHelperTests.cs  # ObjectReference matching: 3-priority logic (v0.62.0, 12 tests)
+│       │   ├── SceneHealthAnalyzerTests.cs # Scene health audit checks + severity tags (v0.62.0, 14 tests)
+│       │   ├── Roslyn/                   # Roslyn analysis tests (v0.62.0)
+│       │   │   └── CompilePreflightTests.cs # Dry-run compilation check + diagnostics (v0.62.0, 6 tests)
 │       │   ├── MarkdownInlineFormatterTests.cs # Rich-text formatting (bold, italic, code, links) (v0.42.0)
 │       │   ├── UpdatesPageTests.cs        # Changelog rendering + update check UI (v0.42.0)
 │       │   ├── LevelUpTests.cs            # LevelUp panel state machine, animation, release diff parsing (12 tests, v0.44.0)
@@ -358,6 +368,11 @@ unity-kiss-mcp/
 │       │       ├── PerfThresholds.cs       # Color band classification: good/warn/crit thresholds + Color32.Lerp gradients
 │       │       ├── AnimatedCounter.cs      # Label subclass: exponential ease lerp to target value (0.3s)
 │       │       └── RecordIndicator.cs      # Pure USS pulsing red dot animation for recording state
+│       ├── Roslyn/                         # Roslyn-based C# analysis (v0.62.0: 4 files)
+│       │   ├── RoslynLoader.cs             # Reflection-based Roslyn assembly discovery (mscorlib, UnityEngine)
+│       │   ├── RoslynWorkspace.cs          # SyntaxTree → Compilation → Diagnostics pipeline
+│       │   ├── RoslynFormat.cs             # OK/ERR formatter for compile_preflight results
+│       │   └── CompilePreflightCommand.cs  # Dry-run compilation check handler
 │       ├── Rendering/                      # Rendering Analysis & Optimization (v0.60.0: 6 C# files + 3 partials)
 │       │   ├── RenderAnalyzer.cs           # Entry point: dispatch to analysis actions (stats, overdraw, materials, etc.)
 │       │   ├── RenderAnalyzer.Materials.cs # Material/texture dedup & compression audit (partial)
@@ -552,6 +567,8 @@ unity-kiss-mcp/
 │       │   │   ├── MCPChatWindow.Selector.cs  # Backend/mode selector + token reset (F1)
 │       │   │   ├── MCPChatWindow.Resize.cs    # Window resize logic
 │       │   │   ├── MCPChatWindow.Approve.cs   # Event handler for interactive permissions (v0.29.2+)
+│       │   │   ├── MCPChatWindow.ErrorResolver.cs # Error resolver message injection (v0.62.0, partial class)
+│       │   │   ├── ErrorResolverButton.cs      # Toolbar button for error-driven development (v0.62.0)
 │       │   │   ├── TokenFormat.cs             # Pure Abbr(n) helper — "1.2k" / "840" token display
 │       │   │   ├── EnterKeySend.cs            # Enter-to-send + Alt+Enter newline logic (pure testable)
 │       │   │   ├── ChatSettingsSection.cs     # Delegate class for ChatConnectionSection (F23 refactored)

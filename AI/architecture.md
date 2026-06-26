@@ -278,6 +278,36 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
   * Colors from ArcadePalette: good=#3ad29f, warn=#e8a23a, crit=#e94560
   * UITK only (no IMGUI, Unity 6 Overlay API)
 
+### Editor Help Tools Subsystem (v0.62.0)
+
+**Error-Driven Development, Scene Health Audit, Auto-Wiring, Dry-Run Compilation:**
+
+- **Error Resolver Toolbar Button** — Chat integration for compile error fixing:
+  * **ErrorResolverButton.cs** (IToolbarButtonProvider): Adds "Fix Errors" button to MCPChatWindow toolbar
+  * **MCPChatWindow.ErrorResolver.cs** (partial): InjectMessage(prompt) routes user-facing agent presets (Syntax, Semantic, Domain) as message contexts. Captures compile error context + code snippet, injects into chat history as human message
+  * Enables error-driven development: compile, fix errors in Chat immediately
+  
+- **scene_health MCP Tool** — 7-check scene hierarchy audit:
+  * **Focus modes**: all | hierarchy (>10 depth) | naming (CamelCase/reserved) | duplicates (sibling names) | origins (>5000 units away) | missing (scripts) | empty (GameObjects) | disabled (roots)
+  * **Severity tags**: CRITICAL (blocking) | WARNING (performance) | INFO (conventions) | OK (clean)
+  * **SceneHealthAnalyzer.cs** (C# helper): 7 static check methods — CheckMissingScripts, CheckDeepHierarchy, CheckBadNaming, CheckDuplicateSiblings, CheckEmptyObjects, CheckWorldOrigin, CheckDisabledRoots. Returns formatted output with path + issue description per check
+  * Category: META (gated)
+  
+- **auto_wire MCP Tool** — Semantic ObjectReference field filling:
+  * **3-Priority Matching Logic**: (1) exact field name match in scene, (2) contains field name (substring), (3) type-only match
+  * **Dry-run Mode**: preview changes without applying (returns: wired count, ambiguous matches, no-match count)
+  * **AutoWiringHelper.cs** (C# helper): FindMatchingObjects(field, priority) returns candidates, SetObjectReference(obj, field, value) writes to SerializedObject
+  * Category: RW (mutating)
+  
+- **compile_preflight MCP Tool** — Dry-run C# validation:
+  * **No Domain Reload**: validates via Roslyn in-process analysis (vs. Editor compiler)
+  * **Syntax + Type Binding**: checks C# grammar + type resolution without invoking Unity's full compile pipeline
+  * **Returns OK/ERR** with diagnostic details (line, column, message)
+  * **RoslynLoader.cs** (C# helper): Extracted Roslyn assembly loading from CodeExecutor. Reflects mscorlib + UnityEngine via System.Runtime.InteropServices.RuntimeEnvironment
+  * **RoslynWorkspace.cs** (C# helper): SyntaxTree → Compilation → Diagnostics pipeline. Creates Compilation with references, filters to CS errors/warnings
+  * **RoslynFormat.cs** (C# helper): OK/ERR formatter — returns summary + line:col:message per diagnostic
+  * Category: META (allowed during compile, zero side effects)
+
 4. **Guards (C#)**
    - **Compile guard**: blocks all except ping, get_version, get_console, screenshot, get_enabled_tools, compile_status
    - **Play Mode guard**: blocks mutating commands (changes would be lost)

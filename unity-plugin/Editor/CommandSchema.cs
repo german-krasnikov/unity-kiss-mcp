@@ -51,6 +51,7 @@ namespace UnityMCP.Editor
             { "set_active", P("path,active") },
             { "wire_event", P("path,component,event,target,method", "arg_type", "arg_value") },
             { "unwire_event", P("path,component,event", "index") },
+            { "auto_wire", P("path", "dry_run") },
             { "manage_component", P("path,type,action") },
             { "set_parent", P("path,parent", "world_position_stays") },
             { "set_material", P("path,color", "shader") },
@@ -58,6 +59,7 @@ namespace UnityMCP.Editor
             { "recompile", P(null) },
             { "checkpoint", P(null, "label") },
             { "execute_code", P("code", "undo_label") },
+            { "compile_preflight", P("file_path,new_content") },
 
             // --- Runtime ---
             { "get_perf", P(null) },
@@ -100,6 +102,7 @@ namespace UnityMCP.Editor
             { "spatial_query", P("action", "path", "target", "distance", "radius", "component", "cell_size", "layer_mask", "center", "vertices", "region_id", "cap") },
             { "material_audit",      P(null, "action", "platform") },
             { "analyze_lod_culling", P(null, "focus") },
+            { "scene_health",        P(null, "focus") },
 
             // --- Meta ---
             { "ping", P(null) },

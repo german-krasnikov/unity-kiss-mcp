@@ -352,6 +352,8 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("check_colliders", args => ColliderChecker.Check(
                 JsonHelper.ExtractString(args, "path")));
             CommandRegistry.Register("material_audit", args => MaterialAuditHelper.Execute(args));
+            CommandRegistry.Register("scene_health", args =>
+                SceneHealthAnalyzer.Analyze(JsonHelper.ExtractString(args, "focus") ?? "all"));
             CommandRegistry.Register("analyze_lod_culling", args => LodCullingAnalyzer.Analyze(
                 JsonHelper.ExtractString(args, "focus")));
             CommandRegistry.Register("get_schema", args => SchemaHelper.GetSchema(
@@ -422,6 +424,7 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "component"),
                 JsonHelper.ExtractString(args, "event"),
                 JsonHelper.ExtractString(args, "index")), mutating: true);
+            CommandRegistry.Register("auto_wire", ExecAutoWire, mutating: true);
             CommandRegistry.Register("manage_component", ExecManageComponent, mutating: true);
             CommandRegistry.Register("set_parent", args => ObjectManager.SetParent(
                 JsonHelper.ExtractString(args, "path"),
@@ -472,6 +475,7 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("execute_code", args => CodeExecutor.Execute(
                 JsonHelper.ExtractString(args, "code"),
                 JsonHelper.ExtractString(args, "undo_label") ?? "execute_code"));
+            CommandRegistry.Register("compile_preflight", args => CompilePreflightCommand.Execute(args));
 
             // Watch system (Phase 3)
             WatchCommandHandler.RegisterAll();
@@ -510,7 +514,8 @@ namespace UnityMCP.Editor
             cmd == "get_test_results" ||  // P1: reads SessionState only — safe during compile
             cmd == "get_test_count" ||  // discovery-only, no test run
             cmd == "execute_code" ||  // T2.5: ReloadGuard probe must work when wedged
-            cmd == "ask_user";  // shows UI card only — no assembly access
+            cmd == "ask_user" ||  // shows UI card only — no assembly access
+            cmd == "compile_preflight";  // Roslyn in-process — safe during Unity compile
 
         private static int ExtractInt(string json, string key, int defaultVal)
         {

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.62.0] — 2026-06-26 <!-- editor help tools, error resolver, scene health, auto-wiring, Roslyn -->
+
+**Editor Help Tools — Error Resolver Toolbar, Scene Health Audit, Auto-Wiring, Dry-Run Compile Check:**
+
+- **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for error-driven development. Three agent presets (Syntax, Semantic, Domain). Injects compile error context + code snippet into Chat as human message (InjectMessage). MCPChatWindow.ErrorResolver partial. IToolbarButtonProvider integration (priority-ordered toolbar).
+- **scene_health MCP Tool** — F4 health audit with 7 checks: hierarchy depth (>10 levels), bad naming (CamelCase violations, reserved names), duplicate names in siblings, far-from-origin objects (>5000 units), missing scripts, empty GameObjects, disabled roots. Focus param: all|hierarchy|naming|duplicates|origins|missing|empty|disabled. Severity-tagged output (CRITICAL/WARNING/INFO/OK). Category: META.
+- **auto_wire MCP Tool** — Fill null ObjectReference fields by 3-priority semantic matching: (1) exact field name match in scene, (2) contains field name substring, (3) matches field type only. Dry-run preview mode (reports: wired count, ambiguous matches, no-match count). Writes changes to SerializedObject. Category: RW.
+- **compile_preflight MCP Tool** — Dry-run compilation check via Roslyn in-process analysis (no domain reload). Validates C# syntax + type binding without invoking Unity compiler. Returns OK/ERR with diagnostics. **RoslynLoader** extracted setup from CodeExecutor (loads mscorlib + UnityEngine via reflection). **RoslynWorkspace** in-process Roslyn SyntaxTree compilation + Compilation creation. **RoslynFormat** OK/ERR text formatter. Category: META.
+- **4 New C# Support Classes**: AutoWiringHelper (3-priority match logic + SetObjectReference), SceneHealthAnalyzer (7 check methods + severity tagging), RoslynLoader (reflection-based Roslyn assembly discovery), RoslynWorkspace (SyntaxTree → Compilation → Diagnostics)
+- **3 New NUnit Test Suites**: AutoWiringHelperTests, SceneHealthAnalyzerTests, CompilePreflightTests (Roslyn), ErrorResolverButtonTests
+- **Test Results**: 2952 py (9 new scene_health/auto_wire) + 4885 NUnit (32 new: Roslyn+Helper+CLI tests), all green
+
 ## [v0.61.0] — 2026-06-26 <!-- profiling UI, perf overlay, sessions, rendering stats -->
 
 **Profiling UI — Real-Time Performance Overlay, EditorWindow, Session Recording & Rendering Snapshot:**

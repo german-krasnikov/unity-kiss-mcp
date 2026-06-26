@@ -32,7 +32,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
         "object_diff", "transfer_object",
     ],
     "COMPONENTS": [
-        "wire_event", "unwire_event",
+        "wire_event", "unwire_event", "auto_wire",
     ],
     "ANIMATION": [
         "animation", "timeline", "animator", "particle",
@@ -77,7 +77,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     "META": [
         "animator_intent",
         "setup_objects", "set_properties", "configure_objects",
-        "scan_scene", "check_colliders", "spatial_query", "region_clear", "navmesh_query",
+        "scan_scene", "check_colliders", "spatial_query", "region_clear", "navmesh_query", "scene_health",
         "set_llm_config",
     ],
     "PROFILING": [
