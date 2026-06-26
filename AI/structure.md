@@ -340,13 +340,24 @@ unity-kiss-mcp/
 │       │   │   └── ... (8 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
-│       ├── Profiling/                      # Profiling & Performance Analysis (v0.60.0: 6 C# files)
+│       ├── Profiling/                      # Profiling & Performance Analysis (v0.60.0: 6 C# files; v0.61.0: +UI folder with 10 files)
 │       │   ├── FrameSample.cs              # Single frame sample data structure (fps, cpu, gpu ms, draw calls, etc.)
 │       │   ├── ProfilerBridge.cs           # Lazy-init profiler access via ProfileRecorder + EditorApplication.update
-│       │   ├── FrameRingBuffer.cs          # Circular 600-frame buffer (~10s at 60fps)
+│       │   ├── FrameRingBuffer.cs          # Circular 600-frame buffer (~10s at 60fps), CopyTo() method for zero-alloc export (v0.61.0)
 │       │   ├── ProfileAnalyzer.cs          # Statistics computation: FPS avg/min/max/P99, compare (STABLE/IMPROVED/REGRESSED)
 │       │   ├── ProfileFormatter.cs         # Human-readable profile output formatting
-│       │   └── ProfileRecorder.cs          # Record session lifecycle manager
+│       │   ├── ProfileRecorder.cs          # Record session lifecycle manager
+│       │   └── UI/                         # Profiling UI Components (v0.61.0: 10 C# files)
+│       │       ├── PerfWindow.cs           # Main EditorWindow: 4-tab interface (Performance, Rendering, Sessions, Memory)
+│       │       ├── PerfWindow.Performance.cs # Performance tab: FPS graph, CPU/GPU bars, frame stats (partial class)
+│       │       ├── PerfWindow.Rendering.cs # Rendering tab: snapshot stats, baseline compare (partial class)
+│       │       ├── PerfWindow.Sessions.cs  # Sessions tab: session list, verdict badges, auto-capture (partial class)
+│       │       ├── PerfWindow.Memory.cs    # Memory tab: Mono heap, GC Gen0, texture memory (partial class)
+│       │       ├── PerfOverlay.cs          # SceneView UITK overlay: FPS sparkline, CPU/GPU, draw calls (5Hz refresh)
+│       │       ├── PerfGraphElement.cs     # Reusable UITK VisualElement for line+fill graphs via Painter2D
+│       │       ├── PerfThresholds.cs       # Color band classification: good/warn/crit thresholds + Color32.Lerp gradients
+│       │       ├── AnimatedCounter.cs      # Label subclass: exponential ease lerp to target value (0.3s)
+│       │       └── RecordIndicator.cs      # Pure USS pulsing red dot animation for recording state
 │       ├── Rendering/                      # Rendering Analysis & Optimization (v0.60.0: 6 C# files + 3 partials)
 │       │   ├── RenderAnalyzer.cs           # Entry point: dispatch to analysis actions (stats, overdraw, materials, etc.)
 │       │   ├── RenderAnalyzer.Materials.cs # Material/texture dedup & compression audit (partial)
@@ -731,7 +742,7 @@ unity-kiss-mcp/
 │       ├── UnityMCP.Runtime.TestHelpers.asmdef # Separate assembly for test utilities
 │       └── TestHelpers/
 │           └── TestDummyMB.cs             # Dummy MonoBehaviour for AddComponent<> in editor tests (moved from Editor/Chat/Tests v0.25.0)
-├── unity-test-project/          # Unity 6000.3 test project (4835 EditMode NUnit tests total, v0.60.0: +profiling/rendering tests; v0.59.0: +44 debug/watch tests)
+├── unity-test-project/          # Unity 6000.3 test project (4852 EditMode NUnit tests total, v0.61.0: +17 profiling UI tests; v0.60.0: +profiling/rendering tests; v0.59.0: +44 debug/watch tests)
 │   ├── Assets/Tests/Editor/     # NUnit test files
 │   ├── Assets/Animations/       # Animation clips + controllers
 │   ├── Assets/Scenes/

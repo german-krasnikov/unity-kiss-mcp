@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="117 MCP Tools · 7865 Tests (2943 Python · 4838 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="117 MCP Tools · 7882 Tests (2943 Python · 4855 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.61.0</b> — 2026-06-26 — **PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, …</summary>
+
+**PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, CPU/GPU ms, draw calls, batches, triangles. 5Hz refresh, zero per-frame …
+
+</details>
+
+<details>
 <summary><b>v0.60.0</b> — 2026-06-26 — **profile MCP Tool** — Session-based frame recording (burst/manual modes) with …</summary>
 
 **profile MCP Tool** — Session-based frame recording (burst/manual modes) with 600-frame ring buffer (~10s at 60fps).
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.56.0</b> — 2026-06-24 — **Unified Scene View Overlay** — Merged 2 separate overlays …</summary>
-
-**Unified Scene View Overlay** — Merged 2 separate overlays (SceneRegionOverlay, SceneAnnotationOverlay) into single `SceneMcpOverlay` with dynamic …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.56.0** — 2026-06-24 — **Unified Scene View Overlay** — Merged 2 separate overlays …
 - **v0.55.0** — 2026-06-24 — **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, …
 - **v0.54.1** — 2026-06-23 — **Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when …
 - **v0.53.1** — 2026-06-23 — **Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP …

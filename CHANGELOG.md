@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.61.0] — 2026-06-26 <!-- profiling UI, perf overlay, sessions, rendering stats -->
+
+**Profiling UI — Real-Time Performance Overlay, EditorWindow, Session Recording & Rendering Snapshot:**
+
+- **PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, CPU/GPU ms, draw calls, batches, triangles. 5Hz refresh, zero per-frame allocations. Color-coded via PerfThresholds (good/warn/crit). Toggle via SceneView overlay dropdown (≡ → MCP Profiler).
+- **PerfWindow EditorWindow** — 4-tab interface (Performance, Rendering, Sessions, Memory):
+  - **Performance tab**: Real-time FPS line graph (120-frame history, Painter2D), CPU/GPU horizontal fill bars with thresholds, frame time stats (current/average/P99/max), Record button with pulsing indicator
+  - **Rendering tab**: Snapshot stats grid (draw calls, batches, set pass, triangles, vertices, shadows, pipeline badge), Save Baseline + Compare buttons
+  - **Sessions tab**: Session list with checkboxes, compare two sessions with verdict badges (IMPROVED/REGRESSED/STABLE), auto-capture toggle on Play mode
+  - **Memory tab**: Mono heap fill bar (used/total MB), GC Gen0 counter with flash animation, texture memory, total managed
+- **PerfGraphElement UITK Component** — Reusable VisualElement for line+fill graphs via Painter2D. Zero-alloc ring buffer with CopyValuesTo scratch array for smooth animations.
+- **PerfThresholds Color Classification** — Smooth Color32.Lerp gradients for performance bands. Methods: FpsBand, FrameTimeBand, DrawCallBand, TriBand, MemBand (classifies performance into good/warn/crit ranges).
+- **AnimatedCounter Label** — Lerps to target value over 0.3s with exponential ease. Scheduler-based (paused at rest, zero overhead).
+- **RecordIndicator Animation** — Pure USS @keyframes pulsing red dot for active recording state.
+- **FrameRingBuffer.CopyTo()** — Zero-alloc method for extracting samples into pre-allocated array (used by graphs).
+- **All animations via USS** — Transitions/@keyframes for record pulse, tab crossfade, bar fill, GC flash, compare slide-in. Colors from ArcadePalette (good=#3ad29f, warn=#e8a23a, crit=#e94560).
+- **17 New Tests** — PerfThresholdsTests (7), PerfGraphElementTests (4), AnimatedCounterTests (3), FrameRingBuffer CopyTo tests (3).
+
 ## [v0.60.0] — 2026-06-26 <!-- profiling, rendering analysis, on-demand activation -->
 
 **Performance Profiling & Rendering Analysis — Session-Based Recording & On-Demand Activation:**

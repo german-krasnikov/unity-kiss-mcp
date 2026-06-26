@@ -40,5 +40,18 @@ namespace UnityMCP.Editor.Profiling
                 result[i] = _buf[(start + i) % _buf.Length];
             return result;
         }
+
+        /// <summary>
+        /// Copies samples chronologically into pre-allocated dest. Zero-alloc path.
+        /// Returns number of elements copied (min of Count and dest.Length).
+        /// </summary>
+        internal int CopyTo(FrameSample[] dest)
+        {
+            int start = _count < _buf.Length ? 0 : _head % _buf.Length;
+            int n = System.Math.Min(_count, dest.Length);
+            for (int i = 0; i < n; i++)
+                dest[i] = _buf[(start + i) % _buf.Length];
+            return n;
+        }
     }
 }

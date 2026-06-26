@@ -1,0 +1,47 @@
+/* PerfOverlay — SceneView HUD styles */
+
+.perf-overlay {
+    padding: 6px 10px;
+    background-color: rgba(30, 30, 30, 0.85);
+    border-radius: 4px;
+    flex-direction: column;
+}
+
+.perf-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.perf-label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-right: 3px;
+}
+
+.perf-value {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: rgba(255, 255, 255, 0.9);
+    margin-right: 8px;
+    transition-property: color;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-in-out;
+}
+
+.perf-value--good {
+    color: rgb(58, 210, 159);
+}
+
+.perf-value--warn {
+    color: rgb(232, 162, 58);
+}
+
+.perf-value--crit {
+    color: rgb(233, 69, 96);
+}
+
+.perf-graph {
+    border-radius: 2px;
+    background-color: rgba(0, 0, 0, 0.3);
+}

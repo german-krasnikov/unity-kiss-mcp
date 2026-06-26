@@ -234,6 +234,50 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
   * Debug tools moved from TIER1 → DEBUG category: debug, snapshot, watch_add/get/remove/clear/reset, get_metrics
   * Saves ~1080 tokens/turn by hiding debug tools by default (only reveal on demand)
 
+### Profiling UI Subsystem (v0.61.0)
+
+**Real-Time Performance Visualization & Recording:**
+
+- **PerfOverlay** — SceneView UITK overlay (5Hz refresh, zero-alloc):
+  * FPS sparkline (60-sample history)
+  * CPU/GPU time (ms) with color-coded bands
+  * Draw calls, batches, triangles counters
+  * Threshold-based coloring (good/warn/crit)
+  * Toggled via SceneView overlay dropdown (≡ → MCP Profiler)
+  
+- **PerfWindow EditorWindow** (opened via MCP → Performance menu):
+  * **Performance tab**: 120-frame FPS line graph (Painter2D), CPU/GPU fill bars, frame stats (current/avg/P99/max), Record button
+  * **Rendering tab**: Snapshot stats grid (draw calls, batches, setpass, triangles, vertices, shadows, pipeline badge), Save Baseline + Compare buttons, verdict badges
+  * **Sessions tab**: Session list with checkboxes, two-session comparison (IMPROVED/REGRESSED/STABLE), auto-capture on Play mode toggle
+  * **Memory tab**: Mono heap bar (used/total MB), GC Gen0 counter with flash animation, texture memory, total managed
+  
+- **PerfGraphElement** — Reusable UITK VisualElement:
+  * Line + fill graph rendering via Painter2D.generateVisualContent
+  * Zero-alloc: ring buffer with CopyValuesTo(FrameSample[] dest) scratch array
+  * Animator callbacks for smooth updates
+  
+- **PerfThresholds** — Color band classification:
+  * Methods: FpsBand, FrameTimeBand, DrawCallBand, TriBand, MemBand (→ color enum)
+  * Smooth Color32.Lerp gradients between bands
+  * ColorForBand(band) → Color, FpsColor(fps) → Color, etc.
+  
+- **AnimatedCounter Label** — Exponential ease lerp (0.3s):
+  * Updates on scheduler tick (paused when stable)
+  * Zero allocation at rest
+  
+- **RecordIndicator** — Pure USS animation:
+  * @keyframes pulsing red dot (#e94560)
+  * Triggered when PerfWindow.Record = true
+  
+- **FrameRingBuffer Enhancement** (v0.61.0):
+  * Added `CopyTo(FrameSample[] dest)` zero-alloc bulk export
+  * Used by PerfGraphElement to extract samples for rendering
+  
+- **Styling**:
+  * All animations via USS transitions/@keyframes (no C# animation)
+  * Colors from ArcadePalette: good=#3ad29f, warn=#e8a23a, crit=#e94560
+  * UITK only (no IMGUI, Unity 6 Overlay API)
+
 4. **Guards (C#)**
    - **Compile guard**: blocks all except ping, get_version, get_console, screenshot, get_enabled_tools, compile_status
    - **Play Mode guard**: blocks mutating commands (changes would be lost)

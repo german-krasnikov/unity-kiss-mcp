@@ -59,5 +59,41 @@ namespace UnityMCP.Editor.Tests
             Assert.AreEqual(0, buf.Count);
             Assert.AreEqual(0, buf.ToArray().Length);
         }
+
+        // CopyTo tests (zero-alloc path)
+        [Test]
+        public void CopyTo_Empty_ReturnsZero()
+        {
+            var buf = new FrameRingBuffer(10);
+            var dest = new FrameSample[10];
+            Assert.AreEqual(0, buf.CopyTo(dest));
+        }
+
+        [Test]
+        public void CopyTo_Partial_CopiesInOrder()
+        {
+            var buf = new FrameRingBuffer(10);
+            buf.Add(new FrameSample { CpuMs = 1f });
+            buf.Add(new FrameSample { CpuMs = 2f });
+            var dest = new FrameSample[10];
+            int n = buf.CopyTo(dest);
+            Assert.AreEqual(2, n);
+            Assert.AreEqual(1f, dest[0].CpuMs);
+            Assert.AreEqual(2f, dest[1].CpuMs);
+        }
+
+        [Test]
+        public void CopyTo_Wrapped_CopiesChronological()
+        {
+            var buf = new FrameRingBuffer(3);
+            buf.Add(new FrameSample { CpuMs = 1f });
+            buf.Add(new FrameSample { CpuMs = 2f });
+            buf.Add(new FrameSample { CpuMs = 3f });
+            buf.Add(new FrameSample { CpuMs = 4f }); // overwrites CpuMs=1
+            var dest = new FrameSample[3];
+            buf.CopyTo(dest);
+            Assert.AreEqual(2f, dest[0].CpuMs, "oldest surviving = 2");
+            Assert.AreEqual(4f, dest[2].CpuMs, "newest = 4");
+        }
     }
 }

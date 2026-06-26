@@ -1,0 +1,378 @@
+/* ── Root ──────────────────────────────────────────────────────────────────── */
+
+.perf-window {
+    flex-direction: column;
+    flex-grow: 1;
+    background-color: var(--unity-colors-window-background);
+}
+
+/* ── Tab bar ───────────────────────────────────────────────────────────────── */
+
+.perf-tab-bar {
+    flex-direction: row;
+    padding: 4px 6px 0 6px;
+    border-bottom-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    background-color: var(--unity-colors-toolbar-background);
+}
+
+.perf-tab-btn {
+    background-color: rgba(0,0,0,0);
+    border-width: 0;
+    border-radius: 4px 4px 0 0;
+    padding: 4px 12px;
+    margin-right: 2px;
+    color: var(--unity-colors-label-text);
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.perf-tab-btn:hover {
+    background-color: rgba(255,255,255,0.06);
+    opacity: 1;
+}
+
+.perf-tab-btn--active {
+    background-color: rgba(58,210,159,0.12);
+    border-bottom-width: 2px;
+    border-color: #3ad29f;
+    color: #3ad29f;
+    opacity: 1;
+}
+
+/* ── Content area ──────────────────────────────────────────────────────────── */
+
+.perf-content-area {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.perf-tab-content {
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+/* ── Section layout ────────────────────────────────────────────────────────── */
+
+.perf-section {
+    flex-direction: column;
+    padding: 8px 10px;
+    flex-grow: 1;
+}
+
+.perf-section-label {
+    font-size: 9px;
+    -unity-font-style: bold;
+    text-transform: uppercase;
+    color: var(--unity-colors-label-text);
+    opacity: 0.5;
+    margin-top: 6px;
+    margin-bottom: 4px;
+}
+
+/* ── FPS Graph ─────────────────────────────────────────────────────────────── */
+
+.perf-graph {
+    height: 60px;
+    background-color: rgba(255,255,255,0.03);
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    margin-bottom: 8px;
+}
+
+/* ── CPU / GPU bar cards ───────────────────────────────────────────────────── */
+
+.perf-bars-row {
+    flex-direction: row;
+    margin-bottom: 8px;
+}
+
+.perf-bar-card {
+    flex-direction: column;
+    flex-grow: 1;
+    margin-right: 8px;
+    padding: 6px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 4px;
+}
+
+.perf-bar-card:last-child {
+    margin-right: 0;
+}
+
+.perf-metric-label {
+    font-size: 9px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.6;
+    margin-bottom: 4px;
+}
+
+.perf-bar-track {
+    height: 8px;
+    background-color: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.perf-bar-fill {
+    height: 100%;
+    background-color: #3ad29f;
+    border-radius: 4px;
+    transition-property: width, background-color;
+    transition-duration: 0.2s;
+    transition-timing-function: ease-out;
+}
+
+.perf-band--good { background-color: #3ad29f; }
+.perf-band--warn { background-color: #e8a23a; }
+.perf-band--crit { background-color: #e94560; }
+
+.perf-bar-label {
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: var(--unity-colors-label-text);
+    -unity-text-align: middle-right;
+}
+
+/* ── Frame stats row ───────────────────────────────────────────────────────── */
+
+.perf-stats-row {
+    flex-direction: row;
+    margin-bottom: 8px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 3px;
+}
+
+.perf-stat-cell {
+    flex-grow: 1;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 4px;
+    border-right-width: 1px;
+    border-color: var(--unity-colors-default-border);
+}
+
+.perf-stat-cell:last-child {
+    border-right-width: 0;
+}
+
+.perf-stat-key {
+    font-size: 9px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.5;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.perf-stat-val {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: var(--unity-colors-label-text);
+    -unity-text-align: middle-center;
+}
+
+/* ── Record indicator ──────────────────────────────────────────────────────── */
+
+.perf-record-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 6px;
+}
+
+@keyframes perf-pulse {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.15; }
+    100% { opacity: 1; }
+}
+
+.record-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    background-color: rgba(255,255,255,0.2);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.record-dot--active {
+    background-color: #e94560;
+    animation-name: perf-pulse;
+    animation-duration: 900ms;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease-in-out;
+}
+
+.perf-record-btn {
+    min-width: 80px;
+}
+
+/* ── Shared controls ───────────────────────────────────────────────────────── */
+
+.perf-ctrl-row {
+    flex-direction: row;
+    margin-top: 4px;
+    margin-bottom: 6px;
+}
+
+.perf-btn {
+    margin-right: 6px;
+    background-color: rgba(255,255,255,0.05);
+    border-color: var(--unity-colors-default-border);
+    border-radius: 3px;
+    padding: 3px 8px;
+}
+
+.perf-btn:hover {
+    background-color: rgba(255,255,255,0.10);
+}
+
+/* ── Rendering tab ─────────────────────────────────────────────────────────── */
+
+.perf-render-top {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.perf-pipeline-badge {
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: #e8a23a;
+    background-color: rgba(232,162,58,0.12);
+    border-width: 1px;
+    border-color: #e8a23a;
+    border-radius: 3px;
+    padding: 2px 7px;
+    margin-right: 8px;
+}
+
+.perf-stats-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.perf-stat-card {
+    flex-direction: column;
+    align-items: center;
+    min-width: 88px;
+    margin: 4px;
+    padding: 6px 8px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 4px;
+    transition-property: border-color;
+    transition-duration: 0.2s;
+}
+
+.perf-stat-card:hover {
+    border-color: #3ad29f;
+}
+
+.perf-card-title {
+    font-size: 9px;
+    color: var(--unity-colors-label-text);
+    opacity: 0.55;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    -unity-text-align: middle-center;
+}
+
+.perf-card-value {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: var(--unity-colors-label-text);
+    -unity-text-align: middle-center;
+}
+
+.perf-compare-result {
+    font-size: 10px;
+    color: var(--unity-colors-label-text);
+    white-space: normal;
+    padding: 6px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 3px;
+    max-height: 120px;
+    overflow: hidden;
+}
+
+/* ── Sessions tab ──────────────────────────────────────────────────────────── */
+
+.perf-session-list {
+    flex-direction: column;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 3px;
+    margin-bottom: 8px;
+    max-height: 200px;
+    overflow: hidden;
+}
+
+.perf-session-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 6px;
+    border-bottom-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    min-height: 22px;
+}
+
+.perf-session-row:hover {
+    background-color: rgba(255,255,255,0.04);
+}
+
+.perf-session-check {
+    margin-right: 6px;
+}
+
+.perf-session-label {
+    font-size: 10px;
+    color: var(--unity-colors-label-text);
+    flex-grow: 1;
+}
+
+.perf-verdict-panel {
+    padding: 6px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 3px;
+    font-size: 10px;
+    white-space: normal;
+    margin-bottom: 6px;
+    min-height: 24px;
+}
+
+.perf-verdict--improved  { border-color: #3ad29f; color: #3ad29f; }
+.perf-verdict--regressed { border-color: #e94560; color: #e94560; }
+.perf-verdict--stable    { border-color: #e8a23a; color: #e8a23a; }
+
+.perf-auto-toggle {
+    margin-top: 6px;
+    font-size: 11px;
+}
+
+/* ── Memory tab ────────────────────────────────────────────────────────────── */
+
+.perf-mem-label {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: var(--unity-colors-label-text);
+    margin-bottom: 6px;
+    margin-top: 2px;
+}
+
+@keyframes perf-gc-flash-anim {
+    0%   { background-color: rgba(233,69,96,0.35); }
+    100% { background-color: rgba(0,0,0,0); }
+}
+
+.perf-gc-flash {
+    animation-name: perf-gc-flash-anim;
+    animation-duration: 400ms;
+    animation-timing-function: ease-out;
+}
