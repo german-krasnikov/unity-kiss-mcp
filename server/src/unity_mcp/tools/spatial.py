@@ -113,6 +113,12 @@ async def navmesh_query(action: str, center: str | None = None,
     return result
 
 
+async def analyze_lod_culling(focus: str | None = None) -> str:
+    """LOD group coverage + occlusion culling analysis.
+    focus: lod|culling|occlusion|null=all."""
+    return await _send("analyze_lod_culling", _args(focus=focus))
+
+
 def register(mcp, send, args):
     global _send, _args
     _send = send
@@ -124,3 +130,4 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RO)(spatial_query)
     mcp.tool(annotations=_RW)(region_clear)
     mcp.tool(annotations=_RO)(navmesh_query)
+    mcp.tool(annotations=_RO)(analyze_lod_culling)

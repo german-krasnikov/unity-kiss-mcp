@@ -1,4 +1,4 @@
-"""TDD tests for diagnostics: get_perf, debug_animator, debug_physics, get_memory."""
+"""TDD tests for diagnostics: get_perf, debug_animator, debug_physics."""
 import pytest
 from unittest.mock import AsyncMock
 
@@ -39,15 +39,6 @@ async def test_debug_physics_custom_radius():
     await mod.debug_physics("/Boss", radius=10.0)
     sent = mod._send.call_args[0][1]
     assert sent["radius"] == 10.0
-
-
-@pytest.mark.asyncio
-async def test_get_memory_sends_correct_command():
-    import unity_mcp.tools.diagnostics as mod
-    mod._send = AsyncMock(return_value="mono=12MB/32MB\nTexture2D: 45")
-    result = await mod.get_memory()
-    mod._send.assert_called_once_with("get_memory", {})
-    assert isinstance(result, str)
 
 
 @pytest.mark.asyncio

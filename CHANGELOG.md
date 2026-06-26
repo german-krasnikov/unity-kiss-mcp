@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.60.0] — 2026-06-26 <!-- profiling, rendering analysis, on-demand activation -->
+
+**Performance Profiling & Rendering Analysis — Session-Based Recording & On-Demand Activation:**
+
+- **profile MCP Tool** — Session-based frame recording (burst/manual modes) with 600-frame ring buffer (~10s at 60fps). Stats: FPS (avg/min/max/P99), CPU/GPU ms, draw calls, batches, triangles, memory (Mono/GC), GC count. Compare verdict (STABLE/IMPROVED/REGRESSED). Category: PROFILING (gated).
+- **get_frame_stats MCP Tool** — One-shot frame snapshot (dt, fps, cpu, gpu, draw calls, batches, triangles). Allowed during compile. Category: PROFILING.
+- **render_analyze MCP Tool** — 9 actions: stats, overdraw, materials, shaders, batching, lights, shadow_audit, probe_audit, frame_debug (Frame Debugger reflection-based capture). Category: RENDERING.
+- **material_audit MCP Tool** — 3 actions: summary, materials, duplicates (fingerprint-based dedup). Texture memory profiling per platform. Category: SHADERS_MATERIAL.
+- **analyze_lod_culling MCP Tool** — LOD group analysis, poly reduction ratios, CrossFade warnings. Occlusion culling detection. Recommendations for high-poly objects. Category: RENDERING.
+- **On-Demand Activation Pattern** — ProfilerBridge lazy-init (no [InitializeOnLoadMethod]), ProfileRecorder subscribes to EditorApplication.update ONLY during recording, FrameDebugHelper lazy reflection. Zero overhead by default.
+- **Gating Categories (v0.60.0)** — New: PROFILING, RENDERING, DEBUG (aliases: 'profiling', 'rendering', 'debug', 'perf'). Debug tools moved from TIER1 → DEBUG: debug, snapshot, watch_add/get/remove/clear/reset, get_metrics. Saves ~1080 tokens/turn by hiding debug tools by default.
+
 ## [v0.59.0] — 2026-06-26 <!-- runtime debug, watch system, debug UI, chat fields, AI diagnostics -->
 
 **Runtime Debug, Watch System, Debug UI Panel, Chat Component Fields, AI Diagnostics & Security Hardening — 20-Architect Review:**

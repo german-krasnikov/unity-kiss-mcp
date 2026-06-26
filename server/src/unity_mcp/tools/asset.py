@@ -66,6 +66,16 @@ async def get_enabled_tools() -> str:
     return await _send("get_enabled_tools", {})
 
 
+async def material_audit(
+    action: str = "summary",
+    platform: str | None = None,
+) -> str:
+    """Material/texture scene-wide audit.
+    action: summary|materials|textures|duplicates|compression|recommendations.
+    platform: Android|iOS|Standalone|Default (for compression check)."""
+    return await _send("material_audit", _args(action=action, platform=platform))
+
+
 def register(mcp, send, args):
     global _send, _args
     _send = send
@@ -76,3 +86,4 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RW)(prefab)
     mcp.tool(annotations=_RW)(scriptable_object)
     mcp.tool(annotations=_RO)(get_enabled_tools)
+    mcp.tool(annotations=_RO)(material_audit)

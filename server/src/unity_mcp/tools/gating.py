@@ -38,7 +38,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
         "animation", "timeline", "animator", "particle",
     ],
     "SHADERS_MATERIAL": [
-        "shader", "material", "references",
+        "shader", "material", "references", "material_audit",
     ],
     "VFX": [
         "vfx_intent",
@@ -54,9 +54,11 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     ],
     "RUNTIME": [
         "invoke_method", "set_runtime_property", "wait_until", "move_to", "query_state",
-        "watch_add", "get_watches", "watch_remove", "watch_clear", "watch_reset",
-        "debug", "snapshot",
-        "get_perf", "debug_animator", "debug_physics", "get_memory",
+        "get_perf", "debug_animator", "debug_physics",
+    ],
+    "DEBUG": [
+        "debug", "snapshot", "watch_add", "get_watches", "watch_remove", "watch_clear",
+        "watch_reset", "get_metrics",
     ],
     "ASSETS": [
         "asset", "prefab", "scriptable_object", "project_settings",
@@ -73,10 +75,16 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     ],
     "CONNECTION": [],  # reconnect_unity + list_connections are in CORE (FORCE_VISIBLE) — not repeated here
     "META": [
-        "animator_intent", "get_metrics",
+        "animator_intent",
         "setup_objects", "set_properties", "configure_objects",
         "scan_scene", "check_colliders", "spatial_query", "region_clear", "navmesh_query",
         "set_llm_config",
+    ],
+    "PROFILING": [
+        "get_frame_stats", "profile", "get_memory",
+    ],
+    "RENDERING": [
+        "render_analyze", "analyze_lod_culling",
     ],
 }
 
@@ -93,6 +101,10 @@ _CATEGORY_ALIAS: dict[str, list[str]] = {
     "runtime":    ["RUNTIME", "UNIT_TESTS"],
     "connection": ["CONNECTION"],
     "session":    ["SESSION_SKILLS", "SCREENSHOTS"],
+    "profiling":  ["PROFILING"],
+    "rendering":  ["RENDERING"],
+    "debug":      ["DEBUG"],
+    "perf":       ["PROFILING", "RENDERING"],
 }
 
 CATEGORIES: dict[str, set[str]] = {
@@ -109,16 +121,11 @@ TIER1: set[str] = {
     "setup_objects", "set_properties", "configure_objects",
     "do", "ask", "ask_user", "permission_prompt",
     "animator_intent", "vfx_intent", "ui_intent",
-    "get_metrics",
     "find_references", "compile_preflight", "semantic_at", "await_compile", "sync_unity",
     "set_parent",
     # runtime tools — always available in Play Mode
     "invoke_method", "set_runtime_property", "wait_until", "move_to",
     "query_state", "test_step", "run_playtest", "fuzz_playtest",
-    # watch system
-    "watch_add", "get_watches", "watch_remove", "watch_clear", "watch_reset",
-    # AI debug tools
-    "debug", "snapshot",
 }
 
 # All known tool names across all tiers

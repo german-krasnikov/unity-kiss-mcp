@@ -348,8 +348,12 @@ namespace UnityMCP.Editor
                 JsonHelper.ExtractString(args, "path"),
                 ExtractInt(args, "depth", 3)));
             CommandRegistry.Register("scan_scene", _ => ScanHelper.Scan());
+            CommandRegistry.Register("render_analyze", args => RenderAnalyzer.Execute(args));
             CommandRegistry.Register("check_colliders", args => ColliderChecker.Check(
                 JsonHelper.ExtractString(args, "path")));
+            CommandRegistry.Register("material_audit", args => MaterialAuditHelper.Execute(args));
+            CommandRegistry.Register("analyze_lod_culling", args => LodCullingAnalyzer.Analyze(
+                JsonHelper.ExtractString(args, "focus")));
             CommandRegistry.Register("get_schema", args => SchemaHelper.GetSchema(
                 JsonHelper.ExtractString(args, "type")));
             CommandRegistry.Register("get_changes", args => ChangeWatcher.GetChanges(
@@ -377,6 +381,8 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("query_state", args => GameStateHelper.Snapshot(
                 JsonHelper.ExtractString(args, "queries")), runtime: true);
             CommandRegistry.Register("get_perf", _ => ProfilerHelper.GetSnapshot(), runtime: true);
+            CommandRegistry.Register("get_frame_stats", _ => ProfilerHelper.GetFrameStats(), runtime: true);
+            CommandRegistry.RegisterAction("profile", Profiling.ProfileRecorder.Dispatch, runtime: true);
             CommandRegistry.Register("debug_animator", args =>
             {
                 var go = ComponentSerializer.FindObjectOrThrow(JsonHelper.ExtractString(args, "path"));
@@ -390,7 +396,8 @@ namespace UnityMCP.Editor
                 float radius = JsonHelper.ExtractFloat(args, "radius");
                 return PhysicsHelper.GetState(go, radius > 0f ? radius : 5f);
             }, runtime: true);
-            CommandRegistry.Register("get_memory", _ => MemoryHelper.GetSnapshot());
+            CommandRegistry.Register("get_memory", args =>
+                MemoryHelper.GetSnapshot(JsonHelper.ExtractString(args, "include") ?? "all"));
 
             // Write (mutating)
             CommandRegistry.Register("create_object", ExecCreateObject, mutating: true);

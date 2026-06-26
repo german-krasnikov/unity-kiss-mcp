@@ -184,6 +184,56 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      * **AnimatorHelper**: GetAnimatorState (current state, parameters, clip info)
      * **PhysicsHelper**: RaycastResults, PhysicsSceneQuery, ColliderOverlapCheck
 
+### Profiling & Rendering Analysis Subsystem (v0.60.0)
+
+**On-Demand Performance Profiling & Rendering Optimization:**
+
+- **profile MCP Tool (5 modes)**: Session-based frame recording with 600-frame ring buffer (~10s at 60fps)
+  - Modes: `start` (manual record), `stop`, `status`, `analyze` (compute stats), `compare` (before/after verdict)
+  - Stats: FPS (avg/min/max/P99), CPU/GPU time (ms), draw calls, batches, triangles, memory (Mono/GC), GC count
+  - Ring buffer zero-copy iteration, compare verdict (STABLE/IMPROVED/REGRESSED)
+  - Category: PROFILING (gated, v0.60.0+)
+  
+- **get_frame_stats MCP Tool**: Instant one-shot snapshot (dt, fps, cpu, gpu, draw calls, batches, triangles)
+  - No parameters, fast path (allowed during compile)
+  - Category: PROFILING
+  
+- **render_analyze MCP Tool (9 actions)**:
+  - `stats` — draw calls, batches, triangles, setpass, shadow counts
+  - `overdraw` — opaque/transparent/particles/UI counts per viewport
+  - `materials` — active material count, dedup candidates (shader+keywords fingerprint)
+  - `shaders` — shader list, variant count per permutation
+  - `batching` — SRP batcher compatibility, static/dynamic/GPU instancing candidates
+  - `lights` — categorized by type/bake status, shadow map count, probe audit
+  - `shadow_audit` — shadow cascade count, max distance, split recommendations
+  - `probe_audit` — probe count, placement density, missing coverage detection
+  - `frame_debug` — reflection-based Frame Debugger batch-break-cause analysis
+  - Category: RENDERING
+  
+- **material_audit MCP Tool (3 actions)**:
+  - `summary` — total material count, memory usage, compression stats per platform
+  - `materials` — per-material breakdown (name, shader, property count, instance count)
+  - `duplicates` — fingerprint-based dedup (shader+keywords+properties, excluding textures)
+  - Category: SHADERS_MATERIAL
+  
+- **analyze_lod_culling MCP Tool**:
+  - LOD group analysis: coverage (% of high-poly objects with LOD), poly reduction ratio per level
+  - CrossFade warnings, poly density heatmap
+  - Occlusion culling detection (per-scene)
+  - Recommendations for high-poly objects missing LOD
+  - Category: RENDERING
+
+- **On-Demand Activation Pattern**:
+  * ProfilerBridge lazy-init (no [InitializeOnLoadMethod] overhead)
+  * ProfileRecorder subscribes to EditorApplication.update ONLY during active recording
+  * FrameDebugHelper lazy reflection (instantiated only on render_analyze frame_debug action)
+  * Zero cost by default — no profiler handles, no per-frame tick until explicitly called
+  
+- **Gating Categories (v0.60.0)**:
+  * New: PROFILING, RENDERING, DEBUG (aliases: 'profiling', 'rendering', 'debug', 'perf')
+  * Debug tools moved from TIER1 → DEBUG category: debug, snapshot, watch_add/get/remove/clear/reset, get_metrics
+  * Saves ~1080 tokens/turn by hiding debug tools by default (only reveal on demand)
+
 4. **Guards (C#)**
    - **Compile guard**: blocks all except ping, get_version, get_console, screenshot, get_enabled_tools, compile_status
    - **Play Mode guard**: blocks mutating commands (changes would be lost)
@@ -470,6 +520,8 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 
 **Update v0.46.0**: ChipKind registry now includes Field + AnnotatedScreenshot. ModelContextWindows presets added per LLM.
 
+**Update v0.60.0**: New categories PROFILING, RENDERING, DEBUG (aliases: 'profiling', 'rendering', 'debug', 'perf'). Debug tools moved from TIER1 → DEBUG: debug, snapshot, watch_add/get/remove/clear/reset, get_metrics. Saves ~1080 tokens/turn by hiding debug tools by default.
+
 ### TIER1 (always visible, 42 core)
 
 Core (42): 24 base + 3 intent + 3 code-intel + 8 runtime + 4 session = get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, set_parent, do, ask, get_metrics, animator_intent, vfx_intent, ui_intent, find_references, compile_preflight, semantic_at, invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest, ask_user, permission_prompt, await_compile, sync_unity
@@ -497,6 +549,15 @@ list_connections, reconnect_unity
 
 ### Category: session (10)
 fingerprint, scene_diff, get_changes, save_session, load_session, screenshot_baseline, screenshot_compare, save_skill, use_skill, list_skills
+
+### Category: profiling (2, v0.60.0)
+profile, get_frame_stats
+
+### Category: rendering (3, v0.60.0)
+render_analyze, material_audit, analyze_lod_culling
+
+### Category: debug (5, v0.59.0+, moved from TIER1 v0.60.0)
+debug, snapshot, watch_add, watch_get, watch_remove, watch_clear, watch_reset, get_metrics
 
 ## C# Commands (CommandRouter)
 

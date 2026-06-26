@@ -20,7 +20,7 @@ namespace UnityMCP.Editor
 
         public static void ResetCounts() => _prevCounts.Clear();
 
-        public static string GetSnapshot()
+        public static string GetSnapshot(string include = "all")
         {
             var sb = new StringBuilder();
 
@@ -32,6 +32,7 @@ namespace UnityMCP.Editor
 
             foreach (var (name, type) in _types)
             {
+                if (include != "all" && !include.Contains(name.ToLower())) continue;
                 int count = Resources.FindObjectsOfTypeAll(type).Length;
                 _prevCounts.TryGetValue(name, out int prev);
                 int delta = count - prev;

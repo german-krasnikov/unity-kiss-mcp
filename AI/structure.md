@@ -84,8 +84,10 @@ unity-kiss-mcp/
 │   │   ├── debug/              # Debug subsystem (v0.59.0: state capture + watch system)
 │   │   │   ├── __init__.py
 │   │   │   └── snapshots.py    # State capture + diff (snapshot comparison for debugging)
-│   │   ├── tools/              # Tool modules (30 files + __init__, asset tool extended v0.30.4, v0.59.0: +3 debug tools)
+│   │   ├── tools/              # Tool modules (32 files + __init__, asset tool extended v0.30.4, v0.59.0: +3 debug tools, v0.60.0: +profiling.py, rendering.py)
 │   │   │   ├── __init__.py     # Tool module registry
+│   │   │   ├── profiling.py    # Profile MCP tool: session-based profiling, frame stats, performance analysis (v0.60.0, 412 LOC)
+│   │   │   ├── rendering.py    # Render analysis MCP tools: draw calls, batching, lights, LOD culling (v0.60.0, 618 LOC)
 │   │   │   ├── reload_ladder.py # Reload recovery T0-T5 ladder (MVID-delta healing proof)
 │   │   │   ├── objects.py      # create/delete/find/inspect/set_parent/set_material
 │   │   │   ├── scene.py        # scene, editor, screenshot, search, spatial, scan, schema
@@ -338,6 +340,22 @@ unity-kiss-mcp/
 │       │   │   └── ... (8 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
+│       ├── Profiling/                      # Profiling & Performance Analysis (v0.60.0: 6 C# files)
+│       │   ├── FrameSample.cs              # Single frame sample data structure (fps, cpu, gpu ms, draw calls, etc.)
+│       │   ├── ProfilerBridge.cs           # Lazy-init profiler access via ProfileRecorder + EditorApplication.update
+│       │   ├── FrameRingBuffer.cs          # Circular 600-frame buffer (~10s at 60fps)
+│       │   ├── ProfileAnalyzer.cs          # Statistics computation: FPS avg/min/max/P99, compare (STABLE/IMPROVED/REGRESSED)
+│       │   ├── ProfileFormatter.cs         # Human-readable profile output formatting
+│       │   └── ProfileRecorder.cs          # Record session lifecycle manager
+│       ├── Rendering/                      # Rendering Analysis & Optimization (v0.60.0: 6 C# files + 3 partials)
+│       │   ├── RenderAnalyzer.cs           # Entry point: dispatch to analysis actions (stats, overdraw, materials, etc.)
+│       │   ├── RenderAnalyzer.Materials.cs # Material/texture dedup & compression audit (partial)
+│       │   ├── RenderAnalyzer.Batching.cs  # SRP batcher compatibility + GPU instancing candidates (partial)
+│       │   ├── RenderAnalyzer.Lights.cs    # Light categorization + shadow + probe audit (partial)
+│       │   ├── RenderPipelineInspector.cs  # Runtime SRP detection + capability checks
+│       │   ├── FrameDebugHelper.cs         # Frame debugger reflection-based capture
+│       │   ├── LodCullingAnalyzer.cs       # LOD group analysis + occlusion culling detection
+│       │   └── MaterialAuditHelper.cs      # Material/texture memory profiling
 │       ├── Debug/                         # Debug UI Panel + Watch System (v0.59.0: 11 C# files, 44 tests)
 │       │   ├── MCPDebugPanel.cs            # EditorWindow entry point (v0.59.0)
 │       │   ├── MCPDebugUI.cs               # Core debug UI orchestrator (v0.59.0)
@@ -713,7 +731,7 @@ unity-kiss-mcp/
 │       ├── UnityMCP.Runtime.TestHelpers.asmdef # Separate assembly for test utilities
 │       └── TestHelpers/
 │           └── TestDummyMB.cs             # Dummy MonoBehaviour for AddComponent<> in editor tests (moved from Editor/Chat/Tests v0.25.0)
-├── unity-test-project/          # Unity 6000.3 test project (4576 EditMode NUnit tests total, v0.59.0: +44 debug/watch tests; v0.54.1: +3 connection stability tests)
+├── unity-test-project/          # Unity 6000.3 test project (4835 EditMode NUnit tests total, v0.60.0: +profiling/rendering tests; v0.59.0: +44 debug/watch tests)
 │   ├── Assets/Tests/Editor/     # NUnit test files
 │   ├── Assets/Animations/       # Animation clips + controllers
 │   ├── Assets/Scenes/

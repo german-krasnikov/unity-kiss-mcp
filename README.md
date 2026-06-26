@@ -46,7 +46,7 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 112 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 117 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `MCP → Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Antigravity, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="112 MCP Tools · 7720 Tests (2898 Python · 4738 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="117 MCP Tools · 7865 Tests (2943 Python · 4838 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.60.0</b> — 2026-06-26 — **profile MCP Tool** — Session-based frame recording (burst/manual modes) with …</summary>
+
+**profile MCP Tool** — Session-based frame recording (burst/manual modes) with 600-frame ring buffer (~10s at 60fps).
+
+</details>
+
+<details>
 <summary><b>v0.59.0</b> — 2026-06-26 — **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: …</summary>
 
 **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: true` flag, now executes during Play Mode without compilation pause. …
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.55.0</b> — 2026-06-24 — **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, …</summary>
-
-**Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, Agy automatically expose installed MCP servers (Blender, Luna, etc.) …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.55.0** — 2026-06-24 — **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, …
 - **v0.54.1** — 2026-06-23 — **Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when …
 - **v0.53.1** — 2026-06-23 — **Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP …
 - **v0.53.0** — 2026-06-23 — **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + …

@@ -1,4 +1,4 @@
-"""Performance and diagnostics tools — Play Mode and editor."""
+"""Performance and diagnostics tools — Play Mode and editor. get_memory lives in profiling.py."""
 from ._annotations import RO as _RO
 
 _send = None
@@ -22,15 +22,9 @@ async def debug_physics(path: str, radius: float = 5.0) -> str:
     return await _send("debug_physics", {"path": path, "radius": radius})
 
 
-async def get_memory() -> str:
-    """Snapshot Mono memory, GC counts, and key asset type counts with delta tracking."""
-    return await _send("get_memory", {})
-
-
 def register(mcp, send, args):
     global _send
     _send = send
     mcp.tool(annotations=_RO)(get_perf)
     mcp.tool(annotations=_RO)(debug_animator)
     mcp.tool(annotations=_RO)(debug_physics)
-    mcp.tool(annotations=_RO)(get_memory)

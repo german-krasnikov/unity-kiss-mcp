@@ -1,11 +1,25 @@
 using System.Text;
 using UnityEngine;
 using UnityEngine.Profiling;
+using UnityMCP.Editor.Profiling;
 
 namespace UnityMCP.Editor
 {
     internal static class ProfilerHelper
     {
+        public static string GetFrameStats()
+        {
+            var s = ProfilerBridge.CollectFrame();
+            ProfilerBridge.Shutdown(); // one-shot: dispose recorder immediately
+            var sb = new StringBuilder();
+            float fps = s.DeltaTime > 0f ? 1f / s.DeltaTime : 0f;
+            sb.AppendLine($"frame dt={s.DeltaTime * 1000:F1}ms fps={fps:F1}");
+            sb.AppendLine($"cpu={s.CpuMs:F1}ms gpu={(s.GpuMs < 0f ? "N/A" : s.GpuMs.ToString("F1") + "ms")}");
+            sb.AppendLine($"draw={s.DrawCalls} batches={s.Batches} tris={RenderAnalyzer.FormatNum(s.Triangles)}");
+            sb.Append($"mono={s.MonoUsedBytes / 1_048_576}MB gc_gen0={s.GcGen0Count}");
+            return sb.ToString();
+        }
+
         public static string GetSnapshot()
         {
             var sb = new StringBuilder();

@@ -35,6 +35,7 @@ namespace UnityMCP.Editor
             { "get_spatial_context", P("path", "radius") },
             { "fingerprint", P("path", "depth") },
             { "scan_scene", P(null, "bands") },
+            { "render_analyze", P("action", "path", "detail", "baseline_id", "max_events") },
             { "check_colliders", P("path") },
             { "get_changes", P(null, "clear") },
             { "validate_layout", P(null, "root", "min_distance") },
@@ -60,9 +61,11 @@ namespace UnityMCP.Editor
 
             // --- Runtime ---
             { "get_perf", P(null) },
+            { "get_frame_stats", P(null) },
+            { "profile", P("action", "duration", "session", "compare_with", "focus", "mode", "threshold_ms") },
             { "debug_animator", P("path") },
             { "debug_physics", P("path", "radius") },
-            { "get_memory", P(null) },
+            { "get_memory", P(null, "include") },
             { "invoke_method", P("path,component,method", "args") },
             { "set_runtime_property", P("path,component,field,value") },
             { "query_state", P("queries") },
@@ -95,6 +98,8 @@ namespace UnityMCP.Editor
             { "prefab", P("action", "path", "asset_path", "base_path", "variant_path", "recursive") },
             { "scriptable_object", P("action", "path", "type", "prop", "value", "filter") },
             { "spatial_query", P("action", "path", "target", "distance", "radius", "component", "cell_size", "layer_mask", "center", "vertices", "region_id", "cap") },
+            { "material_audit",      P(null, "action", "platform") },
+            { "analyze_lod_culling", P(null, "focus") },
 
             // --- Meta ---
             { "ping", P(null) },
