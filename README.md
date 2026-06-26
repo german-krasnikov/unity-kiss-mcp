@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="119 MCP Tools · 7923 Tests (2952 Python · 4887 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="119 MCP Tools · 7935 Tests (2952 Python · 4899 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.63.0</b> — 2026-06-27 — **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool …</summary>
+
+**IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool MenuOnly => false;` allows selective toolbar button repositioning …
+
+</details>
+
+<details>
 <summary><b>v0.62.0</b> — 2026-06-26 — **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for …</summary>
 
 **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for error-driven development.
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.58.0</b> — 2026-06-25 — **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 …</summary>
-
-**ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 spatial/hierarchy terms (transforms, colliders, waypoints, bounds).
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.58.0** — 2026-06-25 — **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 …
 - **v0.57.0** — 2026-06-24 — **Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool …
 - **v0.56.0** — 2026-06-24 — **Unified Scene View Overlay** — Merged 2 separate overlays …
 - **v0.55.0** — 2026-06-24 — **Chat sees 3rd-party MCP from CLI global configs** — Claude Code, Codex, Kimi, …

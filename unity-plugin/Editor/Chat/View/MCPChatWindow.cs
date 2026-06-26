@@ -120,6 +120,8 @@ namespace UnityMCP.Editor.Chat
 
         private void OnDisable()
         {
+            // P0-A: persist transcript so window close/reopen restores history (not just domain reload)
+            SessionState.SetString("MCPChat_Transcript", _transcript?.SerializeForReload() ?? "");
             CommandRouter.OnAskUser -= OnMcpAskUser;
             EditorApplication.hierarchyChanged -= RefreshResolver;
             AssemblyReloadEvents.beforeAssemblyReload -= SaveStateBeforeReload;

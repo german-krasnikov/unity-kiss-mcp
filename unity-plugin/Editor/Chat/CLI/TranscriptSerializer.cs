@@ -1,4 +1,5 @@
 // F21: Serialization helpers for transcript reload-survival via SessionState.
+// P0-B: Added Kind.Tool (2). P1: Added ImagePath (col 5). Old 3-4 col format backward-compat.
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,17 +8,18 @@ namespace UnityMCP.Editor.Chat
 {
     internal struct TranscriptEntry
     {
-        internal enum Kind { User = 0, Assistant = 1 }
+        internal enum Kind { User = 0, Assistant = 1, Tool = 2 }
         internal Kind   EntryKind;
         internal string Text;
-        internal string ChipsData;  // \x1F-delimited KindKey\x1FPath\x1FDisplayName triplets
+        internal string ChipsData;  // for User: serialized chips; for Tool: "1"/"0" = ok flag
         internal string LlmPayload; // full-path payload sent to LLM (nullable; null = same as Text)
+        internal string ImagePath;  // P1: optional image path for user bubbles (nullable)
     }
 
     internal static class TranscriptSerializer
     {
-        // Format per line: Kind|Base64(Text)|Base64(ChipsData)|Base64(LlmPayload)
-        // Old format (3 columns) is backward-compat — missing 4th column → LlmPayload=null.
+        // Format per line: Kind|Base64(Text)|Base64(ChipsData)|Base64(LlmPayload)|Base64(ImagePath)
+        // Old format (3-4 columns) is backward-compat — missing columns → null.
         internal static string Serialize(List<TranscriptEntry> entries)
         {
             if (entries == null || entries.Count == 0) return "";
@@ -25,10 +27,11 @@ namespace UnityMCP.Editor.Chat
             foreach (var e in entries)
             {
                 var textB64  = ToB64(e.Text ?? "");
-                var chipsB64 = string.IsNullOrEmpty(e.ChipsData) ? "" : ToB64(e.ChipsData);
+                var chipsB64 = string.IsNullOrEmpty(e.ChipsData)  ? "" : ToB64(e.ChipsData);
                 var llmB64   = string.IsNullOrEmpty(e.LlmPayload) ? "" : ToB64(e.LlmPayload);
+                var imgB64   = string.IsNullOrEmpty(e.ImagePath)  ? "" : ToB64(e.ImagePath);
                 sb.Append((int)e.EntryKind).Append('|').Append(textB64).Append('|')
-                  .Append(chipsB64).Append('|').Append(llmB64).Append('\n');
+                  .Append(chipsB64).Append('|').Append(llmB64).Append('|').Append(imgB64).Append('\n');
             }
             return sb.ToString();
         }
@@ -43,19 +46,22 @@ namespace UnityMCP.Editor.Chat
                 var parts = line.Split('|');
                 if (parts.Length < 2) continue;
                 if (!int.TryParse(parts[0], out var kindInt)) continue;
-                if (kindInt < 0 || kindInt > 1) continue;
+                if (kindInt < 0 || kindInt > 2) continue; // P0-B: was > 1
                 string text;
                 try { text = FromB64(parts[1]); } catch { continue; }
-                string chipsData = parts.Length > 2 && !string.IsNullOrEmpty(parts[2])
+                string chipsData  = parts.Length > 2 && !string.IsNullOrEmpty(parts[2])
                     ? TryFromB64(parts[2]) : null;
                 string llmPayload = parts.Length > 3 && !string.IsNullOrEmpty(parts[3])
                     ? TryFromB64(parts[3]) : null;
+                string imagePath  = parts.Length > 4 && !string.IsNullOrEmpty(parts[4])
+                    ? TryFromB64(parts[4]) : null;
                 result.Add(new TranscriptEntry
                 {
                     EntryKind  = (TranscriptEntry.Kind)kindInt,
                     Text       = text,
                     ChipsData  = chipsData,
                     LlmPayload = llmPayload,
+                    ImagePath  = imagePath,
                 });
             }
             return result;

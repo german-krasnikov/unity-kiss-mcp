@@ -10,12 +10,13 @@ namespace UnityMCP.Editor.Chat.Tests
         public int    Order       { get; }
         public string ButtonLabel { get; }
         public string Tooltip     { get; }
+        public bool   MenuOnly    { get; }
 
         public int ClickCount { get; private set; }
 
-        public FakeToolbarButtonProvider(string key, string label = "Btn", int order = 100)
+        public FakeToolbarButtonProvider(string key, string label = "Btn", int order = 100, bool menuOnly = false)
         {
-            Key = key; ButtonLabel = label; Order = order; Tooltip = $"{key} tooltip";
+            Key = key; ButtonLabel = label; Order = order; Tooltip = $"{key} tooltip"; MenuOnly = menuOnly;
         }
 
         public void OnClick(UnityEditor.EditorWindow window) => ClickCount++;
@@ -95,6 +96,23 @@ namespace UnityMCP.Editor.Chat.Tests
             int v0 = ToolbarButtonRegistry.Version;
             ToolbarButtonRegistry.Register(new FakeToolbarButtonProvider("my_btn"));
             Assert.Greater(ToolbarButtonRegistry.Version, v0);
+        }
+
+        private sealed class BareProvider : IToolbarButtonProvider
+        {
+            public string Key         => "bare";
+            public int    Order       => 0;
+            public string ButtonLabel => "B";
+            public string Tooltip     => "";
+            public void OnClick(UnityEditor.EditorWindow w) { }
+            // MenuOnly deliberately NOT overridden — tests the DIM default
+        }
+
+        [Test]
+        public void MenuOnly_DefaultIsFalse()
+        {
+            IToolbarButtonProvider p = new BareProvider();
+            Assert.IsFalse(p.MenuOnly, "MenuOnly must default to false for backward compatibility");
         }
     }
 }

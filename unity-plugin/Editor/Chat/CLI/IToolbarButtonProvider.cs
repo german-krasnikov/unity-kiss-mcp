@@ -18,6 +18,12 @@ namespace UnityMCP.Editor.Chat
         string ButtonLabel { get; }
         string Tooltip { get; }
 
+        /// <summary>
+        /// When true, omit from the footer toolbar and show only in the session menu.
+        /// Defaults to false for backward compatibility.
+        /// </summary>
+        bool MenuOnly => false;
+
         /// <summary>Called when the user clicks the button. Receives the host window.</summary>
         void OnClick(UnityEditor.EditorWindow window);
     }

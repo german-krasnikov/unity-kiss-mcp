@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.63.0] — 2026-06-27 <!-- chat toolbar → hamburger menu, domain reload survival -->
+
+**Chat Window UX & Domain Reload Survival — Toolbar Refactor, MenuOnly Interface, Transcript Serialization:**
+
+- **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool MenuOnly => false;` allows selective toolbar button repositioning without breaking backward compatibility. Providers can opt-in to hamburger-menu-only display.
+- **Toolbar button migration** — 5 buttons moved from toolbar to hamburger menu (≡):
+  - ScreenshotToolbarButton — `MenuOnly => true`
+  - AnnotateToolbarButton — `MenuOnly => true`
+  - ErrorResolverButton — `MenuOnly => true`
+  - Attach Image button — moved from toolbar flow bar to menu
+  - → CLI button — moved from footer bar to session menu
+- **MCPChatWindow toolbar filtering** — `if (p.MenuOnly) continue;` gates toolbar rendering. Menu rendering adds MenuOnly providers.
+- **Chat history domain reload survival** — 3 fixes for reload resilience:
+  - P0-B: Tool chips (⚙ set_property ✓) serialized via `TranscriptSerializer.Kind.Tool = 2` + 5-column format. Backward-compatible.
+  - P0-A: `OnDisable` saves transcript to SessionState. Close/reopen preserves history.
+  - P1: Image paths serialized as 5th column in `TranscriptSerializer`. First image persisted.
+- **TranscriptSerializer format upgrade (F21)** — Extended from 4 to 5 columns: `KindInt|Base64(Text)|Base64(ChipsData)|Base64(LlmPayload)|Base64(ImagePath)`. Kind enum extended: User=0, Assistant=1, Tool=2 (new). Backward-compat: old 3-4 column format missing columns → fallback to null.
+- **14 new NUnit tests** — MenuOnly filtering, toolbar registry, transcript edge cases on reload.
+- **Test Results**: 2943 py (unchanged) + 4899 NUnit (14 new), all green.
+
 ## [v0.62.0] — 2026-06-26 <!-- editor help tools, error resolver, scene health, auto-wiring, Roslyn -->
 
 **Editor Help Tools — Error Resolver Toolbar, Scene Health Audit, Auto-Wiring, Dry-Run Compile Check:**

@@ -74,5 +74,9 @@ namespace UnityMCP.Editor.Chat.Tests
 
             Assert.IsFalse(fired);
         }
+
+        [Test]
+        public void MenuOnly_IsTrue()
+            => Assert.IsTrue(_btn.MenuOnly, "Snap button must live in hamburger menu only");
     }
 }

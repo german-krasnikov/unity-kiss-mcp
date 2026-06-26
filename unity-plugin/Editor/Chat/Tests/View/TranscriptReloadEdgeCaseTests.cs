@@ -1,4 +1,4 @@
-// TDD — F21 gap-fill: serialization edge cases and cap behaviour.
+// TDD — F21 gap-fill: serialization edge cases, cap behaviour, tool chip reload (P0-B), image path (P1).
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
@@ -19,6 +19,18 @@ namespace UnityMCP.Editor.Chat.Tests
             return new ChatTranscript(c, ChatBlockRendererFactory.CreateDefault(null, null));
         }
 
+        // Helper: depth-first search for element with CSS class
+        private static VisualElement FindByClass(VisualElement root, string cls)
+        {
+            if (root.ClassListContains(cls)) return root;
+            foreach (var child in root.Children())
+            {
+                var found = FindByClass(child, cls);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
         // 1. cap: 210 messages → serialized max 200, tail preserved
         [Test]
         public void SerializeForReload_CapsToMaxMessages()
@@ -31,13 +43,11 @@ namespace UnityMCP.Editor.Chat.Tests
             var entries = TranscriptSerializer.Deserialize(data);
 
             Assert.AreEqual(200, entries.Count, "must cap at 200");
-            // tail preserved: last message should be msg209
             Assert.IsTrue(entries[199].Text.Contains("msg209"), "tail must be preserved");
-            // head trimmed: msg0..msg9 are gone
             Assert.IsFalse(entries[0].Text.Contains("msg0"), "msg0 must be trimmed");
         }
 
-        // 2. restore does not double entries (single instance, restore twice — CH4.test.6 fix)
+        // 2. restore does not double entries
         [Test]
         public void RestoreFromReload_DoesNotDoubleEntries()
         {
@@ -65,8 +75,8 @@ namespace UnityMCP.Editor.Chat.Tests
             var data = t1.SerializeForReload();
 
             var t2 = Make(out _);
-            t2.RestoreFromReload(data); // first restore
-            t2.RestoreFromReload(data); // second restore on same instance
+            t2.RestoreFromReload(data);
+            t2.RestoreFromReload(data);
 
             var entries = TranscriptSerializer.Deserialize(t2.SerializeForReload());
             Assert.AreEqual(1, entries.Count,
@@ -114,10 +124,7 @@ namespace UnityMCP.Editor.Chat.Tests
             t1.FinalizeAssistant();
             var data = t1.SerializeForReload();
 
-            var t2 = Make(out _);
-            t2.RestoreFromReload(data);
             var entries = TranscriptSerializer.Deserialize(data);
-
             Assert.AreEqual(1, entries.Count);
             Assert.AreEqual(unicode, entries[0].Text, "unicode must survive round-trip");
         }
@@ -136,7 +143,7 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNull(TranscriptSerializer.DeserializeChips(null));
         }
 
-        // 9. _entries list is capped at MaxMessages (CH4.arch.1 fix verification)
+        // 9. _entries list is capped at MaxMessages
         [Test]
         public void Entries_CappedAtMaxMessages_WhenContainerEvicts()
         {
@@ -144,17 +151,111 @@ namespace UnityMCP.Editor.Chat.Tests
             for (int i = 0; i < 210; i++)
                 t.AppendUserBubble($"msg{i}");
 
-            // Verify via reflection that _entries is also capped (not growing unboundedly)
             var entriesField = typeof(ChatTranscript)
                 .GetField("_entries", BindingFlags.NonPublic | BindingFlags.Instance);
-            var entries = (System.Collections.Generic.List<TranscriptEntry>)entriesField.GetValue(t);
-
+            var entries = (List<TranscriptEntry>)entriesField.GetValue(t);
             Assert.LessOrEqual(entries.Count, 200, "_entries must be capped at MaxMessages (200)");
 
-            // Also confirm SerializeForReload still caps correctly
-            var data    = t.SerializeForReload();
-            var serial  = TranscriptSerializer.Deserialize(data);
+            var data   = t.SerializeForReload();
+            var serial = TranscriptSerializer.Deserialize(data);
             Assert.AreEqual(200, serial.Count, "serialized must cap at 200");
+        }
+
+        // ── P0-B: Tool chip reload survival ──────────────────────────────────────
+
+        // 10. Tool chip after serialize/restore appears in DOM
+        [Test]
+        public void ToolChip_SerializeDeserialize_RoundTrip()
+        {
+            var t1 = Make(out _);
+            t1.AppendToolChip("read_file", ok: true, toolId: "tool-1");
+            var data = t1.SerializeForReload();
+
+            Assert.IsNotEmpty(data, "tool chip must produce serialized data");
+
+            var t2 = Make(out var c2);
+            t2.RestoreFromReload(data);
+            Assert.IsNotNull(FindByClass(c2, "tool-chip"),
+                "tool-chip element must be present after restore");
+        }
+
+        // 11. Order: user → tool → assistant preserved after restore
+        [Test]
+        public void ToolChip_RestoreOrder_MatchesOriginal()
+        {
+            var t1 = Make(out var c1);
+            t1.AppendUserBubble("question");
+            t1.AppendToolChip("read_file", ok: true, toolId: "t1");
+            t1.AppendOrExtendAssistant("answer");
+            t1.FinalizeAssistant();
+            var data = t1.SerializeForReload();
+
+            var t2 = Make(out var c2);
+            t2.RestoreFromReload(data);
+            Assert.AreEqual(c1.childCount, c2.childCount,
+                "child count must match original after restore");
+        }
+
+        // 12. _restoring guard: AppendToolChip during restore does not double-add entries
+        [Test]
+        public void ToolChip_NoDoubleAdd_DuringRestore()
+        {
+            var t1 = Make(out _);
+            t1.AppendToolChip("write_file", ok: true, toolId: "t2");
+            var data = t1.SerializeForReload();
+
+            var t2 = Make(out _);
+            t2.RestoreFromReload(data);
+            var data2 = t2.SerializeForReload();
+
+            var e1 = TranscriptSerializer.Deserialize(data);
+            var e2 = TranscriptSerializer.Deserialize(data2);
+            Assert.AreEqual(e1.Count, e2.Count, "restore must not double entries");
+        }
+
+        // 13. Failed tool chip (ok=false) preserves error status
+        [Test]
+        public void ToolChip_OkFalse_PreservedOnRoundTrip()
+        {
+            var t1 = Make(out _);
+            t1.AppendToolChip("bad_tool", ok: false, toolId: "t3");
+            var data = t1.SerializeForReload();
+
+            var t2 = Make(out var c2);
+            t2.RestoreFromReload(data);
+            Assert.IsNotNull(FindByClass(c2, "tool-chip--error"),
+                "error chip must be restored with error class");
+        }
+
+        // 14. Backward compat: data with unknown future kind (e.g. 9) is skipped, no crash
+        [Test]
+        public void ToolChip_BackwardCompat_UnknownKind_Skipped()
+        {
+            var t1 = Make(out _);
+            t1.AppendUserBubble("hi");
+            var data = t1.SerializeForReload();
+            // Inject an unknown-kind line (kind=9) — must be silently skipped
+            data += "9|aGk=||||\n";
+
+            var t2 = Make(out var c2);
+            Assert.DoesNotThrow(() => t2.RestoreFromReload(data));
+            Assert.AreEqual(1, c2.childCount, "unknown kind must be skipped, not crash");
+        }
+
+        // ── P1: Image path persistence ────────────────────────────────────────────
+
+        // 15. Image path on user bubble survives serialize/deserialize
+        [Test]
+        public void ImagePath_SerializeDeserialize_RoundTrip()
+        {
+            var t1 = Make(out _);
+            t1.AppendUserBubble("see image", chips: null, imagePath: "/tmp/test.png");
+            var data = t1.SerializeForReload();
+
+            var entries = TranscriptSerializer.Deserialize(data);
+            Assert.AreEqual(1, entries.Count);
+            Assert.AreEqual("/tmp/test.png", entries[0].ImagePath,
+                "image path must survive serialization round-trip");
         }
     }
 }

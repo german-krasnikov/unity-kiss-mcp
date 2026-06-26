@@ -221,7 +221,6 @@ namespace UnityMCP.Editor.Chat
             foreach (var ev in _evBuf) HandleEvent(ev);
             foreach (var rec in _toolBuf) HandleToolRecord(rec);
             _transcript.FlushStreaming();
-            RefreshCliButton();
             // _needsRefresh is now debounced to TurnDone (HandleEvent case TurnDone).
             // Do NOT act on it here — mid-stream partial compiles cause phantom CS errors.
             if (EditorPrefs.GetBool("MCPChat.AutoScroll", true))

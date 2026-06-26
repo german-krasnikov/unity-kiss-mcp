@@ -65,5 +65,9 @@ namespace UnityMCP.Editor.Chat.Tests
             var result = ErrorResolverButton.BuildPrompt(grouped, "quick_fix");
             StringAssert.Contains("(x3)", result);
         }
+
+        [Test]
+        public void MenuOnly_IsTrue()
+            => Assert.IsTrue(new ErrorResolverButton().MenuOnly, "Fix Errors button must live in hamburger menu only");
     }
 }

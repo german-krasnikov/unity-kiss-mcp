@@ -31,7 +31,6 @@ namespace UnityMCP.Editor.Chat
             if (_activity.Phase != ActivityPhase.Idle) { _activity.Done(); OnActivityChanged(); }
             ResetTokenCounters();
             _undoTracker.Invalidate();
-            RefreshCliButton();
         }
 
         /// <summary>
@@ -69,6 +68,21 @@ namespace UnityMCP.Editor.Chat
             else
             {
                 menu.AddDisabledItem(new GUIContent("Resume CLI Session... (unsupported)"));
+            }
+
+            menu.AddSeparator("");
+            var hasSession = !string.IsNullOrEmpty(_backend?.SessionId);
+            if (hasSession)
+                menu.AddItem(new GUIContent("→ CLI  (copy resume command)"), false, OnCopyCliResume);
+            else
+                menu.AddDisabledItem(new GUIContent("→ CLI  (no session yet)"));
+            menu.AddSeparator("");
+            menu.AddItem(new GUIContent("Attach Image"), false, OnAttachImage);
+            foreach (var p in ToolbarButtonRegistry.All)
+            {
+                if (!p.MenuOnly) continue;
+                var cap = p;
+                menu.AddItem(new GUIContent(cap.ButtonLabel), false, () => cap.OnClick(this));
             }
 
             menu.ShowAsContext();

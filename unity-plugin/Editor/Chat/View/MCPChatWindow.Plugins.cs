@@ -16,6 +16,7 @@ namespace UnityMCP.Editor.Chat
         {
             foreach (var p in ToolbarButtonRegistry.All)
             {
+                if (p.MenuOnly) continue; // shown in session menu instead
                 var provider = p; // capture for lambda
                 var btn = new Button(() =>
                 {

@@ -38,5 +38,9 @@ namespace UnityMCP.Editor.Chat.Tests
             ScreenshotService.CaptureFunc = (w, h, cam) => null;
             Assert.DoesNotThrow(() => _btn.OnClick(null));
         }
+
+        [Test]
+        public void MenuOnly_IsTrue()
+            => Assert.IsTrue(_btn.MenuOnly, "Annotate button must live in hamburger menu only");
     }
 }

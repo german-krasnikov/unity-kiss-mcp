@@ -12,6 +12,7 @@ namespace UnityMCP.Editor.Chat
         public int    Order       => 10;
         public string ButtonLabel => "Snap";
         public string Tooltip     => "Capture screenshot and add to message";
+        public bool   MenuOnly    => true;
 
         /// <summary>Set by MCPChatWindow.OnEnable to insert the stored path as a chip.</summary>
         internal static System.Action<string> OnScreenshotCaptured;

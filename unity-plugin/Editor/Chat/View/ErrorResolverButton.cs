@@ -17,6 +17,7 @@ namespace UnityMCP.Editor.Chat
         public int    Order       => 10;
         public string ButtonLabel => "Fix Errors";
         public string Tooltip     => "Group runtime errors and send a fix prompt to chat";
+        public bool   MenuOnly    => true;
 
         static ErrorResolverButton()
             => ToolbarButtonRegistry.Register(new ErrorResolverButton());

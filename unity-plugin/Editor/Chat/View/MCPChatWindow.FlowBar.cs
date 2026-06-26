@@ -12,7 +12,7 @@ namespace UnityMCP.Editor.Chat
         private VisualElement _flowBar;
         private VisualElement _flowFill;
         private bool _sweepPhase;
-        private Button _sendBtn, _stopBtn, _cliBtn;
+        private Button _sendBtn, _stopBtn;
 
         private VisualElement BuildFlowBar()
         {
@@ -111,16 +111,6 @@ namespace UnityMCP.Editor.Chat
             _contextBar = new ContextProgressBar();
             bar.Add(_contextBar);
 
-            _cliBtn = new Button(OnCopyCliResume) { text = "→ CLI" };
-            _cliBtn.AddToClassList("chat-btn");
-            _cliBtn.tooltip = "Copy resume command for CLI";
-            bar.Add(_cliBtn);
-
-            var attachBtn = new Button(OnAttachImage) { text = "+" };
-            attachBtn.AddToClassList("chat-btn");
-            attachBtn.tooltip = "Attach image";
-            bar.Add(attachBtn);
-
             _sendBtn = new Button(OnSend) { text = "Send" };
             _sendBtn.AddToClassList("chat-btn"); _sendBtn.AddToClassList("chat-btn--send");
             _stopBtn = new Button(CancelTurn) { text = "Stop" };
@@ -155,10 +145,5 @@ namespace UnityMCP.Editor.Chat
             CopyFlash.Show();
         }
 
-        internal void RefreshCliButton()
-        {
-            if (_cliBtn == null) return;
-            _cliBtn.SetEnabled(!string.IsNullOrEmpty(_backend?.SessionId));
-        }
     }
 }

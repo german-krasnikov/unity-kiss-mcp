@@ -537,10 +537,10 @@ unity-kiss-mcp/
 │       │   │   ├── ToolbarButtonRegistry.cs   # Registry for IToolbarButtonProvider implementations (v0.34.0)
 │       │   │   ├── PanelProviderRegistry.cs   # Registry for IPanelProvider implementations (v0.34.0)
 │       │   │   ├── ISettingsProvider.cs       # Plugin interface for custom settings UI (v0.34.0)
-│       │   │   ├── IToolbarButtonProvider.cs  # Plugin interface for toolbar buttons (v0.34.0)
+│       │   │   ├── IToolbarButtonProvider.cs  # Plugin interface for toolbar buttons (v0.34.0, MenuOnly DIM v0.63.0)
 │       │   │   ├── IPanelProvider.cs          # Plugin interface for side panels (v0.34.0)
 │       │   │   ├── ChatTranscript.cs          # In-memory message history + streaming→finalize strategy
-│       │   │   ├── TranscriptSerializer.cs    # Serialize/deserialize chat history to plain-text (F21 reload survival)
+│       │   │   ├── TranscriptSerializer.cs    # Serialize/deserialize chat history to plain-text (F21 reload survival, v0.63.0: Kind enum + 5-column format)
 │       │   │   ├── AssemblyInfo.cs            # AssemblyVersion + InternalsVisibleTo decorators (Chat.CLI)
 │       │   │   └── Tests/                     # CLI assembly tests (protocol, parsing, backends)
 │       │   │       ├── ChatStreamParserTests.cs # Parse stream-json events + control_request routing

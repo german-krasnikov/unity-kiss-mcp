@@ -11,6 +11,7 @@ namespace UnityMCP.Editor.Chat
         public int    Order       => 11; // right after Snap (10)
         public string ButtonLabel => "Annotate";
         public string Tooltip     => "Take screenshot and open annotation editor";
+        public bool   MenuOnly    => true;
 
         static AnnotateToolbarButton()
             => ToolbarButtonRegistry.Register(new AnnotateToolbarButton());

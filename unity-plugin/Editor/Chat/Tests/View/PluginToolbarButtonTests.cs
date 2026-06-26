@@ -88,6 +88,42 @@ namespace UnityMCP.Editor.Chat.Tests
             }
             finally { Object.DestroyImmediate(window); }
         }
+
+        // 5. MenuOnly provider → NOT rendered in toolbar bar.
+        [Test]
+        public void BuildPluginButtons_MenuOnlyProvider_SkippedInBar()
+        {
+            ToolbarButtonRegistry.Register(new FakeToolbarButtonProvider("snap", menuOnly: true));
+
+            var window = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                var bar = new VisualElement();
+                window.BuildPluginButtons(bar);
+                Assert.AreEqual(0, bar.childCount, "MenuOnly provider must not appear in toolbar bar");
+            }
+            finally { Object.DestroyImmediate(window); }
+        }
+
+        // 6. Mixed providers → only non-MenuOnly ones rendered in toolbar bar.
+        [Test]
+        public void BuildPluginButtons_MixedProviders_OnlyToolbarOnesAdded()
+        {
+            ToolbarButtonRegistry.Register(new FakeToolbarButtonProvider("regular_btn", "Regular"));
+            ToolbarButtonRegistry.Register(new FakeToolbarButtonProvider("menu_btn", "MenuOnly", menuOnly: true));
+
+            var window = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                var bar = new VisualElement();
+                window.BuildPluginButtons(bar);
+
+                var buttons = bar.Query<Button>().ToList();
+                Assert.AreEqual(1, buttons.Count, "Only non-MenuOnly providers must appear in toolbar");
+                Assert.AreEqual("Regular", buttons[0].text);
+            }
+            finally { Object.DestroyImmediate(window); }
+        }
     }
 
     internal sealed class ThrowingToolbarButtonProvider : IToolbarButtonProvider

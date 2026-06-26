@@ -72,6 +72,7 @@ namespace UnityMCP.Editor.Chat
                     Text       = display,
                     ChipsData  = TranscriptSerializer.SerializeChips(msg.Chips),
                     LlmPayload = string.IsNullOrEmpty(llmPayload) ? null : llmPayload,
+                    ImagePath  = imagePath,
                 });
                 if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
             }
@@ -113,6 +114,7 @@ namespace UnityMCP.Editor.Chat
                     Text       = text ?? "",
                     ChipsData  = TranscriptSerializer.SerializeChips(chips),
                     LlmPayload = llmPayload,
+                    ImagePath  = imagePaths != null && imagePaths.Count > 0 ? imagePaths[0] : null, // only first image survives reload
                 });
                 if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
             }
@@ -154,6 +156,7 @@ namespace UnityMCP.Editor.Chat
                     Text       = text ?? "",
                     ChipsData  = TranscriptSerializer.SerializeChips(chips),
                     LlmPayload = llmPayload,
+                    ImagePath  = imagePath,
                 });
                 if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
             }
@@ -171,6 +174,16 @@ namespace UnityMCP.Editor.Chat
         {
             FreezeAssistantBubble();
             _grouper.Add(BuildChip(toolName, ok, toolId), isError: !ok);
+            if (!_restoring)
+            {
+                _entries.Add(new TranscriptEntry {
+                    EntryKind  = TranscriptEntry.Kind.Tool,
+                    Text       = toolName,
+                    ChipsData  = ok ? "1" : "0",
+                    LlmPayload = toolId,
+                });
+                if (_entries.Count > MaxMessages) _entries.RemoveAt(0);
+            }
         }
 
         private const string CopyAttachedClass = "copy-attached";
@@ -321,11 +334,14 @@ namespace UnityMCP.Editor.Chat
                     {
                         case TranscriptEntry.Kind.User:
                             AppendUserBubble(e.Text, TranscriptSerializer.DeserializeChips(e.ChipsData),
-                                llmPayload: e.LlmPayload);
+                                imagePath: e.ImagePath, llmPayload: e.LlmPayload);
                             break;
                         case TranscriptEntry.Kind.Assistant:
                             AppendOrExtendAssistant(e.Text);
                             FinalizeAssistant();
+                            break;
+                        case TranscriptEntry.Kind.Tool:
+                            AppendToolChip(e.Text, e.ChipsData == "1", e.LlmPayload);
                             break;
                     }
                     _entries.Add(e); // rebuild _entries from saved data
