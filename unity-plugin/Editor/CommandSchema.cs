@@ -59,6 +59,10 @@ namespace UnityMCP.Editor
             { "execute_code", P("code", "undo_label") },
 
             // --- Runtime ---
+            { "get_perf", P(null) },
+            { "debug_animator", P("path") },
+            { "debug_physics", P("path", "radius") },
+            { "get_memory", P(null) },
             { "invoke_method", P("path,component,method", "args") },
             { "set_runtime_property", P("path,component,field,value") },
             { "query_state", P("queries") },
@@ -67,6 +71,11 @@ namespace UnityMCP.Editor
             { "test_step", P("path,position", "checks_before", "checks_after", "wait_after", "timeout") },
             { "run_playtest", P("script", "timeout") },
             { "fuzz_playtest", P(null, "steps", "seed", "timeout") },
+            { "watch_add",    P("path,component,field", "condition", "action", "interval_ms") },
+            { "get_watches",  P(null) },
+            { "watch_remove", P("id") },
+            { "watch_clear",  P(null) },
+            { "watch_reset",  P("id") },
 
             // --- Consolidated ---
             { "scene", P("action", "path") },

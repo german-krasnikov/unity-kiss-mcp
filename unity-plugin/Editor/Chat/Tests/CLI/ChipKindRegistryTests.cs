@@ -140,11 +140,25 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void AllKeys_Count_Is12()
+        public void AllKeys_Count_Is14()
         {
-            // BUG: AllKeys currently returns 9 — will FAIL until model/audio/image registered
+            // 12 original + field (130) + component (125) added to EnsureBuiltIns
             var count = System.Linq.Enumerable.Count(ChipKindRegistry.AllKeys);
-            Assert.AreEqual(12, count, $"Expected 12 built-in keys, got {count}");
+            Assert.AreEqual(14, count, $"Expected 14 built-in keys, got {count}");
+        }
+
+        [Test]
+        public void ForKey_Field_AfterEnsureBuiltIns_IsNotNull()
+        {
+            Assert.IsNotNull(ChipKindRegistry.ForKey(ChipKindKeys.Field),
+                "Built-in key 'field' must be registered via EnsureBuiltIns");
+        }
+
+        [Test]
+        public void ForKey_Component_AfterEnsureBuiltIns_IsNotNull()
+        {
+            Assert.IsNotNull(ChipKindRegistry.ForKey(ChipKindKeys.Component),
+                "Built-in key 'component' must be registered via EnsureBuiltIns");
         }
 
         // (j) Priority ordering: lower Priority wins

@@ -86,6 +86,7 @@ namespace UnityMCP.Editor.Tests
         [TestCase("get_hierarchy", ExpectedResult = false)]
         [TestCase("get_component", ExpectedResult = false)]
         [TestCase("get_console",   ExpectedResult = false)]
+        [TestCase("execute_code",  ExpectedResult = false)]
         public bool Registry_IsMutating_ReadCommands_ReturnFalse(string cmd)
             => CommandRegistry.IsMutating(cmd);
 

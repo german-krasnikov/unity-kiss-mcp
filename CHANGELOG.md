@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.59.0] — 2026-06-26 <!-- runtime debug, watch system, debug UI, chat fields, AI diagnostics -->
+
+**Runtime Debug, Watch System, Debug UI Panel, Chat Component Fields, AI Diagnostics & Security Hardening — 20-Architect Review:**
+
+- **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: true` flag, now executes during Play Mode without compilation pause. `invoke_method` supports `NonPublic` + `Static` binding flags. `IsAllowedAssembly` inverted to blocklist (custom asmdef assemblies now visible to Roslyn).
+- **Watch System** — 5 MCP tools (`watch_add`, `get_watches`, `watch_remove`, `watch_clear`, `watch_reset`) for polling any component field/property via reflection. `WatchCondition` triggers on threshold changes. `WatchScheduler` auto-polls via `EditorApplication.update` with zombie error storm backoff. `SessionState` persistence across domain reloads. Cap: 20 watches.
+- **Debug UI Panel** — `MCPDebugPanel` EditorWindow with 5 partial classes: watch rows with Unicode sparklines (`SparklineHelper`), eval bar (inline `CodeExecutor.Execute`), console preview, add-watch cascading dropdowns, Scene View overlay (`DebugOverlayDrawer`). USS styled.
+- **Chat Component Fields** — `ComponentChipProvider` for component-level chips in Chat. `PropertyContextMenuBridge` adds "Add to MCP Chat" to Inspector context menu. `FieldChipProvider` registered in `EnsureBuiltIns`. `ChipPropertyFormatter` DRY extraction from duplicated `FormatProperty`. `InlineChipModel` trailing pipe guard.
+- **AI Debug Tools** — Symptom classifier → batch gather → structured diagnostic context for LLM. State snapshots with diff capability (`snapshots.py`). `.claude/skills/ai-debugging.md` workflow skill.
+- **Performance Diagnostics** — 4 MCP tools: `get_perf` (FPS, Mono memory, GC), `debug_animator` (layers, transitions, parameters), `debug_physics` (Rigidbody state, colliders, OverlapSphere, layer matrix), `get_memory` (object counts with delta tracking).
+- **Security Hardening** — 4 new blocked patterns (`InvokeMember`, `EditorApplication.isPlaying`, `EditorApplication.isPaused`, `FileUtil.`). Null guard fix in `IsAllowedAssembly`. `SerializedObject` disposal in chip providers.
+
 ## [v0.58.0] — 2026-06-25 <!-- ask scene queries + AskUserQuestion unblock -->
 
 - **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 spatial/hierarchy terms (transforms, colliders, waypoints, bounds). Added SCENE_QUERY pattern with fallback for any Unity-noun question. Fixes ask rejecting valid scene questions.

@@ -110,7 +110,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **Reconnect (v0.30.3, v0.52.7)**: exponential backoff throttling (MIN=5s → MAX=60s, reset on success, jitter ±10%). v0.52.7: cooldown re-armed on every attempt (not only success), preventing retry spam when port unavailable. Heartbeat debounce=30s. send() reconnect no longer fires callbacks (only heartbeat does) — breaks reconnect feedback loop. push_catalog skips if already locked.
    - Max message: 10MB, timeouts: 30s default, 60s compile_preflight/batch, 120s run_tests/run_playtest/fuzz_playtest
 
-3. **Unity Plugin** (C#: 165+ files, ~17200 LOC, v0.42.0: Wizard asmdef split, Updates folder, MarkdownInlineFormatter extraction, v0.44.0: LevelUp UX, v0.45.0: InstallSourceDetector + async updaters, v0.55.10: unified SceneMcpOverlay + IconCanvas + PluginToolGrouping)
+3. **Unity Plugin** (C#: 165+ files, ~17800 LOC, v0.42.0: Wizard asmdef split, Updates folder, MarkdownInlineFormatter extraction, v0.44.0: LevelUp UX, v0.45.0: InstallSourceDetector + async updaters, v0.55.10: unified SceneMcpOverlay + IconCanvas + PluginToolGrouping, v0.59.0: Runtime Debug + Watch System + Chat field chips + Debug UI panel)
    - **MCPServer.cs**: Dual TCP listeners (main port 9500-9599 + chat port auto-assigned, separate), 4-byte BE framing, 10MB max, SO_KEEPALIVE, **v0.23.0: SO_REUSEPORT** (macOS/Linux) for rapid reconnect recovery, auto-assigns free ports via `PortResolver.FindFreePort()`, persists to Library/MCP_Port.json, state file (`ready`/`compiling`/`reloading`), `going_away` event before domain reload, ClientSlot pattern isolates CLI and Chat connections. **v0.37.0: IsReallyCompiling** — managed flag replaces EditorApplication.isCompiling latching, 120s wedge guard prevents false-positive "backgrounded" state. **v0.36.0: WritePortFile** writes both {pid}.port (main) + {pid}.chat-port (Windows env fallback). **v0.52.6: ShouldStartServer guard** — static ctor checks `ShouldStartServer(isBatchMode)` to prevent AssetImportWorker from creating conflicting port files during batch asset reimports. Detects batch mode via `EditorApplication.isBatchMode` OR `-nographics` args.
    - **PortResolver.cs**: Pure testable helpers (ResolvePort, ResolveChatPort, FindFreePort, SavePorts, IsValidPort, ParsePortFromJson) with 25 NUnit tests. Validates 1024–65535 range, skips reserved ports, fallback to OS-assigned via port 0. **v0.52.6: Chat port collision guard** — ResolveChatPort ensures chat port ≠ main port (prevents accidental self-binding). FindFreePort ceiling raised 9599→9699 to accommodate dual-port scanning.
    - **CommandRouter.cs** (v0.57.0 refactor): RegisterAll() → calls core commands + PluginRegistry.RegisterAllPlugins() for external plugins, data-driven IsMutating/IsRuntime. **v0.37.0: DefaultIsCompiling** — two-layer check (IsReallyCompiling + 120s wedge guard) prevents false-positive compile blocks. **v0.57.0: ProcessAsync simplified** — switch-based dispatch table via `CommandRegistry.HasAsyncHandler()` replaced inline if/else chains (148→27 lines, Open/Closed Principle). Extracted 6 async handlers: AsyncRunTests, AsyncWaitUntil, AsyncMoveTo, AsyncTestStep, AsyncRunPlaytest, AsyncAskUser.
@@ -140,6 +140,49 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      * **SceneAnnotationTool (v0.51.0)**: Unified entry point (Shift+A) for all annotation modes. Mode switching via menu. SceneAnnotationShortcut wires hotkeys. SceneAnnotationUtils for common validation/snapping.
      * **Chat Integration**: RegionChipProvider for region+annotation selection in chat (format methods: FormatRegion, FormatPoint, FormatPolyline, FormatMeasurement)
      * **Tests**: 104 C# NUnit tests (v0.46.0) + 67 new annotation tests (v0.51.0): RegionSnapshotAnnotationTests (27), AnnotationDrawingModeTests (23), RegionChipProviderAnnotationTests (17)
+
+### Runtime Debug Subsystem (v0.59.0)
+
+**Play Mode-Only Debugging & Monitoring:**
+
+   - **execute_code Play Mode Support**: Removed `mutating=true` restriction — code now executes in Play Mode (read-only scripting, no Edit Mode asset changes). Blocked patterns (Reflection, File I/O, Process control) unchanged.
+   - **invoke_method Private/Static Support**: Roslyn reflection now inspects private + static methods. IsAllowedAssembly check inverted to blocklist model (Roslyn visibility spans custom asmdef, Unity Code domain hidden by default).
+   - **Security Hardening (4 new blocked patterns v0.59.0)**:
+     * `InvokeMember(` — reflection-by-name dispatch bypass
+     * `EditorApplication.isPlaying`, `EditorApplication.isPaused` — Play mode kill-switch queries
+     * `FileUtil.` — UnityEditor file API bypass (System.IO already blocked)
+     * Null guard fix in IsAllowedAssembly (handles edge case custom asmdef with zero types)
+   - **Watch System**: 6 C# files + Python watch.py with 5 MCP tools:
+     * **WatchEntry**: id, path, component, field, condition, action, intervalMs (serializable state)
+     * **WatchCondition**: parses `< 10`, `> 0`, `== null` comparison expressions
+     * **WatchEvaluator**: Roslyn-based field value evaluation + condition triggering
+     * **WatchRegistry**: SessionState persistence of active watches
+     * **WatchScheduler**: EditorApplication.update polling (~500ms default interval)
+     * **WatchCommandHandler**: Maps 5 watch MCP tools to C# commands
+     * **Python tools**: watch_add (path, component, field, condition, action, interval_ms) → watch ID; get_watches (list + logs); watch_remove (by ID); watch_clear (all); watch_reset (re-arm triggered)
+     * **Conditions**: Optional comparison (e.g., `field < 10`) triggers action
+     * **Actions**: 'log' (default) or 'pause' (editor pause on trigger)
+   - **Chat Component Fields (v0.59.0)**:
+     * **PropertyContextMenuBridge**: Right-click Inspector property → "Add to MCP Chat" context menu entry
+     * **ComponentChipProvider**: Programmatic chip kind for component-level chip (path format: `goPath|CompType`). Priority 125, summary depth shows ~10 fields
+     * **FieldChipProvider**: Programmatic chip kind for single field chip (path format: `goPath|CompType|fieldName`). Priority 130, summary shows field value only. Registered via ChipKindRegistry.EnsureBuiltIns().
+     * **ChipPropertyFormatter DRY extraction**: Shared serialized property rendering used by both ComponentChipProvider + FieldChipProvider (handles UnityEvent expansion, ObjectReference disambiguation)
+     * **SerializedObject disposal fix**: Using statements ensure SO cleanup (prevents memory leak during watch polling)
+   - **Debug UI Panel (EditorWindow, v0.59.0)**:
+     * **MCPDebugPanel**: Menu item `MCP/Debug Panel`, hosts MCPDebugUI builder
+     * **MCPDebugUI (5 partial files)**: Watch rows, eval bar, add-watch dialog, console preview, sparklines
+     * **DebugOverlayDrawer**: Scene View labels for watched field values (read-only GL overlay)
+     * **SparklineHelper**: Compact sparkline graphs for numeric field trends (32×16px, min/max/current tracking)
+     * **MCPDebug.uss**: Stylesheet for panels + sparklines
+   - **AI Debug Tools (Python v0.59.0)**:
+     * **debug_tool.py**: Symptom classifier → batch command generator. Maps keywords (move, collide, anim, spawn, etc.) → relevant component types + MCP tools. Returns structured context for Haiku reasoning.
+     * **snapshots.py**: State capture + diff. Compares two snapshots (values before/after mutation).
+     * **4 new MCP tools**: debug_tool (symptom → batch plan), get_perf (profiler metrics), debug_animator (animator state dump), debug_physics (physics query results), get_memory (memory usage per system)
+   - **Profiler Helpers (C#)**:
+     * **ProfilerHelper**: QueryAsyncFrameTime, GetMemorySummary, GetAllocationRate
+     * **MemoryHelper**: GetTotalMemory, GetGCStats, GetSystemMemory
+     * **AnimatorHelper**: GetAnimatorState (current state, parameters, clip info)
+     * **PhysicsHelper**: RaycastResults, PhysicsSceneQuery, ColliderOverlapCheck
 
 4. **Guards (C#)**
    - **Compile guard**: blocks all except ping, get_version, get_console, screenshot, get_enabled_tools, compile_status
@@ -175,6 +218,7 @@ for _ in range(24):  # 2min @ 5s intervals
    - **Backend simplification (F28)**: Removed spawn-per-turn CodexBackend. BackendKind now 2 entries (Claude, Codex). BackendKind.Codex always creates CodexAppServerBackend (persistent JSON-RPC sessions, matches Claude one-per-chat model).
    - **External drag/drop (F29)**: FolderChipProvider accepts files/folders from Finder. ProcessExternalPath() static method routes DragAndDrop.paths into chip context.
    - **Input height (F30)**: Default input field height 4 lines (CompactH=117f). Compute() clamps via minH=min(CompactH, maxH) to prevent degenerate clamp in tiny windows.
+   - **Chat Component Fields (v0.59.0)**: Right-click Inspector properties or components → "Add to MCP Chat" menu entries. **PropertyContextMenuBridge**: wires EditorApplication.contextualPropertyMenu hook. **ComponentChipProvider** (priority 125, key "component"): chip for entire component summary (format: `goPath|CompType`). **FieldChipProvider** (priority 130, key "field"): chip for single field (format: `goPath|CompType|fieldName`). Both registered via ChipKindRegistry.EnsureBuiltIns(). **ChipPropertyFormatter DRY**: unified serialized property rendering (UnityEvent expansion, ObjectReference disambiguation, value display). **SerializedObject disposal**: Using statements prevent memory leaks during repeated inspector interactions.
 
 9. **Per-Backend Model Selection + Token Cost Display + Multi-Scene Chat Refs (v0.30.4, expanded v0.30.5)**
    - **Model Selector (Plugin v0.30.5)**: **MCPChatWindow.Selector.cs** with expanded presets per backend: **Claude** (Default, Fable 5, Opus 4.8/4.7/4.6, Sonnet 4.6, Haiku 4.5, Custom), **Codex** (Default, GPT-5.5, GPT-5.4/5.4-Mini, o3-pro, o3, o4-mini, GPT-4.1/4.1-Mini, Custom), **Gemini** (Default, 3.5 Flash, 3.1/3 Pro Preview, 3 Flash Preview, 2.5 Pro/Flash/Flash Lite, Custom). **ModelPresets.cs (NEW, v0.30.5)** extracted from BackendConfig: ModelPresetEntry, ModelPresetsConfig, ModelPresetDefaults.All (hardcoded fallbacks per BackendKind). **BackendConfigStore.GetPresetsForKind()** looks up Library/MCP_ChatBackendConfig.json ModelPresets field; not found → falls back to hardcoded defaults. **Result**: users can override model lists via config file without recompile. Dropdown rebuilt on backend switch. EditorPrefs persistence: `MCPChat.SelectedModel.{BackendKind}` (per-backend state). Custom model entry via text field. **Tests**: 44 new BackendConfigStoreTests (preset lookup, fallback, merge), 231 ModelSelectorTests (dropdown state, preset selection, custom entry, persistence across domain reload).
@@ -522,6 +566,30 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 22. SchemaGuard — pre-flight argument validation
 23. Asymmetric Reflection — compares write args vs read-back snapshot
 
+### Watch System (Python + C#, v0.59.0)
+
+**Play Mode Field Monitoring:**
+
+- **Python API** (`tools/watch.py`): 5 MCP tools registered via `watch` plugin
+  - `watch_add(path, component, field, condition="", action="log", interval_ms=500)` → watch ID (w1, w2, etc.)
+  - `get_watches()` → active watches + recent log entries
+  - `watch_remove(watch_id)` → delete by ID
+  - `watch_clear()` → remove all watches
+  - `watch_reset(watch_id)` → re-arm triggered watch
+  - **Conditions**: Optional comparison (e.g., `< 10`, `> 0`, `== null`) — if matched, action triggers
+  - **Actions**: `"log"` (default) prints value change to console; `"pause"` pauses editor on trigger
+  - **Interval**: Polling frequency in milliseconds (default 500ms, ~2 samples/sec)
+
+- **C# Runtime** (6 files + SessionState persistence):
+  - **WatchEntry**: Serializable state — id, path, component, field, condition, action, intervalMs. Non-serialized: LastValue, Triggered, LastSampleTime, ChangeCount, ErrorCount
+  - **WatchCondition**: Comparison parser — parses `< 10`, `> 0`, `== null` into opcode + value
+  - **WatchEvaluator**: Roslyn C# reflection + condition evaluation. Fetches field value, compares against condition, returns triggered boolean
+  - **WatchRegistry**: SessionState storage. Persists active watches across domain reloads (key = "UnityMCP_Watches")
+  - **WatchScheduler**: EditorApplication.update polling loop. Cycles through registry, samples each watch at configured interval, emits logs to console
+  - **WatchCommandHandler**: Maps 5 watch MCP tools to C# commands via CommandRouter
+  - **Flow**: CLI tool call → WatchCommandHandler → WatchRegistry mutation → (on next update cycle) WatchScheduler samples → Roslyn eval → condition check → action emit
+  - **Thread Safety**: SessionState handles main-thread serialization; all Roslyn evaluation on main thread
+
 ### Additional env-gated features
 - **ToolHinter** (`UNITY_MCP_HINTS`, default ON): suggests underused tools
 - **SceneBrief** (`UNITY_MCP_SCENE_BRIEF`): injects scene context on first call
@@ -678,10 +746,24 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **MCPStatus Window** (MCPStatusWindow.cs): Connection status monitor. UIToolkit-based with breathing heartbeat pulsation (ECG beat when connected, gentle beat when listening, flatline when stopped). Centered orb (`.orb`) + halo ring (`.orb-halo`) with state-driven colors & USS class-triggered pulsation (border-width + opacity + background-color transitions, 2021.3-safe). Polling every 700ms for state. Buttons: Restart MCP / Kill MCP / Reimport. Stylesheet: `MCPStatus.uss`.
 - **Stylesheet Helper** (MCPEditorUtils.LoadStyleSheet): Shared two-path loader for `.uss` files, called by windows (DRY; handles package-relative asset lookup).
 
-### Code Execution (C#: CodeExecutor)
-- Roslyn C# execution via `execute_code` command
-- Sandboxed with blocklist
-- Supports undo_label for undo grouping
+### Code Execution (C#: CodeExecutor, v0.59.0: Play Mode + Security Hardening)
+- **Roslyn C# execution via `execute_code` command**
+- **Play Mode Support (v0.59.0)**: Removed `mutating=true` restriction. Code executes in Play Mode (read-only, no Edit Mode asset changes). Blocked patterns unchanged.
+- **Security Sandbox (v0.59.0: 47 blocked patterns)**:
+  - **Reflection dispatch**: InvokeMember(, GetMethods(, GetProperties(, GetFields(, GetConstructors(, CreateDelegate (blocks runtime method invocation by name)
+  - **Process/File/Network**: Process, FileStream, StreamWriter, StreamReader, File, Directory, Path, WebClient, HttpClient (blocks file I/O, network access)
+  - **Assembly loading**: Assembly.Load, AppDomain, DllImport, extern, unsafe, DynamicMethod, ILGenerator, Activator (blocks dynamic code generation)
+  - **Reflection refinement (v0.59.0)**: GetField(, GetProperty(, GetValue(, SetValue( (singular accessors still blocked; use public properties only)
+  - **Using-directive bypass**: `using System.Diagnostics`, `using System.IO`, etc. (blocks shorthand imports)
+  - **Play mode kill-switch (v0.59.0)**: EditorApplication.isPlaying, EditorApplication.isPaused (blocks queries that could terminate active session)
+  - **Editor file API (v0.59.0)**: FileUtil.* (blocks UnityEditor file manipulation bypass)
+  - **Process termination**: EditorApplication.Exit, Application.Quit, Environment.FailFast (blocks editor/app shutdown)
+  - **Package manipulation**: AssetDatabase.ExportPackage, ImportPackage (blocks data exfiltration)
+  - **Project switching**: EditorApplication.OpenProject, ProjectWindowUtil (blocks arbitrary asset creation/project load)
+  - **Dynamic compilation**: CSharpCodeProvider, CodeDomProvider, CompileAssemblyFrom (blocks compile+exec bypass)
+- **SecurityScan Pipeline**: (1) Strip C# comments, (2) Densify whitespace (O(1) pattern matching), (3) OrdinalIgnoreCase matching, (4) 47-pattern blocklist check
+- **IsAllowedAssembly (v0.59.0)**: Inverted to blocklist model via Roslyn. Scans all types in custom asmdefs (Unity Code domain hides them by default). Null guard prevents edge case crashes.
+- **Supports undo_label for undo grouping**
 
 ### Undo Group Primitives (C#: UndoGroupHelper)
 - **UndoGroupHelper** (`UndoGroupHelper.cs`, public core API): Reusable named-group rollback primitive with 4 methods: `OpenNamedGroup()`, `CloseNamedGroup()`, `RevertToBeforeGroup()`, `CanRevert()`.
@@ -826,7 +908,11 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - `server/src/unity_mcp/middleware_paths.py` — PathResolverMixin extracted from middleware.py
 - `server/src/unity_mcp/metrics.py` — MetricsRegistry singleton
 - `server/src/unity_mcp/sampling.py` — SamplingService for visual verification
-- `server/src/unity_mcp/tools/` — 23 tool modules (scene, objects, asset, animation, batch, codegen, skills, spatial, ui, connection, runtime, gating, autobatch, intent tools, code_intel, etc.)
+- `server/src/unity_mcp/tools/` — 24 tool modules (scene, objects, asset, animation, batch, codegen, skills, spatial, ui, connection, runtime, gating, autobatch, intent tools, code_intel, watch, debug_tool, etc.)
+- `server/src/unity_mcp/tools/watch.py` — Watch system MCP tools (watch_add, get_watches, watch_remove, watch_clear, watch_reset)
+- `server/src/unity_mcp/tools/debug_tool.py` — Symptom classifier + batch command generator (debug_tool, get_perf, debug_animator, debug_physics, get_memory)
+- `server/src/unity_mcp/tools/runtime.py` — Play Mode tools (invoke_method with private/static support, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest)
+- `server/src/unity_mcp/debug/` — Debug subsystem (snapshots.py: state capture + diff)
 - `server/src/unity_mcp/plugins/` — plugin auto-discovery (3-source loader)
 - `server/src/unity_mcp/plugin_api.py` — stable public API for external plugins
 - `server/src/unity_mcp/reflect/` — Asymmetric Reflection (rules_objects, rules_runtime, rules_batch)
@@ -842,8 +928,9 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - `server/src/unity_mcp/visual_diff.py` — visual regression testing
 - `server/src/unity_mcp/sampling_postproc.py` — Haiku output normalizer
 
-**C#** (130+ files, 13400+ LOC):
+**C#** (165+ files, 17800+ LOC):
 - **Core** (55+ files): MCPServer, CommandRouter (3 partials), CommandRegistry/Schema, IMCPPlugin/PluginRegistry, ObjectManager, ValueParser, InputNormalizer, BatchHelper, HierarchySerializer, ComponentSerializer, RefManager, ErrorHelper, RuntimeHelper, PlaytestRunner (2 partials), PlaytestParser, MultiViewCapture, CodeExecutor, SearchHelper, SpatialHelper, AnimationHelper, TimelineHelper, AnimatorControllerHelper, ParticleHelper, ShaderHelper, ShaderGraphHelper, UIHelper, ReferenceHelper, AssetDatabaseHelper, ProjectSettingsHelper, MaterialHelper, PrefabHelper, ScriptableObjectHelper, MCPSettings (data class), MCPToolSettingsWindow, MCPPermissionsWindow, MCPConnectionWindow, MCPStatusWindow, MCPStatusModel, MCPStatusBarWidget, MCPActions, ChatSettingsHook (event hook)
+- **Debug Subsystem (v0.59.0)** (12 files): MCPDebugPanel, MCPDebugUI (5 partials: WatchRows, EvalBar, AddWatch, ConsolePreview), DebugOverlayDrawer, SparklineHelper, ProfilerHelper, MemoryHelper, AnimatorHelper, PhysicsHelper, WatchEntry, WatchCondition, WatchEvaluator, WatchRegistry, WatchScheduler, WatchCommandHandler (+ 10 test files: WatchEntryTests, WatchRegistryTests, ProfilerHelperTests, SparklineHelperTests, WatchEvaluatorTests, WatchCommandHandlerTests, MCPDebugUITests, WatchConditionTests, MemoryHelperTests, AnimatorHelperTests, PhysicsHelperTests). Stylesheet: MCPDebug.uss.
 - **Chat Module** (130+ files, optional behind UNITY_MCP_CHAT define, v0.29.2 split into CLI + View assemblies):
   - **CLI Assembly** (UnityMCP.Editor.Chat.CLI, protocol + backends, compiles independently when main broken):
     - **Backends:** CliBackendBase, ClaudeBackend, CodexAppServerBackend, CodexAppServerParser, CodexArgBuilder, BackendProviderRegistry (auto-discovery), IBackendProvider (extensible), BackendConfig, BackendConfigStore, BackendSettingsForm
@@ -852,6 +939,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
     - **Tools & Input:** ToolVerbMap, ToolCallAccumulator, ToolCallRecord, ToolChipGrouper, ToolDetailBuilder, ToolGroupState, ToolGroupSummary, UserTurnBuilder, UserToolResultParser
     - **UX/Formatting:** TokenFormat, ChatActivityState, ChatLabel, ChatRefResolver, CopyableText, CopyTextBuilder, InputHeightCalc, JsonArrayScan, ArgTokenizer, ArgQuoting
     - **Chip Infrastructure (shared):** ChipContextResolver, ChipKindDetector, InlineChipData, InlineChipModel, ChipPillFactory, BareNameNormalizer
+    - **Chip Providers (v0.59.0):** PropertyContextMenuBridge (Inspector context menu), ComponentChipProvider (component-level chip), FieldChipProvider (single-field chip), ChipPropertyFormatter (DRY serialized property rendering)
   - **View Assembly** (UnityMCP.Editor.Chat.View, UI rendering, depends on CLI):
     - **Windows & Cards:** MCPChatWindow (10 partials: Drain, FlowBar, Chips, InlineChips, Selector, Approve, Slash, Session, Resize, Send), RestoreButton, TurnUndoTracker, SelectionSummary, CompileAutoFix, EditorStateSnapshot, ToolPing, **ToolApprovalCard** (RiskClassifier, SessionAllowlist), **AskUserCard** (radio/checkbox/freetext)
     - **Response Rendering:** ResponseTagInliner, MixedParagraphRenderer (paragraph pills), RefParser (ref parsing for response pills)

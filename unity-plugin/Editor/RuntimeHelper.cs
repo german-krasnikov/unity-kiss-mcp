@@ -37,7 +37,7 @@ namespace UnityMCP.Editor
             if (comp == null)
                 throw new ArgumentException(ErrorHelper.ComponentNotFound(componentType, go));
 
-            var methods = comp.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance);
+            var methods = comp.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
             var method = methods.FirstOrDefault(m => m.Name == methodName);
             if (method == null)
             {

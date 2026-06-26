@@ -46,7 +46,7 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 101 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 112 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `MCP → Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Antigravity, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="101 MCP Tools · 230 Tests (0 Python · 230 Unity · 0 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="112 MCP Tools · 7720 Tests (2898 Python · 4738 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.59.0</b> — 2026-06-26 — **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: …</summary>
+
+**Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: true` flag, now executes during Play Mode without compilation pause. …
+
+</details>
+
+<details>
 <summary><b>v0.58.0</b> — 2026-06-25 — **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 …</summary>
 
 **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 spatial/hierarchy terms (transforms, colliders, waypoints, bounds).
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.54.1</b> — 2026-06-23 — **Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when …</summary>
-
-**Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when Unity loses/regains focus with multiple CLI tools connected.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.54.1** — 2026-06-23 — **Focus-Loss CPU Storm (Multi-Unity × Multi-CLI)** — Fixed 1000% CPU spike when …
 - **v0.53.1** — 2026-06-23 — **Codex App-Server Elicitation Hang** — Fixed infinite spinner on mutating MCP …
 - **v0.53.0** — 2026-06-23 — **Reconnect stability** — Exponential backoff (5→60s) on failed reconnects + …
 - **v0.52.6** — 2026-06-22 — **Multi-Unity Port Race Conditions** — Fixed port file collision and …

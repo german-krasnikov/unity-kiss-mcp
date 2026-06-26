@@ -15,9 +15,21 @@ import ast
 import json
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import warnings
+
+
+def _find_pytest_python(repo_root: pathlib.Path) -> str:
+    """Find a Python interpreter that has pytest installed."""
+    venv_python = repo_root / "server" / ".venv" / "bin" / "python"
+    if venv_python.exists():
+        return str(venv_python)
+    brew = shutil.which("python3.12") or shutil.which("python3.11")
+    if brew:
+        return brew
+    return sys.executable
 from typing import Optional
 
 try:
@@ -67,17 +79,13 @@ def count_mcp_tools(src_dir: pathlib.Path) -> Optional[int]:
 
 
 def count_pytest_python(tests_dir: pathlib.Path) -> int:
-    """Count non-live Python tests via pytest --collect-only.
-
-    Reproduce:
-      source server/.venv/bin/activate
-      python -m pytest server/tests/ --collect-only -q -m "not live" 2>&1 | grep 'collected'
-    """
+    """Count non-live Python tests via pytest --collect-only."""
     if not tests_dir.exists():
         return 0
+    py = _find_pytest_python(tests_dir.parent.parent)
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", str(tests_dir),
+            [py, "-m", "pytest", str(tests_dir),
              "--co", "-q", "--no-header", "-m", "not live"],
             capture_output=True, text=True, timeout=120,
         )
@@ -88,17 +96,13 @@ def count_pytest_python(tests_dir: pathlib.Path) -> int:
 
 
 def count_pytest_live(tests_dir: pathlib.Path) -> int:
-    """Count live Python tests via pytest --collect-only -m live.
-
-    Reproduce:
-      source server/.venv/bin/activate
-      python -m pytest server/tests/ --collect-only -q -m "live" 2>&1 | grep 'collected'
-    """
+    """Count live Python tests via pytest --collect-only -m live."""
     if not tests_dir.exists():
         return 0
+    py = _find_pytest_python(tests_dir.parent.parent)
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", str(tests_dir),
+            [py, "-m", "pytest", str(tests_dir),
              "--co", "-q", "--no-header", "-m", "live"],
             capture_output=True, text=True, timeout=120,
         )

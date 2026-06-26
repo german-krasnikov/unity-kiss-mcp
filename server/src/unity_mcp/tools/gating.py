@@ -54,6 +54,9 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     ],
     "RUNTIME": [
         "invoke_method", "set_runtime_property", "wait_until", "move_to", "query_state",
+        "watch_add", "get_watches", "watch_remove", "watch_clear", "watch_reset",
+        "debug", "snapshot",
+        "get_perf", "debug_animator", "debug_physics", "get_memory",
     ],
     "ASSETS": [
         "asset", "prefab", "scriptable_object", "project_settings",
@@ -112,6 +115,10 @@ TIER1: set[str] = {
     # runtime tools — always available in Play Mode
     "invoke_method", "set_runtime_property", "wait_until", "move_to",
     "query_state", "test_step", "run_playtest", "fuzz_playtest",
+    # watch system
+    "watch_add", "get_watches", "watch_remove", "watch_clear", "watch_reset",
+    # AI debug tools
+    "debug", "snapshot",
 }
 
 # All known tool names across all tiers

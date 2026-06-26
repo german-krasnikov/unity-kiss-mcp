@@ -81,7 +81,10 @@ unity-kiss-mcp/
 │   │   │   ├── overlay.py      # Pillow-based SoM overlay renderer (numbered circles, boxes)
 │   │   │   ├── extract.py      # Parse and filter rects from Unity screenshot payload
 │   │   │   └── diff_annotate.py # Annotate before/after images with SoM, call sampling
-│   │   ├── tools/              # Tool modules (27 files + __init__, asset tool extended v0.30.4)
+│   │   ├── debug/              # Debug subsystem (v0.59.0: state capture + watch system)
+│   │   │   ├── __init__.py
+│   │   │   └── snapshots.py    # State capture + diff (snapshot comparison for debugging)
+│   │   ├── tools/              # Tool modules (30 files + __init__, asset tool extended v0.30.4, v0.59.0: +3 debug tools)
 │   │   │   ├── __init__.py     # Tool module registry
 │   │   │   ├── reload_ladder.py # Reload recovery T0-T5 ladder (MVID-delta healing proof)
 │   │   │   ├── objects.py      # create/delete/find/inspect/set_parent/set_material
@@ -109,10 +112,13 @@ unity-kiss-mcp/
 │   │   │   ├── metrics_tool.py          # Performance metrics tool
 │   │   │   ├── code_intel.py            # find_references, compile_preflight, semantic_at
 │   │   │   ├── scene_session.py         # save_session, load_session, screenshot_baseline/compare (plain-text format v0.18.0+)
+│   │   │   ├── debug_tool.py            # Symptom classifier + runtime diagnostic tool (v0.59.0, 278 LOC)
+│   │   │   ├── diagnostics.py           # Performance/animator/physics/memory helpers (v0.59.0, 345 LOC)
+│   │   │   ├── watch.py                 # Watch system MCP tool interface (v0.59.0, 412 LOC)
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # 2840 unit tests + 78 live tests + conftest.py (v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests)
+│   └── tests/                  # 2851 unit tests + 78 live tests + conftest.py (v0.59.0: +11 debug tests; v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
@@ -131,6 +137,10 @@ unity-kiss-mcp/
 │       ├── test_screenshot_*.py        # Screenshot features
 │       ├── test_update_check.py        # Update checker: GitHub API, version parsing, cache TTL (v0.47.1)
 │       ├── test_unstructured_mcp.py    # Guard tests: _UnstructuredMCP forces structured_output=False (4 tests, v0.50.3)
+│       ├── test_debug_tool.py           # Debug tool symptom classifier tests (v0.59.0)
+│       ├── test_diagnostics.py          # Diagnostics helper tests (v0.59.0)
+│       ├── test_snapshots.py            # State capture + diff tests (v0.59.0)
+│       ├── test_watch.py                # Watch system tests (v0.59.0)
 │       ├── live/conftest.py            # Live test fixtures + _ok/_iid helpers (v0.26.0 DRY)
 │       ├── live/test_multiscene_live.py        # Multi-scene live integration (158 tests, v0.24.3)
 │       ├── live/test_multiscene_stress_live.py # Stress tests: large scenes, rapid operations (243 tests, v0.24.3)
@@ -142,7 +152,7 @@ unity-kiss-mcp/
 │       ├── test_autobatch.py            # _quote_if_spaces, _DOTTED_KV_RE, setup/set/configure_objects (v0.55.10)
 │       ├── test_parse_kv.py             # parse_kv quote-strip, lookahead _KV_RE (v0.55.10)
 │       ├── test_server_filtering.py     # Port discovery edge cases (v0.55.10)
-│       └── ... + domain tests (186+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
+│       └── ... + domain tests (190+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
 │   ├── Editor/
 │   │   ├── ReloadBinder.cs                   # SO_REUSEADDR bind-retry for port 9600+
@@ -164,7 +174,7 @@ unity-kiss-mcp/
 │   ├── UnityMCP.Reload.asmdef                # Core assembly (no references)
 │   ├── package.json                          # v0.1.4, "com.unity-mcp.reload"
 │   └── package.json.meta
-├── unity-plugin/               # Unity Editor Plugin (165+ C# files, ~17200 LOC, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests, v0.55.10: +346 tests for gating/subcategories/icons)
+├── unity-plugin/               # Unity Editor Plugin (176+ C# files, ~18700 LOC, v0.59.0: +11 Debug files, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests, v0.55.10: +346 tests for gating/subcategories/icons)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, SaveProjectSettings) + 35 tests (v0.35.0: 4-arg chain env→ProjectSettings→Library→FindFreePort)
@@ -328,6 +338,39 @@ unity-kiss-mcp/
 │       │   │   └── ... (8 test files total)
 │       │   ├── UnityMCP.Editor.Wizard.asmdef # Separate compile unit, references core Editor asmdef
 │       │   └── WizardAssemblyInfo.cs      # AssemblyVersion + InternalsVisibleTo
+│       ├── Debug/                         # Debug UI Panel + Watch System (v0.59.0: 11 C# files, 44 tests)
+│       │   ├── MCPDebugPanel.cs            # EditorWindow entry point (v0.59.0)
+│       │   ├── MCPDebugUI.cs               # Core debug UI orchestrator (v0.59.0)
+│       │   ├── MCPDebugUI.WatchRows.cs     # Watch list rendering (partial class, v0.59.0)
+│       │   ├── MCPDebugUI.EvalBar.cs       # Expression evaluator UI (partial class, v0.59.0)
+│       │   ├── MCPDebugUI.ConsolePreview.cs # Console output preview (partial class, v0.59.0)
+│       │   ├── MCPDebugUI.AddWatch.cs      # Add watch dialog (partial class, v0.59.0)
+│       │   ├── DebugOverlayDrawer.cs       # Scene view debug labels + sparklines (v0.59.0)
+│       │   ├── WatchEntry.cs               # Single watch data structure (v0.59.0)
+│       │   ├── WatchCondition.cs           # Conditional breakpoint/eval (v0.59.0)
+│       │   ├── WatchEvaluator.cs           # Watch expression evaluation engine (v0.59.0)
+│       │   ├── WatchRegistry.cs            # Watch storage + lifecycle (v0.59.0)
+│       │   ├── WatchScheduler.cs           # Watch polling scheduler (v0.59.0)
+│       │   ├── WatchCommandHandler.cs      # Handle watch commands from Python (v0.59.0)
+│       │   ├── SparklineHelper.cs          # Mini performance graphs (v0.59.0)
+│       │   ├── ProfilerHelper.cs           # Profiler data access helpers (v0.59.0)
+│       │   ├── MemoryHelper.cs             # Memory tracking + GC integration (v0.59.0)
+│       │   ├── PhysicsHelper.cs            # Physics diagnostics (raycasts, colliders) (v0.59.0)
+│       │   ├── AnimatorHelper.cs           # Animator state inspection (v0.59.0)
+│       │   ├── MCPDebug.uss                # Debug UI stylesheet (v0.59.0)
+│       │   └── Tests/                      # 44 NUnit tests (v0.59.0)
+│       │       ├── MCPDebugUITests.cs
+│       │       ├── WatchEntryTests.cs
+│       │       ├── WatchConditionTests.cs
+│       │       ├── WatchEvaluatorTests.cs
+│       │       ├── WatchRegistryTests.cs
+│       │       ├── WatchSchedulerTests.cs
+│       │       ├── WatchCommandHandlerTests.cs
+│       │       ├── SparklineHelperTests.cs
+│       │       ├── ProfilerHelperTests.cs
+│       │       ├── MemoryHelperTests.cs
+│       │       ├── PhysicsHelperTests.cs
+│       │       └── AnimatorHelperTests.cs
 │       ├── RegionTool/                     # Region Selection + Scene Annotations (v0.46.0, v0.51.0: annotations, 171 C# tests)
 │       │   ├── Polygon2D.cs                 # Immutable 2D polygon, winding-number PIP, AABB bounds, CSV import/export, RDP simplify
 │       │   ├── SceneRegionTool.cs           # EditorTool: multi-mode FSM (Lasso/Rect/Circle/PbP), keyboard shortcuts, state machine
@@ -370,9 +413,14 @@ unity-kiss-mcp/
 │       │       │   └── RenderStateAnnotationTests.cs (v0.51.0)
 │       │       └── RegionSnapshotAnnotationTests.cs (v0.51.0: 27 tests for factory methods + type-specific ShortLabel)
 │       ├── Chat/CLI/RegionChipProvider.cs   # Region + annotation chip provider for chat (v0.46.0, v0.51.0: +3 format methods)
+│       ├── Chat/CLI/ComponentChipProvider.cs # Component field chip provider for chat context (v0.59.0)
+│       ├── Chat/CLI/ChipPropertyFormatter.cs # DRY component property formatting (v0.59.0)
 │       ├── Chat/Tests/CLI/RegionChipProviderTests.cs # Chip provider tests
 │       ├── Chat/Tests/CLI/RegionChipProviderAnnotationTests.cs # Annotation-specific chip provider tests (v0.51.0: 17 tests)
+│       ├── Chat/Tests/CLI/PropertyContextMenuBridgeTests.cs # Property context menu tests (v0.59.0)
 │       ├── Chat/Tests/CLI/SceneRegionStateTests.cs # State persistence tests
+│       ├── Chat/View/PropertyContextMenuBridge.cs # Right-click property menu integration (v0.59.0)
+│       ├── Chat/View/MCPChatWindow.DebugContext.cs # Debug context injection in chat (v0.59.0)
 │       ├── Updates/                       # Update checking + changelog display (v0.42.0, v0.44.0: LevelUp UX, v0.45.0: install-source detection)
 │       │   ├── ChangelogReader.cs         # Parse CHANGELOG.md entries (version, date, content)
 │       │   ├── UpdateBanner.cs            # Update notification banner UI (DRY RepoGitUrl constant, v0.44.0)
@@ -665,7 +713,7 @@ unity-kiss-mcp/
 │       ├── UnityMCP.Runtime.TestHelpers.asmdef # Separate assembly for test utilities
 │       └── TestHelpers/
 │           └── TestDummyMB.cs             # Dummy MonoBehaviour for AddComponent<> in editor tests (moved from Editor/Chat/Tests v0.25.0)
-├── unity-test-project/          # Unity 6000.3 test project (4532 EditMode NUnit tests total, v0.54.1: +3 connection stability tests)
+├── unity-test-project/          # Unity 6000.3 test project (4576 EditMode NUnit tests total, v0.59.0: +44 debug/watch tests; v0.54.1: +3 connection stability tests)
 │   ├── Assets/Tests/Editor/     # NUnit test files
 │   ├── Assets/Animations/       # Animation clips + controllers
 │   ├── Assets/Scenes/

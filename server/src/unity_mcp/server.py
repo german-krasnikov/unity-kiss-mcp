@@ -130,6 +130,7 @@ from .tools.spatial import validate_layout, get_spatial_context, scan_scene, che
 from .tools.ui import create_ui, set_rect, menu, shader
 from .tools.connection import list_connections, reconnect_unity
 from .tools.runtime import invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
+from .tools.watch import watch_add, get_watches, watch_remove, watch_clear, watch_reset
 from .tools.autobatch import setup_objects, set_properties, configure_objects
 from .tools.code_intel import find_references, compile_preflight, semantic_at
 from .tools.animator_intent_tool import animator_intent

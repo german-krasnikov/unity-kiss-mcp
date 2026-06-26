@@ -13,6 +13,12 @@ namespace UnityMCP.Editor.Chat
     {
         private const string PackageId = "com.unity-mcp.editor";
 
+#if UNITY_INCLUDE_TESTS
+        private static string _packageRootOverride;
+        internal static void SetPackageRootForTest(string root) => _packageRootOverride = root;
+        internal static void ClearPackageRootForTest() => _packageRootOverride = null;
+#endif
+
         /// <summary>Returns per-port config filename. Port=0 falls back to legacy bare name.</summary>
         public static string ConfigFileName(int port) =>
             port > 0 ? $"unity-mcp-config-{port}.json" : "unity-mcp-config.json";
@@ -110,23 +116,30 @@ namespace UnityMCP.Editor.Chat
         /// </summary>
         public static string GetOrCreateConfigPath(string configDir, int port)
         {
-            var packageRoot = Path.GetFullPath($"Packages/{PackageId}");
-            var serverDir   = ResolveServerDir(packageRoot);
-            if (serverDir == null)
+            var source = InstallSourceDetector.Detect();
+
+            // Non-local install: always use uvx (server available via PyPI)
+            if (source != InstallSourceDetector.Source.Local)
             {
-                if (InstallSourceDetector.Detect() == InstallSourceDetector.Source.Local)
-                {
-                    Debug.LogError($"[MCP Chat] Server not found at expected path (package={packageRoot}). " +
-                                   "Check the UPM package is installed correctly.");
-                    return null;
-                }
-                // Git/Registry/Embedded/Unknown install — server available via PyPI
                 var uvxJson = BuildClaudeConfigJson("uvx",
                     new[] { "--from", WizardConfigWriter.GitInstallUrl, "unity-mcp" },
                     port);
                 var uvxPath = Path.Combine(configDir, ConfigFileName(port));
                 AtomicWrite(uvxPath, uvxJson);
                 return uvxPath;
+            }
+
+#if UNITY_INCLUDE_TESTS
+            var packageRoot = _packageRootOverride ?? Path.GetFullPath($"Packages/{PackageId}");
+#else
+            var packageRoot = Path.GetFullPath($"Packages/{PackageId}");
+#endif
+            var serverDir   = ResolveServerDir(packageRoot);
+            if (serverDir == null)
+            {
+                Debug.LogError($"[MCP Chat] Server not found at expected path (package={packageRoot}). " +
+                               "Check the UPM package is installed correctly.");
+                return null;
             }
 
             const string LastServerDirPref = "UnityMCP_LastServerDir";

@@ -21,6 +21,10 @@ namespace UnityMCP.Editor.Chat
             var llmText  = ChipTextInterleaver.ToLlmPayload(msg, store.Chips);
             if (string.IsNullOrEmpty(llmText)) return;
 
+            var debugCtx = BuildDebugContext();
+            if (!string.IsNullOrEmpty(debugCtx))
+                llmText = debugCtx + "\n" + llmText;
+
             var images = CollectImageChipBytes(msg.Chips);
             var turnJson = images.Count > 0
                 ? UserTurnBuilder.Build(llmText, images)

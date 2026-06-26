@@ -112,6 +112,8 @@ namespace UnityMCP.Editor.Chat
             _builtInsRegistered = true;
             Register(new ImageChipProvider());    // priority 50 — external images (obj==null)
             Register(new HierarchyChipProvider());
+            Register(new ComponentChipProvider()); // priority 125 — programmatic only
+            Register(new FieldChipProvider());     // priority 130 — programmatic only
             Register(new FolderChipProvider());
             Register(new SceneChipProvider());
             Register(new ScriptChipProvider());

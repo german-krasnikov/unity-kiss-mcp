@@ -1,0 +1,182 @@
+.mcp-debug-panel {
+    flex-direction: column;
+    padding: 8px;
+    background-color: var(--unity-colors-window-background);
+}
+
+/* Section header */
+.section-header {
+    font-size: 10px;
+    -unity-font-style: bold;
+    color: var(--unity-colors-label-text);
+    margin-top: 8px;
+    margin-bottom: 4px;
+    opacity: 0.7;
+    text-transform: uppercase;
+}
+
+/* ── Watch rows ──────────────────────────────────────────── */
+
+.watch-rows {
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.watch-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 3px 6px;
+    border-bottom-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    min-height: 22px;
+}
+
+.watch-row:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.watch-changed {
+    background-color: rgba(232, 162, 58, 0.12);
+}
+
+.watch-triggered {
+    background-color: rgba(232, 71, 58, 0.15);
+}
+
+.watch-error {
+    opacity: 0.45;
+}
+
+.watch-label {
+    flex-grow: 1;
+    font-size: 10px;
+    color: var(--unity-colors-label-text);
+    overflow: hidden;
+    -unity-text-overflow-position: end;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.watch-value {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #3ad29f;
+    min-width: 60px;
+    -unity-text-align: middle-right;
+    margin-left: 6px;
+    margin-right: 4px;
+}
+
+.watch-delta {
+    font-size: 9px;
+    color: #e8a23a;
+    min-width: 28px;
+    -unity-text-align: middle-center;
+    margin-right: 4px;
+}
+
+.sparkline {
+    font-size: 10px;
+    color: #3ad29f;
+    min-width: 52px;
+    margin-right: 4px;
+    letter-spacing: -1px;
+}
+
+.watch-condition {
+    font-size: 9px;
+    color: #e8473a;
+    min-width: 40px;
+    margin-right: 4px;
+    background-color: rgba(232, 71, 58, 0.12);
+    padding: 1px 3px;
+    border-radius: 3px;
+}
+
+.watch-remove {
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    padding: 0;
+    margin-left: 2px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.watch-remove:hover {
+    color: #e8473a;
+}
+
+/* ── Add watch form ──────────────────────────────────────── */
+
+.add-watch-form {
+    flex-direction: column;
+    padding: 6px;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.add-watch-btn {
+    margin-top: 4px;
+    background-color: rgba(58, 210, 159, 0.15);
+    border-color: #3ad29f;
+    border-radius: 3px;
+    color: #3ad29f;
+}
+
+.add-watch-btn:hover {
+    background-color: rgba(58, 210, 159, 0.28);
+}
+
+/* ── Eval bar ────────────────────────────────────────────── */
+
+.eval-section {
+    flex-direction: column;
+    margin-bottom: 8px;
+}
+
+.eval-bar {
+    flex-direction: row;
+    align-items: center;
+}
+
+.eval-input {
+    flex-grow: 1;
+    margin-right: 4px;
+}
+
+.eval-submit {
+    min-width: 40px;
+}
+
+.eval-result {
+    font-size: 10px;
+    color: #3ad29f;
+    margin-top: 2px;
+    padding: 2px 4px;
+    white-space: normal;
+    word-wrap: normal;
+    overflow: hidden;
+}
+
+/* ── Console preview ─────────────────────────────────────── */
+
+.console-preview {
+    flex-direction: column;
+    max-height: 110px;
+    overflow: hidden;
+    border-width: 1px;
+    border-color: var(--unity-colors-default-border);
+    border-radius: 3px;
+    padding: 4px;
+}
+
+.console-log {
+    font-size: 9px;
+    white-space: normal;
+    color: var(--unity-colors-label-text);
+    overflow: hidden;
+}

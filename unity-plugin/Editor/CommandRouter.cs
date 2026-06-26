@@ -376,6 +376,21 @@ namespace UnityMCP.Editor
             CommandRegistry.RegisterAsync("run_playtest", AsyncRunPlaytest, runtime: true);
             CommandRegistry.Register("query_state", args => GameStateHelper.Snapshot(
                 JsonHelper.ExtractString(args, "queries")), runtime: true);
+            CommandRegistry.Register("get_perf", _ => ProfilerHelper.GetSnapshot(), runtime: true);
+            CommandRegistry.Register("debug_animator", args =>
+            {
+                var go = ComponentSerializer.FindObjectOrThrow(JsonHelper.ExtractString(args, "path"));
+                var animator = go.GetComponent<Animator>();
+                if (animator == null) throw new ArgumentException("No Animator on " + go.name);
+                return AnimatorHelper.GetState(animator);
+            }, runtime: true);
+            CommandRegistry.Register("debug_physics", args =>
+            {
+                var go = ComponentSerializer.FindObjectOrThrow(JsonHelper.ExtractString(args, "path"));
+                float radius = JsonHelper.ExtractFloat(args, "radius");
+                return PhysicsHelper.GetState(go, radius > 0f ? radius : 5f);
+            }, runtime: true);
+            CommandRegistry.Register("get_memory", _ => MemoryHelper.GetSnapshot());
 
             // Write (mutating)
             CommandRegistry.Register("create_object", ExecCreateObject, mutating: true);
@@ -446,10 +461,13 @@ namespace UnityMCP.Editor
             // Spatial mutation: region_clear (delete objects inside polygon)
             CommandRegistry.Register("region_clear", args => SpatialHelper.RegionClear(args), mutating: true);
 
-            // Code execution via Roslyn (mutating)
+            // Code execution via Roslyn (non-mutating: allowed in Play Mode)
             CommandRegistry.Register("execute_code", args => CodeExecutor.Execute(
                 JsonHelper.ExtractString(args, "code"),
-                JsonHelper.ExtractString(args, "undo_label") ?? "execute_code"), mutating: true);
+                JsonHelper.ExtractString(args, "undo_label") ?? "execute_code"));
+
+            // Watch system (Phase 3)
+            WatchCommandHandler.RegisterAll();
 
             PluginRegistry.RegisterAllPlugins();
             AttributeScanner.ScanAndRegister();

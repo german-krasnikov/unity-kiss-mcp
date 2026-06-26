@@ -8,8 +8,8 @@ namespace UnityMCP.Editor.Chat
     /// Chip kind for a single serialized field of a component.
     /// Key = "field". Path = "goPath|CompType|fieldName".
     /// CanHandle = false — created programmatically from Inspector context menu.
+    /// Registered via ChipKindRegistry.EnsureBuiltIns().
     /// </summary>
-    [InitializeOnLoad]
     internal sealed class FieldChipProvider : IChipKindProvider
     {
         public string   Key              => ChipKindKeys.Field;
@@ -18,8 +18,6 @@ namespace UnityMCP.Editor.Chat
         public string   HexColor         => "#f59e0b";
         public string   DefaultDepth     => "summary";
         public string[] BarePathExtensions => System.Array.Empty<string>();
-
-        static FieldChipProvider() => ChipKindRegistry.Register(new FieldChipProvider());
 
         public bool     CanHandle(Object obj, string assetPath) => false;
         public ChipData Create(Object obj, string assetPath)    => default;
@@ -44,45 +42,18 @@ namespace UnityMCP.Editor.Chat
             var comp = go.GetComponent(compType);
             if (comp == null) return bracket + $"\n{fieldName}=(component not found)";
 
-            var so   = new SerializedObject(comp);
+            using var so = new SerializedObject(comp);
             var prop = so.FindProperty(fieldName);
             if (prop == null) return bracket + $"\n{fieldName}=(not found)";
 
-            return bracket + $"\n{fieldName}={FormatProperty(prop)}";
+            return bracket + $"\n{fieldName}={ChipPropertyFormatter.Format(prop)}";
         }
 
         // Test seam: replace with a mock to avoid scene queries in unit tests.
         internal static System.Func<string, GameObject> FindObjectOverride;
 
         private static GameObject FindObject(string path)
-        {
-            if (FindObjectOverride != null) return FindObjectOverride(path);
-            return ComponentSerializer.FindObject(path);
-        }
-
-        private static string FormatProperty(SerializedProperty prop)
-        {
-            return prop.propertyType switch
-            {
-                SerializedPropertyType.Integer         => prop.intValue.ToString(),
-                SerializedPropertyType.Boolean         => prop.boolValue.ToString(),
-                SerializedPropertyType.Float           => prop.floatValue.ToString("G"),
-                SerializedPropertyType.String          => prop.stringValue,
-                SerializedPropertyType.Color           => prop.colorValue.ToString(),
-                SerializedPropertyType.ObjectReference => prop.objectReferenceValue != null
-                    ? prop.objectReferenceValue.name : "(null)",
-                SerializedPropertyType.Enum             =>
-                    prop.enumValueIndex >= 0 && prop.enumValueIndex < prop.enumDisplayNames.Length
-                        ? prop.enumDisplayNames[prop.enumValueIndex]
-                        : $"(enum:{prop.enumValueIndex})",
-                SerializedPropertyType.Vector2         => prop.vector2Value.ToString(),
-                SerializedPropertyType.Vector3         => prop.vector3Value.ToString(),
-                SerializedPropertyType.Vector4         => prop.vector4Value.ToString(),
-                SerializedPropertyType.Rect            => prop.rectValue.ToString(),
-                SerializedPropertyType.Quaternion      => prop.quaternionValue.eulerAngles.ToString(),
-                _                                      => $"({prop.propertyType})"
-            };
-        }
+            => FindObjectOverride != null ? FindObjectOverride(path) : ComponentSerializer.FindObject(path);
 
         public void Navigate(string reference)
         {

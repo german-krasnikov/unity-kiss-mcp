@@ -430,6 +430,41 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(7, mIncl.PositionedChips[0].TextOffset, "inclusive: chip at boundary shifts");
         }
 
+        // ── Group D: DeriveDisplayName (pipe-path fix) ────────────────────────
+
+        // D1: pipe path with 3 parts → "CompType.fieldName" dot notation
+        [Test]
+        public void DeriveDisplayName_PipePath_ThreeParts_ReturnsDotNotation()
+        {
+            var m = new InlineChipModel();
+            m.RestoreFromReload(
+                new[] { "Player|Transform|m_localPosition" },
+                new[] { ChipKindKeys.Field });
+            Assert.AreEqual("Transform.m_localPosition", m.Chips[0].DisplayName);
+        }
+
+        // D2: pipe path with 2 parts → returns suffix after pipe
+        [Test]
+        public void DeriveDisplayName_PipePath_TwoParts_ReturnsSuffix()
+        {
+            var m = new InlineChipModel();
+            m.RestoreFromReload(
+                new[] { "Player|Transform" },
+                new[] { ChipKindKeys.Component });
+            Assert.AreEqual("Transform", m.Chips[0].DisplayName);
+        }
+
+        // D3: slash path → returns last segment (regression)
+        [Test]
+        public void DeriveDisplayName_SlashPath_ReturnsLastSegment()
+        {
+            var m = new InlineChipModel();
+            m.RestoreFromReload(
+                new[] { "/Root/Child" },
+                new[] { ChipKindKeys.Hierarchy });
+            Assert.AreEqual("Child", m.Chips[0].DisplayName);
+        }
+
         // R6: full scenario — chip, type "test", chip, build message, verify segment order.
         [Test]
         public void FullScenario_ChipTypeChip_CorrectSegmentOrder()

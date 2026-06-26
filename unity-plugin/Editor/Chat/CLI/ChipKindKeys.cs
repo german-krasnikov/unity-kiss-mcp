@@ -26,6 +26,8 @@ namespace UnityMCP.Editor.Chat
         public const string Region          = "region";
         // Single serialized field of a component. Path = "goPath|CompType|fieldName".
         public const string Field           = "field";
+        // A component on a GameObject. Path = "goPath|CompType".
+        public const string Component       = "component";
         // Annotated screenshot captured by the annotation editor. Path = absolute PNG path.
         public const string AnnotatedScreenshot = "annotated_screenshot";
     }

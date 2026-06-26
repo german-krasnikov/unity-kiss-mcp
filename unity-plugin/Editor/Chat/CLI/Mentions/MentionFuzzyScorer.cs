@@ -30,8 +30,8 @@ namespace UnityMCP.Editor.Chat
             // Exact match
             if (pattern.Equals(candidateLower, StringComparison.Ordinal)) return 1000;
 
-            // Short query (≤2): prefix/substring fast path only
-            if (pattern.Length <= 2)
+            // Short query (≤1): prefix/substring fast path only
+            if (pattern.Length <= 1)
                 return ShortScore(pattern, candidateLower);
 
             // Prefix match bonus

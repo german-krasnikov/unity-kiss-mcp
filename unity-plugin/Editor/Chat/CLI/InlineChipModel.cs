@@ -129,6 +129,15 @@ namespace UnityMCP.Editor.Chat
         private static string DeriveDisplayName(string path)
         {
             if (string.IsNullOrEmpty(path)) return path;
+            var pipe = path.IndexOf('|');
+            if (pipe >= 0)
+            {
+                var parts = path.Split('|');
+                var suffix = path.Substring(pipe + 1);
+                return string.IsNullOrEmpty(suffix)
+                    ? (pipe > 0 ? path.Substring(0, pipe) : path)
+                    : (parts.Length >= 3 ? $"{parts[1]}.{parts[2]}" : suffix);
+            }
             var slash = path.LastIndexOf('/');
             return slash >= 0 ? path.Substring(slash + 1) : path;
         }

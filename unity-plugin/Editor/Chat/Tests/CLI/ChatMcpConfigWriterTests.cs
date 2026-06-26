@@ -1,6 +1,9 @@
 using System;
 using System.IO;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 using UnityMCP.Editor.Chat;
 
 namespace UnityMCP.Editor.Chat.Tests
@@ -11,7 +14,11 @@ namespace UnityMCP.Editor.Chat.Tests
     public class ChatMcpConfigWriterInstallSourceTests
     {
         [TearDown]
-        public void TearDown() => InstallSourceDetector.ClearTestOverride();
+        public void TearDown()
+        {
+            InstallSourceDetector.ClearTestOverride();
+            ChatMcpConfigWriter.ClearPackageRootForTest();
+        }
 
         [Test]
         public void GetOrCreateConfigPath_GitInstall_NoServer_ReturnsUvxConfig()
@@ -32,9 +39,10 @@ namespace UnityMCP.Editor.Chat.Tests
         public void GetOrCreateConfigPath_LocalInstall_NoServer_ReturnsNull()
         {
             InstallSourceDetector.SetSourceForTest(InstallSourceDetector.Source.Local);
+            // Override packageRoot to a path that has no sibling server/ with pyproject.toml
+            ChatMcpConfigWriter.SetPackageRootForTest("/nonexistent/path/unity-plugin");
+            LogAssert.Expect(LogType.Error, new Regex("Server not found at expected path"));
 
-            // In test env, Packages/com.unity-mcp.editor has no sibling server/ with pyproject.toml
-            // so serverDir == null — with Local source it must log error and return null
             var path = ChatMcpConfigWriter.GetOrCreateConfigPath();
 
             Assert.IsNull(path, "Local install with missing server should return null");

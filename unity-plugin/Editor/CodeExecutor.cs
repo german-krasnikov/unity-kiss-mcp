@@ -38,6 +38,12 @@ namespace UnityMCP.Editor
             "= System.IO", "= System.Diagnostics", "= System.Net", "= System.Reflection",
             // Dynamic compilation bypass — attacker could compile+exec arbitrary code
             "CSharpCodeProvider", "CodeDomProvider", "CompileAssemblyFrom",
+            // Reflection method dispatch by name — bypasses allowlist
+            "InvokeMember(",
+            // Play-mode kill switch — could terminate the active session
+            "EditorApplication.isPlaying", "EditorApplication.isPaused",
+            // UnityEditor file API — bypasses System.IO block
+            "FileUtil.",
         };
 
         // Pre-densified blocked patterns (whitespace stripped) for O(1) SecurityScan matching
@@ -284,10 +290,12 @@ namespace UnityMCP.Editor
         internal static bool IsAllowedAssembly(Assembly a)
         {
             var name = a.GetName().Name;
-            return name == "mscorlib" || name == "netstandard" ||
-                   name == "System" || name == "System.Core" ||
-                   name.StartsWith("UnityEngine") || name.StartsWith("UnityEditor") ||
-                   name == "Assembly-CSharp" || name == "Assembly-CSharp-Editor";
+            if (string.IsNullOrEmpty(name)) return false;
+            if (name.StartsWith("UnityMCP")) return false;
+            if (name.StartsWith("Microsoft.CodeAnalysis")) return false;
+            if (name.StartsWith("Mono.Cecil")) return false;
+            try { return !string.IsNullOrEmpty(a.Location); }
+            catch { return false; }
         }
 
         private static void CheckEmitResult(object emitResult)
@@ -304,7 +312,9 @@ namespace UnityMCP.Editor
                 })
                 .Select(d => d.ToString())
                 .ToArray();
-            throw new InvalidOperationException("Compile error:\n" + string.Join("\n", errors));
+            var errorMessage = string.Join("\n", errors);
+            Debug.LogError($"[MCP] execute_code compile error: {errorMessage}");
+            throw new InvalidOperationException("Compile error:\n" + errorMessage);
         }
 
         private static string RunWithUndo(Assembly assembly, string undoLabel)
