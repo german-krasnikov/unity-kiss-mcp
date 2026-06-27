@@ -40,6 +40,7 @@ namespace UnityMCP.Editor.Chat
             if (!_turnInFlight) return;
             UndoGroupHelper.CloseNamedGroup(_inflightGroupId);
             _turns.Add(new TurnRecord(_inflightGroupId, ""));
+            UndoGroupStack.Push(_inflightGroupId);
             _inflightGroupId = -1;
             _turnInFlight    = false;
         }
@@ -66,6 +67,7 @@ namespace UnityMCP.Editor.Chat
         public void Invalidate()
         {
             _turns.Clear();
+            UndoGroupStack.Clear();
             _inflightGroupId = -1;
             _turnInFlight    = false;
         }

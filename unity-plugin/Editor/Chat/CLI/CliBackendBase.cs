@@ -40,7 +40,18 @@ namespace UnityMCP.Editor.Chat
         protected string PendingPrompt { get; private set; }
 
         public virtual bool IsRunning => _proc?.IsRunning ?? false;
-        public string SessionId { get; protected set; }
+
+        private string _sessionId;
+        public string SessionId
+        {
+            get => _sessionId;
+            protected set
+            {
+                _sessionId = value;
+                if (!string.IsNullOrEmpty(value))
+                    UnityEditor.SessionState.SetString("MCPChat_BackendSessionId", value);
+            }
+        }
 
         // ── LIFECYCLE (shared, not overridden) ────────────────────────────────
 

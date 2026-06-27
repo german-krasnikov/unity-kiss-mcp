@@ -90,7 +90,7 @@ namespace UnityMCP.Editor.Chat
         {
             int pts = snap.VerticesFlat != null ? snap.VerticesFlat.Length / 2 : 0;
             var sb  = new StringBuilder();
-            sb.Append($"pts={pts} len={snap.LengthOrDistance:F1}m");
+            sb.Append($"type=polyline pts={pts} len={snap.LengthOrDistance:F1}m");
             if (!string.IsNullOrEmpty(snap.Label))
                 sb.Append($" label={snap.Label}");
             if (!string.IsNullOrEmpty(snap.SceneName))
@@ -100,22 +100,32 @@ namespace UnityMCP.Editor.Chat
 
             if (depth == "full")
             {
+                // Deployment hint: tell AI which tool uses these waypoints
+                sb.Append("\n# use these XZ waypoints for am_deploy_line");
+
                 if (snap.VerticesFlat != null && snap.VerticesFlat.Length >= 4)
                 {
-                    sb.Append("\npoints=");
+                    sb.Append("\npoints:");
                     for (int i = 0; i < pts; i++)
                     {
-                        if (i > 0) sb.Append(';');
+                        sb.Append("\n  - x=");
                         sb.Append(snap.VerticesFlat[i * 2].ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
-                        sb.Append(',');
+                        sb.Append(" z=");
                         sb.Append(snap.VerticesFlat[i * 2 + 1].ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
                     }
                 }
-                if (snap.ObjectPaths != null && snap.ObjectPaths.Length > 0)
-                {
-                    sb.Append("\nnear(r=2m):");
-                    foreach (var p in snap.ObjectPaths) sb.Append('\n').Append(p);
-                }
+            }
+
+            if (pts >= 2)
+            {
+                sb.Append($"\nstart=({snap.VerticesFlat[0]:F2},{snap.VerticesFlat[1]:F2})");
+                sb.Append($"\nend=({snap.VerticesFlat[(pts - 1) * 2]:F2},{snap.VerticesFlat[(pts - 1) * 2 + 1]:F2})");
+            }
+
+            if (depth == "full" && snap.ObjectPaths != null && snap.ObjectPaths.Length > 0)
+            {
+                sb.Append("\nnear(r=2m):");
+                foreach (var p in snap.ObjectPaths) sb.Append('\n').Append(p);
             }
             return sb.ToString();
         }

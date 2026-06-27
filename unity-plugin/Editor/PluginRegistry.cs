@@ -49,6 +49,8 @@ namespace UnityMCP.Editor
 
         public static IReadOnlyList<IMCPPlugin> GetAll() => _plugins;
 
+        public static IReadOnlyList<IMCPPlugin> All => _plugins;
+
         internal static void Clear() => _plugins.Clear();
     }
 }

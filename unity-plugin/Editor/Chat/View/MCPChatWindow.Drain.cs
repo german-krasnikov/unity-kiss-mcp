@@ -46,7 +46,9 @@ namespace UnityMCP.Editor.Chat
                 return;
 
             var state = new PendingTurnState(
-                isIdle ? null : _backend?.SessionId,
+                isIdle ? null
+                       : (_backend?.SessionId
+                          ?? SessionState.GetString("MCPChat_BackendSessionId", null)),
                 inputText,
                 chipPaths,
                 _agentMode,

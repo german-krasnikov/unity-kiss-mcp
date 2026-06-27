@@ -9,7 +9,7 @@ unity-kiss-mcp/
 │   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
 │   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall, connect, disconnect, pull - v0.45.0)
 │   └── tests/                  # Bootstrap + UI + install tests
-├── server/                     # Python MCP Server (2840 unit tests total, v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
+├── server/                     # Python MCP Server (2958 unit tests total, v0.64.0: +75 polyline/scene tests; v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # _UnstructuredMCP(FastMCP) instance, lifespan, 99 registered MCP tools (v0.50.3)
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
@@ -751,7 +751,7 @@ unity-kiss-mcp/
 │       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
 │       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat.*")
 │       ├── MenuHelper.cs + SceneHelper.cs + EditorStateHelper.cs
-│       ├── JsonHelper.cs + StringDistance.cs + UndoGroupHelper.cs
+│       ├── JsonHelper.cs + StringDistance.cs + UndoGroupHelper.cs + UndoGroupStack.cs (v0.64.0: T5 undo tool)
 │       ├── FileOutputHelper.cs             # ScreenshotsDir = <ProjectRoot>/ScreenShots/ (v0.23.0)
 │       ├── VersionTracker.cs
 │       └── Roslyn/                         # Roslyn compiler for execute_code
@@ -759,7 +759,7 @@ unity-kiss-mcp/
 │       ├── UnityMCP.Runtime.TestHelpers.asmdef # Separate assembly for test utilities
 │       └── TestHelpers/
 │           └── TestDummyMB.cs             # Dummy MonoBehaviour for AddComponent<> in editor tests (moved from Editor/Chat/Tests v0.25.0)
-├── unity-test-project/          # Unity 6000.3 test project (4852 EditMode NUnit tests total, v0.61.0: +17 profiling UI tests; v0.60.0: +profiling/rendering tests; v0.59.0: +44 debug/watch tests)
+├── unity-test-project/          # Unity 6000.3 test project (4922 EditMode NUnit tests total, v0.64.0: +70 chat/undo/plugins tests; v0.61.0: +17 profiling UI tests; v0.60.0: +profiling/rendering tests; v0.59.0: +44 debug/watch tests)
 │   ├── Assets/Tests/Editor/     # NUnit test files
 │   ├── Assets/Animations/       # Animation clips + controllers
 │   ├── Assets/Scenes/

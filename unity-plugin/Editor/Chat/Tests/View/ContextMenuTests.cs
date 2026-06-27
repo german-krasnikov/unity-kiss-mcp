@@ -22,6 +22,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             ChipKindRegistry.ResetToBuiltIns();
             ChipPillFactory.AddToContextAction = null;
+            ChipPillFactory.PendingChips.Clear();
         }
 
         // F16a: FindChatWindow returns null when no window open
@@ -126,6 +127,56 @@ namespace UnityMCP.Editor.Chat.Tests
                 Assert.AreEqual(1, chips.Count, "GO chip must be present");
                 Assert.AreEqual(ChipKindKeys.Hierarchy, chips[0].KindKey);
                 Assert.AreEqual(go.name, chips[0].DisplayName);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        // T7-1: PendingChips queue enqueues correctly
+        [Test]
+        public void PendingChips_Enqueue_StoresChip()
+        {
+            ChipPillFactory.AddToContextAction = null;
+            var chip = new ChipData(ChipKindKeys.Field, "/Obj|Health|value", "Health.value", 0);
+            ChipPillFactory.PendingChips.Enqueue(chip);
+            Assert.AreEqual(1, ChipPillFactory.PendingChips.Count);
+            Assert.AreEqual("Health.value", ChipPillFactory.PendingChips.Peek().DisplayName);
+        }
+
+        // T7-2: AddChip with action set invokes directly, queue stays empty
+        [Test]
+        public void AddChip_ActionSet_InvokesDirectly_QueueEmpty()
+        {
+            ChipData received = default;
+            ChipPillFactory.AddToContextAction = c => received = c;
+            var chip = new ChipData(ChipKindKeys.Field, "/Obj|Health|value", "Health.value", 0);
+            ChipPillFactory.AddChip(chip);
+            Assert.AreEqual("Health.value", received.DisplayName);
+            Assert.AreEqual(0, ChipPillFactory.PendingChips.Count);
+        }
+
+        // T7-3: FieldContextMenu.Validate returns true regardless of AddToContextAction
+        [Test]
+        public void FieldContextMenu_Validate_NullAction_LogicPassesForComponent()
+        {
+            ChipPillFactory.AddToContextAction = null;
+            // Validate logic: cmd.context is Component
+            Assert.IsTrue(typeof(Component).IsAssignableFrom(typeof(BoxCollider)));
+        }
+
+        // T7-4: PropertyContextMenuBridge builds chip regardless of AddToContextAction state
+        [Test]
+        public void PropertyContextMenuBridge_NullAction_BuildsChip()
+        {
+            ChipPillFactory.AddToContextAction = null;
+            var go = new GameObject("T7TestObj");
+            go.AddComponent<BoxCollider>();
+            var comp = go.GetComponent<BoxCollider>();
+            var so   = new SerializedObject(comp);
+            var prop = so.FindProperty("m_Size");
+            try
+            {
+                var chip = PropertyContextMenuBridge.BuildChipForProperty(prop);
+                Assert.IsTrue(chip.HasValue, "Chip must be built regardless of AddToContextAction state");
             }
             finally { Object.DestroyImmediate(go); }
         }

@@ -343,6 +343,19 @@ namespace UnityMCP.Editor.Chat.Tests
                 "UNITY_MCP_SESSION_TIMEOUT must be present");
             Assert.AreEqual("300", env["UNITY_MCP_SESSION_TIMEOUT"]);
         }
+
+        // T6: SessionId setter must eagerly write to SessionState for domain-reload survival.
+        [Test]
+        public void SessionId_eager_written_to_SessionState_on_set()
+        {
+            QueueLine("x", (_, s) => { s.Add(ChatEvent.SessionInit("persist-sess")); return true; });
+            _b.DrainEvents(new List<ChatEvent>());
+            Assert.AreEqual("persist-sess",
+                UnityEditor.SessionState.GetString("MCPChat_BackendSessionId", null),
+                "SessionId setter must persist to SessionState immediately");
+            // cleanup
+            UnityEditor.SessionState.EraseString("MCPChat_BackendSessionId");
+        }
     }
 
     /// <summary>

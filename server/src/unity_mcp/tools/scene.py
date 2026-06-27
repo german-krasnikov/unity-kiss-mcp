@@ -67,9 +67,15 @@ async def get_hierarchy(depth: int = 2, root: str | None = None, filter: str | N
     return result
 
 
-async def get_console(count: int = 10, level: str | None = None, first: int = 0) -> str:
-    """Recent console logs. first>0: return first N from init buffer + last (count-first) from ring."""
-    return await _send("get_console", _args(count=count, level=level, first=first if first > 0 else None))
+async def get_console(count: int = 10, level: str | None = None, first: int = 0,
+                      keyword: str | None = None, count_only: bool = False) -> str:
+    """Recent console logs. keyword: case-insensitive substring filter. count_only: return N matches as string."""
+    return await _send("get_console", _args(
+        count=count, level=level,
+        first=first if first > 0 else None,
+        keyword=keyword,
+        count_only="true" if count_only else None,
+    ))
 
 
 async def get_compile_errors() -> str:
@@ -185,6 +191,11 @@ async def checkpoint(label: str = "checkpoint") -> str:
     return await _send("checkpoint", _args(label=label))
 
 
+async def undo_last(turns: int = 1) -> str:
+    """Undo the last N AI turns in the Unity Undo stack. Default: 1."""
+    return await _send("undo_last", _args(turns=turns))
+
+
 async def fingerprint(path: str | None = None, depth: int = 3) -> str:
     """Scene state hash. Returns fp:XXXXXXXX. If unchanged, skip re-reading. ~5 tokens."""
     return await _send("fingerprint", _args(path=path, depth=depth))
@@ -219,6 +230,7 @@ def register(mcp, send, args):
     mcp.tool(annotations=_RO)(search_scene)
     mcp.tool(annotations=_RW)(editor)
     mcp.tool(annotations=_RW)(checkpoint)
+    mcp.tool(annotations=_RW)(undo_last)
     mcp.tool(annotations=_RO)(fingerprint)
     mcp.tool(annotations=_RO)(scene_diff)
     from . import scene_session

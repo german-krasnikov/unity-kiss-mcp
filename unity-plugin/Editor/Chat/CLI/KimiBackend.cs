@@ -9,6 +9,7 @@ namespace UnityMCP.Editor.Chat
         private readonly string _model;
         private readonly string _approvalMode;
         private readonly string _extraArgs;
+        private bool _pendingResumeNotice;
 
         internal KimiBackend(string model = null, string approvalMode = null,
             string extraArgs = null, string resumeSessionId = null)
@@ -16,8 +17,13 @@ namespace UnityMCP.Editor.Chat
             _model        = model;
             _approvalMode = approvalMode;
             _extraArgs    = extraArgs;
-            SessionId     = resumeSessionId;
-            // Note: kimi -p mode doesn't emit session_id — resumeSessionId unused.
+            // Kimi doesn't support --resume. Show a notice on first response, clear stale key.
+            if (!string.IsNullOrEmpty(resumeSessionId))
+            {
+                _pendingResumeNotice = true;
+                UnityEditor.SessionState.EraseString("MCPChat_BackendSessionId");
+            }
+            SessionId = null; // clear: Kimi can't resume, so don't persist any id
         }
 
         protected override string BinaryName           => "kimi";
@@ -31,6 +37,13 @@ namespace UnityMCP.Editor.Chat
         }
 
         protected override void ParseLine(string line, List<ChatEvent> sink)
-            => KimiParser.ParseLine(line, sink);
+        {
+            if (_pendingResumeNotice)
+            {
+                sink.Add(ChatEvent.Error("[Session restarted — Kimi does not support resume after domain reload]"));
+                _pendingResumeNotice = false;
+            }
+            KimiParser.ParseLine(line, sink);
+        }
     }
 }

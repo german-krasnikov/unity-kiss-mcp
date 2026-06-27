@@ -334,6 +334,11 @@ namespace UnityMCP.Editor
                 UndoGroupHelper.BeginGroup($"AI: {label}");
                 return $"Checkpoint: {label}";
             });
+            CommandRegistry.Register("undo_last", args =>
+            {
+                var turns = ExtractInt(args, "turns", 1);
+                return UndoGroupStack.RevertLast(turns);
+            }, mutating: true);
             CommandRegistry.Register("validate_layout", args => LayoutValidator.Validate(
                 JsonHelper.ExtractString(args, "root") ?? "/",
                 float.TryParse(JsonHelper.ExtractString(args, "min_distance") ?? "3",

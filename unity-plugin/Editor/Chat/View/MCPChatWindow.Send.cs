@@ -67,6 +67,7 @@ namespace UnityMCP.Editor.Chat
                 : displayText);
             _sentTextCache.Set(displayText);
             _sentLlmCache.Set(llmPayload); // task#10: persist the EXACT full-path bytes sent this turn
+            _resolver?.Refresh(); // ensure objects created since last turn are visible to BareNameNormalizer
             _transcript.SetLastTurnChips(displayMsg.Chips);
             _transcript.AppendUserBubble(displayMsg, llmPayload, screenshotPath);
             _backend.SendTurn(turnJson);

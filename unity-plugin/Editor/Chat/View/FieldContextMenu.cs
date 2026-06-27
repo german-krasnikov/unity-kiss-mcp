@@ -10,8 +10,7 @@ namespace UnityMCP.Editor.Chat
     internal static class FieldContextMenu
     {
         [MenuItem("CONTEXT/Component/Add Field to Chat", true)]
-        private static bool Validate(MenuCommand cmd)
-            => cmd.context is Component && ChipPillFactory.AddToContextAction != null;
+        private static bool Validate(MenuCommand cmd) => cmd.context is Component;
 
         [MenuItem("CONTEXT/Component/Add Field to Chat")]
         private static void Execute(MenuCommand cmd)
@@ -33,8 +32,7 @@ namespace UnityMCP.Editor.Chat
                     var displayName = prop.displayName;
                     menu.AddItem(new GUIContent(displayName), false, () =>
                     {
-                        var chip = BuildChipData(comp, fieldName);
-                        ChipPillFactory.AddToContextAction?.Invoke(chip);
+                        ChipPillFactory.AddChip(BuildChipData(comp, fieldName));
                     });
                     hasFields = true;
                 }

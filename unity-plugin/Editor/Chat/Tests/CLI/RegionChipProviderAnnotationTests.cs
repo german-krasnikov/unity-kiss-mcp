@@ -152,8 +152,62 @@ namespace UnityMCP.Editor.Chat.Tests
             var snap = RegionSnapshot.CreatePolyline("poly1", pts, Array.Empty<string>(), "Level1");
             var id = SceneRegionState.SetRegion(snap);
             var result = _provider.FormatPayload(MakeChip(id), new ChipPayloadContext("full", ""));
-            StringAssert.Contains("points=", result);
-            StringAssert.Contains("0.00,0.00", result);
+            StringAssert.Contains("points:", result);
+            StringAssert.Contains("x=0.00", result);
+        }
+
+        // ── Polyline enriched format (Phase v0.64) ────────────────────────────
+
+        [Test]
+        public void Polyline_FormatPayload_ContainsTypeField()
+        {
+            var pts = new[] { new Vector2(0f, 0f), new Vector2(5f, 0f) };
+            var snap = RegionSnapshot.CreatePolyline("poly1", pts, Array.Empty<string>(), "Level1");
+            var id = SceneRegionState.SetRegion(snap);
+            var result = _provider.FormatPayload(MakeChip(id), new ChipPayloadContext("summary", ""));
+            StringAssert.Contains("type=polyline", result);
+        }
+
+        [Test]
+        public void Polyline_FormatPayload_ContainsDeploymentHint()
+        {
+            var pts = new[] { new Vector2(0f, 0f), new Vector2(5f, 0f) };
+            var snap = RegionSnapshot.CreatePolyline("poly1", pts, Array.Empty<string>(), "Level1");
+            var id = SceneRegionState.SetRegion(snap);
+            var result = _provider.FormatPayload(MakeChip(id), new ChipPayloadContext("full", ""));
+            StringAssert.Contains("am_deploy_line", result);
+        }
+
+        [Test]
+        public void Polyline_FormatPayload_ContainsStartEnd()
+        {
+            var pts = new[] { new Vector2(1f, 2f), new Vector2(3f, 4f), new Vector2(5f, 6f) };
+            var snap = RegionSnapshot.CreatePolyline("poly1", pts, Array.Empty<string>(), "Level1");
+            var id = SceneRegionState.SetRegion(snap);
+            var result = _provider.FormatPayload(MakeChip(id), new ChipPayloadContext("summary", ""));
+            StringAssert.Contains("start=", result);
+            StringAssert.Contains("end=", result);
+        }
+
+        [Test]
+        public void Polyline_FormatPayload_PointsYamlStyle()
+        {
+            var pts = new[] { new Vector2(0f, 0f), new Vector2(5f, 3f) };
+            var snap = RegionSnapshot.CreatePolyline("poly1", pts, Array.Empty<string>(), "Level1");
+            var id = SceneRegionState.SetRegion(snap);
+            var result = _provider.FormatPayload(MakeChip(id), new ChipPayloadContext("full", ""));
+            StringAssert.Contains("- x=", result);
+            StringAssert.Contains(" z=", result);
+        }
+
+        [Test]
+        public void FormatPayload_Polyline_Summary_NoPoints()
+        {
+            var pts = new[] { new Vector2(0f, 0f), new Vector2(5f, 3f) };
+            var snap = RegionSnapshot.CreatePolyline("poly1", pts, Array.Empty<string>(), "Level1");
+            var id = SceneRegionState.SetRegion(snap);
+            var result = _provider.FormatPayload(MakeChip(id), new ChipPayloadContext("summary", ""));
+            StringAssert.DoesNotContain("- x=", result);
         }
 
         [Test]

@@ -180,5 +180,57 @@ namespace UnityMCP.Editor.Tests
 
             Assert.AreEqual("", result);
         }
+
+        [Test]
+        public void GetLogs_keyword_filters_by_substring()
+        {
+            ConsoleCapture.InjectForTest("player died", LogType.Log);
+            ConsoleCapture.InjectForTest("enemy spawned", LogType.Log);
+            ConsoleCapture.InjectForTest("player respawned", LogType.Log);
+
+            var result = ConsoleCapture.GetLogs(keyword: "player");
+
+            StringAssert.Contains("player died", result);
+            StringAssert.Contains("player respawned", result);
+            StringAssert.DoesNotContain("enemy spawned", result);
+        }
+
+        [Test]
+        public void GetLogs_keyword_case_insensitive()
+        {
+            ConsoleCapture.InjectForTest("NullReferenceException in Update", LogType.Error);
+            ConsoleCapture.InjectForTest("normal log", LogType.Log);
+
+            var result = ConsoleCapture.GetLogs(keyword: "nullreferenceexception");
+
+            StringAssert.Contains("NullReferenceException", result);
+            StringAssert.DoesNotContain("normal log", result);
+        }
+
+        [Test]
+        public void GetLogs_countOnly_returns_count_string()
+        {
+            ConsoleCapture.InjectForTest("error one", LogType.Error);
+            ConsoleCapture.InjectForTest("error two", LogType.Error);
+            ConsoleCapture.InjectForTest("log msg", LogType.Log);
+
+            var result = ConsoleCapture.GetLogs(level: "Error", countOnly: true);
+
+            Assert.AreEqual("2", result);
+        }
+
+        [Test]
+        public void GetLogs_keyword_plus_level_combined()
+        {
+            ConsoleCapture.InjectForTest("NPC error", LogType.Error);
+            ConsoleCapture.InjectForTest("NPC warning", LogType.Warning);
+            ConsoleCapture.InjectForTest("player error", LogType.Error);
+
+            var result = ConsoleCapture.GetLogs(level: "Error", keyword: "NPC");
+
+            StringAssert.Contains("NPC error", result);
+            StringAssert.DoesNotContain("NPC warning", result);
+            StringAssert.DoesNotContain("player error", result);
+        }
     }
 }

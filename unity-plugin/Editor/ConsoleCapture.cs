@@ -78,7 +78,8 @@ namespace UnityMCP.Editor
         /// first>0: return first N entries from init buffer + last (count-first) from ring.
         /// first=0: return last count from combined (init + ring in order).
         /// </summary>
-        public static string GetLogs(int count = -1, string level = null, int first = 0)
+        public static string GetLogs(int count = -1, string level = null, int first = 0,
+                                     string keyword = null, bool countOnly = false)
         {
             lock (_lock)
             {
@@ -106,11 +107,26 @@ namespace UnityMCP.Editor
                     selected = combined;
                 }
 
+                if (!string.IsNullOrEmpty(keyword))
+                    selected = FilterByKeyword(selected, keyword);
+
+                if (countOnly)
+                    return selected.Count.ToString();
+
                 var sb = new StringBuilder();
                 foreach (var e in selected)
                     sb.AppendFormat("[{0}] {1:HH:mm:ss.fff} {2}\n", e.Type, e.Timestamp, e.Message);
                 return sb.ToString().TrimEnd('\n');
             }
+        }
+
+        private static List<LogEntry> FilterByKeyword(List<LogEntry> entries, string kw)
+        {
+            var result = new List<LogEntry>(entries.Count);
+            foreach (var e in entries)
+                if (e.Message.IndexOf(kw, StringComparison.OrdinalIgnoreCase) >= 0)
+                    result.Add(e);
+            return result;
         }
 
         public static string GetErrorsSince(DateTime since, int maxCount = 5)

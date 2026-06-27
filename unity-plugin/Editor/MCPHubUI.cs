@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine.UIElements;
 
@@ -24,6 +25,9 @@ namespace UnityMCP.Editor
             home.Add(MCPHubDivider.Build(root));
             home.Add(HubCardButton.Build("⚙",  "Tools",        "Enable / disable MCP tools",
                 () => nav.Push(SettingsPageFactory.BuildToolsPage(() => nav.Pop()))));
+            if (PluginRegistry.All.Any(p => p.HasSettingsUI))
+                home.Add(HubCardButton.Build("🧩", "Plugins", "Installed plugin settings",
+                    () => nav.Push(SettingsPageFactory.BuildPluginsPage(() => nav.Pop()))));
             home.Add(HubCardButton.Build("🔒", "Permissions",   "Agent tool deny-set",
                 () => nav.Push(SettingsPageFactory.BuildPermissionsPage(() => nav.Pop()))));
             home.Add(HubCardButton.Build("💬", "Chat Settings",  ChatCardSubtitle(),

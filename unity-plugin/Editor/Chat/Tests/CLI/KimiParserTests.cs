@@ -1,6 +1,7 @@
-// TDD tests for KimiParser.
+// TDD tests for KimiParser + KimiBackend session behaviour.
 // Role-based NDJSON dispatch — role:assistant (text/tool_calls), role:tool, role:user (echo).
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
 
@@ -262,6 +263,54 @@ namespace UnityMCP.Editor.Chat.Tests
             var events = Parse(line);
             Assert.AreEqual(1, events.Count);
             Assert.IsTrue(events[0].IsOk);
+        }
+
+        // ── T6: KimiBackend graceful degradation on session resume ────────────
+
+        private static List<ChatEvent> ParseViaBackend(KimiBackend backend, string line)
+        {
+            var sink = new List<ChatEvent>();
+            typeof(KimiBackend)
+                .GetMethod("ParseLine", BindingFlags.NonPublic | BindingFlags.Instance)
+                .Invoke(backend, new object[] { line, sink });
+            return sink;
+        }
+
+        [Test]
+        public void Kimi_emits_notice_when_resume_requested()
+        {
+            var backend = new KimiBackend(resumeSessionId: "old-sess");
+            var textDeltaLine = "{\"role\":\"assistant\",\"content\":\"Hello\"}";
+
+            var events = ParseViaBackend(backend, textDeltaLine);
+
+            // First call: notice + the actual TextDelta
+            Assert.AreEqual(2, events.Count, "must emit notice + TextDelta on first parse after resume");
+            Assert.AreEqual(ChatEventKind.Error, events[0].Kind);
+            StringAssert.Contains("Kimi does not support resume", events[0].Text);
+            Assert.AreEqual(ChatEventKind.TextDelta, events[1].Kind);
+        }
+
+        [Test]
+        public void Kimi_notice_emitted_only_once()
+        {
+            var backend = new KimiBackend(resumeSessionId: "old-sess");
+            var textDeltaLine = "{\"role\":\"assistant\",\"content\":\"Hello\"}";
+
+            ParseViaBackend(backend, textDeltaLine);  // first call → notice
+            var second = ParseViaBackend(backend, textDeltaLine);  // second call → no notice
+
+            Assert.AreEqual(1, second.Count, "notice must not repeat on subsequent parses");
+            Assert.AreEqual(ChatEventKind.TextDelta, second[0].Kind);
+        }
+
+        [Test]
+        public void Kimi_no_notice_without_resumeSessionId()
+        {
+            var backend = new KimiBackend(resumeSessionId: null);
+            var events = ParseViaBackend(backend, "{\"role\":\"assistant\",\"content\":\"Hi\"}");
+            Assert.AreEqual(1, events.Count, "no notice when no resume requested");
+            Assert.AreEqual(ChatEventKind.TextDelta, events[0].Kind);
         }
     }
 }

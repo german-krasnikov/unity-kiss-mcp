@@ -66,7 +66,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     "ADVANCED_CODE": [
         "execute_code", "recompile", "sync_unity", "find_references", "semantic_at",
         "compile_preflight", "await_compile", "get_schema", "auto_fix", "smart_build",
-        "checkpoint", "validate_references", "menu", "diagnose",
+        "checkpoint", "undo_last", "validate_references", "menu", "diagnose",
     ],
     "SESSION_SKILLS": [
         "save_skill", "use_skill", "list_skills",

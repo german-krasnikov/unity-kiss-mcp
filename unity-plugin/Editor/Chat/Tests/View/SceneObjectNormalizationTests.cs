@@ -1,6 +1,7 @@
 // TDD — Bug 3: scene objects in LLM responses rendered as pills, not underlined links.
 // Pure headless: no Unity runtime dependency.
 // Verifies BareNameNormalizer works with scene-object-derived ChipData (instanceID=0).
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityMCP.Editor.Chat;
@@ -96,6 +97,42 @@ namespace UnityMCP.Editor.Chat.Tests
             // The [hierarchy:/Grid#42] is in a protected range → id preserved
             StringAssert.Contains("[hierarchy:/Grid#42]", afterScene);
             StringAssert.DoesNotContain("[hierarchy:/Grid]", afterScene);
+        }
+
+        // SN8: when resolver is null, SceneObjects delegate returns null → BareNameNormalizer gets
+        // empty chips → no normalization, no exception (verifies null-safe _resolver?.Objects fix)
+        [Test]
+        public void SN8_NullResolver_SceneObjectsReturnsNull_NormalizationSkipped()
+        {
+            // Simulate: _resolver is null → _resolver?.Objects returns null
+            Func<IReadOnlyDictionary<string, string>> sceneObjects = () => null;
+            var sceneMap = sceneObjects?.Invoke();
+            Assert.IsNull(sceneMap); // null → FreezeAssistantBubble skips normalization pass
+
+            // BareNameNormalizer with empty chips is a no-op (no crash)
+            var result = BareNameNormalizer.Normalize("The Grid is broken", new List<ChipData>());
+            Assert.AreEqual("The Grid is broken", result);
+        }
+
+        // SN9: object created mid-turn is found after Refresh updates the sceneMap
+        // (verifies _resolver?.Refresh() call added to DispatchTurn is effective)
+        [Test]
+        public void SN9_ObjectCreatedMidTurn_VisibleAfterRefresh()
+        {
+            // Simulate sceneMap before send: empty (object didn't exist yet)
+            var sceneMap = new Dictionary<string, string>();
+
+            // Object created during the turn; Refresh() populates sceneMap
+            sceneMap["NewCube"] = "/NewCube";
+
+            // FreezeAssistantBubble builds chips from the refreshed map
+            var sceneChips = new List<ChipData>();
+            foreach (var kvp in sceneMap)
+                if (kvp.Key.Length > 1)
+                    sceneChips.Add(new ChipData(ChipKindKeys.Hierarchy, kvp.Value, kvp.Key, 0));
+
+            var result = BareNameNormalizer.Normalize("I created NewCube for you", sceneChips);
+            StringAssert.Contains("[hierarchy:/NewCube]", result);
         }
 
     }

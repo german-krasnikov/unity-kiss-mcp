@@ -14,12 +14,11 @@ namespace UnityMCP.Editor.Chat
 
         internal static void OnPropertyContextMenu(GenericMenu menu, SerializedProperty property)
         {
-            if (ChipPillFactory.AddToContextAction == null) return;
             var chip = BuildChipForProperty(property);
             if (!chip.HasValue) return;
             var captured = chip.Value;
             menu.AddItem(new GUIContent("Add to MCP Chat"), false,
-                () => ChipPillFactory.AddToContextAction?.Invoke(captured));
+                () => ChipPillFactory.AddChip(captured));
         }
 
         /// <summary>Test seam: builds ChipData for a property without touching GenericMenu.</summary>

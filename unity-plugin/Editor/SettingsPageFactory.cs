@@ -61,6 +61,57 @@ namespace UnityMCP.Editor
             return page;
         }
 
+        internal static VisualElement BuildPluginsPage(Action onBack)
+        {
+            var page = new VisualElement();
+            page.AddToClassList("nav-page");
+            page.Add(BackHeader("Plugins", onBack));
+
+            var plugins = PluginRegistry.All;
+            if (plugins.Count == 0)
+            {
+                page.Add(new Label("No plugins registered.") { style = { marginTop = 12 } });
+                return page;
+            }
+
+            var content = new VisualElement();
+            var nav = new SettingsNavController(content);
+            var home = new VisualElement();
+
+            bool anyWithUI = false;
+            foreach (var plugin in plugins)
+            {
+                if (!plugin.HasSettingsUI) continue;
+                anyWithUI = true;
+                var p = plugin;
+                var card = HubCardButton.Build("🧩", p.Name, p.Description,
+                    () => nav.Push(BuildPluginDetailPage(p, () => nav.Pop())));
+                home.Add(card);
+            }
+
+            if (!anyWithUI)
+            {
+                page.Add(new Label("No plugins have settings UI.") { style = { marginTop = 12 } });
+                return page;
+            }
+
+            nav.SetRoot(home);
+            page.Add(content);
+            return page;
+        }
+
+        private static VisualElement BuildPluginDetailPage(IMCPPlugin plugin, Action onBack)
+        {
+            var page = new VisualElement();
+            page.AddToClassList("nav-page");
+            page.Add(BackHeader(plugin.Name, onBack));
+            VisualElement ui = null;
+            try { ui = plugin.BuildSettingsUI(); }
+            catch (Exception e) { UnityEngine.Debug.LogError($"[MCP] Plugin '{plugin.Name}' BuildSettingsUI failed: {e.Message}"); }
+            if (ui != null) page.Add(ui);
+            return page;
+        }
+
         internal static VisualElement BuildUpdatesPage(Action onBack) =>
             UpdatesPage.Build(onBack);
 

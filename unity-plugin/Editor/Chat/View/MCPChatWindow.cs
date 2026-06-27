@@ -168,7 +168,7 @@ namespace UnityMCP.Editor.Chat
             _resolver.Refresh();
             var registry = ChatBlockRendererFactory.CreateDefault(_resolver, AddRefToContext);
             _transcript = new ChatTranscript(inner, registry);
-            _transcript.SceneObjects = () => _resolver.Objects;
+            _transcript.SceneObjects = () => _resolver?.Objects;
             // F21: restore transcript that was saved before domain reload
             var savedTranscript = SessionState.GetString("MCPChat_Transcript", "");
             if (!string.IsNullOrEmpty(savedTranscript))
@@ -213,6 +213,8 @@ namespace UnityMCP.Editor.Chat
             area.Add(BuildFlowBar());
 
             _chipField = new InlineChipField();
+            while (ChipPillFactory.PendingChips.Count > 0)
+                _chipField.AddChip(ChipPillFactory.PendingChips.Dequeue());
             _chipField.AddToClassList("chat-input");
             _input = _chipField.TextField;
             area.Add(_chipField);
@@ -236,7 +238,11 @@ namespace UnityMCP.Editor.Chat
             _agentBtn?.EnableInClassList("mode-toggle-btn--active", agentMode);
         }
 
-        private void CreateBackend() => CreateBackendWithSession(null);
+        private void CreateBackend()
+        {
+            SessionState.EraseString("MCPChat_BackendSessionId");
+            CreateBackendWithSession(null);
+        }
 
         private void CreateBackendWithSession(string resumeSessionId, BackendConfigStore store = null)
         {

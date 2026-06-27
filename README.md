@@ -46,7 +46,7 @@
 
 ### Two ways to work
 
-🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 119 MCP tools with 80–95% token compression.
+🖥️ **CLI Mode** — run from terminal via Claude Code, Codex CLI, or any MCP client. The Python server connects to Unity over TCP :9500. Best for automation, batch operations, and scripting. Full access to 120 MCP tools with 80–95% token compression.
 
 💬 **In-Unity Chat** — open `MCP → Chat` inside the editor. No API key needed — spawns the CLI directly. 5 backends: Claude, Antigravity, Kimi, Codex, OpenCode. Drag GameObjects, scripts, and materials into chat as typed context chips. Each AI turn gets its own undo group — one Ctrl+Z rolls back everything the AI changed. Domain-reload safe. Extensible chip-kind registry lets third-party plugins add new chip types with zero core edits.
 
@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="119 MCP Tools · 7935 Tests (2952 Python · 4899 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 7967 Tests (2958 Python · 4925 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.64.0</b> — 2026-06-27 — **T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` …</summary>
+
+**T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` in OnSend with null-safe delegate guard.
+
+</details>
+
+<details>
 <summary><b>v0.63.0</b> — 2026-06-27 — **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool …</summary>
 
 **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool MenuOnly => false;` allows selective toolbar button repositioning …
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.59.0</b> — 2026-06-26 — **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: …</summary>
-
-**Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: true` flag, now executes during Play Mode without compilation pause. …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.59.0** — 2026-06-26 — **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: …
 - **v0.58.0** — 2026-06-25 — **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 …
 - **v0.57.0** — 2026-06-24 — **Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool …
 - **v0.56.0** — 2026-06-24 — **Unified Scene View Overlay** — Merged 2 separate overlays …

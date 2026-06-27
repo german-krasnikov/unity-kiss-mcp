@@ -233,6 +233,92 @@ namespace UnityMCP.Editor.Chat.Tests
             }
         }
 
+        // T6: SaveStateBeforeReload uses SessionState fallback when backend.SessionId is null.
+        private sealed class NullSessionStub : IChatBackend
+        {
+            public bool   IsRunning  => true;
+            public string SessionId  => null;       // simulates not-yet-drained session
+            public void   Start()    { }
+            public void   Stop()     { }
+            public void   SendTurn(string t) { }
+            public void   DrainEvents(List<ChatEvent> o, List<ToolCallRecord> t = null) { }
+            public void   SendControlResponse(string j) { }
+            public void   Dispose()  { }
+        }
+
+        [Test]
+        public void SaveState_falls_back_to_SessionState_when_backend_sessionid_null()
+        {
+            var tmpPath = System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                $"SaveStateFallbackTest_{System.Guid.NewGuid()}.txt");
+            var w = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                ReloadGuard.OverrideFilePath(tmpPath);
+                ReloadGuard.ResetForTest();
+
+                // Seed the SessionState fallback key
+                UnityEditor.SessionState.SetString("MCPChat_BackendSessionId", "fallback-id");
+
+                // Inject a stub backend with null SessionId
+                InjectMinimalTranscript(w);
+                var stub = new NullSessionStub();
+                typeof(MCPChatWindow)
+                    .GetField("_backend", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .SetValue(w, stub);
+
+                // Move activity to Sending so SaveState takes the non-idle path
+                var activity = (ChatActivityState)typeof(MCPChatWindow)
+                    .GetField("_activity", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(w);
+                activity.Send();
+
+                // Also set a non-empty sentTextCache so state is worth saving
+                var cache = typeof(MCPChatWindow)
+                    .GetField("_sentTextCache", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(w);
+                cache.GetType()
+                    .GetMethod("Set", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Invoke(cache, new object[] { "some prompt" });
+
+                // Invoke SaveStateBeforeReload
+                typeof(MCPChatWindow)
+                    .GetMethod("SaveStateBeforeReload", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Invoke(w, null);
+
+                // Load and verify SessionId came from the SessionState fallback
+                var pending = ReloadGuard.LoadPendingState();
+                Assert.IsNotNull(pending, "State must be saved");
+                Assert.AreEqual("fallback-id", pending.Value.SessionId,
+                    "SessionId must fall back to SessionState when backend.SessionId is null");
+            }
+            finally
+            {
+                Object.DestroyImmediate(w);
+                UnityEditor.SessionState.EraseString("MCPChat_BackendSessionId");
+                ReloadGuard.ResetForTest();
+                if (System.IO.File.Exists(tmpPath)) System.IO.File.Delete(tmpPath);
+            }
+        }
+
+        // T6: NewSession must erase the SessionState key so stale IDs don't survive.
+        [Test]
+        public void NewSession_clears_SessionState_key()
+        {
+            UnityEditor.SessionState.SetString("MCPChat_BackendSessionId", "old-session-id");
+            var w = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                InjectMinimalTranscript(w);
+                try { w.NewSession(); } catch (System.NullReferenceException) { }
+                var stored = UnityEditor.SessionState.GetString("MCPChat_BackendSessionId", null);
+                Assert.IsTrue(string.IsNullOrEmpty(stored),
+                    "NewSession must erase MCPChat_BackendSessionId from SessionState");
+            }
+            finally { Object.DestroyImmediate(w); }
+        }
+
         // P0-1: _transcriptRestored must be cleared even on the early-return (null pending) path.
         // Regression pin: before the fix the flag stayed true when LoadPendingState returned null,
         // allowing a later OnAfterReloadResume call to suppress a legitimate user bubble.

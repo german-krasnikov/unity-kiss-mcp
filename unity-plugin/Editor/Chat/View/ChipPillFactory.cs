@@ -3,6 +3,7 @@
 // P4: ColorResolver seam allows per-kind color overrides from BackendConfigStore.
 // F14b: AddToContextAction seam for right-click "Add to context" menu.
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -27,6 +28,24 @@ namespace UnityMCP.Editor.Chat
         /// Set in MCPChatWindow.OnEnable; cleared in OnDisable.
         /// </summary>
         internal static Action<ChipData> AddToContextAction;
+
+        /// <summary>
+        /// Chips queued while no window was open. Drained in MCPChatWindow.BuildInputArea
+        /// after _chipField is created. Clear in tests TearDown to prevent leakage.
+        /// </summary>
+        internal static readonly Queue<ChipData> PendingChips = new Queue<ChipData>();
+
+        /// <summary>
+        /// Route a chip to the chat input field.
+        /// If window is open → immediate. If closed → enqueue + auto-open window.
+        /// Drain happens in MCPChatWindow.BuildInputArea after _chipField is ready.
+        /// </summary>
+        internal static void AddChip(ChipData chip)
+        {
+            if (AddToContextAction != null) { AddToContextAction(chip); return; }
+            PendingChips.Enqueue(chip);
+            MCPChatWindow.ShowWindow();
+        }
 
         /// <summary>
         /// Attach right-click menu to a pill.

@@ -286,10 +286,12 @@ namespace UnityMCP.Editor
 
         private static string ExecGetConsole(string args)
         {
-            var count = ExtractInt(args, "count", -1);
-            var level = JsonHelper.ExtractString(args, "level");
-            var first = ExtractInt(args, "first", 0);
-            return ConsoleCapture.GetLogs(count, level, first);
+            var count     = ExtractInt(args, "count", -1);
+            var level     = JsonHelper.ExtractString(args, "level");
+            var first     = ExtractInt(args, "first", 0);
+            var keyword   = JsonHelper.ExtractString(args, "keyword");
+            var countOnly = JsonHelper.ExtractString(args, "count_only") == "true";
+            return ConsoleCapture.GetLogs(count, level, first, keyword, countOnly);
         }
 
         private static string BuildScreenshotResponse(string id, string args)

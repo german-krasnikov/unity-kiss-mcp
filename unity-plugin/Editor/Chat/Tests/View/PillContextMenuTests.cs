@@ -25,6 +25,7 @@ namespace UnityMCP.Editor.Chat.Tests
             ChipKindRegistry.ResetToBuiltIns();
             ChipPillFactory.AddToContextAction = null;
             ChipPillFactory.ColorResolver      = null;
+            ChipPillFactory.PendingChips.Clear();
         }
 
         // 1. AttachReadOnlyBehavior_ActionNull_NothingThrows

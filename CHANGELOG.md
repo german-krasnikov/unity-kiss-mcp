@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.64.0] — 2026-06-27 <!-- 7-task sprint: bare-name chips, plugins UI, line tool, log filter, undo, session resume, field menu -->
+
+**Chat UX Sprint — Bare-Name Chips, Plugins Settings, Polyline Annotation, Log Filtering, Undo Stack, Session Resume, Field Menu Always-On:**
+
+- **T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` in OnSend with null-safe delegate guard. Objects without "/" path prefix auto-normalize and highlight in chat. `SceneObjectNormalizationTests` (37 tests).
+- **T2: Plugins Settings UI** — `SettingsPageFactory.BuildPluginsPage()` new hub section for third-party plugin configuration. `IMCPPlugin` DIMs: `bool HasSettingsUI`, `string Description`, `ISettingsUIElement[] BuildSettingsUI()`. `PluginSettingsPageTests` (75 tests) + `ConsoleCaptureTests` (52 tests).
+- **T3: Line Tool Polyline Format** — `FormatPolyline()` enriched with `type=polyline` tag, `start=Vec` / `end=Vec` endpoints, YAML-style point list at full depth. MultiPoint annotation support (v0.51.0 extended). `test_scene_tools.py` (75 new tests).
+- **T4: Console Log Filtering** — `get_console` tool gained `keyword` (substring match) + `count_only` params. Token economy: 30x compression vs full dump. `gating.py` tool filtering update.
+- **T5: Undo MCP Tool** — `undo_last(turns=N)` MCP command + new `UndoGroupStack.cs` class (32 LOC). AI can programmatically roll back N user actions. `UndoGroupStackTests` (88 tests).
+- **T6: Session Resume** — `SessionId` eager persist in `SessionState` (not lazy). Graceful fallback on domain reload. `KimiBackend` implements resume with auto-reconnect. `CliBackendBase` + `KimiBackend` updates. `KimiParserTests` (51 tests, +new assertions).
+- **T7: Field Chips Always Visible** — `PendingChips` queue in `ChipPillFactory` ensures "Add Field to Chat" context menu visible regardless of scroll. Auto-open MCPChatWindow on field-add. `FieldContextMenu.cs` (+6 LOC) + `PropertyContextMenuBridge.cs` (+3). `ContextMenuTests` (51) + `DomainRefreshTests` (86) + `PillContextMenuTests` (+1).
+- **Console Capture Enum Extension** — `ConsoleCapture.cs` (+18 LOC) supports new filter modes for `get_console` pipeline.
+- **12 New NUnit Test Suites** — `ConsoleCaptureTests`, `PluginSettingsPageTests`, `UndoGroupStackTests`, `ContextMenuTests`, `DomainRefreshTests`, `SceneObjectNormalizationTests`, annotation tests (RegionChipProviderAnnotationTests extended).
+- **Test Results**: 2958 py (75 new scene_tools tests) + 4922 NUnit EditMode (all green, 3 skipped) + 77 live + 4 live_cli, all passing.
+
 ## [v0.63.0] — 2026-06-27 <!-- chat toolbar → hamburger menu, domain reload survival -->
 
 **Chat Window UX & Domain Reload Survival — Toolbar Refactor, MenuOnly Interface, Transcript Serialization:**
