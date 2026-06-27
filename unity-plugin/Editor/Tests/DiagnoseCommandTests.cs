@@ -254,5 +254,74 @@ namespace UnityMCP.Editor.Tests
             StringAssert.Contains("stamp_frozen=true", result,
                 "stamp_frozen must be true when domain stamp equals StampAtTrigger");
         }
+
+        // Fix C #1: FindAsmdefDir — Assets/ scan still works (regression guard)
+        [Test]
+        public void FindAsmdefDir_AssetsPath_StillWorks()
+        {
+            var tmp = Path.Combine(Path.GetTempPath(), "McpFixC_" + Guid.NewGuid());
+            Directory.CreateDirectory(tmp);
+            try
+            {
+                File.WriteAllText(Path.Combine(tmp, "MyLib.asmdef"), "{}");
+                var result = DiagnoseCommand.FindAsmdefDir(tmp, "MyLib");
+                Assert.AreEqual(tmp, result, "Must find asmdef via Directory.GetFiles scan");
+            }
+            finally { Directory.Delete(tmp, true); }
+        }
+
+        // Fix C #2: FindAsmdefDir falls back to FindInPackages when Assets/ empty
+        [Test]
+        public void FindAsmdefDir_FallsBackToPackages_WhenAssetsEmpty()
+        {
+            var tmpDataPath = Path.Combine(Path.GetTempPath(), "McpFixCEmpty_" + Guid.NewGuid());
+            var tmpPkgDir   = Path.Combine(Path.GetTempPath(), "McpFixCPkg_" + Guid.NewGuid());
+            Directory.CreateDirectory(tmpDataPath);
+            Directory.CreateDirectory(tmpPkgDir);
+            var originalSeam = DiagnoseCommand.FindInPackages;
+            try
+            {
+                DiagnoseCommand.FindInPackages = (f) =>
+                    f == "UnityMCP.Editor.asmdef" ? tmpPkgDir : null;
+                var result = DiagnoseCommand.FindAsmdefDir(tmpDataPath, "UnityMCP.Editor");
+                Assert.AreEqual(tmpPkgDir, result, "Must fall back to Packages/ via injected seam");
+            }
+            finally
+            {
+                DiagnoseCommand.FindInPackages = originalSeam;
+                Directory.Delete(tmpDataPath, true);
+                Directory.Delete(tmpPkgDir, true);
+            }
+        }
+
+        // Fix C #3: GetDllFreshnessToken detects stale dll with seam-injected UPM src dir
+        [Test]
+        public void BuildDllFreshness_ReturnsStale_ForUPMPackage_ViaSeam()
+        {
+            var tmp = Path.Combine(Path.GetTempPath(), "McpFixCStale_" + Guid.NewGuid());
+            Directory.CreateDirectory(tmp);
+            var originalSeam = DiagnoseCommand.FindInPackages;
+            try
+            {
+                var dllPath = Path.Combine(tmp, "Fake.dll");
+                var csPath  = Path.Combine(tmp, "Code.cs");
+                File.WriteAllText(dllPath, "dll");
+                File.SetLastWriteTimeUtc(dllPath, DateTime.UtcNow.AddSeconds(-5));
+                File.WriteAllText(csPath, "// code");
+                File.SetLastWriteTimeUtc(csPath, DateTime.UtcNow);
+
+                // Seam returns tmp as the package source dir
+                DiagnoseCommand.FindInPackages = (_) => tmp;
+                // GetDllFreshnessToken directly — dll is older than .cs
+                var token = DiagnoseCommand.GetDllFreshnessToken(dllPath, tmp);
+                Assert.AreEqual("stale", token,
+                    "Must detect stale dll when .cs is newer than dll");
+            }
+            finally
+            {
+                DiagnoseCommand.FindInPackages = originalSeam;
+                Directory.Delete(tmp, true);
+            }
+        }
     }
 }

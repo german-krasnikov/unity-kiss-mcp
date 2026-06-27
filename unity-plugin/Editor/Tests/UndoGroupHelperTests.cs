@@ -10,6 +10,9 @@ namespace UnityMCP.Editor.Tests
     [TestFixture]
     public class UndoGroupHelperTests
     {
+        [TearDown]
+        public void TearDown() => Undo.ClearAll();
+
         // --- 1. OpenNamedGroup returns a non-negative id -----------------------
         [Test]
         public void OpenNamedGroup_ReturnsNonNegativeId()

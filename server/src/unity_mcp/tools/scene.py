@@ -143,8 +143,27 @@ async def recompile() -> str:
 
 
 
+# STALE-DOMAIN: defensive — unreachable with expected_compile=False, guards future callers
+_BLOCK_STARTS = (
+    "FAILED:", "BUILD-FAILED-WEDGE", "STALE-CACHE",
+    "STALE-DOMAIN", "WEDGE-ENGINE", "WEDGE-STATE",
+    "REBUILDING", "TESTS-INVISIBLE",
+)
+
+
 async def run_tests(mode: str = "EditMode", filter: str | None = None) -> str:
     """Start Unity tests (returns immediately). mode: EditMode or PlayMode. filter: pipe-separated test names. Poll get_test_results every 5s for results."""
+    from mcp.server.fastmcp.exceptions import ToolError as _ToolError
+    try:
+        from . import diagnose as _diag
+        verdict = await _diag.diagnose(prev_mvid="", expected_compile=False)
+        if verdict.startswith(_BLOCK_STARTS):
+            return f"BLOCKED: {verdict} — fix domain state before running tests"
+    except _ToolError:
+        raise  # compile guard / connection-dead ToolErrors must propagate
+    except Exception:
+        pass  # diagnose unavailable — degrade gracefully
+
     args = {"mode": mode}
     if filter:
         args["filter"] = filter
@@ -153,7 +172,7 @@ async def run_tests(mode: str = "EditMode", filter: str | None = None) -> str:
         if result and result not in ("pending", "none"):
             return result
     except Exception:
-        pass  # TCP died (domain reload expected) — return immediately
+        pass  # TCP died / domain reload expected — return fire-and-forget ack
     return f"tests-started|{mode}|poll get_test_results every 5s for up to 2min"
 
 

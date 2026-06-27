@@ -20,6 +20,15 @@ def scene_mod():
     return mod
 
 
+@pytest.fixture
+def mock_diagnose(monkeypatch):
+    """Patch diagnose.diagnose so run_tests pre-flight uses controlled verdict."""
+    import unity_mcp.tools.diagnose as diag_mod
+    mock = AsyncMock()
+    monkeypatch.setattr(diag_mod, "diagnose", mock)
+    return mock
+
+
 # ── T4: get_console keyword / count_only ─────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -73,3 +82,75 @@ async def test_undo_last_passes_turns_param(scene_mod, _patch_send):
 
     call_args = _patch_send.call_args
     assert call_args[0][1].get("turns") == 3
+
+
+# ── Pre-flight gate — blocked verdicts ────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_run_tests_blocked_by_compile_error(scene_mod, _patch_send, mock_diagnose):
+    mock_diagnose.return_value = "FAILED:CS0001"
+    result = await scene_mod.run_tests()
+    assert result.startswith("BLOCKED:")
+    assert "FAILED:CS0001" in result
+    _patch_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_blocked_by_wedge(scene_mod, _patch_send, mock_diagnose):
+    mock_diagnose.return_value = "WEDGE-ENGINE"
+    result = await scene_mod.run_tests()
+    assert result.startswith("BLOCKED:")
+    assert "WEDGE-ENGINE" in result
+    _patch_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_blocked_by_build_failed_wedge(scene_mod, _patch_send, mock_diagnose):
+    mock_diagnose.return_value = (
+        "BUILD-FAILED-WEDGE: reload failed on unknown — "
+        "reimport the file: package (sync), do NOT restart"
+    )
+    result = await scene_mod.run_tests()
+    assert result.startswith("BLOCKED:")
+    _patch_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_blocked_by_rebuilding(scene_mod, _patch_send, mock_diagnose):
+    mock_diagnose.return_value = "REBUILDING"
+    result = await scene_mod.run_tests()
+    assert result.startswith("BLOCKED:")
+    _patch_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_blocked_by_stale_domain(scene_mod, _patch_send, mock_diagnose):
+    mock_diagnose.return_value = "STALE-DOMAIN"
+    result = await scene_mod.run_tests()
+    assert result.startswith("BLOCKED:")
+    _patch_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_proceeds_on_clean(scene_mod, _patch_send, mock_diagnose):
+    mock_diagnose.return_value = "CLEAN-LIVE"
+    result = await scene_mod.run_tests()
+    assert "tests-started" in result or result == "ok"
+    _patch_send.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_degrades_on_diagnose_failure(scene_mod, _patch_send, mock_diagnose):
+    mock_diagnose.side_effect = RuntimeError("disk read failed")
+    result = await scene_mod.run_tests()
+    assert "tests-started" in result or result == "ok"
+    _patch_send.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_tests_propagates_tool_error(scene_mod, _patch_send, mock_diagnose):
+    from mcp.server.fastmcp.exceptions import ToolError
+    mock_diagnose.side_effect = ToolError("Unity connection dead")
+    with pytest.raises(ToolError, match="Unity connection dead"):
+        await scene_mod.run_tests()
+    _patch_send.assert_not_called()

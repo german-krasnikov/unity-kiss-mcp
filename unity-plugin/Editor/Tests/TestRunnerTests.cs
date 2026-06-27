@@ -29,6 +29,10 @@ namespace UnityMCP.Editor.Tests
             SessionState.SetBool(KeyPending, false);
             SessionState.SetString(KeyResults, "");
             SessionState.SetFloat(KeyStartTime, 0f);
+            // Reset seams to production defaults
+            TestRunner.GetIsCompiling    = () => EditorApplication.isCompiling;
+            TestRunner.GetIsCompileClean = () => SyncHelper.IsCompileClean;
+            TestRunner.GetTimeSinceStartup = () => EditorApplication.timeSinceStartup;
         }
 
         [TearDown]
@@ -161,6 +165,49 @@ namespace UnityMCP.Editor.Tests
         public void GetTestCount_IsAllowedDuringCompile()
             => Assert.IsTrue(CommandRouter.IsAllowedDuringCompile("get_test_count"),
                 "get_test_count must be allowed during compile");
+
+        // ── 7. Gap-window guard — GetIsCompileClean seam ─────────────────────
+
+        [Test]
+        public void TestRunner_Execute_RejectsWhenCompileNotClean()
+        {
+            TestRunner.GetIsCompiling    = () => false;  // pass existing guard
+            TestRunner.GetIsCompileClean = () => false;  // gap window active
+            string captured = null;
+            TestRunner.Execute("EditMode", s => captured = s);
+            Assert.IsNotNull(captured, "onComplete must be called");
+            StringAssert.Contains("domain reload pending", captured,
+                "Must reject with 'domain reload pending' message");
+            Assert.AreEqual(0, (int)IsRunningField().GetValue(null),
+                "_isRunning must remain 0 — never entered the run");
+        }
+
+        [Test]
+        public void TestRunner_Execute_ProceedsWhenCompileClean()
+        {
+            TestRunner.GetIsCompiling    = () => false;
+            TestRunner.GetIsCompileClean = () => true;
+            TestRunner.GetTimeSinceStartup = () => 0.0;  // elapsed = 0 < 120 → no stale clear
+            IsRunningField().SetValue(null, 1);           // force concurrent-run guard next
+            string captured = null;
+            TestRunner.Execute("EditMode", s => captured = s);
+            StringAssert.DoesNotContain("domain reload pending", captured,
+                "compile-clean guard must have been passed");
+            StringAssert.Contains("already in progress", captured,
+                "must reach and hit the concurrent-run guard");
+        }
+
+        [Test]
+        public void TestRunner_Execute_DefaultCompileCleanIsTrue()
+        {
+            SyncHelper.ResetForTest(); // CleanKey erased → GetBool returns default=true
+            Assert.IsTrue(SyncHelper.IsCompileClean,
+                "IsCompileClean default must be true on cold start");
+            Assert.IsNotNull(TestRunner.GetIsCompileClean,
+                "GetIsCompileClean seam must exist");
+            Assert.IsTrue(TestRunner.GetIsCompileClean(),
+                "Default seam must return SyncHelper.IsCompileClean which defaults to true");
+        }
 
     }
 }

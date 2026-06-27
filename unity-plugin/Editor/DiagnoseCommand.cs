@@ -150,8 +150,23 @@ namespace UnityMCP.Editor
             return dllMtime < maxCsMtime ? "stale" : "fresh";
         }
 
+        // Seam: resolves an asmdef filename to its directory via AssetDatabase Packages/ scan.
+        // Returns null when not found. Injectable for NUnit — production impl calls AssetDatabase.
+        internal static Func<string, string> FindInPackages = (asmdefFile) =>
+        {
+            var guids = AssetDatabase.FindAssets("t:asmdef", new[] { "Packages" });
+            foreach (var guid in guids)
+            {
+                var virtualPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (Path.GetFileName(virtualPath).Equals(asmdefFile, StringComparison.OrdinalIgnoreCase))
+                    return Path.GetDirectoryName(Path.GetFullPath(virtualPath));
+            }
+            return null;
+        };
+
         // Find the directory containing <asmName>.asmdef by scanning under dataPath.
-        static string FindAsmdefDir(string dataPath, string asmName)
+        // Falls back to FindInPackages for file: UPM packages outside Assets/.
+        internal static string FindAsmdefDir(string dataPath, string asmName)
         {
             var asmdefName = asmName + ".asmdef";
             try
@@ -163,7 +178,7 @@ namespace UnityMCP.Editor
                 }
             }
             catch (Exception) { /* permission or IO error — degrade gracefully */ }
-            return "";
+            return FindInPackages(asmdefName) ?? "";
         }
 
         // C10: Detect reload-failed markers in Editor.log.

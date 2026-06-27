@@ -216,7 +216,8 @@ async def test_get_object_detail_raises_on_error(mock_bridge):
 async def test_run_tests_calls_bridge(mock_bridge):
     """Test run_tests sends correct command to bridge"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "tests: 5 passed, 0 failed\nTime: 1.2s"})
-    result = await run_tests(mode="EditMode")
+    with patch("unity_mcp.tools.diagnose.diagnose", new=AsyncMock(return_value="CLEAN-LIVE")):
+        result = await run_tests(mode="EditMode")
     mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=8.0)
     assert "passed" in result
 
@@ -224,7 +225,8 @@ async def test_run_tests_calls_bridge(mock_bridge):
 async def test_run_tests_default_mode(mock_bridge):
     """Test run_tests defaults to EditMode"""
     mock_bridge.send = AsyncMock(return_value={"ok": True, "data": "tests: 3 passed, 0 failed"})
-    result = await run_tests()
+    with patch("unity_mcp.tools.diagnose.diagnose", new=AsyncMock(return_value="CLEAN-LIVE")):
+        result = await run_tests()
     mock_bridge.send.assert_called_once_with("run_tests", {"mode": "EditMode"}, timeout=8.0)
     assert "passed" in result
 
@@ -232,7 +234,8 @@ async def test_run_tests_default_mode(mock_bridge):
 async def test_run_tests_error_returns_started(mock_bridge):
     """run_tests error on initial send → returns tests-started immediately."""
     mock_bridge.send = AsyncMock(return_value={"ok": False, "err": "Test framework not available"})
-    result = await run_tests()
+    with patch("unity_mcp.tools.diagnose.diagnose", new=AsyncMock(return_value="CLEAN-LIVE")):
+        result = await run_tests()
     assert "tests-started" in result
 
 
@@ -261,7 +264,8 @@ async def test_get_test_results_returns_none_when_no_run(mock_bridge):
 async def test_run_tests_playmode_disconnect_returns_started(mock_bridge):
     """run_tests PlayMode: on disconnect, returns tests-started immediately."""
     mock_bridge.send = AsyncMock(side_effect=ToolError("Unity connection lost"))
-    result = await run_tests(mode="PlayMode")
+    with patch("unity_mcp.tools.diagnose.diagnose", new=AsyncMock(return_value="CLEAN-LIVE")):
+        result = await run_tests(mode="PlayMode")
     assert "tests-started" in result
     assert "PlayMode" in result
 
@@ -269,7 +273,8 @@ async def test_run_tests_playmode_disconnect_returns_started(mock_bridge):
 async def test_run_tests_editmode_disconnect_returns_started(mock_bridge):
     """run_tests EditMode: ToolError caught → returns tests-started."""
     mock_bridge.send = AsyncMock(side_effect=ToolError("Unity connection lost"))
-    result = await run_tests(mode="EditMode")
+    with patch("unity_mcp.tools.diagnose.diagnose", new=AsyncMock(return_value="CLEAN-LIVE")):
+        result = await run_tests(mode="EditMode")
     assert "tests-started" in result
     assert "EditMode" in result
 

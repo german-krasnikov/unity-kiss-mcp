@@ -190,6 +190,9 @@ namespace UnityMCP.Editor.Tests
     [TestFixture]
     public class ErrorHelperPrefabHintTests
     {
+        [SetUp]
+        public void SetUp() => Undo.ClearAll();
+
         [Test]
         public void ObjectNotFound_AssetsPrefabPath_ContainsPrefabHint()
         {
@@ -220,6 +223,9 @@ namespace UnityMCP.Editor.Tests
     [TestFixture]
     public class SceneHelperGuardTests
     {
+        [SetUp]
+        public void SetUp() => Undo.ClearAll();
+
         // SaveScene with no path on untitled scene throws
         [Test]
         public void SaveScene_NullPath_UntitledScene_ThrowsArgumentException()

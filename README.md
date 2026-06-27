@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 7967 Tests (2958 Python · 4925 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 7975 Tests (2966 Python · 4925 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.65.0</b> — 2026-06-27 — **Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` …</summary>
+
+**Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` blocks test execution if compilation unstable.
+
+</details>
+
+<details>
 <summary><b>v0.64.0</b> — 2026-06-27 — **T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` …</summary>
 
 **T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` in OnSend with null-safe delegate guard.
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.60.0</b> — 2026-06-26 — **profile MCP Tool** — Session-based frame recording (burst/manual modes) with …</summary>
-
-**profile MCP Tool** — Session-based frame recording (burst/manual modes) with 600-frame ring buffer (~10s at 60fps).
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.60.0** — 2026-06-26 — **profile MCP Tool** — Session-based frame recording (burst/manual modes) with …
 - **v0.59.0** — 2026-06-26 — **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: …
 - **v0.58.0** — 2026-06-25 — **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 …
 - **v0.57.0** — 2026-06-24 — **Tool-Gating OR Bug** — Empty disabled set was falsy, skipping the entire tool …

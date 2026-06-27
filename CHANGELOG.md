@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.65.0] — 2026-06-27 <!-- stale DLL guard: Python pre-flight, C# gap-window, UPM fallback, scene save fix -->
+
+**Stale DLL Guard — Pre-Flight Diagnosis, Gap-Window Closure, UPM Fallback Detection, Scene Save Dialog Prevention:**
+
+- **Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` blocks test execution if compilation unstable. Detects: FAILED, WEDGE-ENGINE, BUILD-FAILED-WEDGE, STALE-CACHE, STALE-DOMAIN, REBUILDING, TESTS-INVISIBLE. ToolError propagates; graceful degrade on other exceptions. Prevents stale-DLL test runs (tests pass against old code while current compile broken). 8 new Python tests in test_scene_tools.py.
+- **C# TestRunner Gap-Window Guard** — `GetIsCompileClean()` seam after `isCompiling` check closes domain-reload window (compilationFinished → afterAssemblyReload race). Guard detects if assemblies loading while gate passed, returns false to trigger reload retry. 3 new NUnit tests in TestRunnerTests.
+- **FindAsmdefDir UPM Fallback** — DiagnoseCommand.cs fallback via `AssetDatabase.FindAssets()` for file: UPM packages (no source). Enables stale detection for local packages (previously: unknown stale state). 3 new NUnit tests in DiagnoseCommandTests.
+- **Undo.ClearAll() in Test Setup/Teardown** — UndoGroupHelperTests ([TearDown]) + HelperTests ([SetUp]×2) clean Undo stack, prevent "Save scene?" dialog on test cleanup. Zero user impact; infrastructure only.
+- **Test Results**: 2966 py (2958+8) + 4928 NUnit EditMode (4922+6 new guard tests), all green
+
 ## [v0.64.0] — 2026-06-27 <!-- 7-task sprint: bare-name chips, plugins UI, line tool, log filter, undo, session resume, field menu -->
 
 **Chat UX Sprint — Bare-Name Chips, Plugins Settings, Polyline Annotation, Log Filtering, Undo Stack, Session Resume, Field Menu Always-On:**

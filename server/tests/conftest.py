@@ -87,6 +87,16 @@ def _reset_sampling_semaphore():
 
 
 @pytest.fixture(autouse=True)
+def _reset_diagnose_send():
+    """Prevent diagnose._send from leaking between tests (set by server.register())."""
+    import unity_mcp.tools.diagnose as _diag
+    original = _diag._send
+    _diag._send = None
+    yield
+    _diag._send = original
+
+
+@pytest.fixture(autouse=True)
 def _clean_unity_env(monkeypatch):
     """Default-disable env-gated features. Tests opt in via their own monkeypatch.setenv."""
     for k in ("UNITY_MCP_HINTS", "UNITY_MCP_VALIDATE", "UNITY_MCP_VISUAL_VERIFY",

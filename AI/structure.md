@@ -9,7 +9,7 @@ unity-kiss-mcp/
 │   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
 │   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall, connect, disconnect, pull - v0.45.0)
 │   └── tests/                  # Bootstrap + UI + install tests
-├── server/                     # Python MCP Server (2958 unit tests total, v0.64.0: +75 polyline/scene tests; v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
+├── server/                     # Python MCP Server (2966 unit tests total, v0.65.0: +8 run_tests pre-flight gate tests; v0.64.0: +75 polyline/scene tests; v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # _UnstructuredMCP(FastMCP) instance, lifespan, 99 registered MCP tools (v0.50.3)
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)

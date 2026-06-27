@@ -25,7 +25,8 @@ namespace UnityMCP.Editor
 
         // Testable seam — override in tests to avoid Editor-uptime dependency
         internal static Func<double> GetTimeSinceStartup = () => EditorApplication.timeSinceStartup;
-        internal static Func<bool> GetIsCompiling = () => EditorApplication.isCompiling;
+        internal static Func<bool> GetIsCompiling    = () => EditorApplication.isCompiling;
+        internal static Func<bool> GetIsCompileClean = () => SyncHelper.IsCompileClean;
 
         internal static bool IsRunning => _isRunning == 1
             || SessionState.GetBool(KeyPending, false);
@@ -73,6 +74,12 @@ namespace UnityMCP.Editor
             if (GetIsCompiling())
             {
                 onComplete?.Invoke("Error: compilation in progress — poll sync_status and retry after compile completes");
+                return;
+            }
+
+            if (!GetIsCompileClean())
+            {
+                onComplete?.Invoke("Error: domain reload pending — poll sync_status and retry after reload completes");
                 return;
             }
 
