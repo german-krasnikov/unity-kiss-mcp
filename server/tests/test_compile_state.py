@@ -71,8 +71,8 @@ def test_probe_disconnect_window_expires(tmp_path):
     with patch("unity_mcp.compile_state.time") as mock_time:
         mock_time.monotonic.return_value = base_ts
         probe.mark_recompile_issued()
-        # Advance 91 seconds past mark (window is now 90s)
-        mock_time.monotonic.return_value = base_ts + 91
+        # Advance 121 seconds past mark (window is now 120s)
+        mock_time.monotonic.return_value = base_ts + 121
         assert probe.is_unity_busy() is False
 
 

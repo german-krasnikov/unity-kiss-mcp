@@ -51,6 +51,10 @@ namespace UnityMCP.Editor.Tests
             _additiveScene = default;
             if (_additiveTempPath != null && File.Exists(_additiveTempPath))
                 AssetDatabase.DeleteAsset(_additiveTempPath);
+            // Replace the active dirty scene BEFORE deleting its backing file (unconditionally).
+            // DestroyImmediate above marks it dirty; without this, any dirty scene that lacks
+            // a backing file triggers the "Save Scene?" dialog on the next test or Unity focus.
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             if (_tempPath != null && File.Exists(_tempPath))
                 AssetDatabase.DeleteAsset(_tempPath);
         }

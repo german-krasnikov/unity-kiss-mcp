@@ -89,6 +89,9 @@ namespace UnityMCP.Editor
             // BuildFailure.reload_failed; this C# signal lets Python consume it via wire format.
             sb.AppendLine($"reload_failed={DetectReloadFailed().ToString().ToLower()}");
 
+            // all_errors= — FIX-1: cross-asmdef compile errors with explicit CS codes
+            sb.AppendLine($"all_errors={SessionState.GetString(SyncHelper.AllAsmErrKey, "")}");
+
             return sb.ToString().TrimEnd();
         }
 
@@ -142,6 +145,8 @@ namespace UnityMCP.Editor
             var maxCsMtime = DateTime.MinValue;
             foreach (var cs in Directory.GetFiles(srcDir, "*.cs", SearchOption.AllDirectories))
             {
+                // Unity ignores files/dirs with ~ prefix — exclude from freshness calculation (FIX-3)
+                if (Path.GetFileName(cs).StartsWith("~")) continue;
                 var t = new FileInfo(cs).LastWriteTimeUtc;
                 if (t > maxCsMtime) maxCsMtime = t;
             }

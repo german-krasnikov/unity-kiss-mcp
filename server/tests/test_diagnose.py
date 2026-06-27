@@ -283,7 +283,7 @@ stamp=60d2de34-f1b2-4c3d-a5e6-789012345678:639169455305003280
 compile=idle|8.2
 sync=ready  epoch=3
 iscompiling=false  cn_active=false  started=false  stamp_frozen=false
-dlls=UnityMCP.Editor:639169455305003280:fresh UnityMCP.Editor.Chat.Tests:0:unknown(missing)
+dlls=UnityMCP.Editor:639169455305003280:fresh,UnityMCP.Editor.Chat.Tests:0:unknown(missing)
 errors=
 log=clean
 """
@@ -306,7 +306,7 @@ stamp=60d2de34-f1b2-4c3d-a5e6-789012345678:639169455305003280
 compile=idle|8.2
 sync=ready  epoch=3
 iscompiling=false  cn_active=false  started=false  stamp_frozen=false
-dlls=UnityMCP.Editor:0:unknown(missing) UnityMCP.Editor.Chat.Tests:0:unknown(missing)
+dlls=UnityMCP.Editor:0:unknown(missing),UnityMCP.Editor.Chat.Tests:0:unknown(missing)
 errors=
 log=clean
 """
@@ -342,6 +342,50 @@ def test_stale_prod_dll_yields_failed_stale():
     f = _d._parse_diagnose(STALE_DLL_WIRE)
     v = _d._verdict(f)
     assert v == "FAILED:stale-dll", f"Stale prod dll → FAILED:stale-dll, got {v!r}"
+
+
+# Bug 2: idle-never + stale-dll must NOT be masked by NO-OP (priority inversion fix)
+IDLE_NEVER_STALE_DLL_WIRE = """\
+mvid=
+stamp=60d2de34-f1b2-4c3d-a5e6-789012345678:639169455305003280
+compile=idle-never|0.0
+sync=ready  epoch=1
+iscompiling=false  cn_active=false  started=false  stamp_frozen=false
+dlls=UnityMCP.Editor:100:stale
+errors=
+log=clean
+"""
+
+def test_idle_never_with_stale_dll_yields_failed_not_noop():
+    """idle-never + stale dll → FAILED:stale-dll, not NO-OP.
+
+    Bug 2 fix: stale-dll check must precede idle-never to avoid masking.
+    """
+    f = _d._parse_diagnose(IDLE_NEVER_STALE_DLL_WIRE)
+    v = _d._verdict(f)
+    assert v == "FAILED:stale-dll", f"idle-never + stale-dll must be FAILED:stale-dll, got {v!r}"
+
+
+# Bug 3: iscompiling + idle-never + stale-dlls = package-resolve transient → STALE-TRANSIENT
+STALE_TRANSIENT_WIRE = """\
+mvid=
+stamp=60d2de34-f1b2-4c3d-a5e6-789012345678:639169455305003280
+compile=idle-never|0.0
+sync=ready  epoch=1
+iscompiling=true  cn_active=true  started=true  stamp_frozen=false
+dlls=UnityMCP.Editor:100:stale
+errors=
+log=clean
+"""
+
+def test_iscompiling_idle_never_stale_dll_yields_stale_transient():
+    """iscompiling=true + idle-never + stale dll → STALE-TRANSIENT (package-resolve transient).
+
+    Bug 3 fix: transient state must be distinguishable from permanent stale.
+    """
+    f = _d._parse_diagnose(STALE_TRANSIENT_WIRE)
+    v = _d._verdict(f)
+    assert v == "STALE-TRANSIENT", f"iscompiling+idle-never+stale → STALE-TRANSIENT, got {v!r}"
 
 
 # ------ A5/G27 : STALE-DOMAIN gated on expected_compile ------
@@ -532,3 +576,50 @@ def test_diagnose_reload_failed_false_clean_wire_yields_clean_live():
     assert v == "CLEAN-LIVE", (
         f"reload_failed=false + clean wire must yield CLEAN-LIVE, got {v!r}"
     )
+
+
+# ------ FIX-1 : all_errors= cross-asmdef compile error detection ------
+
+ALL_ERRORS_PAYLOAD = """\
+mvid=60d2de34-f1b2-4c3d-a5e6-789012345678
+stamp=60d2de34-f1b2-4c3d-a5e6-789012345678:639169455305003280
+compile=idle|8.2
+sync=ready  epoch=3
+iscompiling=false  cn_active=false  started=false  stamp_frozen=false
+dlls=UnityMCP.Editor:639169455305003280:fresh
+errors=No compilation errors
+log=clean
+main_mvid=60d2de34-f1b2-4c3d-a5e6-789012345678
+reload_failed=false
+all_errors=UnityMCP.Editor.Tests:CS0246:Assets/Editor/Tests/Foo.cs:12: error CS0246: The type or namespace name 'Foo' could not be found
+"""
+
+ALL_ERRORS_EMPTY_PAYLOAD = """\
+mvid=60d2de34-f1b2-4c3d-a5e6-789012345678
+stamp=60d2de34-f1b2-4c3d-a5e6-789012345678:639169455305003280
+compile=idle|8.2
+sync=ready  epoch=3
+iscompiling=false  cn_active=false  started=false  stamp_frozen=false
+dlls=UnityMCP.Editor:639169455305003280:fresh
+errors=
+log=clean
+main_mvid=60d2de34-f1b2-4c3d-a5e6-789012345678
+reload_failed=false
+all_errors=
+"""
+
+
+def test_all_errors_yields_failed_cs():
+    """FIX-1: all_errors= with CS0246 + clean errors= → FAILED:CS0246."""
+    f = _d._parse_diagnose(ALL_ERRORS_PAYLOAD)
+    assert "CS0246" in f.all_errors, f"all_errors field must contain CS0246, got: {f.all_errors!r}"
+    v = _d._verdict(f)
+    assert v == "FAILED:CS0246", f"all_errors with CS0246 must yield FAILED:CS0246, got {v!r}"
+
+
+def test_all_errors_empty_no_impact():
+    """FIX-1: all_errors= empty + clean errors= → CLEAN-LIVE (no false-fire)."""
+    f = _d._parse_diagnose(ALL_ERRORS_EMPTY_PAYLOAD)
+    assert f.all_errors == "", f"Empty all_errors must parse to empty string, got: {f.all_errors!r}"
+    v = _d._verdict(f)
+    assert v == "CLEAN-LIVE", f"Empty all_errors + clean wire must yield CLEAN-LIVE, got {v!r}"

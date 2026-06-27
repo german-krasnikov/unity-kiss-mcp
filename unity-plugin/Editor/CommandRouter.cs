@@ -286,6 +286,7 @@ namespace UnityMCP.Editor
             CommandRegistry.Register("get_object_detail", ExecGetObjectDetail);
             CommandRegistry.Register("find_objects", ExecFindObjects);
             CommandRegistry.Register("get_console", ExecGetConsole);
+            CommandRegistry.Register("clear_console", _ => { ConsoleCapture.Clear(); return "ok"; });
             CommandRegistry.Register("get_compile_errors", _ => CompileErrorCapture.GetErrors());
             CommandRegistry.Register("compile_status", _ => CompileNotifier.GetStatus());
             CommandRegistry.Register("diagnose", args => DiagnoseCommand.Execute(args));  // C8: read-only multi-signal snapshot
@@ -511,7 +512,7 @@ namespace UnityMCP.Editor
             cmd == "ask_user";  // read-only UI card — not gated by MCPSettings
 
         internal static bool IsAllowedDuringCompile(string cmd) =>
-            cmd == "ping" || cmd == "get_version" || cmd == "get_console" ||
+            cmd == "ping" || cmd == "get_version" || cmd == "get_console" || cmd == "clear_console" ||
             cmd == "screenshot" || cmd == "get_enabled_tools" || cmd == "compile_status" ||
             cmd == "get_disabled_tools" || cmd == "set_tool_catalog" || cmd == "sync_status" ||
             cmd == "get_compile_errors" || cmd == "diagnose" ||  // C4: escape-hatch + diagnose reachable while wedged

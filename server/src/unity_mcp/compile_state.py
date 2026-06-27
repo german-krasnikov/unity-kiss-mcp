@@ -11,7 +11,7 @@ from typing import Optional
 from unity_mcp.lockfile import read_pid_from_port_file, is_pid_alive, read_project_path_from_port_file
 from unity_mcp.unity_state import read_state_for_port
 
-_DISCONNECT_WINDOW_S = 90.0  # was 30.0 — match DOMAIN_RELOAD_EXPIRY_S
+_DISCONNECT_WINDOW_S = 120.0  # was 90.0 — match DOMAIN_RELOAD_EXPIRY_S
 _DEFAULT_REMAINING_S = 5.0  # TODO(FM-26 G16w): derive from real diagnose state, not a fabricated 5.0s default
 _MAX_REMAINING_S = 60.0
 

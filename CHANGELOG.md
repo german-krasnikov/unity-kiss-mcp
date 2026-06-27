@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.66.0] — 2026-06-28 <!-- 5 fixes from monkey experiments: diagnose, reload timing, stale DLL filter, panel tests, clear_console -->
+
+**Stability Fixes — Cross-Assembly Diagnostics, Reload Timing Expansion, Stale File Filter, Console Control:**
+
+- **FIX-1: Cross-Assembly Compile Error Detection (diagnose tool)** — DiagnoseCommand now hooks `CompilationPipeline.assemblyCompilationFinished` callback (C# SyncHelper.cs) to report errors across all UnityMCP.* assemblies. New `all_errors=` field in diagnose wire format captures multi-assembly failures. Python diagnose.py parses all_errors block alongside main errors. Prevents silent failures in Chat/Reload/Plugin assemblies masked by main assembly compile success. 17 new Python tests in test_diagnose.py.
+
+- **FIX-2: DOMAIN_RELOAD_EXPIRY_S 90s → 120s** — Increased from v0.42.0's 90s to accommodate large-file compiles and cross-asmdef diagnostics on slow systems. Both DOMAIN_RELOAD_EXPIRY_S (bridge_reload_state.py) and _DISCONNECT_WINDOW_S (compile_state.py) synchronized at 120s. Reduces false "domain stuck" timeouts on complex projects. 5 new Python tests in test_reload_stability.py.
+
+- **FIX-3: GetDllFreshnessToken ~ Prefix Filter** — GetDllFreshnessToken now skips files starting with ~ (editor temp files ignored by Unity). Prevents false-positive stale DLL detection from cleanup artifacts. compile_state.py determinism improved; MVID comparisons ignore transient files.
+
+- **FIX-4: PluginUIHelpersTests EditorWindow.ShowUtility() Panel Fix** — PluginUIHelpersTests now call EditorWindow.ShowUtility() for test panels (was creating hidden windows). Fixes 5 NUnit test failures in PluginUIHelpersTests and allows MakeCard/AddControl tests to render correctly. 5 tests now passing.
+
+- **FIX-5: clear_console TCP Command** — New `clear_console` TCP command (C# CommandRouter.cs line 289) replaces `.GetMethod()` reflection hack. Simple stateless operation: calls ConsoleCapture.Clear() and returns "ok". Added to compile guard allowlist + fast-path commands. Enables console reset in Play Mode + domain reload scenarios. 3 live integration tests fixed in conftest.py.
+
+- **Test Results**: 2970 Python (↑27), 4956 NUnit EditMode (all green, 0 pre-existing failures), 80 live (all green, 0 failures)
+
+## [v0.65.1] — 2026-06-27 <!-- Plugin API documentation -->
+
+**Plugin Development Documentation — Complete Guide for Third-Party Plugins:**
+
+- **Plugin Development Guide** — New `/docs/plugin-development.md` (2100+ lines). Comprehensive guide for creating MCP plugins: IMCPPlugin interface details, registration patterns, command naming, PluginConfig isolated storage API, BuildSettingsUI lifecycle, PluginUIHelpers convenience layer (MakeCard, AddTextField, AddToggle, AddSlider, AddIntSlider, AddDropdown, LoadStyles). Complete asset manager example with 5 UI controls, testing patterns with FakePlugin test double, 10 best practices, troubleshooting section.
+- **PluginConfig API** — Per-plugin isolated settings via EditorPrefs. Namespace: `MCPPlugin_{pluginId}_{key}`. Methods: GetString/SetString, GetBool/SetBool, GetInt/SetInt, GetFloat/SetFloat, Delete. All main-thread only. Zero conflicts with core MCP or other plugins.
+- **PluginUIHelpers Convenience Layer** — 7 methods: MakeCard (foldout), InlineRow (flex), AddTextField (auto-save), AddToggle (auto-save), AddSlider (auto-save), AddIntSlider (auto-save), AddDropdown (auto-save + fallback), LoadStyles (for standalone EditorWindows). Each control auto-binds to PluginConfig. Changes persist immediately.
+- **Documentation Only** — No code changes (v0.64.0 Plugin API already shipped). This version documents existing API for plugin developers.
+
 ## [v0.65.0] — 2026-06-27 <!-- stale DLL guard: Python pre-flight, C# gap-window, UPM fallback, scene save fix -->
 
 **Stale DLL Guard — Pre-Flight Diagnosis, Gap-Window Closure, UPM Fallback Detection, Scene Save Dialog Prevention:**

@@ -146,7 +146,7 @@ async def recompile() -> str:
 # STALE-DOMAIN: defensive — unreachable with expected_compile=False, guards future callers
 _BLOCK_STARTS = (
     "FAILED:", "BUILD-FAILED-WEDGE", "STALE-CACHE",
-    "STALE-DOMAIN", "WEDGE-ENGINE", "WEDGE-STATE",
+    "STALE-DOMAIN", "STALE-TRANSIENT", "WEDGE-ENGINE", "WEDGE-STATE",
     "REBUILDING", "TESTS-INVISIBLE",
 )
 

@@ -28,14 +28,14 @@ _RELOAD = _PROJECT / "unity-plugin-reload"
 # Group A: Compile Detection constants
 # ===========================================================================
 
-def test_domain_reload_expiry_is_90s():
-    """DOMAIN_RELOAD_EXPIRY_S must be 90.0, not the old 30.0."""
-    assert DOMAIN_RELOAD_EXPIRY_S == 90.0
+def test_domain_reload_expiry_is_120s():
+    """DOMAIN_RELOAD_EXPIRY_S must be 120.0 — 9 assemblies can take 60s+."""
+    assert DOMAIN_RELOAD_EXPIRY_S == 120.0
 
 
-def test_disconnect_window_is_90s():
-    """_DISCONNECT_WINDOW_S must match DOMAIN_RELOAD_EXPIRY_S (90s)."""
-    assert _DISCONNECT_WINDOW_S == 90.0
+def test_disconnect_window_is_120s():
+    """_DISCONNECT_WINDOW_S must match DOMAIN_RELOAD_EXPIRY_S (120s)."""
+    assert _DISCONNECT_WINDOW_S == 120.0
 
 
 def test_domain_reload_tracker_active_at_60s():
@@ -47,11 +47,11 @@ def test_domain_reload_tracker_active_at_60s():
         assert tracker.is_active() is True
 
 
-def test_domain_reload_tracker_expires_after_90s():
-    """After 91s, tracker auto-clears and returns False."""
+def test_domain_reload_tracker_expires_after_120s():
+    """After 121s, tracker auto-clears and returns False."""
     tracker = DomainReloadTracker()
     with patch("unity_mcp.bridge_reload_state.time") as t:
-        t.monotonic.side_effect = [0.0, 91.0]
+        t.monotonic.side_effect = [0.0, 121.0]
         tracker.mark()
         assert tracker.is_active() is False
         assert tracker._active is False  # must auto-clear internal flag

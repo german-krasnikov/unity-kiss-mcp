@@ -19,6 +19,7 @@ namespace UnityMCP.Editor
         private const string CompileStartedKey = "MCP_SyncCompileStarted";
         private const string StampKey          = "MCP_DomainStamp";
         private const string StampAtTriggerKey = "MCP_StampAtTrigger";
+        internal const string AllAsmErrKey     = "MCP_AllCompileErrors";
 
         // RC-2 fix: lowered from 10s to 3s — self-heal is only needed for the
         // genuine no-op path (RC-8); masking a real failure after 10s caused false-greens.
@@ -45,9 +46,10 @@ namespace UnityMCP.Editor
 
         static SyncHelper()
         {
-            CompilationPipeline.compilationStarted  += _ => OnCompileStarted();
-            CompilationPipeline.compilationFinished += _ => OnCompileFinished();
-            AssemblyReloadEvents.afterAssemblyReload += OnAfterReload;
+            CompilationPipeline.compilationStarted          += _ => OnCompileStarted();
+            CompilationPipeline.compilationFinished         += _ => OnCompileFinished();
+            CompilationPipeline.assemblyCompilationFinished += OnAsmCompilationFinished;
+            AssemblyReloadEvents.afterAssemblyReload        += OnAfterReload;
 
             // Bootstrap: seed stamp on first load — afterAssemblyReload does not fire on Unity startup.
             if (string.IsNullOrEmpty(SessionState.GetString(StampKey, "")))
@@ -170,6 +172,7 @@ namespace UnityMCP.Editor
             SessionState.EraseFloat(TriggerTimeKey);
             SessionState.EraseBool(CompileStartedKey);
             SessionState.EraseString(StampAtTriggerKey);
+            SessionState.EraseString(AllAsmErrKey);
             // StampKey intentionally NOT erased: stamp is written only by OnAfterReload
             // (real domain reload). Erasing it here wipes the live stamp between test runs
             // and breaks get_version until the next reload (HOLE-1b). Tests that need a
@@ -185,6 +188,7 @@ namespace UnityMCP.Editor
             SessionState.SetBool(CleanKey, false);
             SessionState.SetString(StateKey, "compiling");
             SessionState.SetBool(CompileStartedKey, true);
+            SessionState.EraseString(AllAsmErrKey);
             // C3: seed stamp baseline so Play-initiated reloads self-heal via stamp-heal.
             // Only seed if no TriggerSync has already written it (non-empty = TriggerSync was called).
             if (string.IsNullOrEmpty(SessionState.GetString(StampAtTriggerKey, "")))
@@ -202,6 +206,35 @@ namespace UnityMCP.Editor
             }
             // Success: don't write "ready" here — only afterAssemblyReload may (R-4 fix).
         }
+
+        // FIX-1: accumulate compile errors per UnityMCP.* assembly with explicit CS codes.
+        private static void OnAsmCompilationFinished(string assemblyPath, CompilerMessage[] messages)
+        {
+            var asmName = System.IO.Path.GetFileNameWithoutExtension(assemblyPath);
+            if (!asmName.StartsWith("UnityMCP.")) return;
+
+            var sb = new System.Text.StringBuilder(SessionState.GetString(AllAsmErrKey, ""));
+            foreach (var msg in messages)
+            {
+                if (msg.type != CompilerMessageType.Error) continue;
+                var csCode = ExtractCsCode(msg.message);
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append($"{asmName}:{csCode}:{msg.file}:{msg.line}: {msg.message}");
+            }
+            if (sb.Length > 0)
+                SessionState.SetString(AllAsmErrKey, sb.ToString());
+        }
+
+        private static string ExtractCsCode(string message)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(message, @"CS\d+");
+            return m.Success ? m.Value : "CS0000";
+        }
+
+#if UNITY_INCLUDE_TESTS
+        public static void SimulateAsmCompilationFinished(string assemblyPath, CompilerMessage[] msgs)
+            => OnAsmCompilationFinished(assemblyPath, msgs);
+#endif
 
         private static void OnAfterReload()
         {

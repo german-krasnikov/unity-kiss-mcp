@@ -191,7 +191,8 @@ namespace UnityMCP.Editor.Tests
     public class ErrorHelperPrefabHintTests
     {
         [SetUp]
-        public void SetUp() => Undo.ClearAll();
+        public void SetUp() =>
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         [Test]
         public void ObjectNotFound_AssetsPrefabPath_ContainsPrefabHint()
@@ -224,7 +225,8 @@ namespace UnityMCP.Editor.Tests
     public class SceneHelperGuardTests
     {
         [SetUp]
-        public void SetUp() => Undo.ClearAll();
+        public void SetUp() =>
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         // SaveScene with no path on untitled scene throws
         [Test]

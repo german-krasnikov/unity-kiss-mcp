@@ -45,11 +45,12 @@ class _DiagnoseFields:
     guard_rejected: bool = False   # P16: Unity busy guard text received
     reload_failed: bool = False    # C10: in-process reload failure (authoritative)
     main_mvid: str = ""        # F3/F5: main-asmdef MVID (absent=not loaded)
+    all_errors: str = ""       # FIX-1: cross-asmdef compile errors with explicit CS codes
 
 
 _KNOWN_KEYS = frozenset(
     ["mvid=", "stamp=", "compile=", "sync=", "iscompiling=", "dlls=", "errors=", "log=",
-     "main_mvid=", "reload_failed="]
+     "main_mvid=", "reload_failed=", "all_errors="]
 )
 
 # Guard-reject signal substrings (Unity is compiling, guard blocked the command)
@@ -76,6 +77,8 @@ def _parse_diagnose(text: str) -> _DiagnoseFields:
 
     errors_lines: list[str] = []
     in_errors = False
+    all_errors_lines: list[str] = []
+    in_all_errors = False
 
     for line in text.splitlines():
         if in_errors:
@@ -84,6 +87,13 @@ def _parse_diagnose(text: str) -> _DiagnoseFields:
                 in_errors = False
             else:
                 errors_lines.append(line)
+                continue
+
+        if in_all_errors:
+            if any(line.startswith(k) for k in _KNOWN_KEYS):
+                in_all_errors = False
+            else:
+                all_errors_lines.append(line)
                 continue
 
         if line.startswith("mvid="):
@@ -123,8 +133,14 @@ def _parse_diagnose(text: str) -> _DiagnoseFields:
             in_errors = True  # errors block may span multiple lines
         elif line.startswith("log="):
             f.log = line[4:].strip()
+        elif line.startswith("all_errors="):
+            rest = line[11:]
+            if rest:
+                all_errors_lines.append(rest)
+            in_all_errors = True
 
     f.errors = "\n".join(errors_lines).strip()
+    f.all_errors = "\n".join(all_errors_lines).strip()
     return f
 
 
@@ -135,14 +151,21 @@ def _first_cs(errors: str) -> str:
     return m.group(1) if m else ""
 
 
+def _first_cs_from_all(all_errors: str) -> str:
+    """Extract first CS#### from all_errors= format 'AsmName:CS####:file:line: msg'."""
+    import re
+    m = re.search(r":(CS\d+):", all_errors)
+    return m.group(1) if m else ""
+
+
 def _parse_dlls(dlls_str: str) -> list[tuple[str, str]]:
     """Parse dlls= token string into [(name, status), ...].
 
-    Format: 'Name1:ticks:status Name2:ticks:status(detail) ...'
+    Format: 'Name1:ticks:status,Name2:ticks:status(detail),...'
     Status is the third colon-delimited field (may contain parens).
     """
     result = []
-    for token in dlls_str.split():
+    for token in dlls_str.split(","):
         parts = token.split(":")
         if len(parts) >= 3:
             name = parts[0]
@@ -160,26 +183,27 @@ def _verdict(
     """Apply §3 protocol priority order. Returns ONE verdict string.
 
     Priority (first match wins) — spec §2:
-      1.  errors= has CS codes          → FAILED:<CS>           [ground truth, always wins]
-      2.  stamp UNDETERMINED            → UNKNOWN
-      3.  build-failed-wedge log        → BUILD-FAILED-WEDGE    [before WEDGE-ENGINE: different remedy]
-      4.  stale-cache log               → STALE-CACHE
-      5.  Tests dll unknown(missing)    → TESTS-INVISIBLE
-      6.  ALL dlls unknown(missing)     → REBUILDING
-      7.  WEDGE-ENGINE fingerprint      → WEDGE-ENGINE
-      8.  WEDGE-STATE fingerprint       → WEDGE-STATE
-      9.  idle-failed                   → FAILED:<CS|unknown>
-      10. idle-never / idle-stale       → NO-OP
-      11. prev_mvid + frozen + expected → STALE-DOMAIN          [gated on expected_compile, A5]
-      12. prev_mvid + frozen + !expected→ NO-OP                 [cache-hit is clean, A5]
-      13. prod dll :stale               → FAILED:stale-dll
-      14. log errors                    → FAILED:<log>
-      15. stamp set                     → CLEAN-LIVE
-      16. fallthrough                   → UNKNOWN
+      1.  errors= has CS codes                        → FAILED:<CS>           [ground truth, always wins]
+      2.  stamp UNDETERMINED                          → UNKNOWN
+      3.  build-failed-wedge log                      → BUILD-FAILED-WEDGE    [before WEDGE-ENGINE: different remedy]
+      4.  stale-cache log                             → STALE-CACHE
+      5.  Tests dll unknown(missing)                  → TESTS-INVISIBLE
+      6.  ALL dlls unknown(missing)                   → REBUILDING
+      7.  WEDGE-ENGINE fingerprint                    → WEDGE-ENGINE
+      8.  WEDGE-STATE fingerprint                     → WEDGE-STATE
+      9.  idle-failed                                 → FAILED:<CS|unknown>
+      9.5 iscompiling + idle-never + stale-dlls       → STALE-TRANSIENT       [package-resolve transient]
+      9.7 prod dll :stale                             → FAILED:stale-dll      [before idle-never to avoid masking]
+      10. idle-never / idle-stale                     → NO-OP
+      11. prev_mvid + frozen + expected               → STALE-DOMAIN          [gated on expected_compile, A5]
+      12. prev_mvid + frozen + !expected              → NO-OP                 [cache-hit is clean, A5]
+      13. log errors                                  → FAILED:<log>
+      14. stamp set                                   → CLEAN-LIVE
+      15. fallthrough                                 → UNKNOWN
     """
     # 1. Compile errors — in-memory C# capture, ground truth, always wins
-    if "error CS" in fields.errors:
-        cs = _first_cs(fields.errors)
+    if "error CS" in fields.errors or fields.all_errors:
+        cs = _first_cs(fields.errors) or _first_cs_from_all(fields.all_errors)
         return f"FAILED:{cs}" if cs else "FAILED:unknown"
 
     # 2. Undetermined stamp → can't assert domain identity
@@ -236,6 +260,15 @@ def _verdict(
         cs = _first_cs(fields.errors)
         return f"FAILED:{cs}" if cs else "FAILED:unknown"
 
+    # 9.5. iscompiling + idle-never + stale-dlls = package-resolve transient state
+    if fields.iscompiling and fields.compile == "idle-never" and \
+            parsed_dlls and any(s == "stale" for _, s in parsed_dlls):
+        return "STALE-TRANSIENT"
+
+    # 9.7. Prod dll stale — must precede idle-never so stale is never masked by NO-OP
+    if parsed_dlls and any(status == "stale" for _, status in parsed_dlls):
+        return "FAILED:stale-dll"
+
     # 10. Never compiled / self-cleared stale → NO-OP
     if fields.compile in ("idle-never", "idle-stale"):
         return "NO-OP"
@@ -247,11 +280,7 @@ def _verdict(
         else:
             return "NO-OP"          # slot 12: cache-hit / no compile expected → clean
 
-    # 13. Prod dll stale (A6 slot 13) — reuse parsed_dlls computed at slots 5/6
-    if parsed_dlls and any(status == "stale" for _, status in parsed_dlls):
-        return "FAILED:stale-dll"
-
-    # 14. Log errors
+    # 13. Log errors
     if fields.log not in ("clean", "absent", ""):
         return f"FAILED:{fields.log}"
 

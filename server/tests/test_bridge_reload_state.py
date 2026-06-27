@@ -64,8 +64,8 @@ def test_double_mark_resets_timer():
     assert t.is_active() is True
 
 
-def test_domain_reload_expiry_is_90s():
-    assert DOMAIN_RELOAD_EXPIRY_S == 90.0
+def test_domain_reload_expiry_is_120s():
+    assert DOMAIN_RELOAD_EXPIRY_S == 120.0
 
 
 def test_disconnect_window_matches_domain_reload_expiry():

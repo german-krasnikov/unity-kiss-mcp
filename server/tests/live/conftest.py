@@ -257,14 +257,9 @@ async def _reload_scene(b: UnityBridge) -> None:
 
 
 async def _clear_console(b: UnityBridge) -> None:
-    """Clear Unity console (removes [MCP] reconnect messages)."""
-    code = (
-        'var m = typeof(UnityEditor.LogEntries).GetMethod("Clear", '
-        'System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public); '
-        'm.Invoke(null, null); return "ok";'
-    )
+    """Clear ConsoleCapture buffer (removes [MCP] reconnect noise before ASSERT_CONSOLE_CLEAN)."""
     try:
-        await b.send("execute_code", {"code": code})
+        await b.send("clear_console", {})
     except Exception:
         pass
 

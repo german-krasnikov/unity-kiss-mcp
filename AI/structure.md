@@ -9,7 +9,7 @@ unity-kiss-mcp/
 │   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
 │   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall, connect, disconnect, pull - v0.45.0)
 │   └── tests/                  # Bootstrap + UI + install tests
-├── server/                     # Python MCP Server (2966 unit tests total, v0.65.0: +8 run_tests pre-flight gate tests; v0.64.0: +75 polyline/scene tests; v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
+├── server/                     # Python MCP Server (2970 unit tests total, v0.66.0: +27 diagnose/reload stability tests; v0.65.0: +8 run_tests pre-flight gate tests; v0.64.0: +75 polyline/scene tests; v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
 │   ├── src/unity_mcp/
 │   │   ├── server.py           # _UnstructuredMCP(FastMCP) instance, lifespan, 99 registered MCP tools (v0.50.3)
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
@@ -180,15 +180,17 @@ unity-kiss-mcp/
 │   ├── UnityMCP.Reload.asmdef                # Core assembly (no references)
 │   ├── package.json                          # v0.1.4, "com.unity-mcp.reload"
 │   └── package.json.meta
-├── unity-plugin/               # Unity Editor Plugin (176+ C# files, ~18700 LOC, v0.59.0: +11 Debug files, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests, v0.55.10: +346 tests for gating/subcategories/icons)
+├── unity-plugin/               # Unity Editor Plugin (178+ C# files, ~18800 LOC, v0.65.1: +2 Plugin API files, v0.59.0: +11 Debug files, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests, v0.55.10: +346 tests for gating/subcategories/icons, v0.65.1: +29 Plugin API tests)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, SaveProjectSettings) + 35 tests (v0.35.0: 4-arg chain env→ProjectSettings→Library→FindFreePort)
 │       ├── CommandRouter.cs                # RegisterAll(), guards, core dispatch (partial class)
 │       ├── CommandRouter.ObjectHandlers.cs # Object mutation handlers (partial class)
 │       ├── CommandRouter.MediaHandlers.cs  # Media/asset handlers (partial class)
-│       ├── IMCPPlugin.cs                   # Plugin interface (Name, CommandPrefix, RegisterCommands, OnDomainReload, GetToolSubcategory)
+│       ├── IMCPPlugin.cs                   # Plugin interface (Name, CommandPrefix, RegisterCommands, OnDomainReload, GetToolSubcategory, DIMs: Description, HasSettingsUI, BuildSettingsUI)
 │       ├── PluginRegistry.cs               # Static plugin registry (Register, RegisterAllPlugins, OnDomainReload, GetCommandsForPlugin, BelongsToPlugin)
+│       ├── PluginConfig.cs                 # Isolated EditorPrefs storage for plugins (GetString/SetString, GetBool/SetBool, GetInt/SetInt, GetFloat/SetFloat, Delete, namespace: MCPPlugin_{pluginId}_{key}, v0.65.1)
+│       ├── PluginUIHelpers.cs              # Convenience UI builders (MakeCard, InlineRow, AddTextField/Toggle/Slider/IntSlider/Dropdown with auto-persist, LoadStyles, v0.65.1)
 │       ├── PluginToolGrouping.cs           # Stateless grouping by subcategory (v0.55.10)
 │       ├── CommandRegistry.cs              # Command registration + runtime flag
 │       ├── CommandSchema.cs                # Parameter validation + fuzzy matching
@@ -325,6 +327,9 @@ unity-kiss-mcp/
 │       │   ├── ObjectManagerTests.cs      # SafeGetTypes, TypeCache, custom namespace tests (v0.55.10)
 │       │   ├── PluginDisabledToolsTests.cs # Per-tool gating tests (v0.55.10)
 │       │   ├── PluginRegistryTests.cs     # Plugin registry tests (v0.55.10)
+│       │   ├── PluginConfigTests.cs       # Isolated EditorPrefs storage tests (Get/Set String/Bool/Int/Float, Delete, namespacing, v0.65.1, 9 tests)
+│       │   ├── PluginUIHelpersTests.cs    # Convenience UI builder tests (MakeCard, InlineRow, Add* controls, auto-persist, LoadStyles, v0.65.1, 20 tests)
+│       │   ├── PluginSettingsPageTests.cs # Plugin UI registration + settings page rendering (v0.64.0, 29 tests)
 │       ├── Wizard/                        # Setup Wizard + Diagnostics (v0.38.0+, v0.42.0: 3-screen flow, 9 backends, asmdef split; v0.47.1: AiConfigScreen fallback, removed dead screens)
 │       │   ├── SetupWizard.cs             # Auto-launch on first run, 3 screens (Welcome → PickBackend → Configure)
 │       │   ├── SetupWizard.uss            # Wizard stylesheet (layout, animations)

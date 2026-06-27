@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 7975 Tests (2966 Python · 4925 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 8013 Tests (2970 Python · 4959 Unity · 84 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,20 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.66.0</b> — 2026-06-28 — **FIX-1: Cross-Assembly Compile Error Detection (diagnose tool)** — …</summary>
+
+**FIX-1: Cross-Assembly Compile Error Detection (diagnose tool)** — DiagnoseCommand now hooks `CompilationPipeline.assemblyCompilationFinished` …
+
+</details>
+
+<details>
+<summary><b>v0.65.1</b> — 2026-06-27 — **Plugin Development Guide** — New `/docs/plugin-development.md` (2100+ lines).</summary>
+
+**Plugin Development Guide** — New `/docs/plugin-development.md` (2100+ lines).
+
+</details>
+
+<details>
 <summary><b>v0.65.0</b> — 2026-06-27 — **Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` …</summary>
 
 **Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` blocks test execution if compilation unstable.
@@ -302,22 +316,10 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.62.0</b> — 2026-06-26 — **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for …</summary>
-
-**Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for error-driven development.
-
-</details>
-
-<details>
-<summary><b>v0.61.0</b> — 2026-06-26 — **PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, …</summary>
-
-**PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, CPU/GPU ms, draw calls, batches, triangles. 5Hz refresh, zero per-frame …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.62.0** — 2026-06-26 — **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for …
+- **v0.61.0** — 2026-06-26 — **PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, …
 - **v0.60.0** — 2026-06-26 — **profile MCP Tool** — Session-based frame recording (burst/manual modes) with …
 - **v0.59.0** — 2026-06-26 — **Runtime Code Execution in Play Mode** — `execute_code` removed `mutating: …
 - **v0.58.0** — 2026-06-25 — **ask tool Scene Queries** — Extended `UNITY_NOUNS_RE` with 23 …

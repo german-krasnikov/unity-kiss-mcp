@@ -104,6 +104,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      * **Python run_tests Pre-Flight** — `diagnose(expected_compile=False)` executed before test launch. Blocks on: FAILED, WEDGE-ENGINE, BUILD-FAILED-WEDGE, STALE-CACHE, STALE-DOMAIN, REBUILDING, TESTS-INVISIBLE. Prevents tests passing against stale DLLs. ToolError propagates; other exceptions gracefully degrade.
      * **C# TestRunner Gap-Window Guard** — `GetIsCompileClean()` seam checks if assemblies are loading between `isCompiling=false` and afterAssemblyReload gate. Detects race window and retries. Closes domain-reload timing gap.
      * **UPM Fallback Detection** — DiagnoseCommand.FindAsmdefDir() uses `AssetDatabase.FindAssets()` for file: UPM packages (source unavailable). Enables stale detection for local packages (previously: unknown state).
+     * **Cross-Assembly Compile Errors (v0.66.0)** — DiagnoseCommand now reports `all_errors=` field via `CompilationPipeline.assemblyCompilationFinished` callback (C# SyncHelper.cs), capturing compile errors across all UnityMCP.* assemblies. Python diagnose.py parses and validates all_errors block alongside main errors field. Enables detection of silent failures in plugin/Chat/Reload assemblies that may be broken while main assembly compiles clean.
    - **DomainReloadError**: on Unity `going_away` event → immediate close + busy flag. Heartbeat now calls `_reload.mark()` on DomainReloadError (v0.36.0) to extend retry window in send()
    - **PID Lockfile**: `~/.unity-mcp/server-{port}.lock`, **cross-platform locking**:
      * **macOS/Linux**: `fcntl.flock` (advisory, whole-file lock)
@@ -122,7 +123,9 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **MCPToolAttribute** (v0.57.0 new): `[MCPTool(name, description="", Mutating=false, Runtime=false)]` attribute for user-extensible tool registration. Decorates public static methods returning `string(string args)`.
    - **AttributeScanner.cs** (v0.57.0 new): `ScanAndRegister()` discovers MCPToolAttribute methods in user assemblies (avoids UnityMCP.* + System + Unity frameworks). Validates signature, calls `CommandRegistry.Register()` for each tool. Returns tool count. Wired into CommandRouter.RegisterAll() after core commands.
    - **PluginRegistry.cs**: Static registry for IMCPPlugin implementations. Plugins register via `[InitializeOnLoad]`. One-way asmdef dependency: external → public.
-   - **IMCPPlugin.cs** (v0.64.0: DIMs for settings UI): Interface — Name, CommandPrefix, RegisterCommands(), OnDomainReload(), AdditionalCommands. **v0.64.0 DIMs**: `string Description` (plugin purpose), `bool HasSettingsUI` (default false), `ISettingsUIElement[] BuildSettingsUI()` (configurable settings). Enables plugin UI registration without breaking backward compatibility.
+   - **IMCPPlugin.cs** (v0.64.0: DIMs for settings UI; v0.65.1: documentation): Interface — Name, CommandPrefix, RegisterCommands(), OnDomainReload(), AdditionalCommands (DIMs). **v0.64.0 DIMs**: `string Description` (plugin purpose), `bool HasSettingsUI` (default false), `VisualElement BuildSettingsUI()` (configurable settings). Enables plugin UI registration without breaking backward compatibility. **v0.65.1 complete guide**: `docs/plugin-development.md` (2100+ lines) documents IMCPPlugin contract, registration patterns, PluginConfig storage, UI building, PluginUIHelpers layer, testing patterns, best practices, troubleshooting.
+   - **PluginConfig.cs** (v0.65.1 new): Isolated EditorPrefs storage for plugins. Namespace: `MCPPlugin_{pluginId}_{key}`. Methods: GetString/SetString, GetBool/SetBool, GetInt/SetInt, GetFloat/SetFloat, Delete. All main-thread only. Zero conflicts with core MCP or other plugins.
+   - **PluginUIHelpers.cs** (v0.65.1 new): Convenience layer for plugin settings UI. 7 methods: MakeCard (bordered foldout), InlineRow (flex row), AddTextField (auto-persist), AddToggle (auto-persist), AddSlider (float, auto-persist), AddIntSlider (int, auto-persist), AddDropdown (with fallback, auto-persist), LoadStyles (standalone EditorWindows). Each control binds to PluginConfig automatically.
    - **SettingsPageFactory.cs** (v0.64.0): `BuildPluginsPage()` method generates MCP Hub settings section for all registered plugins. Lists descriptions, renders `BuildSettingsUI()` per plugin. Integrated into MCPHubUI. 52 tests in PluginSettingsPageTests.
    - **CommandSchema.cs**: parameter validation with fuzzy did-you-mean suggestions (79 schemas)
    - **ValueParser.cs**: vectors, quaternions, colors, arrays, 100+ types (Rect/Bounds/RectInt/BoundsInt/LayerMask + Int64/Double precision), type-aware SetPropertyValue
@@ -319,11 +322,11 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
   * Category: META (allowed during compile, zero side effects)
 
 4. **Guards (C#)**
-   - **Compile guard**: blocks all except ping, get_version, get_console, screenshot, get_enabled_tools, compile_status
+   - **Compile guard**: blocks all except ping, get_version, get_console, clear_console, screenshot, get_enabled_tools, compile_status
    - **Play Mode guard**: blocks mutating commands (changes would be lost)
    - **Runtime guard**: runtime commands blocked outside Play Mode
    - **Tool enable guard**: MCPSettings per-tool toggle (ping/get_version/get_enabled_tools always allowed)
-   - **Fast-path commands** (bypass main thread): ping, get_version, status, get_enabled_tools
+   - **Fast-path commands** (bypass main thread): ping, get_version, status, get_enabled_tools, clear_console (v0.66.0)
 
 5. **Per-command timeouts (C#)**: run_tests=130s, run_playtest=130s, batch=65s, wait_until/move_to/test_step=30s, default=25s
 
@@ -467,6 +470,7 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 **ComputeStamp (compile_state.py)**: Now iterates all UnityMCP.* assemblies (was checking only one assembly, blind to breakage in other .dlls)
 - Detects stale .mvfrm files via MVID comparison (per assembly)
 - Aggregates into single STALE verdict if ANY assembly diverges
+- **v0.66.0: GetDllFreshnessToken ~ prefix filter** — skips files starting with ~ (Unity ignores them; prevents false-positive stale detection from editor temp files)
 
 **ReloadGuard (C# CLI assembly)**: 
 - Constructor barrier calls `AssetDatabase.Refresh()` on init
@@ -483,12 +487,13 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 
 ### Reload Timing
 
-**DOMAIN_RELOAD_EXPIRY_S**: Increased 30s → 90s for 9-assembly reload window
+**DOMAIN_RELOAD_EXPIRY_S**: Increased 30s → 90s → 120s for 9-assembly reload window (v0.66.0)
 - v0.42.0 increased assembly count 7→9 (main, Chat CLI, Chat View, Wizard, Reload, reload tests, Chat tests, Wizard tests)
+- v0.66.0 further increased to 120s to accommodate large file compiles and cross-asmdef compile checks
 - Longer window accommodates full serialization + reload + recompile cycle
 - Bridge heartbeat retry logic uses this window to avoid false "domain stuck" timeouts
 
-**_DISCONNECT_WINDOW_S**: Also 90s (synchronizes with reload window)
+**_DISCONNECT_WINDOW_S**: Also 120s (synchronizes with reload window, v0.66.0)
 
 ### Asmdef Isolation
 
