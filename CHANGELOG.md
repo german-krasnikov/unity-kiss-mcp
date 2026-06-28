@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.67.0] — 2026-06-29 <!-- Chat Relay System: Python sidecar + 5 backends (Claude/Codex/Kimi/Agy/OpenCode) + stream-json transformer + 400+ UI monkey tests -->
+
+**Chat Relay System — Multi-Backend Integration, In-Unity Session Continuity, Domain Reload Survival:**
+
+### Breaking Changes
+- **ThinView Flag Removed** — Deleted MCPChat.ThinView conditional compilation flag (−7410 LOC). RelayBackend is now the only code path for all chat operations. Simplifies architecture and removes dead code branches. Update to v0.67.0+ mandatory; no compatibility layer.
+
+### Features
+- **Chat Relay System (Phase 1–2)** — Complete Python sidecar + C# integration for multi-backend chat. Decouples Claude Code from in-app chat session state.
+  * **CliBackendBase (Python)** — Abstract base for CLI tools with auto-configuring backend dispatch. Builders: `build_args()` (CLI flags), `build_config_path()` (env TOML/JSON). 5 implementations: `ClaudeBackend`, `CodexBackend`, `KimiBackend`, `AgyBackend`, `OpenCodeBackend`.
+  * **RelayBackend (C#)** — TCP→TCP bridge forwarding chat events to relay sidecar (Python). Async loop via `HandleClientAsync`. Zero external dependencies (no Anthropic SDK in plugin).
+  * **RelayEventParser** — Parses wire format: `|cmd=...|arg1=...|arg2=...|\n`. Handles escaped newlines + carriage return sanitization.
+  * **set_mode MCP Tool** — Switch active backend mid-session with `session_id` preservation (Ask↔Agent mode seamless). Injects backend selection into Chat UI.
+- **stream-json → pipe-format Transformer** — Converts Claude API's `stream` JSON (per-event object) into pipe-delimited format for relay wire protocol. Lossless round-trip.
+- **SessionState Domain Reload Survival** — `SessionId` + `SessionState.backup()` persist chat history across domain reloads. Graceful reconnect to relay sidecar on asset recompile.
+- **ChipSystemPrompt & Annotation Settings** — `--append-system-prompt` flag for custom instructions. `AnnotationSettingsProvider` exposes 3 EditorPrefs: `ShowAnnotationGuidelines`, `EnableAutoSave`, `HighContrastMode`.
+- **Security: extra_args Sanitizer** — Whitelist-based validation for all `spawn_relay()` + backend config args. Blocks dangerous flag combinations + command injection vectors.
+- **Removed Unsafe Operations** — Deleted `spawn_relay()` and `switch_relay()` commands (pre-existing vulnerability). Relay lifecycle now managed via C# MCPRelay class only.
+
+### Fixes
+- **Antigravity/Agy Backend Key Mismatch** — Fixed Agy auth config reading wrong env var (`AGENTGPT_API_KEY` typo). Stale doc comment removed.
+- **Region Snapshot Domain Reload Survival** — Backup/restore via `SessionState` prevents annotation loss on recompile.
+- **ChatWindow Transcript Persistence** — Tool chips (⚙ set_property ✓) now survive reload via `TranscriptSerializer` (Kind=Tool). Image paths in 5th column.
+- **Relay Stream-JSON Escape Handling** — Fixed `\r` (carriage return) in relay payload causing pipe-format corruption. Hex-escape sanitizer applied.
+- **Button.clicked.Invoke Hack → Reflection** — Replaced legacy Button state manipulation with `SetMode()` reflection for robust toolbar updates.
+
+### Tests
+- **3759 Python tests** (pytest) — 2970 unit (−live) + 80 live (requires Unity) + 4 live_cli (Claude CLI required) + 705 new relay/monkey tests
+  * 298 chat-focused monkey tests (model selection, send, drag-drop, session persistence)
+  * 115 relay monkey tests (backend chaos, stream-json parsing, pipe-format escape safety)
+  * 96 Chat View UI monkey tests (scroll, window state, mode switch)
+  * 61 relay integration tests (build_args contract, mute, relay pipeline)
+  * 22 C# relay integration tests (drag-drop, chip navigation, window lifecycle)
+- **5493 C# NUnit EditMode tests** — all green (4 pre-existing failures unrelated to relay)
+  * 4956 base + 400 UI monkey tests (UIToolkit interactive) + 137 relay/relay-parser tests
+- **Live Verify**: Round-trip relay start → relay mode → set_mode → message inject → ChatWindow display + domain reload recovery
+
 ## [v0.66.0] — 2026-06-28 <!-- 5 fixes from monkey experiments: diagnose, reload timing, stale DLL filter, panel tests, clear_console -->
 
 **Stability Fixes — Cross-Assembly Diagnostics, Reload Timing Expansion, Stale File Filter, Console Control:**

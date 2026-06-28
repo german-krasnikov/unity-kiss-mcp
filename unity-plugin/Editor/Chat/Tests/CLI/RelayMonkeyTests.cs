@@ -1,0 +1,511 @@
+// Monkey / chaos tests for RelayBackend, RelayEventParser, RelaySpawner, RelayChatProcess.
+// Goal: find NullReferenceExceptions, resource leaks, and state corruption via edge-case inputs.
+// All tests are fully mocked — no real Python relay required.
+#if UNITY_MCP_CHAT
+using System;
+using System.Collections.Generic;
+using NUnit.Framework;
+using UnityEditor;
+using UnityMCP.Editor.Chat;
+
+namespace UnityMCP.Editor.Chat.Tests
+{
+    [TestFixture]
+    public class RelayMonkeyTests
+    {
+        private Func<RelayChatProcess> _origProcFactory;
+        private Func<int>              _origEnsureOverride;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _origProcFactory           = RelayBackend.ProcessFactory;
+            _origEnsureOverride        = RelaySpawner.EnsureRunningOverride;
+            RelaySpawner.EnsureRunningOverride = () => 19700;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            RelayBackend.ProcessFactory        = _origProcFactory;
+            RelaySpawner.EnsureRunningOverride  = _origEnsureOverride;
+            RelaySpawner.Stop();
+            SessionState.EraseInt(RelaySpawner.PortKey);
+            SessionState.EraseInt(RelaySpawner.PidKey);
+        }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private static RelayChatProcess MakeFakeProc(string eventsData = "")
+        {
+            return new RelayChatProcess(json =>
+            {
+                if (json.Contains("\"cmd\":\"events\""))
+                    return $"{{\"ok\":true,\"data\":\"{eventsData}\"}}";
+                return "{\"ok\":true,\"data\":\"\"}";
+            });
+        }
+
+        private RelayBackend MakeBackend(string id = "claude", string mode = "agent",
+                                          string model = "m", int mcp = 0)
+        {
+            RelayBackend.ProcessFactory = () => MakeFakeProc();
+            return new RelayBackend(id, mode, model, mcp);
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // A. RelayEventParser torture (52 tests)
+        // ══════════════════════════════════════════════════════════════════════
+
+        // A1. Every valid prefix without a pipe → null (sep=-1 → early return)
+        [TestCase("t")][TestCase("tc")][TestCase("tr")][TestCase("pp")][TestCase("au")]
+        [TestCase("tp")][TestCase("d")][TestCase("hb")][TestCase("si")][TestCase("ss")]
+        [TestCase("ar")][TestCase("rl")][TestCase("e")]
+        public void Parse_ValidPrefixNoPipe_ReturnsNull(string s) =>
+            Assert.IsNull(RelayEventParser.Parse(s));
+
+        // A2. Unknown / near-miss prefixes
+        [TestCase("tex|data")][TestCase("tcp|data")][TestCase("T|data")][TestCase("TC|data")]
+        [TestCase("|data")][TestCase("0|data")][TestCase("x|y")][TestCase(" t|data")]
+        [TestCase("t |data")]
+        public void Parse_UnknownPrefix_ReturnsNull(string s) =>
+            Assert.IsNull(RelayEventParser.Parse(s));
+
+        // A3. Valid single-field prefixes with empty rest → event produced
+        [TestCase("t|")][TestCase("e|")][TestCase("ar|")][TestCase("rl|")]
+        [TestCase("si|")][TestCase("ss|")][TestCase("hb|")]
+        public void Parse_ValidPrefixEmptyRest_ReturnsEvent(string s) =>
+            Assert.IsNotNull(RelayEventParser.Parse(s));
+
+        // A4. Multi-field prefixes with too few pipe-separated fields → null
+        [TestCase("tc|")][TestCase("tc|name")][TestCase("tc|name|id")]
+        [TestCase("tr|")][TestCase("tr|id")][TestCase("tr|id|true")]
+        [TestCase("pp|")][TestCase("pp|name")][TestCase("pp|name|id")]
+        [TestCase("au|")][TestCase("tp|")]
+        [TestCase("d|")][TestCase("d|s")][TestCase("d|s|0.01")]
+        public void Parse_TooFewFields_ReturnsNull(string s) =>
+            Assert.IsNull(RelayEventParser.Parse(s));
+
+        // A5. Whitespace-only lines have no pipe → null
+        [TestCase("   ")][TestCase("\t")][TestCase("\n")]
+        public void Parse_WhitespaceOnly_ReturnsNull(string s) =>
+            Assert.IsNull(RelayEventParser.Parse(s));
+
+        // A6. Unicode payload survives round-trip
+        [Test]
+        public void Parse_TextDelta_Unicode_Preserved()
+        {
+            var ev = RelayEventParser.Parse("t|こんにちは🌍");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual("こんにちは🌍", ev.Value.Text);
+        }
+
+        // A7. 10 KB payload — no crash, no truncation
+        [Test]
+        public void Parse_TextDelta_LargePayload_Preserved()
+        {
+            var big = new string('x', 10_000);
+            var ev  = RelayEventParser.Parse("t|" + big);
+            Assert.IsNotNull(ev);
+            Assert.AreEqual(10_000, ev.Value.Text.Length);
+        }
+
+        // A8. Non-numeric pct in tp| → defaults to 0, event still produced
+        [Test]
+        public void Parse_ToolProgress_NonNumericPct_DefaultsToZero()
+        {
+            var ev = RelayEventParser.Parse("tp|notanumber|some text");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual(0f, ev.Value.Percentage, 0.001f);
+            Assert.AreEqual("some text", ev.Value.Text);
+        }
+
+        // A9. Non-numeric tokens in d| → defaults to 0, event still produced
+        [Test]
+        public void Parse_TurnDone_NonNumericFields_DefaultsToZero()
+        {
+            var ev = RelayEventParser.Parse("d|sess|notfloat|notint|notint");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual("sess", ev.Value.SessionId);
+            Assert.AreEqual(0f, ev.Value.CostUsd, 0.001f);
+        }
+
+        // A10. tc| args field containing extra pipes — all remaining content preserved
+        [Test]
+        public void Parse_ToolCall_ArgsContainsExtraPipes_FullArgsPreserved()
+        {
+            var ev = RelayEventParser.Parse("tc|bash|tid1|{\"a\":1}|extra|pipes");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual("{\"a\":1}|extra|pipes", ev.Value.ArgsJson);
+        }
+
+        // A11. Control characters in payload — no crash
+        [Test]
+        public void Parse_TextDelta_ControlChars_DoesNotThrow() =>
+            Assert.DoesNotThrow(() => RelayEventParser.Parse("t|\0\r\t"));
+
+        // A12. Broken JSON-like args in tc| — parsed as string, no crash
+        [Test]
+        public void Parse_ToolCall_BrokenJsonArgs_ReturnedAsIs()
+        {
+            var ev = RelayEventParser.Parse("tc|name|id|{broken json");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual("{broken json", ev.Value.ArgsJson);
+        }
+
+        // A13. tr|id|false|error with pipe in error text
+        [Test]
+        public void Parse_ToolResult_PipeInErrorText_Preserved()
+        {
+            var ev = RelayEventParser.Parse("tr|tid1|false|err|text|more");
+            Assert.IsNotNull(ev);
+            Assert.IsFalse(ev.Value.IsOk);
+            Assert.AreEqual("err|text|more", ev.Value.Text);
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // B. RelayBackend lifecycle chaos (19 tests)
+        // ══════════════════════════════════════════════════════════════════════
+
+        [Test]
+        public void Backend_ConstructWithNullId_DoesNotThrow() =>
+            Assert.DoesNotThrow(() => new RelayBackend(null, "agent", "m", 0));
+
+        [Test]
+        public void Backend_ConstructWithNullMode_DoesNotThrow() =>
+            Assert.DoesNotThrow(() => new RelayBackend("id", null, "m", 0));
+
+        [Test]
+        public void Backend_ConstructWithAllNulls_DoesNotThrow() =>
+            Assert.DoesNotThrow(() => new RelayBackend(null, null, null, 0));
+
+        [Test]
+        public void Backend_IsRunning_BeforeStart_ReturnsFalse() =>
+            Assert.IsFalse(MakeBackend().IsRunning);
+
+        [Test]
+        public void Backend_SessionId_BeforeStart_IsNull() =>
+            Assert.IsNull(MakeBackend().SessionId);
+
+        [Test]
+        public void Backend_Stop_BeforeStart_DoesNotThrow() =>
+            Assert.DoesNotThrow(() => MakeBackend().Stop());
+
+        [Test]
+        public void Backend_Stop_MultipleTimes_DoesNotThrow()
+        {
+            var b = MakeBackend(); b.Start();
+            Assert.DoesNotThrow(() => { b.Stop(); b.Stop(); b.Stop(); });
+        }
+
+        [Test]
+        public void Backend_Dispose_MultipleTimes_DoesNotThrow()
+        {
+            var b = MakeBackend(); b.Start();
+            Assert.DoesNotThrow(() => { b.Dispose(); b.Dispose(); b.Dispose(); });
+        }
+
+        [Test]
+        public void Backend_SetMode_BeforeStart_DoesNotThrow() =>
+            Assert.DoesNotThrow(() => MakeBackend().SetMode("ask"));
+
+        [Test]
+        public void Backend_SetMode_Null_DoesNotThrow()
+        {
+            var b = MakeBackend(); b.Start();
+            Assert.DoesNotThrow(() => b.SetMode(null)); b.Stop();
+        }
+
+        [Test]
+        public void Backend_SetMode_AfterStop_DoesNotThrow()
+        {
+            var b = MakeBackend(); b.Start(); b.Stop();
+            Assert.DoesNotThrow(() => b.SetMode("ask"));
+        }
+
+        [Test]
+        public void Backend_DrainEvents_BeforeStart_EmptyOutput()
+        {
+            var output = new List<ChatEvent>();
+            Assert.DoesNotThrow(() => MakeBackend().DrainEvents(output));
+            Assert.AreEqual(0, output.Count);
+        }
+
+        [Test]
+        public void Backend_DrainEvents_AfterStop_DoesNotThrow()
+        {
+            var b = MakeBackend(); b.Start(); b.Stop();
+            Assert.DoesNotThrow(() => b.DrainEvents(new List<ChatEvent>()));
+        }
+
+        [Test]
+        public void Backend_DrainEvents_UnknownPrefixLines_Filtered()
+        {
+            var proc = new RelayChatProcess(json =>
+                json.Contains("events")
+                    ? "{\"ok\":true,\"data\":\"0\\nunknown|garbage\\n1\\nxyz|data\\n\"}"
+                    : "{\"ok\":true,\"data\":\"\"}");
+            RelayBackend.ProcessFactory = () => proc;
+            var b = new RelayBackend("id", "m", "model", 0);
+            b.Start();
+            System.Threading.Thread.Sleep(200);
+            var output = new List<ChatEvent>();
+            Assert.DoesNotThrow(() => b.DrainEvents(output));
+            Assert.AreEqual(0, output.Count);
+            b.Stop();
+        }
+
+        [Test]
+        public void Backend_SendControlResponse_BeforeStart_DoesNotThrow() =>
+            Assert.DoesNotThrow(() => MakeBackend().SendControlResponse("{\"type\":\"ctrl\"}"));
+
+        [Test]
+        public void Backend_StartStopStart_Succeeds()
+        {
+            var b = MakeBackend(); b.Start(); b.Stop();
+            Assert.DoesNotThrow(() => b.Start()); b.Stop();
+        }
+
+        [Test]
+        public void Backend_LongModelName_DoesNotThrow()
+        {
+            RelayBackend.ProcessFactory = () => MakeFakeProc();
+            var b = new RelayBackend("id", "agent", new string('m', 1000), 0);
+            Assert.DoesNotThrow(() => b.Start()); b.Stop();
+        }
+
+        [Test]
+        public void Backend_UnicodeResumeSessionId_DoesNotThrow()
+        {
+            RelayBackend.ProcessFactory = () => MakeFakeProc();
+            var b = new RelayBackend("id", "agent", "m", 0, "sessión-こんにちは");
+            Assert.DoesNotThrow(() => b.Start()); b.Stop();
+        }
+
+        [Test]
+        public void Backend_DrainEvents_EmptyEventsPoll_ProducesNoOutput()
+        {
+            var b = MakeBackend(); b.Start();
+            System.Threading.Thread.Sleep(200);
+            var output = new List<ChatEvent>();
+            b.DrainEvents(output);
+            Assert.AreEqual(0, output.Count);
+            b.Stop();
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // C. RelaySpawner.ParseRelayPort + IsProcessAlive stress (16 tests)
+        // ══════════════════════════════════════════════════════════════════════
+
+        // C1. Edge values that parse successfully
+        [TestCase("relay_port:0",              0)]
+        [TestCase("relay_port:-1",            -1)]
+        [TestCase("relay_port:65536",      65536)]
+        [TestCase("relay_port:2147483647", 2147483647)]
+        [TestCase("relay_port:12345\n",    12345)]
+        [TestCase("relay_port: 12345",     12345)]
+        public void ParseRelayPort_EdgeValues_ParsesSuccessfully(string input, int expected) =>
+            Assert.AreEqual(expected, RelaySpawner.ParseRelayPort(input));
+
+        // C2. Inputs that must throw FormatException
+        [TestCase("  relay_port:12345")]
+        [TestCase("RELAY_PORT:12345")]
+        [TestCase("relay_port:")]
+        [TestCase("relay_port:2147483648")]
+        [TestCase("relay_port:abc")]
+        [TestCase("relay_port:1.5")]
+        [TestCase("relay_port:12 345")]
+        public void ParseRelayPort_InvalidInput_ThrowsFormatException(string input) =>
+            Assert.Throws<FormatException>(() => RelaySpawner.ParseRelayPort(input));
+
+        // C3. 10 KB junk string — wrong prefix → FormatException
+        [Test]
+        public void ParseRelayPort_VeryLongBadString_ThrowsFormatException() =>
+            Assert.Throws<FormatException>(() => RelaySpawner.ParseRelayPort(new string('x', 10_000)));
+
+        // C4. Stop is idempotent
+        [Test]
+        public void Spawner_Stop_WhenNotRunning_IsIdempotent() =>
+            Assert.DoesNotThrow(() => { RelaySpawner.Stop(); RelaySpawner.Stop(); RelaySpawner.Stop(); });
+
+        // C5. int.MaxValue PID almost certainly does not exist
+        [Test]
+        public void Spawner_IsProcessAlive_MaxIntPid_ReturnsFalse() =>
+            Assert.IsFalse(RelaySpawner.IsProcessAlive(int.MaxValue));
+
+        // ══════════════════════════════════════════════════════════════════════
+        // D. RelayChatProcess edge cases (10 tests)
+        // ══════════════════════════════════════════════════════════════════════
+
+        [Test]
+        public void RCP_DrainLines_BeforeStart_ReturnsEmpty()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":true,\"data\":\"\"}");
+            var out_ = new List<string>();
+            proc.DrainLines(out_);
+            Assert.AreEqual(0, out_.Count);
+        }
+
+        [Test]
+        public void RCP_SendSetMode_WhenNotRunning_SendsNothing()
+        {
+            var sent = new List<string>();
+            var proc = new RelayChatProcess(json => { lock (sent) sent.Add(json); return "{\"ok\":true,\"data\":\"\"}"; });
+            proc.SendSetMode("ask");
+            Assert.AreEqual(0, sent.Count);
+        }
+
+        [Test]
+        public void RCP_StartViaRelay_RelayError_ThrowsInvalidOperation()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":false,\"err\":\"relay down\"}");
+            Assert.Throws<InvalidOperationException>(() =>
+                proc.StartViaRelay(0, "id", "agent", "m", 0, null));
+            proc.Dispose();
+        }
+
+        [Test]
+        public void RCP_StartViaRelay_NullStrings_DoesNotThrow()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":true,\"data\":\"\"}");
+            Assert.DoesNotThrow(() => proc.StartViaRelay(0, null, null, null, 0, null));
+            proc.Dispose();
+        }
+
+        [Test]
+        public void RCP_WriteLine_NullText_DoesNotThrow()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":true,\"data\":\"\"}");
+            proc.StartViaRelay(0, "id", "agent", "m", 0, null);
+            Assert.DoesNotThrow(() => proc.WriteLine(null));
+            proc.Dispose();
+        }
+
+        [Test]
+        public void RCP_WriteLine_100KPayload_DoesNotThrow()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":true,\"data\":\"\"}");
+            proc.StartViaRelay(0, "id", "agent", "m", 0, null);
+            Assert.DoesNotThrow(() => proc.WriteLine(new string('a', 100_000)));
+            proc.Dispose();
+        }
+
+        [Test]
+        public void RCP_SendSetMode_Null_DoesNotThrow()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":true,\"data\":\"\"}");
+            proc.StartViaRelay(0, "id", "agent", "m", 0, null);
+            Assert.DoesNotThrow(() => proc.SendSetMode(null));
+            proc.Dispose();
+        }
+
+        [Test]
+        public void RCP_CloseStdin_BeforeStart_DoesNotThrow()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":true,\"data\":\"\"}");
+            Assert.DoesNotThrow(() => proc.CloseStdin());
+        }
+
+        [Test]
+        public void RCP_DrainLines_AppendsToNonEmptyList()
+        {
+            var proc = new RelayChatProcess(json => "{\"ok\":true,\"data\":\"\"}");
+            var out_ = new List<string> { "existing" };
+            proc.DrainLines(out_);
+            Assert.AreEqual(1, out_.Count, "Pre-existing entries must survive empty drain");
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // E. Integration chaos (8 tests)
+        // ══════════════════════════════════════════════════════════════════════
+
+        [Test]
+        public void Integration_100RapidSendTurns_NoException()
+        {
+            var b = MakeBackend(); b.Start();
+            Assert.DoesNotThrow(() =>
+            {
+                for (int i = 0; i < 100; i++) b.SendTurn($"{{\"turn\":{i}}}");
+            });
+            b.Stop();
+        }
+
+        [Test]
+        public void Integration_50RapidSetModes_NoException()
+        {
+            var b = MakeBackend(); b.Start();
+            Assert.DoesNotThrow(() =>
+            {
+                for (int i = 0; i < 50; i++) b.SetMode(i % 2 == 0 ? "agent" : "ask");
+            });
+            b.Stop();
+        }
+
+        [Test]
+        public void Integration_SendThenDrainThenStop_NoException()
+        {
+            var b = MakeBackend(); b.Start();
+            b.SendTurn("{\"type\":\"user\",\"text\":\"hello\"}");
+            var output = new List<ChatEvent>();
+            b.DrainEvents(output);
+            Assert.DoesNotThrow(() => b.Stop());
+        }
+
+        [Test]
+        public void Integration_TwoBackendsSameSpawner_Independent()
+        {
+            RelayBackend.ProcessFactory = () => MakeFakeProc();
+            var b1 = new RelayBackend("id1", "agent", "m", 0);
+            var b2 = new RelayBackend("id2", "ask",   "m", 0);
+            b1.Start(); b2.Start();
+            b1.SendTurn("{\"type\":\"user\"}");
+            b2.SetMode("agent");
+            b1.DrainEvents(new List<ChatEvent>());
+            b2.DrainEvents(new List<ChatEvent>());
+            b1.Stop(); b2.Stop();
+        }
+
+        [Test]
+        public void Integration_DisposeAfterRapidSendTurns_NoException()
+        {
+            var b = MakeBackend(); b.Start();
+            Assert.DoesNotThrow(() =>
+            {
+                for (int i = 0; i < 10; i++) b.SendTurn($"{{\"t\":{i}}}");
+                b.Dispose();
+            });
+        }
+
+        [Test]
+        public void Integration_SessionIdCapturedFromTurnDone()
+        {
+            var proc = new RelayChatProcess(json =>
+                json.Contains("events")
+                    ? "{\"ok\":true,\"data\":\"0\\nd|test-sess|0.01|10|5\\n\"}"
+                    : "{\"ok\":true,\"data\":\"\"}");
+            RelayBackend.ProcessFactory = () => proc;
+            var b = new RelayBackend("id", "agent", "m", 0);
+            b.Start();
+            System.Threading.Thread.Sleep(200);
+            b.DrainEvents(new List<ChatEvent>());
+            b.Stop();
+            Assert.AreEqual("test-sess", b.SessionId);
+        }
+
+        [Test]
+        public void Integration_SpecialCharsInModel_DoesNotThrow()
+        {
+            RelayBackend.ProcessFactory = () => MakeFakeProc();
+            var b = new RelayBackend("id", "agent", "m\"with quotes\"\n", 0);
+            Assert.DoesNotThrow(() => b.Start()); b.Stop();
+        }
+
+        [Test]
+        public void Integration_StopImmediatelyAfterStart_IsRunningFalse()
+        {
+            var b = MakeBackend(); b.Start(); b.Stop();
+            Assert.IsFalse(b.IsRunning);
+        }
+    }
+}
+#endif

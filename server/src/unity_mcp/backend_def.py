@@ -1,0 +1,274 @@
+"""CLI backend definitions: binary resolution + argv construction.
+
+Each BackendDef subclass knows its binary name, resume capability, and how to
+build (argv, env_set, env_strip) from high-level params.  All I/O (config file
+writes) is injectable via config_dir so unit tests never touch real FS paths.
+"""
+from __future__ import annotations
+import asyncio
+import os
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+
+from . import mcp_config_writer
+
+# ── Permission constants (mirrors PermissionConfig.cs) ───────────────────────
+MCP_BLANKET        = "mcp__unity"
+
+# ── extra_args sanitizer ─────────────────────────────────────────────────────
+# Flags that would override security-critical argv already set by build_args.
+_BLOCKED_FLAGS = frozenset({
+    "--output-format", "--input-format",
+    "--permission-mode", "--permission-prompt-tool",
+    "--mcp-config", "--config",
+})
+
+
+def _sanitize_extra_args(raw: str) -> list[str]:
+    """Strip dangerous flags (and their values) from user-supplied extra_args."""
+    if not raw:
+        return []
+    tokens = shlex.split(raw)
+    result, skip = [], False
+    for tok in tokens:
+        if skip:
+            skip = False
+            continue
+        flag = tok.split("=", 1)[0]
+        if flag in _BLOCKED_FLAGS:
+            if "=" not in tok:
+                skip = True  # separate-value style: drop next token too
+            continue
+        result.append(tok)
+    return result
+MCP_PERMISSION_TOOL = MCP_BLANKET + "__permission_prompt"
+MCP_TOOL_PREFIX    = MCP_BLANKET + "__"
+
+
+async def _which_via_login_shell(binary: str) -> str | None:
+    """Login-shell resolution for macOS/Linux (Unity has minimal PATH)."""
+    if sys.platform == "darwin":
+        shell, flag = "/bin/zsh", "-lic"
+    elif sys.platform.startswith("linux"):
+        shell, flag = "/bin/bash", "-lic"
+    else:
+        return None  # Windows: shutil.which handles .cmd/.exe
+    try:
+        out = (await asyncio.to_thread(
+            subprocess.run,
+            [shell, flag, f'command -v "{binary}"'],
+            capture_output=True, text=True, timeout=3,
+        )).stdout
+        for line in reversed(out.splitlines()):
+            if line.startswith("/"):
+                return line.strip()
+    except Exception:
+        pass
+    return None
+
+
+# ── Base class ────────────────────────────────────────────────────────────────
+
+@dataclass
+class BackendDef:
+    name:            str
+    binary:          str
+    has_resume:      bool
+    uses_stream_json: bool = False
+
+    async def resolve_binary(self) -> str | None:
+        """shutil.which → login shell fallback → None."""
+        found = shutil.which(self.binary)
+        return found if found else await _which_via_login_shell(self.binary)
+
+    def build_args(
+        self,
+        mode: str,
+        model: str | None,
+        mcp_port: int,
+        prompt: str = "",
+        session_id: str | None = None,
+        config_dir: str | None = None,
+        **kwargs,
+    ) -> tuple[list[str], dict[str, str], list[str]]:
+        raise NotImplementedError
+
+
+# ── Claude ────────────────────────────────────────────────────────────────────
+
+@dataclass
+class ClaudeDef(BackendDef):
+    name:            str  = "claude"
+    binary:          str  = "claude"
+    has_resume:      bool = True
+    uses_stream_json: bool = True
+
+    def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
+                   config_dir=None, agent_name=None, allowed_mcp_tools=None,
+                   append_system_prompt=None, extra_args=None, **kwargs):
+        config_dir  = config_dir or tempfile.gettempdir()
+        config_path = mcp_config_writer.write_claude_config(config_dir, mcp_port)
+        perm_mode   = "acceptEdits" if mode == "agent" else "plan"
+
+        argv: list[str] = [
+            "-p",
+            "--output-format",          "stream-json",
+            "--verbose",
+            "--include-partial-messages",
+            "--input-format",           "stream-json",
+            "--mcp-config",             config_path,
+            "--permission-mode",        perm_mode,
+            "--permission-prompt-tool", MCP_PERMISSION_TOOL,
+        ]
+
+        if allowed_mcp_tools is None:
+            argv += ["--allowedTools", MCP_BLANKET]
+        elif allowed_mcp_tools:
+            argv += ["--allowedTools",
+                     ",".join(MCP_TOOL_PREFIX + t for t in allowed_mcp_tools)]
+
+        if session_id:
+            argv += ["--resume", session_id]
+        if agent_name:
+            argv += ["--agent", agent_name]
+        if append_system_prompt:
+            argv += ["--append-system-prompt", append_system_prompt]
+        if model:
+            argv += ["--model", model]
+        if extra_args:
+            argv += _sanitize_extra_args(extra_args)
+
+        strip = ["ANTHROPIC_API_KEY", "CLAUDECODE", "UNITY_MCP_PORT", "UNITY_MCP_CHAT"]
+        return argv, {}, strip
+
+
+# ── Codex ─────────────────────────────────────────────────────────────────────
+
+@dataclass
+class CodexDef(BackendDef):
+    name:       str  = "codex"
+    binary:     str  = "codex"
+    has_resume: bool = True  # resume via subcommand switch
+
+    def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
+                   config_dir=None, extra_args=None, **kwargs):
+        cmd, cmd_args = mcp_config_writer.resolve_server_cmd()
+
+        argv: list[str] = ["exec"]
+        if session_id:
+            argv += ["resume", session_id, "--json",
+                     "--dangerously-bypass-approvals-and-sandbox"]
+        else:
+            argv += ["--json", "-C", os.getcwd(), "-s", "danger-full-access"]
+
+        argv.append("--skip-git-repo-check")
+
+        def _toml_esc(s: str) -> str:
+            return s.replace("\\", "\\\\").replace('"', '\\"')
+
+        def _toml_arr(items: list[str]) -> str:
+            return ",".join(f'"{_toml_esc(i)}"' for i in items)
+
+        argv += [
+            "-c", f'mcp_servers.unity.command="{_toml_esc(cmd)}"',
+            "-c", f"mcp_servers.unity.args=[{_toml_arr(cmd_args)}]",
+            "-c", "mcp_servers.unity.startup_timeout_sec=30",
+            "-c", f'mcp_servers.unity.env.UNITY_MCP_PORT="{mcp_port}"',
+        ]
+
+        if model:
+            argv += ["--model", model]
+        if extra_args:
+            argv += _sanitize_extra_args(extra_args)
+        if prompt:
+            argv.append(prompt)
+
+        return argv, {}, ["OPENAI_API_KEY"]
+
+
+# ── Kimi ──────────────────────────────────────────────────────────────────────
+
+@dataclass
+class KimiDef(BackendDef):
+    name:            str  = "kimi"
+    binary:          str  = "kimi"
+    has_resume:      bool = False
+    uses_stream_json: bool = True
+
+    def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
+                   config_dir=None, extra_args=None, **kwargs):
+        config_dir = config_dir or tempfile.gettempdir()
+        mcp_config_writer.write_kimi_mcp_config(config_dir, mcp_port)
+
+        argv: list[str] = ["-p", prompt, "--output-format", "stream-json"]
+        if model:
+            argv += ["--model", model]
+        if extra_args:
+            argv += _sanitize_extra_args(extra_args)
+
+        return argv, {}, []
+
+
+# ── Agy ───────────────────────────────────────────────────────────────────────
+
+@dataclass
+class AgyDef(BackendDef):
+    name:       str  = "agy"
+    binary:     str  = "agy"
+    has_resume: bool = False
+
+    def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
+                   config_dir=None, extra_args=None, **kwargs):
+        config_dir = config_dir or tempfile.gettempdir()
+        mcp_config_writer.write_agy_settings(config_dir, mcp_port)
+
+        argv: list[str] = ["-p", prompt]
+        if model:
+            argv += ["--model", model]
+        if mode == "agent":
+            argv.append("--dangerously-skip-permissions")
+        if extra_args:
+            argv += _sanitize_extra_args(extra_args)
+
+        return argv, {}, ["GEMINI_API_KEY"]
+
+
+# ── OpenCode ──────────────────────────────────────────────────────────────────
+
+@dataclass
+class OpenCodeDef(BackendDef):
+    name:       str  = "opencode"
+    binary:     str  = "opencode"
+    has_resume: bool = True  # -s <id>
+
+    def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
+                   config_dir=None, extra_args=None, **kwargs):
+        config_dir  = config_dir or tempfile.gettempdir()
+        config_path = mcp_config_writer.write_opencode_config(config_dir, mcp_port)
+
+        argv: list[str] = ["run", "--format", "json", "--dangerously-skip-permissions"]
+        if model:
+            argv += ["--model", model]
+        if session_id:
+            argv += ["-s", session_id]
+        if extra_args:
+            argv += _sanitize_extra_args(extra_args)
+        argv.append(prompt)
+
+        return argv, {"OPENCODE_CONFIG": config_path}, []
+
+
+# ── Registry ──────────────────────────────────────────────────────────────────
+
+BACKENDS: dict[str, BackendDef] = {
+    "claude":       ClaudeDef(),
+    "codex":        CodexDef(),
+    "kimi":         KimiDef(),
+    "agy":          AgyDef(),
+    "antigravity":  AgyDef(),
+    "opencode":     OpenCodeDef(),
+}

@@ -14,6 +14,12 @@ unity-kiss-mcp/
 │   │   ├── server.py           # _UnstructuredMCP(FastMCP) instance, lifespan, 99 registered MCP tools (v0.50.3)
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
+│   │   ├── chat_relay.py       # Chat relay MCP tool: stream-json → pipe-format bridge (v0.66.0+)
+│   │   ├── cli_session.py      # CLI session state tracking + history scanning (v0.66.0+)
+│   │   ├── backend_def.py      # Backend definition enum + detection (v0.66.0+)
+│   │   ├── relay_buffer.py     # Message buffering + dequeuing for relay pipeline (v0.66.0+)
+│   │   ├── stream_transform.py # Stream-json → pipe-format transformer + muting (v0.66.0+)
+│   │   ├── mcp_config_writer.py # Dynamic MCP config generation for relay (v0.66.0+)
 │   │   ├── config/             # Config module (v0.38.0+): client detection, MCP JSON merger, backup/restore; v0.47.1: GitHub-direct install, per-client root_key
 │   │   │   ├── clients.py      # CLIENT_REGISTRY (Claude Code/Desktop/Cursor/Windsurf), detect_installed(), platform-aware ConfigDir (v0.47.1)
 │   │   │   ├── merger.py       # merge_mcp_config(path, entry) — idempotent MCP server entry addition
@@ -122,7 +128,7 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # 2851 unit tests + 78 live tests + conftest.py (v0.59.0: +11 debug tests; v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests)
+│   └── tests/                  # 2970 unit tests + 80 live tests + conftest.py (v0.66.0: +relay/stream_transform tests; v0.59.0: +11 debug tests; v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
@@ -158,6 +164,20 @@ unity-kiss-mcp/
 │       ├── test_server_filtering.py     # Port discovery edge cases (v0.55.10)
 │       ├── test_auto_wire.py             # auto_wire tool: 3-priority matching, dry-run (v0.62.0, 5 tests)
 │       ├── test_scene_health.py          # scene_health tool: 7 checks, focus param (v0.62.0, 4 tests)
+│       ├── test_chat_relay.py            # Chat relay MCP tool core logic (v0.66.0+)
+│       ├── test_relay_pipeline.py        # Relay pipeline integration (v0.66.0+)
+│       ├── test_relay_monkey.py          # Relay initialization monkey tests (v0.66.0+)
+│       ├── test_monkey_relay_stress.py   # Relay stress + chaos tests (v0.66.0+)
+│       ├── test_monkey_chat_askmode.py   # Ask mode chat monkey tests (v0.66.0+)
+│       ├── test_monkey_chat_focus.py     # Chat focus monkey tests (v0.66.0+)
+│       ├── test_build_args_contract.py   # Build args protocol validation (v0.66.0+)
+│       ├── test_backend_def.py           # Backend definition + detection (v0.66.0+)
+│       ├── test_mcp_config_writer.py     # Dynamic MCP config generation (v0.66.0+)
+│       ├── test_stream_transform.py      # Stream-json → pipe-format transformer (v0.66.0+)
+│       ├── test_stream_transform_mute.py # Stream transformer muting behavior (v0.66.0+)
+│       ├── relay_helpers.py              # DRY relay test utilities (v0.66.0+)
+│       ├── live/test_chat_ui_monkey.py   # Chat UI monkey tests with live relay (v0.66.0+)
+│       ├── live/chat_ui_helpers.py       # Chat UI test helpers (v0.66.0+)
 │       └── ... + domain tests (190+ files total, 1018 @pytest.mark.asyncio removed v0.26.0)
 ├── unity-plugin-reload/        # Reload Recovery Package (independent compile-unit, v0.27.4)
 │   ├── Editor/
@@ -180,7 +200,7 @@ unity-kiss-mcp/
 │   ├── UnityMCP.Reload.asmdef                # Core assembly (no references)
 │   ├── package.json                          # v0.1.4, "com.unity-mcp.reload"
 │   └── package.json.meta
-├── unity-plugin/               # Unity Editor Plugin (178+ C# files, ~18800 LOC, v0.65.1: +2 Plugin API files, v0.59.0: +11 Debug files, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests, v0.55.10: +346 tests for gating/subcategories/icons, v0.65.1: +29 Plugin API tests)
+├── unity-plugin/               # Unity Editor Plugin (190+ C# files, ~19200 LOC, v0.66.0: +7 Relay files, v0.65.1: +2 Plugin API files, v0.59.0: +11 Debug files, v0.29.2: Chat split into CLI+View, v0.30.4: +482 new tests, v0.55.10: +346 tests for gating/subcategories/icons, v0.65.1: +29 Plugin API tests)
 │   └── Editor/
 │       ├── MCPServer.cs                    # Dual TCP listeners (main + chat), port auto-assign, ClientSlot pattern
 │       ├── PortResolver.cs                 # Pure testable port helpers (ResolvePort, FindFreePort, SavePorts, SaveProjectSettings) + 35 tests (v0.35.0: 4-arg chain env→ProjectSettings→Library→FindFreePort)
@@ -496,10 +516,8 @@ unity-kiss-mcp/
 │       │   │   ├── RecentMentionSource.cs     # Selection.activeGameObject + score boost
 │       │   │   ├── MentionCoordinator.cs      # Merge, dedup, sort, cap at maxResults
 │       │   │   └── MentionPopup.cs            # UIToolkit popup (focusable=false, max 8 rows)
-│       │   ├── CLI/                        # Chat.CLI assembly (protocol, parsing, backends, independent compile)
+│       │   ├── CLI/                        # Chat.CLI assembly (protocol, parsing, relay backends, independent compile, v0.66.0+: RelayBackend)
 │       │   │   ├── ChatEvent.cs               # Normalized event struct
-│       │   │   ├── ChatStreamParser.cs    # Parse stream-json from claude CLI stdout
-│       │   │   ├── ClaudeArgBuilder.cs    # Build --mcp-config file + CLI args (--permission-prompt-tool wired, v0.29.37)
 │       │   │   ├── UserTurnBuilder.cs     # Encode user messages → stdin JSON
 │       │   │   ├── ToolVerbMap.cs             # Tool name → humanized action text
 │       │   │   ├── AnnotatedScreenshotChipProvider.cs # Chip provider for annotated images (v0.46.0)
@@ -511,26 +529,14 @@ unity-kiss-mcp/
 │       │   │   ├── SessionHandoff.cs          # GetResumeCommand(), GetBinaryName() static helpers (v0.41.0)
 │       │   │   ├── SessionScanner.cs          # Scan ~/Library/Caches/<backend>/ for resume sessions (v0.41.0, 190 LOC)
 │       │   │   ├── CopyFlash.cs               # Static seam for showing "Copied!" notification (v0.41.0)
-│       │   │   ├── IChatBackend.cs            # Backend interface (future plugin seams)
-│       │   │   ├── ChatBinaryResolver.cs      # Binary PATH resolution (macOS /bin/zsh -lc)
-│       │   │   ├── ChatProcess.cs             # Process lifecycle manager
-│       │   │   ├── CliBackendBase.cs          # Abstract host: shared lifecycle, 4 variation axes
-│       │   │   ├── ClaudeBackend.cs           # Claude: CliBackendBase subclass (persistent stdin)
-│       │   │   ├── CodexAppServerBackend.cs   # Codex (app-server): persistent JSON-RPC 2.0 sessions (experimentalApi, v0.29.38)
-│       │   │   ├── CodexAppServerParser.cs    # Codex (app-server): JSON-RPC + tool/requestUserInput handler (v0.29.38)
-│       │   │   ├── AntigravityBackend.cs      # Antigravity: CliBackendBase subclass (LLM service, v0.41.0)
-│       │   │   ├── AgyArgBuilder.cs           # Build Antigravity args + environment (v0.41.0)
-│       │   │   ├── AgyParser.cs               # Parse Antigravity stream-json output (v0.41.0)
-│       │   │   ├── AntigravityProvider.cs     # IBackendProvider Antigravity implementation (v0.41.0)
-│       │   │   ├── KimiBackend.cs             # Kimi: CliBackendBase subclass (Kimi K2 CLI, v0.34.0)
-│       │   │   ├── KimiArgBuilder.cs          # Build Kimi args + role-based NDJSON protocol (v0.34.0, 120 LOC, merge-preserving v0.38.0)
-│       │   │   ├── KimiParser.cs              # Parse Kimi NDJSON response stream (v0.34.0, 74 LOC)
-│       │   │   ├── KimiProvider.cs            # IBackendProvider Kimi implementation (v0.34.0)
-│       │   │   ├── OpenCodeBackend.cs         # OpenCode: CliBackendBase subclass (multi-provider model selection, v0.34.0)
-│       │   │   ├── OpenCodeArgBuilder.cs      # Build OpenCode args + model name mapping (v0.34.0, 132 LOC)
-│       │   │   ├── OpenCodeParser.cs          # Parse OpenCode stream-json (v0.34.0, 92 LOC)
-│       │   │   ├── OpenCodeProvider.cs        # IBackendProvider OpenCode implementation (v0.34.0)
-│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum (Claude, Codex, Antigravity, Kimi, OpenCode)
+│       │   │   ├── ChipSystemPrompt.cs        # System prompt generation for chip-aware LLM (v0.66.0+)
+│       │   │   ├── AnnotationSettingsProvider.cs # Plugin settings provider for annotation preferences (v0.66.0+)
+│       │   │   ├── RelayChatProcess.cs        # Relay process manager: spawn + stdin/stdout (v0.66.0+)
+│       │   │   ├── RelayEventParser.cs        # Parse stream-json events from relay process (v0.66.0+)
+│       │   │   ├── RelaySpawner.cs            # Dynamic relay spawner with backend detection (v0.66.0+)
+│       │   │   ├── RelayTcpClient.cs          # TCP client for relay bidirectional communication (v0.66.0+)
+│       │   │   ├── RelayBackend.cs            # Unified relay backend (replaces 5 separate backends, v0.66.0+)
+│       │   │   ├── BackendRegistry.cs         # Backend factory + BackendKind enum
 │       │   │   ├── BackendConfig.cs           # [Serializable] configs per backend + KimiBackendConfig + OpenCodeBackendConfig (v0.34.0)
 │       │   │   ├── BackendConfigStore.cs      # JsonUtility Load/Save (project-local Library/)
 │       │   │   ├── BackendSettingsForm.cs     # UIToolkit per-backend settings forms (v0.30.1: redesigned with presets)
@@ -678,18 +684,20 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── MermaidView.cs     # Absolute nodes + edge overlay + geom-change callback
 │       │   │   │   │   └── MermaidEdgePainter.cs  # Painter2D lines + arrowheads
 │       │   │   ├── Tests/                     # CLI + View assembly tests (parsing, backends, cards, interactivity)
-│       │   │   │   ├── CLI/                   # CLI assembly tests
-│       │   │   │   │   ├── ChatStreamParserTests.cs # Parse stream-json events + control_request routing
-│       │   │   │   │   ├── ClaudeArgBuilderTests.cs # CLI arg building + permission-prompt-tool (v0.29.37)
-│       │   │   │   │   ├── CodexAppServerParserTests.cs # Codex JSON-RPC + requestUserInput (v0.29.38)
-│       │   │   │   │   ├── CodexArgBuilderTests.cs # Codex CLI args + model wiring (v0.30.4, 33 tests)
-│       │   │   │   │   ├── ControlResponseBuilderTests.cs # Response serialization including CodexUserInputResponse (v0.29.38)
-│       │   │   │   │   ├── GeminiArgBuilderTests.cs # Gemini gcloud args + settings.json port update (v0.30.1, 217 tests)
-│       │   │   │   │   ├── GeminiParserTests.cs   # Gemini stream-json parsing (v0.30.1, 190 tests)
-│       │   │   │   │   ├── KimiArgBuilderTests.cs # Kimi K2 args + role NDJSON protocol (v0.34.0, 214 tests)
-│       │   │   │   │   ├── KimiParserTests.cs     # Kimi NDJSON response parsing (v0.34.0, 243 tests)
-│       │   │   │   │   ├── OpenCodeArgBuilderTests.cs # OpenCode args + model mapping (v0.34.0, 222 tests)
-│       │   │   │   │   ├── OpenCodeParserTests.cs # OpenCode stream-json parsing (v0.34.0, 273 tests)
+│       │   │   │   ├── CLI/                   # CLI assembly tests (relay architecture v0.66.0+)
+│       │   │   │   │   ├── ControlResponseBuilderTests.cs # Response serialization (v0.29.38+)
+│       │   │   │   │   ├── RelayBackendTests.cs # Relay backend core logic (v0.66.0+)
+│       │   │   │   │   ├── RelayChatProcessTests.cs # Process spawning + lifecycle (v0.66.0+)
+│       │   │   │   │   ├── RelayEventParserTests.cs # Stream-json event parsing (v0.66.0+)
+│       │   │   │   │   ├── RelayTcpClientTests.cs # TCP bidirectional communication (v0.66.0+)
+│       │   │   │   │   ├── RelayBackendConstructionMonkeyTests.cs # Initialization chaos (v0.66.0+)
+│       │   │   │   │   ├── RelayBackendDrainMonkeyTests.cs # Drain path stress (v0.66.0+)
+│       │   │   │   │   ├── RelayConnectionChaosTests.cs # Connection failures + recovery (v0.66.0+)
+│       │   │   │   │   ├── RelayDrainStressTests.cs # High-volume message drain (v0.66.0+)
+│       │   │   │   │   ├── RelayParserStress2Tests.cs # Parser chaos + edge cases (v0.66.0+)
+│       │   │   │   │   ├── RelayReloadSurvivalTests.cs # Domain reload recovery (v0.66.0+)
+│       │   │   │   │   ├── RelayMonkeyTests.cs # Initialization monkey tests (v0.66.0+)
+│       │   │   │   │   ├── RelayMonkeyChatTests.cs # Chat flow monkey tests (v0.66.0+)
 │       │   │   │   │   ├── ImageAttachmentStoreTests.cs # Image attachment storage + temp files (v0.34.0, 188 tests)
 │       │   │   │   │   ├── BuiltInChipProvidersTests.cs # Image/Model/Audio chip providers (v0.34.0, 214 tests)
 │       │   │   │   │   ├── ProviderRegistryTests.cs # Provider registry base class (v0.34.0, 57 tests)
@@ -706,9 +714,23 @@ unity-kiss-mcp/
 │       │   │   │   │   ├── ScreenshotServiceTests.cs # Screenshot capture flow (v0.46.0, 69 tests)
 │       │   │   │   │   ├── ScreenshotToolbarButtonTests.cs # Screenshot toolbar button (v0.46.0, 78 tests)
 │       │   │   │   │   ├── AnnotateToolbarButtonTests.cs # Annotation editor launcher (v0.46.0, 42 tests)
-│       │   │   │   └── View/                  # View assembly tests (UI, cards, interactivity)
+│       │   │   │   └── View/                  # View assembly tests (UI, cards, interactivity, v0.66.0+: relay flow tests)
 │       │   │   │   │   ├── AskUserCardTests.cs     # User input dialog + Codex protocol (v0.29.38 addition)
 │       │   │   │   │   ├── ApproveFlowTests.cs     # Interactive approvals flow
+│       │   │   │   │   ├── ChatUIMonkeyTests.cs    # Chat UI interaction monkey tests (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowButtonStateTests.cs # Button state transitions (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowDragDropMonkeyTests.cs # Drag-drop interactions (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowElementQueryTests.cs # DOM element queries (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowModeMonkeyTests.cs # Mode switch stress tests (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowModelChaosTests.cs # Model/backend chaos (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowSendMonkeyTests.cs # Send path chaos (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowSessionMonkeyTests.cs # Session management stress (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowUIInteractionTests.cs # General UI interaction (v0.66.0+)
+│       │   │   │   │   ├── ChatWindowWindowLifecycleTests.cs # Window open/close lifecycle (v0.66.0+)
+│       │   │   │   │   ├── ChipNavigationIntegrationTests.cs # Chip navigation integration (v0.66.0+)
+│       │   │   │   │   ├── InlineChipFieldModelMonkeyTests.cs # Inline chip field chaos (v0.66.0+)
+│       │   │   │   │   ├── RelayFlowWindowTests.cs # Relay chat flow window tests (v0.66.0+)
+│       │   │   │   │   ├── SceneGoDragTests.cs     # Scene GameObject drag tests (v0.66.0+)
 │       │   │   │   │   ├── AnnotationCanvasTests.cs # Canvas rasterization (v0.46.0, 30 tests)
 │       │   │   │   │   ├── AnnotationCommandTests.cs # Command pattern + execution (v0.46.0, 86 tests)
 │       │   │   │   │   ├── AnnotationCompositorTests.cs # PNG composition + flattening (v0.46.0, 82 tests)
@@ -751,7 +773,7 @@ unity-kiss-mcp/
 │       │   │   │       ├── MarkdownParserTests.cs
 │       │   │   │       ├── MermaidParserTests.cs
 │       │   │   │       └── ... # 25+ render tests
-│       │   ├── UnityMCP.Editor.Chat.CLI.asmdef # CLI assembly: protocol, parsing, backends (independent compile, v0.29.2)
+│       │   ├── UnityMCP.Editor.Chat.CLI.asmdef # CLI assembly: protocol, relay backends (independent compile, v0.29.2; v0.66.0: unified RelayBackend)
 │       │   ├── UnityMCP.Editor.Chat.View.asmdef # View assembly: UI windows, rendering, cards (depends on CLI)
 │       ├── ChatSettingsHook.cs            # Event hook: fires on MCPSettings rebuild
 │       ├── AssemblyInfo.cs                # InternalsVisibleTo("UnityMCP.Editor.Chat.*")

@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 8013 Tests (2970 Python · 4959 Unity · 84 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 9542 Tests (3759 Python · 5499 Unity · 284 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.67.0</b> — 2026-06-29 — **ThinView Flag Removed** — Deleted MCPChat.ThinView conditional compilation …</summary>
+
+**ThinView Flag Removed** — Deleted MCPChat.ThinView conditional compilation flag (−7410 LOC).
+
+</details>
+
+<details>
 <summary><b>v0.66.0</b> — 2026-06-28 — **FIX-1: Cross-Assembly Compile Error Detection (diagnose tool)** — …</summary>
 
 **FIX-1: Cross-Assembly Compile Error Detection (diagnose tool)** — DiagnoseCommand now hooks `CompilationPipeline.assemblyCompilationFinished` …
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.63.0</b> — 2026-06-27 — **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool …</summary>
-
-**IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool MenuOnly => false;` allows selective toolbar button repositioning …
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.63.0** — 2026-06-27 — **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool …
 - **v0.62.0** — 2026-06-26 — **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for …
 - **v0.61.0** — 2026-06-26 — **PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, …
 - **v0.60.0** — 2026-06-26 — **profile MCP Tool** — Session-based frame recording (burst/manual modes) with …

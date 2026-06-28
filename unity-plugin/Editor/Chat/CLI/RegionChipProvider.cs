@@ -36,16 +36,27 @@ namespace UnityMCP.Editor.Chat
             if (ctx.Depth == "path") return bracket;
 
             var snap = SceneRegionState.GetById(chip.Path);
-            if (snap == null) return bracket + " (expired)";
+            if (snap == null)
+                return bracket + (string.IsNullOrEmpty(chip.DisplayName)
+                    ? " (expired)"
+                    : $" (expired: {chip.DisplayName})");
 
-            var body = (snap.AnnotationType ?? "region") switch
+            var annotationType = snap.AnnotationType ?? "region";
+            var body = annotationType switch
             {
                 "point"       => FormatPoint(snap, ctx.Depth),
                 "polyline"    => FormatPolyline(snap, ctx.Depth),
                 "measurement" => FormatMeasurement(snap),
                 _             => FormatSnapshot(snap, ctx.Depth),
             };
-            return bracket + "\n" + body;
+            var typeLabel = annotationType switch
+            {
+                "point"       => " (scene point marker)",
+                "polyline"    => " (scene path)",
+                "measurement" => " (scene ruler)",
+                _             => " (scene area selection)",
+            };
+            return bracket + typeLabel + "\n" + body;
         }
 
         public void Navigate(string reference)
@@ -100,9 +111,6 @@ namespace UnityMCP.Editor.Chat
 
             if (depth == "full")
             {
-                // Deployment hint: tell AI which tool uses these waypoints
-                sb.Append("\n# use these XZ waypoints for am_deploy_line");
-
                 if (snap.VerticesFlat != null && snap.VerticesFlat.Length >= 4)
                 {
                     sb.Append("\npoints:");
@@ -175,14 +183,15 @@ namespace UnityMCP.Editor.Chat
 
             sb.Append('\n');
 
-            if (depth == "full" || paths.Length <= 10)
+            int limit = EditorPrefs.GetInt("MCP_RegionMaxObjects", 10);
+            if (depth == "full" || paths.Length <= limit)
             {
                 foreach (var p in paths) sb.Append(p).Append('\n');
             }
             else
             {
-                for (int i = 0; i < 10; i++) sb.Append(paths[i]).Append('\n');
-                if (paths.Length > 10) sb.Append($"...+{paths.Length - 10} more");
+                for (int i = 0; i < limit; i++) sb.Append(paths[i]).Append('\n');
+                if (paths.Length > limit) sb.Append($"...+{paths.Length - limit} more");
             }
 
             if (depth == "full" && snap.VerticesFlat != null && snap.VerticesFlat.Length >= 4)

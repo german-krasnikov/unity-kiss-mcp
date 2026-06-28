@@ -45,20 +45,18 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void SetMode_CallsResetTokenCounters()
+        public void SetMode_PreservesTokenCounters()
         {
             var w = CreateWindow();
             s_inputTokens .SetValue(w, 100);
             s_outputTokens.SetValue(w, 200);
 
-            // SetMode is private — invoke via reflection.
             var setMode = typeof(MCPChatWindow)
                 .GetMethod("SetMode", BindingFlags.NonPublic | BindingFlags.Instance);
-            // SetMode(false) — default _agentMode is false, so switch to true to trigger the body.
             setMode.Invoke(w, new object[] { true });
 
-            Assert.AreEqual(0, (int)s_inputTokens .GetValue(w), "inputTokens zeroed");
-            Assert.AreEqual(0, (int)s_outputTokens.GetValue(w), "outputTokens zeroed");
+            Assert.AreEqual(100, (int)s_inputTokens .GetValue(w), "inputTokens preserved");
+            Assert.AreEqual(200, (int)s_outputTokens.GetValue(w), "outputTokens preserved");
             UnityEngine.Object.DestroyImmediate(w);
         }
 

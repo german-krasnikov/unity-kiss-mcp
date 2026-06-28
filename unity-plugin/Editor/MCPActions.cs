@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -13,6 +15,15 @@ namespace UnityMCP.Editor
         {
             MCPServer.Stop();
             MCPServer.StartAsync();
+        }
+
+        internal static void RestartRelay()
+        {
+            InvokeRelay("Stop");
+            Task.Run(() => {
+                try { InvokeRelay("EnsureRunning"); }
+                catch { /* status bar reflects result on next PulseTick */ }
+            });
         }
 
         internal static void Kill() => KillAll();
@@ -52,7 +63,16 @@ namespace UnityMCP.Editor
                     UnityEngine.Debug.LogWarning($"[MCP] Kill PID {pid}: {ex.Message}");
                 }
             }
+            InvokeRelay("Stop");
             UnityEngine.Debug.Log($"[MCP] Kill All: {killed} killed, {stale} stale cleaned");
+        }
+
+        // Reflection bridge: Chat.CLI assembly depends on Editor, so we can't depend back.
+        private static void InvokeRelay(string method)
+        {
+            const string typeName = "UnityMCP.Editor.Chat.RelaySpawner, UnityMCP.Editor.Chat.CLI";
+            var flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            System.Type.GetType(typeName)?.GetMethod(method, flags)?.Invoke(null, null);
         }
 
         private static void TryDelete(string path)

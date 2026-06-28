@@ -261,7 +261,8 @@ namespace UnityMCP.Editor
         {
             var name = a.GetName().Name;
             if (string.IsNullOrEmpty(name)) return false;
-            if (name.StartsWith("UnityMCP")) return false;
+            if (name == "UnityMCP.Editor") return false;  // circular: executor lives here
+            if (name.StartsWith("UnityMCP") && name.Contains(".Tests")) return false;
             if (name.StartsWith("Microsoft.CodeAnalysis")) return false;
             if (name.StartsWith("Mono.Cecil")) return false;
             try { return !string.IsNullOrEmpty(a.Location); }

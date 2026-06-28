@@ -169,16 +169,6 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
-        public void Polyline_FormatPayload_ContainsDeploymentHint()
-        {
-            var pts = new[] { new Vector2(0f, 0f), new Vector2(5f, 0f) };
-            var snap = RegionSnapshot.CreatePolyline("poly1", pts, Array.Empty<string>(), "Level1");
-            var id = SceneRegionState.SetRegion(snap);
-            var result = _provider.FormatPayload(MakeChip(id), new ChipPayloadContext("full", ""));
-            StringAssert.Contains("am_deploy_line", result);
-        }
-
-        [Test]
         public void Polyline_FormatPayload_ContainsStartEnd()
         {
             var pts = new[] { new Vector2(1f, 2f), new Vector2(3f, 4f), new Vector2(5f, 6f) };

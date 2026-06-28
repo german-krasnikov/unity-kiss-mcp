@@ -74,17 +74,17 @@ namespace UnityMCP.Editor.Chat
                     ReloadGuard.OnTurnFinished(); // #1 unlock even on error
                     _askPending = false;
                     if (_activity.Fail()) OnActivityChanged();
-                    _transcript.AppendToolChip(ev.Text ?? "Error", ok: false);
+                    _transcript?.AppendToolChip(ev.Text ?? "Error", ok: false);
                     ResetTurnFlags(); // P0-2: DRY reset (was 3 inline assignments)
                     // F6: partial mutations still restorable on error.
                     _undoTracker.OnTurnFailed();
                     _transcript?.Append(RestoreButton.Create(_undoTracker));
                     break;
                 case ChatEventKind.PermissionPrompt:
-                    if (_sessionAllowlist.IsAutoApproved(ev.Text))
+                    if (_agentMode || _sessionAllowlist.IsAutoApproved(ev.Text))
                     {
                         _backend?.SendControlResponse(ControlResponseBuilder.Allow(ev.RequestId));
-                        _transcript.AppendToolChip($"Auto-approved: {ev.Text}", ok: true);
+                        _transcript?.AppendToolChip($"Auto-approved: {ev.Text}", ok: true);
                     }
                     else
                     {
@@ -108,7 +108,7 @@ namespace UnityMCP.Editor.Chat
                                         ControlResponseBuilder.Allow(ev.RequestId));
                                 }
                             });
-                        _transcript.Append(permCard);
+                        _transcript?.Append(permCard);
                         _scroll.scrollOffset = new UnityEngine.Vector2(0, float.MaxValue);
                     }
                     break;
@@ -121,7 +121,7 @@ namespace UnityMCP.Editor.Chat
                             OnActivityChanged();
                             _backend?.SendControlResponse(responseJson);
                         });
-                    _transcript.Append(askCard);
+                    _transcript?.Append(askCard);
                     _scroll.scrollOffset = new UnityEngine.Vector2(0, float.MaxValue);
                     break;
                 case ChatEventKind.ToolProgress:
@@ -144,7 +144,7 @@ namespace UnityMCP.Editor.Chat
                     PendingAskRegistry.Complete(requestId, responseJson);
                 },
                 directAnswer: true);
-            _transcript.Append(card);
+            _transcript?.Append(card);
             _scroll.scrollOffset = new UnityEngine.Vector2(0, float.MaxValue);
         }
 
@@ -154,7 +154,7 @@ namespace UnityMCP.Editor.Chat
             {
                 // null ArgsJson = chip-creation record (ToolStart moment)
                 if (_activity.FirstToken()) OnActivityChanged();
-                _transcript.AppendToolChip(rec.Name, ok: true, toolId: rec.Id);
+                _transcript?.AppendToolChip(rec.Name, ok: true, toolId: rec.Id);
                 _turnHasToolCalls = true;
                 _lastToolName = rec.Name; // M1: track last tool for timeout hint
             }
@@ -168,7 +168,7 @@ namespace UnityMCP.Editor.Chat
                     if (IsCodeEditingTool(rec))
                         _turnEditedCode = true;
                 }
-                _transcript.UpdateToolDetail(rec.Id, rec);
+                _transcript?.UpdateToolDetail(rec.Id, rec);
                 if (rec.HasResult && IsCodeEditingTool(rec))
                     _needsRefresh = true;
             }

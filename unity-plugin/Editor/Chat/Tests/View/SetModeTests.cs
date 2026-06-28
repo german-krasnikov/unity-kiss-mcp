@@ -1,7 +1,8 @@
-// TDD — Issue #6: SetMode must preserve SessionId when switching Ask ↔ Agent.
-// SetMode captures _backend?.SessionId BEFORE Stop(), then calls CreateBackendWithSession(resumeId).
-// The new ClaudeBackend stores resumeSessionId as its own SessionId, so we can assert equality.
+// TDD — SetMode must be a pure UI state flip: no process kill/restart.
+// Agent mode = _agentMode bool; PermissionPrompt events are auto-approved in EventHandlers.
+// Backend instance must remain unchanged across Ask ↔ Agent switches.
 #if UNITY_MCP_CHAT
+using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -12,6 +13,19 @@ namespace UnityMCP.Editor.Chat.Tests
     [TestFixture]
     public class SetModeTests
     {
+        // Minimal stub implementing IChatBackend for mode-switch tests.
+        private sealed class FakeBackend : IChatBackend
+        {
+            public bool   IsRunning  => false;
+            public string SessionId  { get; }
+            public FakeBackend(string sessionId = null) { SessionId = sessionId; }
+            public void Start()  { }
+            public void Stop()   { }
+            public void SendTurn(string j)           { }
+            public void SendControlResponse(string j){ }
+            public void DrainEvents(List<ChatEvent> o, List<ToolCallRecord> t = null) { }
+        }
+
         // ── helpers ──────────────────────────────────────────────────────────
 
         private static void InjectBackend(MCPChatWindow w, IChatBackend backend)
@@ -38,14 +52,6 @@ namespace UnityMCP.Editor.Chat.Tests
                 .GetField("_agentMode", BindingFlags.NonPublic | BindingFlags.Instance)
                 .GetValue(w);
 
-        // Set SessionId on any CliBackendBase via reflection (protected set).
-        private static void SetSessionId(CliBackendBase b, string id)
-        {
-            typeof(CliBackendBase)
-                .GetProperty("SessionId", BindingFlags.Public | BindingFlags.Instance)
-                .SetValue(b, id);
-        }
-
         // ── Test 1: SetMode_SameMode_NoOp ────────────────────────────────────
 
         [Test]
@@ -55,8 +61,6 @@ namespace UnityMCP.Editor.Chat.Tests
             try
             {
                 bool before = GetAgentMode(w);
-                var stopCount = 0;
-                // No-op means _agentMode unchanged and no backend replacement.
                 var backend = GetBackend(w);
 
                 CallSetMode(w, before); // same mode → early return
@@ -67,17 +71,16 @@ namespace UnityMCP.Editor.Chat.Tests
             finally { Object.DestroyImmediate(w); }
         }
 
-        // ── Test 2: SetMode_PreservesSessionId ───────────────────────────────
+        // ── Test 2: SetMode_DoesNotReplaceBackend ────────────────────────────
 
         [Test]
-        public void SetMode_PreservesSessionId_WhenSwitchingModes()
+        public void SetMode_DoesNotReplaceBackend_OnModeSwitch()
         {
             var w = ScriptableObject.CreateInstance<MCPChatWindow>();
             try
             {
                 // Arrange: inject a fake backend with a known SessionId
-                var fakeBackend = new TestCliBackend();
-                SetSessionId(fakeBackend, "sess-abc123");
+                var fakeBackend = new FakeBackend("sess-abc123");
                 InjectBackend(w, fakeBackend);
 
                 bool initialMode = GetAgentMode(w); // false (Ask)
@@ -85,17 +88,17 @@ namespace UnityMCP.Editor.Chat.Tests
                 // Act: switch to opposite mode
                 CallSetMode(w, !initialMode);
 
-                // Assert: new backend's SessionId equals the preserved resumeId
-                var newBackend = GetBackend(w);
-                Assert.IsNotNull(newBackend, "new backend must be created");
-                Assert.AreNotSame(fakeBackend, newBackend, "must replace backend");
-                Assert.AreEqual("sess-abc123", newBackend.SessionId,
-                    "SetMode must pass old SessionId to new backend (--resume)");
+                // Assert: same backend instance — no process kill/restart on mode switch
+                var currentBackend = GetBackend(w);
+                Assert.AreSame(fakeBackend, currentBackend,
+                    "SetMode must NOT replace backend — mode switch is a pure UI state flip");
+                Assert.AreEqual("sess-abc123", currentBackend.SessionId,
+                    "session ID unchanged because same backend instance is reused");
             }
             finally { Object.DestroyImmediate(w); }
         }
 
-        // ── Test 3: SetMode_NullSessionId_CreatesFreashBackend ───────────────
+        // ── Test 3: SetMode_NullSessionId_DoesNotCrash ───────────────────────
 
         [Test]
         public void SetMode_NullSessionId_DoesNotCrash()
@@ -104,14 +107,30 @@ namespace UnityMCP.Editor.Chat.Tests
             try
             {
                 // Inject backend with null SessionId (no session yet)
-                var fakeBackend = new TestCliBackend(); // SessionId defaults to null
+                var fakeBackend = new FakeBackend(); // SessionId defaults to null
                 InjectBackend(w, fakeBackend);
 
                 bool initialMode = GetAgentMode(w);
                 Assert.DoesNotThrow(() => CallSetMode(w, !initialMode));
 
-                // New backend is created with null resume → fresh session (correct)
-                Assert.IsNotNull(GetBackend(w));
+                // Backend is unchanged (mode switch is a no-op for the process)
+                Assert.AreSame(fakeBackend, GetBackend(w), "backend must not change");
+            }
+            finally { Object.DestroyImmediate(w); }
+        }
+
+        // ── Test 4: SetMode_FlipsAgentMode ───────────────────────────────────
+
+        [Test]
+        public void SetMode_FlipsAgentMode_Flag()
+        {
+            var w = ScriptableObject.CreateInstance<MCPChatWindow>();
+            try
+            {
+                InjectBackend(w, new FakeBackend());
+                bool before = GetAgentMode(w);
+                CallSetMode(w, !before);
+                Assert.AreEqual(!before, GetAgentMode(w), "_agentMode must be flipped");
             }
             finally { Object.DestroyImmediate(w); }
         }

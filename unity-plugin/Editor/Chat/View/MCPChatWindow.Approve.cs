@@ -15,12 +15,10 @@ namespace UnityMCP.Editor.Chat
             var prompt = ApproveHelper.BuildPromptOrNull(sessionId);
             if (prompt == null) return;
 
+            // Flip to agent mode (no process kill/restart — PermissionPrompts auto-approved now).
             _agentMode = true;
             _askBtn?.EnableInClassList("mode-toggle-btn--active",   false);
             _agentBtn?.EnableInClassList("mode-toggle-btn--active", true);
-
-            _backend?.Stop();
-            CreateBackendWithSession(sessionId);   // reuse → acceptEdits + --resume
 
             try { DispatchTurn(UserTurnBuilder.Build(prompt), prompt); }
             catch (System.Exception e)

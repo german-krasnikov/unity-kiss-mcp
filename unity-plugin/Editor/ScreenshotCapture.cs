@@ -182,6 +182,11 @@ namespace UnityMCP.Editor
             var allCameras = Camera.allCameras;
             if (allCameras.Length > 0) return allCameras[0];
 
+            // Camera.allCameras excludes inactive — search including inactive as last resort
+            var allInclInactive = UnityEngine.Object.FindObjectsByType<Camera>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (allInclInactive.Length > 0) return allInclInactive[0];
+
             throw new ArgumentException("No camera found in scene");
         }
     }

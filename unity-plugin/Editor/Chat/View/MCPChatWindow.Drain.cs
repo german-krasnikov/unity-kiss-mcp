@@ -64,7 +64,7 @@ namespace UnityMCP.Editor.Chat
             ReloadGuard.SavePendingState(state);
         }
 
-        // #1 Called by ChatProcess.OnAfterReloadResume after assembly reload completes.
+        // #1 Called by RelaySpawner.OnAfterReloadResume after assembly reload completes.
         private void TryResumePendingTurn()
         {
             // P0-1: consume the restore flag exactly once per call, regardless of which

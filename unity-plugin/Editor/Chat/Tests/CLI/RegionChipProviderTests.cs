@@ -118,7 +118,7 @@ namespace UnityMCP.Editor.Chat.Tests
         {
             var chip   = MakeChip("ghost_id");
             var result = _provider.FormatPayload(chip, new ChipPayloadContext("summary", ""));
-            StringAssert.Contains("(expired)", result);
+            StringAssert.Contains("(expired:", result);
         }
 
         [Test] public void FormatPayload_DepthSummary_StaleFlag_Present()

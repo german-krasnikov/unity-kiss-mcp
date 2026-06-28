@@ -44,6 +44,7 @@ namespace UnityMCP.Editor.RegionTool
             _cache[snap.Id] = snap;
             if (_cache.Count > MaxRegions) Evict();
             Save();
+            SessionStateHelper.Cache(snap);
             return snap.Id;
         }
 
@@ -57,7 +58,7 @@ namespace UnityMCP.Editor.RegionTool
         internal static bool Remove(string id)
         {
             var removed = _cache.Remove(id);
-            if (removed) Save();
+            if (removed) { Save(); SessionStateHelper.Remove(id); }
             return removed;
         }
 
@@ -103,27 +104,36 @@ namespace UnityMCP.Editor.RegionTool
         internal static void Load()
         {
             _cache.Clear();
-            if (!File.Exists(PersistPath)) return;
-            try
+            long cutoff = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 86400; // 24h
+            if (File.Exists(PersistPath))
             {
-                var store = JsonUtility.FromJson<RegionStore>(File.ReadAllText(PersistPath));
-                if (store?.Regions == null) return;
-                long cutoff = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - 86400; // 24h
-                foreach (var r in store.Regions)
-                    if (r?.Id != null && r.CreatedTicks > cutoff)
-                        _cache[r.Id] = r;
+                try
+                {
+                    var store = JsonUtility.FromJson<RegionStore>(File.ReadAllText(PersistPath));
+                    if (store?.Regions != null)
+                        foreach (var r in store.Regions)
+                            if (r?.Id != null && r.CreatedTicks > cutoff)
+                                _cache[r.Id] = r;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning("[MCP] RegionStore load failed: " + e.Message);
+                }
             }
-            catch (Exception e)
-            {
-                Debug.LogWarning("[MCP] RegionStore load failed: " + e.Message);
-            }
+            SessionStateHelper.RecoverInto(_cache, cutoff);
         }
 
         internal static void Clear()
         {
             _cache.Clear();
+            SessionStateHelper.ClearAll();
             try { File.Delete(PersistPath); } catch { /* ignore */ }
         }
+
+#if UNITY_INCLUDE_TESTS
+        /// <summary>Simulate domain reload for tests: clears cache and reloads from file + SessionState.</summary>
+        internal static void SimulateDomainReload() { _cache.Clear(); Load(); }
+#endif
 
         // ── Helpers ───────────────────────────────────────────────────────────
 

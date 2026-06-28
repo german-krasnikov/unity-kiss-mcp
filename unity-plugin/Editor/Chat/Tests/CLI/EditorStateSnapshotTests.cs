@@ -1,4 +1,4 @@
-// TDD — RED first. Tests drive EditorStateSnapshot.Capture() and ClaudeArgBuilder extension.
+// TDD — Tests for EditorStateSnapshot.Capture().
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -74,42 +74,6 @@ namespace UnityMCP.Editor.Chat.Tests
             Debug.LogError("Test error for snapshot");
             var result = EditorStateSnapshot.Capture();
             StringAssert.Contains("Console:", result);
-        }
-
-        // ── ClaudeArgBuilder extension ────────────────────────────────────────
-
-        [Test]
-        public void ArgBuilder_WithAppendSystemPrompt_ContainsFlag()
-        {
-            var (args, _) = ClaudeArgBuilder.Build(
-                "/bin/claude", "/tmp/mcp.json", "plan", null,
-                appendSystemPrompt: "Some context");
-
-            Assert.IsTrue(System.Array.IndexOf(args, "--append-system-prompt") >= 0,
-                "--append-system-prompt flag must be present");
-        }
-
-        [Test]
-        public void ArgBuilder_WithAppendSystemPrompt_TextFollowsFlag()
-        {
-            var (args, _) = ClaudeArgBuilder.Build(
-                "/bin/claude", "/tmp/mcp.json", "plan", null,
-                appendSystemPrompt: "My context");
-
-            var idx = System.Array.IndexOf(args, "--append-system-prompt");
-            Assert.Greater(idx, -1);
-            Assert.AreEqual("My context", args[idx + 1]);
-        }
-
-        [Test]
-        public void ArgBuilder_NullAppendSystemPrompt_FlagAbsent()
-        {
-            var (args, _) = ClaudeArgBuilder.Build(
-                "/bin/claude", "/tmp/mcp.json", "plan", null,
-                appendSystemPrompt: null);
-
-            Assert.IsFalse(System.Array.IndexOf(args, "--append-system-prompt") >= 0,
-                "--append-system-prompt must be absent when null");
         }
 
         // ── Resume prepend seam (tested via snapshot content contract) ────────

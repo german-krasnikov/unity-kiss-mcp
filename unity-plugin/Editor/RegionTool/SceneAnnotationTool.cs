@@ -46,7 +46,7 @@ namespace UnityMCP.Editor.RegionTool
         public override void OnActivated()
         {
             _instance = this;
-            _modeId   = AnnotationModeId.Point;
+            _modeId   = (AnnotationModeId)EditorPrefs.GetInt("MCP_DefaultAnnotationMode", (int)AnnotationModeId.Point);
             _gridSnap = EditorPrefs.GetBool("MCP_AnnotSnap", false);
             _mode     = AnnotationModeFactory.Create(_modeId);
             CurrentModeId = _modeId;

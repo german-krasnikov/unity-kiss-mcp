@@ -54,6 +54,16 @@ namespace UnityMCP.Editor.Tests
             Assert.IsNotEmpty(result);
         }
 
+        [Test]
+        public void Capture_WithInactiveCamera_Succeeds()
+        {
+            // Deactivate the camera — Camera.main and Camera.allCameras exclude inactive
+            _cameraGo.SetActive(false);
+            var result = ScreenshotCapture.Capture(16, 16, null);
+            Assert.IsNotNull(result);
+            Assert.IsNotEmpty(result);
+        }
+
         // ── No camera in scene → ArgumentException ───────────────────────────
 
         [Test]
@@ -63,8 +73,8 @@ namespace UnityMCP.Editor.Tests
             Object.DestroyImmediate(_cameraGo);
             _cameraGo = null;
 
-            // Also destroy any other cameras that may exist from other tests
-            foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            // Destroy all cameras including inactive ones
+            foreach (var cam in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 Object.DestroyImmediate(cam.gameObject);
 
             Assert.Throws<System.ArgumentException>(

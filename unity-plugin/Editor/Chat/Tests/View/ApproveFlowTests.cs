@@ -1,9 +1,7 @@
 // Tests for Approve & Execute flow.
-// Pure logic tests (1-6): ClaudeArgBuilder + string asserts, no EditorWindow.
-// UI tests (7-10): bare VisualElement tree, no EditorWindow.
-// Tests (11-15): _turnHasToolCalls gate — field reflection + MaybeAppend logic.
+// UI tests: bare VisualElement tree, no EditorWindow.
+// Tests: _turnHasToolCalls gate — field reflection + MaybeAppend logic.
 using NUnit.Framework;
-using System.Linq;
 using System.Reflection;
 using UnityEngine.UIElements;
 using UnityMCP.Editor.Chat;
@@ -13,33 +11,6 @@ namespace UnityMCP.Editor.Chat.Tests
     [TestFixture]
     public class ApproveFlowTests
     {
-        // ── Pure logic: ClaudeArgBuilder ─────────────────────────────────────
-
-        [Test]
-        public void Test_ApproveArgs_ContainsResumeAndAcceptEdits()
-        {
-            var (args, _) = ClaudeArgBuilder.Build(
-                "/bin/claude", "/tmp/mcp.json", "acceptEdits", "sess-X");
-
-            Assert.Contains("--resume",      (System.Array)args);
-            Assert.Contains("sess-X",        (System.Array)args);
-            Assert.Contains("acceptEdits",   (System.Array)args);
-        }
-
-        [Test]
-        public void Test_ApproveArgs_PlanToAcceptEdits_PermissionModeChanges()
-        {
-            var (argsPlan, _) = ClaudeArgBuilder.Build(
-                "/bin/claude", "/tmp/mcp.json", "plan",         "sess-X");
-            var (argsAgent, _) = ClaudeArgBuilder.Build(
-                "/bin/claude", "/tmp/mcp.json", "acceptEdits",  "sess-X");
-
-            var idxPlan  = System.Array.IndexOf(argsPlan,  "--permission-mode");
-            var idxAgent = System.Array.IndexOf(argsAgent, "--permission-mode");
-            Assert.AreEqual("plan",         argsPlan [idxPlan  + 1]);
-            Assert.AreEqual("acceptEdits",  argsAgent[idxAgent + 1]);
-        }
-
         [Test]
         public void Test_ApproveGuard_NullSessionId_NoOp()
         {

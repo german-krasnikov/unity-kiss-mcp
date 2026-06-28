@@ -169,8 +169,9 @@ namespace UnityMCP.Editor
         {
             var phantoms = MCPServer.PhantomCount;
             var m = new GenericMenu();
-            m.AddItem(new GUIContent("Restart"),  false, MCPActions.Restart);
-            m.AddItem(new GUIContent("Reimport"), false, MCPActions.Reimport);
+            m.AddItem(new GUIContent("Restart"),       false, MCPActions.Restart);
+            m.AddItem(new GUIContent("Restart Relay"), false, MCPActions.RestartRelay);
+            m.AddItem(new GUIContent("Reimport"),      false, MCPActions.Reimport);
             m.AddItem(new GUIContent("Kill"),     false, MCPActions.Kill);
             if (phantoms > 0)
                 m.AddItem(new GUIContent($"Kill Phantoms ({phantoms})"), false, () => MCPServer.KillPhantoms());

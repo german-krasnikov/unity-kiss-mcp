@@ -1,6 +1,6 @@
 [project]
 name = "unity-mcp"
-version = "0.66.0"
+version = "0.67.0"
 description = "MCP server for Unity Editor control"
 license = {text = "MIT"}
 authors = [{name = "German Krasnikov", email = "german.krasnikov@gmail.com"}]
@@ -46,6 +46,8 @@ filterwarnings = [
 markers = [
     "live: requires running Unity Editor with MCP plugin on :9500",
     "live_cli: also calls real claude CLI (~$0.001/call) — opt-in via 'pytest -m \"live and live_cli\"'",
+    "monkey: stress/chaos tests for chat_relay (connection storms, process leaks, protocol torture)",
+    "live_chat: requires running Unity + MCPChatWindow; subset of live",
 ]
 
 [build-system]

@@ -36,7 +36,7 @@ namespace UnityMCP.Editor.Chat
         AutoReply,
     }
 
-    /// <summary>Immutable event emitted by ChatStreamParser.</summary>
+    /// <summary>Immutable event emitted by RelayEventParser.</summary>
     public readonly struct ChatEvent
     {
         public ChatEventKind Kind         { get; }

@@ -77,20 +77,6 @@ namespace UnityMCP.Editor.Chat.Tests
         public void KindToId_Codex_ReturnsCodex()
             => Assert.AreEqual("codex", BackendProviderRegistry.KindToId(BackendKind.Codex));
 
-        // ── ClaudeProvider / CodexProvider satisfy interface contract ─────────
-
-        [Test]
-        public void ClaudeProvider_ProviderId_IsClaude()
-            => Assert.AreEqual("claude", new ClaudeProvider().ProviderId);
-
-        [Test]
-        public void ClaudeProvider_SortOrder_LessThan_CodexProvider()
-            => Assert.Less(new ClaudeProvider().SortOrder, new CodexProvider().SortOrder);
-
-        [Test]
-        public void CodexProvider_ProviderId_IsCodex()
-            => Assert.AreEqual("codex", new CodexProvider().ProviderId);
-
         // ── Get is case-sensitive ─────────────────────────────────────────────
 
         [Test]

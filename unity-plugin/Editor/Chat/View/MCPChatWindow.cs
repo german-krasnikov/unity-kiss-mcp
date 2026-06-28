@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -84,9 +83,9 @@ namespace UnityMCP.Editor.Chat
             RefreshColorResolver();
             ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
             RegionTool.SceneRegionTool.OnRegionCommitted = (id, label) =>
-                ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0));
+            { if (EditorPrefs.GetBool("MCP_RegionAutoAdd", true)) ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0)); };
             RegionTool.SceneAnnotationTool.OnAnnotationCommitted = (id, label) =>
-                ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0));
+            { if (EditorPrefs.GetBool("MCP_RegionAutoAdd", true)) ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0)); };
             ScreenshotToolbarButton.OnScreenshotCaptured = path =>
                 ProcessExternalPath(path, InsertInlineChip);
             Annotation.AnnotationEditorWindow.OnAnnotationReady = (path, displayName) =>
@@ -95,7 +94,7 @@ namespace UnityMCP.Editor.Chat
             CopyFlash.ShowAction = ShowCopyFlash;
             CreateBackend();
             ResetTokenCounters();
-            ChatProcess.OnAfterReloadResume += TryResumePendingTurn;
+            RelaySpawner.OnAfterReloadResume += TryResumePendingTurn;
             AssemblyReloadEvents.beforeAssemblyReload += SaveStateBeforeReload;
             EditorApplication.hierarchyChanged += RefreshResolver;
             _autoFix.Subscribe();
@@ -125,7 +124,7 @@ namespace UnityMCP.Editor.Chat
             CommandRouter.OnAskUser -= OnMcpAskUser;
             EditorApplication.hierarchyChanged -= RefreshResolver;
             AssemblyReloadEvents.beforeAssemblyReload -= SaveStateBeforeReload;
-            ChatProcess.OnAfterReloadResume -= TryResumePendingTurn;
+            RelaySpawner.OnAfterReloadResume -= TryResumePendingTurn;
             _autoFix.OnErrorsDetected -= InjectCompileErrors;
             _autoFix.Unsubscribe();
             ChipPillFactory.AddToContextAction = null;
@@ -229,13 +228,12 @@ namespace UnityMCP.Editor.Chat
         private void SetMode(bool agentMode)
         {
             if (_agentMode == agentMode) return;
-            var resumeId = _backend?.SessionId;   // capture before Stop() clears the process
             _agentMode = agentMode;
-            _backend?.Stop();
-            ResetTokenCounters();
-            CreateBackendWithSession(resumeId);
+            // Pure UI state flip — no process kill/restart.
+            // Agent mode = PermissionPrompt events are auto-approved in EventHandlers.
             _askBtn?.EnableInClassList("mode-toggle-btn--active",   !agentMode);
             _agentBtn?.EnableInClassList("mode-toggle-btn--active", agentMode);
+            (_backend as RelayBackend)?.SetMode(agentMode ? "agent" : "ask");
         }
 
         private void CreateBackend()
@@ -246,26 +244,11 @@ namespace UnityMCP.Editor.Chat
 
         private void CreateBackendWithSession(string resumeSessionId, BackendConfigStore store = null)
         {
-            store ??= BackendConfigStore.Load();
-            store = ApplySelectedModel(store, _selectedKind, _selectedModel);
-
-            var providerId = BackendProviderRegistry.KindToId(_selectedKind);
-            var provider   = BackendProviderRegistry.Get(providerId);
-            if (provider != null)
-            {
-                var mcpCfg = ChatMcpConfigWriter.GetOrCreateConfigPath();
-                _backend = provider.Create(new BackendCreateArgs(
-                    mcpCfg, _agentMode, _selectedAgent, _permConfig, resumeSessionId, store));
-                return;
-            }
-            // Fallback: provider not found (binary not installed) — default to Claude
-            var cfg = ChatMcpConfigWriter.GetOrCreateConfigPath()
-                ?? Path.Combine(
-                    System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                    ".claude", "mcp.json");
-            _backend = new ClaudeBackend(cfg, _agentMode ? "acceptEdits" : "plan",
-                _selectedAgent, _permConfig, resumeSessionId,
-                store.Claude.Model, store.Claude.ExtraArgs);
+            var backendId  = BackendProviderRegistry.KindToId(_selectedKind);
+            var sysPrompt  = ChipSystemPrompt.ForBackend(_selectedKind);
+            _backend = new RelayBackend(backendId, _agentMode ? "agent" : "ask",
+                                        _selectedModel, MCPServer.ServerChatPort, resumeSessionId,
+                                        sysPrompt);
         }
 
         // Pure helper — no allocation if model unchanged.
