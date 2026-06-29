@@ -3,7 +3,11 @@ import json
 
 import pytest
 
-from unity_mcp.stream_transform import _ToolCallAcc, _transform_line
+from unity_mcp.stream_transform import (
+    _ToolCallAcc, _transform_line,
+    _transform_plain_text_line, _transform_codex_line, _transform_opencode_line,
+    _transform_kimi_line,
+)
 
 
 # ── text delta ───────────────────────────────────────────────────────────────
@@ -288,3 +292,324 @@ def test_transform_hook_callback_ask_user():
     })
     r = _transform_line(line, _ToolCallAcc())
     assert r == ['au|h1|{"prompt":"ok?"}']
+
+
+# ── _transform_plain_text_line ────────────────────────────────────────────────
+
+def test_plain_text_wraps_as_t():
+    assert _transform_plain_text_line("Hello world", _ToolCallAcc()) == ["t|Hello world"]
+
+
+def test_plain_text_empty_returns_empty():
+    assert _transform_plain_text_line("", _ToolCallAcc()) == []
+
+
+def test_plain_text_whitespace_only_returns_empty():
+    assert _transform_plain_text_line("  \n  ", _ToolCallAcc()) == []
+
+
+def test_plain_text_strips_surrounding_whitespace():
+    assert _transform_plain_text_line("  hello  ", _ToolCallAcc()) == ["t|hello"]
+
+
+def test_plain_text_preserves_pipe_chars():
+    """Pipe inside content is fine — RelayEventParser splits only on first pipe."""
+    assert _transform_plain_text_line("a|b|c", _ToolCallAcc()) == ["t|a|b|c"]
+
+
+def test_plain_text_acc_unused():
+    """acc parameter accepted but not used; result is purely line-based."""
+    acc = _ToolCallAcc()
+    acc.active = True
+    assert _transform_plain_text_line("text", acc) == ["t|text"]
+
+
+# ── _transform_codex_line (real Codex CLI NDJSON format) ─────────────────────
+
+def test_codex_agent_message():
+    line = json.dumps({
+        "type": "item.completed",
+        "item": {"id": "item_0", "type": "agent_message", "text": "Hello."},
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == ["t|Hello."]
+
+
+def test_codex_agent_message_empty_text():
+    line = json.dumps({
+        "type": "item.completed",
+        "item": {"id": "item_1", "type": "agent_message", "text": ""},
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == []
+
+
+def test_codex_tool_call_item():
+    line = json.dumps({
+        "type": "item.completed",
+        "item": {
+            "type": "tool_call",
+            "id": "tc_1",
+            "call_id": "call_abc",
+            "name": "bash",
+            "arguments": '{"cmd":"ls"}',
+        },
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == ['tc|bash|call_abc|{"cmd":"ls"}']
+
+
+def test_codex_tool_call_item_dict_args():
+    """arguments as dict (not string) gets JSON-serialized."""
+    line = json.dumps({
+        "type": "item.completed",
+        "item": {
+            "type": "tool_call",
+            "call_id": "call_x",
+            "name": "read",
+            "arguments": {"path": "/tmp/f"},
+        },
+    })
+    result = _transform_codex_line(line, _ToolCallAcc())
+    assert result == ['tc|read|call_x|{"path":"/tmp/f"}']
+
+
+def test_codex_function_call_item_mcp():
+    """Codex emits MCP tool calls as function_call, not tool_call."""
+    line = json.dumps({
+        "type": "item.completed",
+        "item": {
+            "type": "function_call",
+            "call_id": "call_xyz",
+            "name": "get_hierarchy",
+            "arguments": "{}",
+        },
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == ["tc|get_hierarchy|call_xyz|{}"]
+
+
+def test_codex_mcp_tool_call_started():
+    """item.started with mcp_tool_call emits tc| chip immediately."""
+    line = json.dumps({
+        "type": "item.started",
+        "item": {
+            "id": "item_2",
+            "type": "mcp_tool_call",
+            "server": "unity",
+            "tool": "get_hierarchy",
+            "arguments": {"full": True},
+            "result": None,
+            "status": "in_progress",
+        },
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == ['tc|get_hierarchy|item_2|{"full":true}']
+
+
+def test_codex_mcp_tool_call_completed():
+    """item.completed with mcp_tool_call emits tr| result."""
+    line = json.dumps({
+        "type": "item.completed",
+        "item": {
+            "id": "item_2",
+            "type": "mcp_tool_call",
+            "server": "unity",
+            "tool": "get_hierarchy",
+            "arguments": {"full": True},
+            "result": {"content": [{"type": "text", "text": "Main Camera\nGridFloor"}]},
+            "status": "completed",
+        },
+    })
+    result = _transform_codex_line(line, _ToolCallAcc())
+    assert result == ["tr|item_2|true|Main Camera\nGridFloor"]
+
+
+def test_codex_item_started_non_mcp_ignored():
+    """item.started for non-mcp_tool_call types is ignored."""
+    line = json.dumps({
+        "type": "item.started",
+        "item": {"id": "item_1", "type": "agent_message", "text": ""},
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == []
+
+
+def test_codex_item_unknown_type_ignored():
+    """Non-agent_message, non-tool_call item types are silently ignored."""
+    line = json.dumps({
+        "type": "item.completed",
+        "item": {"type": "reasoning", "text": "thinking..."},
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == []
+
+
+def test_codex_turn_completed_with_usage():
+    line = json.dumps({
+        "type": "turn.completed",
+        "usage": {
+            "input_tokens": 9724,
+            "cached_input_tokens": 4992,
+            "output_tokens": 22,
+            "reasoning_output_tokens": 14,
+        },
+    })
+    assert _transform_codex_line(line, _ToolCallAcc()) == ["d||0|9724|22"]
+
+
+def test_codex_turn_completed_no_usage():
+    line = json.dumps({"type": "turn.completed"})
+    assert _transform_codex_line(line, _ToolCallAcc()) == ["d||0|0|0"]
+
+
+def test_codex_error_event():
+    line = json.dumps({"type": "error", "message": "stream error"})
+    assert _transform_codex_line(line, _ToolCallAcc()) == ["e|stream error"]
+
+
+def test_codex_thread_started_ignored():
+    line = json.dumps({"type": "thread.started", "thread_id": "019f1247"})
+    assert _transform_codex_line(line, _ToolCallAcc()) == []
+
+
+def test_codex_turn_started_ignored():
+    line = json.dumps({"type": "turn.started"})
+    assert _transform_codex_line(line, _ToolCallAcc()) == []
+
+
+def test_codex_malformed_json_fallback_to_text():
+    assert _transform_codex_line("not json", _ToolCallAcc()) == ["t|not json"]
+
+
+def test_codex_empty_line_returns_empty():
+    assert _transform_codex_line("", _ToolCallAcc()) == []
+
+
+def test_codex_whitespace_only_returns_empty():
+    assert _transform_codex_line("  \n", _ToolCallAcc()) == []
+
+
+# ── _transform_opencode_line (OpenCode run --format json) ────────────────────
+
+def test_opencode_text_event_extracts_text():
+    line = json.dumps({
+        "type": "text",
+        "sessionID": "ses_abc",
+        "part": {"type": "text", "text": "Hello world"},
+    })
+    assert _transform_opencode_line(line, _ToolCallAcc()) == ["t|Hello world"]
+
+
+def test_opencode_text_event_empty_text_returns_empty():
+    line = json.dumps({
+        "type": "text",
+        "sessionID": "ses_abc",
+        "part": {"type": "text", "text": ""},
+    })
+    assert _transform_opencode_line(line, _ToolCallAcc()) == []
+
+
+def test_opencode_step_finish_returns_done():
+    line = json.dumps({
+        "type": "step_finish",
+        "sessionID": "ses_xyz",
+        "part": {
+            "type": "step-finish",
+            "reason": "stop",
+            "tokens": {"total": 100, "input": 90, "output": 10},
+            "cost": 0.002,
+        },
+    })
+    result = _transform_opencode_line(line, _ToolCallAcc())
+    assert len(result) == 1
+    assert result[0].startswith("d|ses_xyz|")
+    parts = result[0].split("|")
+    assert parts[2] == "0.002"
+    assert parts[3] == "90"
+    assert parts[4] == "10"
+
+
+def test_opencode_step_finish_zero_cost():
+    line = json.dumps({
+        "type": "step_finish",
+        "sessionID": "ses_0",
+        "part": {"tokens": {"input": 5, "output": 2}, "cost": 0},
+    })
+    result = _transform_opencode_line(line, _ToolCallAcc())
+    assert result[0] == "d|ses_0|0|5|2"
+
+
+def test_opencode_error_event():
+    line = json.dumps({
+        "type": "error",
+        "part": {"error": "rate limit exceeded"},
+    })
+    assert _transform_opencode_line(line, _ToolCallAcc()) == ["e|rate limit exceeded"]
+
+
+def test_opencode_error_no_message_fallback():
+    line = json.dumps({"type": "error", "part": {}})
+    assert _transform_opencode_line(line, _ToolCallAcc()) == ["e|OpenCode error"]
+
+
+def test_opencode_tool_start_emits_tc():
+    line = json.dumps({
+        "type": "tool_start",
+        "part": {"name": "bash", "id": "tid_1", "input": {"cmd": "ls"}},
+    })
+    result = _transform_opencode_line(line, _ToolCallAcc())
+    assert len(result) == 1
+    assert result[0].startswith("tc|bash|tid_1|")
+    assert '"cmd"' in result[0]
+
+
+def test_opencode_tool_start_no_name_returns_empty():
+    line = json.dumps({"type": "tool_start", "part": {"id": "tid_1"}})
+    assert _transform_opencode_line(line, _ToolCallAcc()) == []
+
+
+def test_opencode_step_start_ignored():
+    line = json.dumps({"type": "step_start", "part": {}})
+    assert _transform_opencode_line(line, _ToolCallAcc()) == []
+
+
+def test_opencode_malformed_json_fallback_to_text():
+    assert _transform_opencode_line("not json at all", _ToolCallAcc()) == ["t|not json at all"]
+
+
+def test_opencode_empty_line_returns_empty():
+    assert _transform_opencode_line("", _ToolCallAcc()) == []
+
+
+def test_opencode_whitespace_only_returns_empty():
+    assert _transform_opencode_line("   ", _ToolCallAcc()) == []
+
+
+# ── _transform_kimi_line (Kimi -p --output-format stream-json) ───────────────
+
+def test_kimi_assistant_text():
+    line = '{"role":"assistant","content":"Hello! How can I help you today?"}'
+    assert _transform_kimi_line(line, _ToolCallAcc()) == ["t|Hello! How can I help you today?"]
+
+
+def test_kimi_assistant_empty_content():
+    line = '{"role":"assistant","content":""}'
+    assert _transform_kimi_line(line, _ToolCallAcc()) == []
+
+
+def test_kimi_meta_resume_hint():
+    line = '{"role":"meta","type":"session.resume_hint","session_id":"session_534cd057","command":"kimi -r session_534cd057","content":"To resume: kimi -r session_534cd057"}'
+    result = _transform_kimi_line(line, _ToolCallAcc())
+    assert result == ["d|session_534cd057|0|0|0"]
+
+
+def test_kimi_empty_line():
+    assert _transform_kimi_line("", _ToolCallAcc()) == []
+
+
+def test_kimi_malformed_json_fallback():
+    assert _transform_kimi_line("not json", _ToolCallAcc()) == ["t|not json"]
+
+
+def test_kimi_unknown_role():
+    line = '{"role":"system","content":"something"}'
+    assert _transform_kimi_line(line, _ToolCallAcc()) == []
+
+
+def test_kimi_meta_unknown_type():
+    line = '{"role":"meta","type":"other_event"}'
+    assert _transform_kimi_line(line, _ToolCallAcc()) == []

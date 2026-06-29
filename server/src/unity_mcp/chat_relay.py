@@ -10,10 +10,26 @@ import signal
 import struct
 import tempfile
 
-from .backend_def import BACKENDS
+from .backend_def import (
+    BACKENDS,
+    OUTPUT_FORMAT_STREAM_JSON, OUTPUT_FORMAT_PLAIN_TEXT,
+    OUTPUT_FORMAT_CODEX_JSON, OUTPUT_FORMAT_OPENCODE_JSON, OUTPUT_FORMAT_KIMI_JSON,
+)
 from .cli_session import CliSession, SessionMeta, BufLine, KILL_WAIT, PPID_POLL, MAX_FRAME, _find_free_port
 from .relay_buffer import RelayBuffer, MAX_BUF
-from .stream_transform import _ToolCallAcc, _transform_line
+from .stream_transform import (
+    _ToolCallAcc, _transform_line,
+    _transform_plain_text_line, _transform_codex_line, _transform_opencode_line,
+    _transform_kimi_line,
+)
+
+_TRANSFORM_FNS = {
+    OUTPUT_FORMAT_STREAM_JSON:   _transform_line,
+    OUTPUT_FORMAT_PLAIN_TEXT:    _transform_plain_text_line,
+    OUTPUT_FORMAT_CODEX_JSON:    _transform_codex_line,
+    OUTPUT_FORMAT_OPENCODE_JSON: _transform_opencode_line,
+    OUTPUT_FORMAT_KIMI_JSON:     _transform_kimi_line,
+}
 
 
 class ChatRelay:
@@ -27,7 +43,7 @@ class ChatRelay:
         self._orig_ppid:      int                        = os.getppid()
         self._drain_task:     asyncio.Task | None        = None  # M3: prevent GC
         self._watchdog_task:  asyncio.Task | None        = None  # M3: prevent GC
-        self._transform:      bool                       = False
+        self._transform_fn                               = _transform_line  # default: stream-json
 
     # ── Public TCP server ────────────────────────────────────────────────
 
@@ -63,7 +79,7 @@ class ChatRelay:
                 writer.write(struct.pack("!I", len(out)) + out)
                 await writer.drain()
         except (asyncio.IncompleteReadError, ConnectionResetError, BrokenPipeError,
-                json.JSONDecodeError):
+                json.JSONDecodeError, AttributeError):
             pass
         finally:
             if self._current_writer is writer:
@@ -104,11 +120,26 @@ class ChatRelay:
             await session.start()
         except Exception as e:
             return {"ok": False, "err": f"spawn failed: {e}"}
-        self._session = session
+        self._session    = session
         self._drain_task = asyncio.create_task(self._drain_stdout_loop())
         return {"ok": True, "data": f"spawned pid={session.pid}"}
 
     async def _cmd_send(self, args: dict) -> dict:
+        meta = self._session_meta
+        if meta:
+            backend = BACKENDS.get(meta.backend)
+            if backend and not backend.reads_stdin:
+                # Single-turn CLI: extract plain text and respawn with actual prompt.
+                prompt = _extract_text_from_turn(args.get("line") or "")
+                return await self._cmd_start({
+                    "backend":    meta.backend,
+                    "mode":       meta.mode,
+                    "model":      meta.model,
+                    "mcp_port":   meta.mcp_port,
+                    "prompt":     prompt,
+                    "config_dir": meta.config_dir,
+                    **meta.extra,
+                })
         if self._session is None:
             return {"ok": False, "err": "no session"}
         try:
@@ -173,6 +204,16 @@ class ChatRelay:
         except Exception as e:
             return {"ok": False, "err": f"build_args failed: {e}"}
 
+        # Defer spawn for single-turn backends: wait for first _cmd_send to provide the prompt.
+        if not backend.reads_stdin and not prompt:
+            await self._kill_current()
+            self._session_meta = SessionMeta(
+                backend=backend_name, mode=mode, model=model,
+                mcp_port=mcp_port, prompt=prompt, config_dir=config_dir,
+                extra=extra_keys,
+            )
+            return {"ok": True, "data": "deferred|no prompt yet"}
+
         await self._kill_current()
         session = CliSession(binary=resolved, argv=argv,
                              env_set=env_set, env_strip=env_strip)
@@ -181,8 +222,11 @@ class ChatRelay:
         except Exception as e:
             return {"ok": False, "err": f"spawn failed: {e}"}
 
-        self._session   = session
-        self._transform = backend.uses_stream_json
+        if not backend.reads_stdin:
+            session.close_stdin()
+
+        self._session      = session
+        self._transform_fn = _TRANSFORM_FNS.get(backend.output_format, _transform_plain_text_line)
         self._session_meta = SessionMeta(
             backend=backend_name, mode=mode, model=model,
             mcp_port=mcp_port, prompt=prompt, config_dir=config_dir,
@@ -216,9 +260,9 @@ class ChatRelay:
 
     async def _drain_stdout_loop(self) -> None:
         """Read subprocess stdout line-by-line, buffer with seq_id."""
-        session   = self._session
-        transform = self._transform   # capture — avoids TOCTOU
-        acc       = _ToolCallAcc()    # fresh accumulator per subprocess
+        session = self._session
+        fn      = self._transform_fn   # capture — avoids TOCTOU
+        acc     = _ToolCallAcc()       # fresh accumulator per subprocess
         while session is self._session:
             line = await session.read_stdout_line()
             if line is None:
@@ -229,17 +273,12 @@ class ChatRelay:
                 else:
                     # B3: notify C# of clean exit so spinner clears
                     raw = '{"type":"result","subtype":"done","is_error":false}'
-                if transform:
-                    for p in _transform_line(raw, acc):
-                        self._relay_buf.enqueue(p)
-                else:
-                    self._relay_buf.enqueue(raw)
-                break
-            if transform:
-                for p in _transform_line(line, acc):
+                # EOF synthetic events always use _transform_line (our own format, not backend's)
+                for p in _transform_line(raw, acc):
                     self._relay_buf.enqueue(p)
-            else:
-                self._relay_buf.enqueue(line)
+                break
+            for p in fn(line, acc):
+                self._relay_buf.enqueue(p)
 
     async def _ppid_watchdog(self) -> None:
         """Exit relay if Unity (parent) dies."""
@@ -290,6 +329,16 @@ def _esc(s: str) -> str:
              .replace("\n", "\\n")
              .replace("\r", "\\r")
              .replace("\t", "\\t"))
+
+
+def _extract_text_from_turn(line: str) -> str:
+    """Extract plain text from a stream-json user turn envelope. Fallback: raw line."""
+    try:
+        obj = json.loads(line)
+        content = (obj.get("message") or {}).get("content") or []
+        return "\n".join(b["text"] for b in content if b.get("type") == "text")
+    except Exception:
+        return line
 
 
 async def _main() -> None:

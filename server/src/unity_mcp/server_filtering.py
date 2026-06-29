@@ -165,8 +165,6 @@ def read_unity_port(skip_probe: bool = False) -> int | None:
                 try: f.unlink()
                 except OSError: pass
                 continue
-            if not skip_probe and not _tcp_probe(port):
-                continue
             project_path = lines[1] if len(lines) > 1 else ""
             project = lines[2] if len(lines) > 2 else "?"
             candidates.append((f.stat().st_mtime, port, project, pid, project_path))

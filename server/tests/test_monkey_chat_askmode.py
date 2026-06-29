@@ -454,6 +454,7 @@ async def test_multiturn_error_recovery_restart_at_turn3() -> None:
     mock_b.name = "kimi"
     mock_b.binary = "kimi"
     mock_b.has_resume = False
+    mock_b.reads_stdin = True  # explicit: testing stdin-write failure path
     mock_b.resolve_binary = AsyncMock(return_value="/bin/kimi")
     mock_b.build_args.return_value = (["-p", "msg"], {}, [])
 
@@ -461,32 +462,32 @@ async def test_multiturn_error_recovery_restart_at_turn3() -> None:
          patch("unity_mcp.chat_relay.asyncio.create_subprocess_exec",
                AsyncMock(return_value=make_proc(pid=30))):
         await relay._cmd_start({
-            "backend": "kimi", "mode": "ask", "mcp_port": 9500, "prompt": "",
+            "backend": "kimi", "mode": "ask", "mcp_port": 9500, "prompt": "hello",
         })
+        relay._session = mock_sess(pid=30)
 
-    relay._session = mock_sess(pid=30)
+        for t in range(3):
+            rs = await relay._cmd_send({"line": f"msg {t}"})
+            assert rs["ok"] is True
 
-    for t in range(3):
-        rs = await relay._cmd_send({"line": f"msg {t}"})
-        assert rs["ok"] is True
-
-    # simulate process death
-    relay._session = mock_sess(alive=False, exit_code=1)
-    relay._session.write_line = AsyncMock(side_effect=RuntimeError("process dead (exit=1)"))
-    rs = await relay._cmd_send({"line": "turn 3 fails"})
-    assert rs["ok"] is False
+        # simulate process death
+        relay._session = mock_sess(alive=False, exit_code=1)
+        relay._session.write_line = AsyncMock(side_effect=RuntimeError("process dead (exit=1)"))
+        rs = await relay._cmd_send({"line": "turn 3 fails"})
+        assert rs["ok"] is False
 
     # restart
-    with patch("unity_mcp.chat_relay.asyncio.create_subprocess_exec",
+    with patch.dict(BACKENDS, {"kimi": mock_b}, clear=False), \
+         patch("unity_mcp.chat_relay.asyncio.create_subprocess_exec",
                AsyncMock(return_value=make_proc(pid=31))):
         r2 = await relay._cmd_start({
-            "backend": "kimi", "mode": "ask", "mcp_port": 9500, "prompt": "",
+            "backend": "kimi", "mode": "ask", "mcp_port": 9500, "prompt": "hello",
         })
-    assert r2["ok"] is True
-    relay._session = mock_sess(pid=31)
+        assert r2["ok"] is True
+        relay._session = mock_sess(pid=31)
 
-    rs = await relay._cmd_send({"line": "turn 4 after recovery"})
-    assert rs["ok"] is True
+        rs = await relay._cmd_send({"line": "turn 4 after recovery"})
+        assert rs["ok"] is True
 
 
 @pytest.mark.monkey

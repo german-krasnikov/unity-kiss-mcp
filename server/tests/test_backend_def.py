@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+_TEST_PORT = 19500
+
 from unity_mcp.backend_def import (
     BACKENDS,
     AgyDef,
@@ -48,20 +50,20 @@ async def test_resolve_binary_both_miss(monkeypatch):
 # ─── Claude (7 tests) ───────────────────────────────────────────────────────
 
 def test_claude_build_args_ask_mode(tmp_path):
-    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=9600,
+    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                                         config_dir=str(tmp_path))
     assert "--permission-mode" in argv
     assert argv[argv.index("--permission-mode") + 1] == "plan"
 
 
 def test_claude_build_args_agent_mode(tmp_path):
-    argv, _, _ = ClaudeDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = ClaudeDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                         config_dir=str(tmp_path))
     assert argv[argv.index("--permission-mode") + 1] == "acceptEdits"
 
 
 def test_claude_resume_includes_session_id(tmp_path):
-    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=9600,
+    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                                         session_id="abc123",
                                         config_dir=str(tmp_path))
     assert "--resume" in argv
@@ -69,16 +71,15 @@ def test_claude_resume_includes_session_id(tmp_path):
 
 
 def test_claude_env_strip_keys(tmp_path):
-    _, _, strip = ClaudeDef().build_args(mode="ask", model=None, mcp_port=9600,
+    _, _, strip = ClaudeDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                                          config_dir=str(tmp_path))
-    assert "ANTHROPIC_API_KEY" in strip
     assert "CLAUDECODE"        in strip
     assert "UNITY_MCP_PORT"   in strip
     assert "UNITY_MCP_CHAT"   in strip
 
 
 def test_claude_agent_name_flag(tmp_path):
-    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=9600,
+    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                                         agent_name="my-agent",
                                         config_dir=str(tmp_path))
     assert "--agent" in argv
@@ -87,13 +88,13 @@ def test_claude_agent_name_flag(tmp_path):
 
 def test_claude_model_flag(tmp_path):
     argv, _, _ = ClaudeDef().build_args(mode="ask", model="claude-opus-4",
-                                        mcp_port=9600, config_dir=str(tmp_path))
+                                        mcp_port=_TEST_PORT, config_dir=str(tmp_path))
     assert "--model" in argv
     assert argv[argv.index("--model") + 1] == "claude-opus-4"
 
 
 def test_claude_no_resume_when_none(tmp_path):
-    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=9600,
+    argv, _, _ = ClaudeDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                                         session_id=None, config_dir=str(tmp_path))
     assert "--resume" not in argv
 
@@ -101,7 +102,7 @@ def test_claude_no_resume_when_none(tmp_path):
 # ─── Codex (5 tests) ────────────────────────────────────────────────────────
 
 def test_codex_first_turn_argv_structure():
-    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                        prompt="hello")
     assert argv[0] == "exec"
     assert "--json" in argv
@@ -110,7 +111,7 @@ def test_codex_first_turn_argv_structure():
 
 
 def test_codex_resume_argv_structure():
-    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                        prompt="hello", session_id="sess-42")
     assert argv[:2] == ["exec", "resume"]
     assert argv[2] == "sess-42"
@@ -118,13 +119,13 @@ def test_codex_resume_argv_structure():
 
 
 def test_codex_prompt_is_last_arg():
-    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                        prompt="do the thing")
     assert argv[-1] == "do the thing"
 
 
 def test_codex_toml_mcp_flags_present():
-    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = CodexDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                        prompt="x")
     # Collect all -c values
     c_values = [argv[i + 1] for i, v in enumerate(argv) if v == "-c"]
@@ -133,34 +134,48 @@ def test_codex_toml_mcp_flags_present():
     assert any("mcp_servers.unity.startup_timeout_sec=30" in v for v in c_values)
 
 
-def test_codex_env_strip():
-    _, _, strip = CodexDef().build_args(mode="agent", model=None, mcp_port=9600,
-                                        prompt="x")
-    assert "OPENAI_API_KEY" in strip
+def test_codex_env_set_unity_mcp_port():
+    _, env_set, strip = CodexDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
+                                              prompt="x")
+    assert env_set.get("UNITY_MCP_PORT") == str(_TEST_PORT)
+    assert "UNITY_MCP_PORT" not in strip
+
+
+def test_codex_argv_env_port_flag_matches_env_set():
+    """T3: port in -c TOML flag must match env_set port (no drift between the two)."""
+    import re
+    argv, env_set, _ = CodexDef().build_args(mode="ask", model=None, mcp_port=9601, prompt="hi")
+    c_values = [argv[i + 1] for i, a in enumerate(argv) if a == "-c"]
+    port_flag = next((v for v in c_values if "UNITY_MCP_PORT" in v), None)
+    assert port_flag is not None, f"-c UNITY_MCP_PORT flag not found in argv: {argv}"
+    m = re.search(r'UNITY_MCP_PORT="(\d+)"', port_flag)
+    assert m is not None, f"port not extractable from: {port_flag}"
+    assert m.group(1) == env_set["UNITY_MCP_PORT"] == "9601"
 
 
 # ─── Kimi (5 tests) ─────────────────────────────────────────────────────────
 
 def test_kimi_argv_structure(tmp_path):
-    argv, _, _ = KimiDef().build_args(mode="ask", model=None, mcp_port=9600,
+    argv, _, _ = KimiDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                                       prompt="hi", config_dir=str(tmp_path))
     assert argv[0] == "-p"
-    assert argv[1] == "hi"
+    assert "--input-format" not in argv  # kimi v0.20.1+ does not support --input-format
     assert "--output-format" in argv
     assert argv[argv.index("--output-format") + 1] == "stream-json"
 
 
 def test_kimi_model_flag(tmp_path):
-    argv, _, _ = KimiDef().build_args(mode="ask", model="kimi-k2", mcp_port=9600,
+    argv, _, _ = KimiDef().build_args(mode="ask", model="kimi-k2", mcp_port=_TEST_PORT,
                                       prompt="x", config_dir=str(tmp_path))
     assert "--model" in argv
     assert argv[argv.index("--model") + 1] == "kimi-k2"
 
 
-def test_kimi_no_env_strip(tmp_path):
-    _, _, strip = KimiDef().build_args(mode="ask", model=None, mcp_port=9600,
-                                       prompt="x", config_dir=str(tmp_path))
-    assert strip == []
+def test_kimi_env_set_unity_mcp_port(tmp_path):
+    _, env_set, strip = KimiDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
+                                              prompt="x", config_dir=str(tmp_path))
+    assert env_set.get("UNITY_MCP_PORT") == str(_TEST_PORT)
+    assert "UNITY_MCP_PORT" not in strip
 
 
 def test_kimi_writes_mcp_config(tmp_path):
@@ -179,36 +194,37 @@ def test_kimi_no_resume():
 # ─── Agy (4 tests) ──────────────────────────────────────────────────────────
 
 def test_agy_ask_no_skip_permissions(tmp_path):
-    argv, _, _ = AgyDef().build_args(mode="ask", model=None, mcp_port=9600,
+    argv, _, _ = AgyDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                                      prompt="x", config_dir=str(tmp_path))
     assert "--dangerously-skip-permissions" not in argv
 
 
 def test_agy_agent_adds_skip_permissions(tmp_path):
-    argv, _, _ = AgyDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = AgyDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                      prompt="x", config_dir=str(tmp_path))
     assert "--dangerously-skip-permissions" in argv
 
 
-def test_agy_env_strip(tmp_path):
-    _, _, strip = AgyDef().build_args(mode="ask", model=None, mcp_port=9600,
-                                      prompt="x", config_dir=str(tmp_path))
-    assert "GEMINI_API_KEY" in strip
+def test_agy_env_set_unity_mcp_port(tmp_path):
+    _, env_set, strip = AgyDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
+                                             prompt="x", config_dir=str(tmp_path))
+    assert env_set.get("UNITY_MCP_PORT") == str(_TEST_PORT)
+    assert "UNITY_MCP_PORT" not in strip
 
 
 def test_agy_writes_settings_json(tmp_path):
-    AgyDef().build_args(mode="ask", model=None, mcp_port=9602,
+    AgyDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
                         prompt="x", config_dir=str(tmp_path))
     settings_path = tmp_path / "settings.json"
     assert settings_path.exists()
     data = json.loads(settings_path.read_text(encoding="utf-8"))
-    assert data["mcpServers"]["unity-mcp"]["env"]["UNITY_MCP_PORT"] == "9602"
+    assert data["mcpServers"]["unity-mcp"]["env"]["UNITY_MCP_PORT"] == str(_TEST_PORT)
 
 
 # ─── OpenCode (4 tests) ─────────────────────────────────────────────────────
 
 def test_opencode_argv_structure(tmp_path):
-    argv, _, _ = OpenCodeDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = OpenCodeDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                           prompt="x", config_dir=str(tmp_path))
     assert argv[0] == "run"
     assert "--format" in argv
@@ -217,7 +233,7 @@ def test_opencode_argv_structure(tmp_path):
 
 
 def test_opencode_resume_flag(tmp_path):
-    argv, _, _ = OpenCodeDef().build_args(mode="agent", model=None, mcp_port=9600,
+    argv, _, _ = OpenCodeDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                           prompt="x", session_id="oc-99",
                                           config_dir=str(tmp_path))
     assert "-s" in argv
@@ -225,10 +241,10 @@ def test_opencode_resume_flag(tmp_path):
 
 
 def test_opencode_env_set_opencode_config(tmp_path):
-    _, env_set, _ = OpenCodeDef().build_args(mode="agent", model=None, mcp_port=9600,
+    _, env_set, _ = OpenCodeDef().build_args(mode="agent", model=None, mcp_port=_TEST_PORT,
                                               prompt="x", config_dir=str(tmp_path))
     assert "OPENCODE_CONFIG" in env_set
-    assert "opencode-unity-mcp-9600.json" in env_set["OPENCODE_CONFIG"]
+    assert f"opencode-unity-mcp-{_TEST_PORT}.json" in env_set["OPENCODE_CONFIG"]
 
 
 def test_opencode_writes_config_file(tmp_path):
@@ -258,6 +274,10 @@ def test_sanitize_blocks_output_format_and_value():
     assert result == []
 
 
+def test_sanitize_blocks_format_flag():
+    assert _sanitize_extra_args("--format json -p hello") == ["-p", "hello"]
+
+
 def test_sanitize_blocks_mcp_config_and_value():
     result = _sanitize_extra_args("--mcp-config /evil/path --model sonnet")
     assert "--mcp-config" not in result
@@ -273,7 +293,7 @@ def test_sanitize_empty_string_returns_empty():
 
 def test_claude_extra_args_cannot_inject_permission_mode(tmp_path):
     argv, _, _ = ClaudeDef().build_args(
-        mode="ask", model=None, mcp_port=9500,
+        mode="ask", model=None, mcp_port=_TEST_PORT,
         config_dir=str(tmp_path),
         extra_args="--permission-mode acceptEdits",
     )
@@ -284,10 +304,40 @@ def test_claude_extra_args_cannot_inject_permission_mode(tmp_path):
 
 def test_claude_extra_args_cannot_inject_output_format(tmp_path):
     argv, _, _ = ClaudeDef().build_args(
-        mode="ask", model=None, mcp_port=9500,
+        mode="ask", model=None, mcp_port=_TEST_PORT,
         config_dir=str(tmp_path),
         extra_args="--output-format text",
     )
     idx = argv.index("--output-format")
     assert argv[idx + 1] == "stream-json"
     assert argv.count("--output-format") == 1
+
+
+# ─── reads_stdin flag ────────────────────────────────────────────────────────
+
+def test_claude_reads_stdin():
+    assert ClaudeDef().reads_stdin is True
+
+def test_kimi_reads_stdin():
+    assert KimiDef().reads_stdin is False
+
+def test_agy_does_not_read_stdin():
+    assert AgyDef().reads_stdin is False
+
+def test_codex_does_not_read_stdin():
+    assert CodexDef().reads_stdin is False
+
+def test_kimi_argv_has_no_input_format(tmp_path):
+    """kimi v0.20.1+ does not support --input-format; prompt is sent via stdin."""
+    argv, _, _ = KimiDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
+                                       config_dir=str(tmp_path))
+    assert "--input-format" not in argv
+    assert "--output-format" in argv
+    assert argv[argv.index("--output-format") + 1] == "stream-json"
+
+def test_kimi_argv_prompt_value(tmp_path):
+    """After -p must come the prompt string (Kimi v0.20.1+ -p <prompt> syntax)."""
+    argv, _, _ = KimiDef().build_args(mode="ask", model=None, mcp_port=_TEST_PORT,
+                                       prompt="hello", config_dir=str(tmp_path))
+    p_idx = argv.index("-p")
+    assert argv[p_idx + 1] == "hello"

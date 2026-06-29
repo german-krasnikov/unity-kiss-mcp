@@ -14,6 +14,14 @@ from unity_mcp.chat_relay import (
     _esc, _find_free_port,
     MAX_BUF, KILL_WAIT, PPID_POLL,
 )
+from unity_mcp.stream_transform import (
+    _transform_plain_text_line, _transform_line,
+    _transform_codex_line, _transform_kimi_line, _transform_opencode_line,
+)
+from unity_mcp.backend_def import (
+    OUTPUT_FORMAT_STREAM_JSON, OUTPUT_FORMAT_PLAIN_TEXT,
+    OUTPUT_FORMAT_CODEX_JSON, OUTPUT_FORMAT_OPENCODE_JSON, OUTPUT_FORMAT_KIMI_JSON,
+)
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
@@ -318,6 +326,69 @@ async def test_send_utf8():
     sess.write_line.assert_called_once_with("日本語テスト")
 
 
+# ─── _extract_text_from_turn ─────────────────────────────────────────────────
+
+def test_extract_text_single_block():
+    from unity_mcp.chat_relay import _extract_text_from_turn
+    line = '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"hello!"}]}}'
+    assert _extract_text_from_turn(line) == "hello!"
+
+def test_extract_text_fallback_on_bad_json():
+    from unity_mcp.chat_relay import _extract_text_from_turn
+    assert _extract_text_from_turn("not json") == "not json"
+
+def test_extract_text_multi_blocks_joined():
+    from unity_mcp.chat_relay import _extract_text_from_turn
+    line = '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"a"},{"type":"image"},{"type":"text","text":"b"}]}}'
+    assert _extract_text_from_turn(line) == "a\nb"
+
+
+# ─── _cmd_start deferred for reads_stdin=False ───────────────────────────────
+
+async def test_cmd_start_agy_empty_prompt_deferred(monkeypatch):
+    """_cmd_start with reads_stdin=False backend + empty prompt must NOT spawn."""
+    from unity_mcp.backend_def import AgyDef
+    relay = ChatRelay()
+
+    fake_backend = AgyDef()
+    async def fake_resolve():
+        return "/usr/bin/agy"
+    monkeypatch.setattr(fake_backend, "resolve_binary", fake_resolve)
+    monkeypatch.setitem(BACKENDS, "agy", fake_backend)
+
+    resp = await relay._cmd_start({
+        "backend": "agy", "mode": "ask", "model": None,
+        "mcp_port": 0, "prompt": "", "config_dir": "/tmp"
+    })
+    assert resp["ok"] is True
+    assert "deferred" in resp["data"]
+    assert relay._session is None          # no process spawned
+    assert relay._session_meta is not None
+
+
+# ─── _cmd_send respawn for reads_stdin=False ─────────────────────────────────
+
+async def test_cmd_send_agy_respawns_with_extracted_prompt(monkeypatch):
+    """_cmd_send with reads_stdin=False calls _cmd_start with extracted plain text."""
+    relay = ChatRelay()
+    relay._session_meta = SessionMeta(
+        backend="agy", mode="ask", model=None, mcp_port=0,
+        prompt="", config_dir="/tmp", extra={}
+    )
+
+    spawned_prompts = []
+    async def fake_start(args):
+        spawned_prompts.append(args.get("prompt", ""))
+        return {"ok": True, "data": "spawned pid=999"}
+    monkeypatch.setattr(relay, "_cmd_start", fake_start)
+
+    turn_json = '{"type":"user","message":{"role":"user","content":[{"type":"text","text":"fix the bug"}]}}'
+    resp = await relay._cmd_send({"line": turn_json})
+
+    assert resp["ok"] is True
+    assert spawned_prompts == ["fix the bug"]
+
+
 # ─── Kill (3 tests) ─────────────────────────────────────────────────────────
 
 async def test_kill_calls_terminate():
@@ -441,7 +512,8 @@ async def test_crash_nonzero_exit_enqueues_error():
     await relay._drain_stdout_loop()
 
     texts = [b.text for b in relay._buf]
-    assert any("is_error" in t for t in texts)
+    # EOF error events are pipe-format: e|<message>
+    assert any(t.startswith("e|") for t in texts)
 
 
 async def test_crash_zero_exit_enqueues_done():
@@ -455,7 +527,8 @@ async def test_crash_zero_exit_enqueues_done():
 
     texts = [b.text for b in relay._buf]
     assert len(texts) == 1
-    assert json.loads(texts[0])["is_error"] is False
+    # EOF done events are pipe-format: d|<sid>|<cost>|<in>|<out>
+    assert texts[0].startswith("d|")
 
 
 async def test_crash_error_event_format():
@@ -469,11 +542,9 @@ async def test_crash_error_event_format():
 
     texts = [b.text for b in relay._buf]
     assert len(texts) == 1
-    import json as _json
-    parsed = _json.loads(texts[0])
-    assert parsed["type"] == "result"
-    assert parsed["is_error"] is True
-    assert "claude" in parsed["error"]
+    # Pipe format: e|Process claude exited 3
+    assert texts[0].startswith("e|")
+    assert "claude" in texts[0]
 
 
 # ─── PPID Watchdog (3 tests) ────────────────────────────────────────────────
@@ -538,6 +609,8 @@ async def test_tcp_spawn_send_events_cycle(running_relay):
     relay, port = running_relay
     proc = make_proc(pid=5555, stdout_lines=[b"stream line one\n", b"stream line two\n"])
 
+    # Use plain-text transform so raw lines land as t| events in the buffer
+    relay._transform_fn = _transform_plain_text_line
     with patch("unity_mcp.chat_relay.asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
         spawn_resp = await relay._cmd_spawn({  # direct call — spawn removed from TCP dispatch
             "binary": "/bin/cli", "argv": [], "env_set": {}, "env_strip": [],
@@ -550,8 +623,8 @@ async def test_tcp_spawn_send_events_cycle(running_relay):
 
     events_resp = await tcp_cmd(port, "events", {"after_seq": -1})
     assert events_resp["ok"] is True
-    assert "stream line one" in events_resp["data"]
-    assert "stream line two" in events_resp["data"]
+    assert "t|stream line one" in events_resp["data"]
+    assert "t|stream line two" in events_resp["data"]
 
 
 async def test_reconnect_replay(running_relay):
@@ -793,6 +866,8 @@ async def test_read_stdout_line_on_incomplete_read():
 async def test_real_subprocess_stdout_buffered(running_relay):
     """Real subprocess stdout lines land in the event buffer."""
     relay, port = running_relay
+    # Use plain-text transform so raw stdout lands as t| events
+    relay._transform_fn = _transform_plain_text_line
     spawn_resp = await relay._cmd_spawn({  # direct call — spawn removed from TCP dispatch
         "binary": sys.executable,
         "argv": ["-c", "import sys; print('hello_relay'); sys.stdout.flush()"],
@@ -842,10 +917,8 @@ async def test_exit_code_zero_enqueues_done_event():
 
     texts = [b.text for b in relay._buf]
     assert len(texts) == 1
-    parsed = json.loads(texts[0])
-    assert parsed["type"] == "result"
-    assert parsed.get("subtype") == "done"
-    assert parsed["is_error"] is False
+    # EOF clean exit → pipe-format done event d|<sid>|<cost>|<in>|<out>
+    assert texts[0].startswith("d|")
 
 
 async def test_kill_clears_buffer_and_resets_seq():
@@ -1244,13 +1317,14 @@ async def test_kill_current_no_spurious_event():
     assert relay._drain_task is None
 
 
-# ─── T3: pipe-format synthetic exit events (transform=True path) ─────────────
+# ─── Synthetic exit events (pipe-format regardless of backend transform) ──────
 
 @pytest.mark.asyncio
-async def test_t3_error_exit_produces_pipe_not_json():
-    """T3: transform=True + exit_code=1 → e|Process cli exited 1, not raw JSON."""
+async def test_error_exit_synthetic_event_is_pipe_format():
+    """Drain loop wraps error-exit as e| pipe event even for plain-text backends."""
+    from unity_mcp.stream_transform import _transform_plain_text_line
     relay = ChatRelay()
-    relay._transform = True
+    relay._transform_fn = _transform_plain_text_line
     sess = mock_sess(alive=False, exit_code=1)
     sess.read_stdout_line = AsyncMock(return_value=None)
     relay._session = sess
@@ -1265,10 +1339,11 @@ async def test_t3_error_exit_produces_pipe_not_json():
 
 
 @pytest.mark.asyncio
-async def test_t3_clean_exit_produces_done_pipe():
-    """T3: transform=True + exit_code=0 → d||0|0|0, not raw JSON."""
+async def test_clean_exit_synthetic_event_is_done_pipe():
+    """Drain loop wraps clean exit as d||0|0|0 regardless of backend transform."""
+    from unity_mcp.stream_transform import _transform_plain_text_line
     relay = ChatRelay()
-    relay._transform = True
+    relay._transform_fn = _transform_plain_text_line
     sess = mock_sess(alive=False, exit_code=0)
     sess.read_stdout_line = AsyncMock(return_value=None)
     relay._session = sess
@@ -1740,3 +1815,59 @@ async def test_start_rejects_unknown_backend_via_tcp(running_relay):
     resp = await tcp_cmd(port, "start", {"backend": "/bin/sh", "mode": "ask", "mcp_port": 9500})
     assert resp["ok"] is False
     assert "unknown backend" in resp["err"]
+
+
+# ─── T1/T2: _transform_fn set by _cmd_start ─────────────────────────────────
+
+async def test_cmd_start_codex_sets_codex_transform_fn():
+    """T1: _cmd_start(backend=codex) must set _transform_fn = _transform_codex_line."""
+    relay = ChatRelay()
+    proc = make_proc(pid=5001)
+    backend = _mock_backend()
+    backend.output_format = OUTPUT_FORMAT_CODEX_JSON
+    with patch.dict(BACKENDS, {"codex": backend}, clear=False):
+        with patch("unity_mcp.chat_relay.asyncio.create_subprocess_exec",
+                   AsyncMock(return_value=proc)):
+            result = await relay._cmd_start({"backend": "codex", "mode": "ask", "mcp_port": 9601})
+    assert result["ok"] is True
+    assert relay._transform_fn is _transform_codex_line
+
+
+@pytest.mark.parametrize("backend_name,output_format,expected_fn", [
+    ("claude",    OUTPUT_FORMAT_STREAM_JSON,   _transform_line),
+    ("codex",     OUTPUT_FORMAT_CODEX_JSON,    _transform_codex_line),
+    ("kimi",      OUTPUT_FORMAT_KIMI_JSON,     _transform_kimi_line),
+    ("agy",       OUTPUT_FORMAT_PLAIN_TEXT,    _transform_plain_text_line),
+    ("opencode",  OUTPUT_FORMAT_OPENCODE_JSON, _transform_opencode_line),
+])
+async def test_cmd_start_sets_correct_transform_per_backend(
+        backend_name, output_format, expected_fn):
+    """T2: every backend maps to the correct transform function."""
+    relay = ChatRelay()
+    proc = make_proc(pid=5002)
+    backend = _mock_backend()
+    backend.output_format = output_format
+    with patch.dict(BACKENDS, {backend_name: backend}, clear=False):
+        with patch("unity_mcp.chat_relay.asyncio.create_subprocess_exec",
+                   AsyncMock(return_value=proc)):
+            await relay._cmd_start({"backend": backend_name, "mode": "ask", "mcp_port": 9500})
+    assert relay._transform_fn is expected_fn
+
+
+# ─── T4: env_set overrides inherited UNITY_MCP_PORT ─────────────────────────
+
+async def test_cli_session_env_set_overrides_inherited_port(monkeypatch):
+    """T4: env_set UNITY_MCP_PORT=9601 wins over inherited os.environ UNITY_MCP_PORT=9999."""
+    monkeypatch.setenv("UNITY_MCP_PORT", "9999")
+    proc = make_proc(pid=5004)
+    mock_exec = AsyncMock(return_value=proc)
+    with patch("unity_mcp.chat_relay.asyncio.create_subprocess_exec", mock_exec):
+        relay = ChatRelay()
+        await relay._cmd_spawn({
+            "binary": "/bin/cli",
+            "argv": [],
+            "env_set": {"UNITY_MCP_PORT": "9601"},
+            "env_strip": [],
+        })
+    env_arg = mock_exec.call_args.kwargs["env"]
+    assert env_arg["UNITY_MCP_PORT"] == "9601"

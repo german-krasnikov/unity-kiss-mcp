@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 9542 Tests (3759 Python · 5499 Unity · 284 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 8743 Tests (3845 Python · 4614 Unity · 284 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.67.1</b> — 2026-06-29 — **output_format Discriminator** — Replaces `uses_stream_json: bool` with typed …</summary>
+
+**output_format Discriminator** — Replaces `uses_stream_json: bool` with typed `output_format` enum (5 values: `stream-json`, `codex-json`, …
+
+</details>
+
+<details>
 <summary><b>v0.67.0</b> — 2026-06-29 — **ThinView Flag Removed** — Deleted MCPChat.ThinView conditional compilation …</summary>
 
 **ThinView Flag Removed** — Deleted MCPChat.ThinView conditional compilation flag (−7410 LOC).
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.64.0</b> — 2026-06-27 — **T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` …</summary>
-
-**T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` in OnSend with null-safe delegate guard.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.64.0** — 2026-06-27 — **T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` …
 - **v0.63.0** — 2026-06-27 — **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool …
 - **v0.62.0** — 2026-06-26 — **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for …
 - **v0.61.0** — 2026-06-26 — **PerfOverlay** — SceneView UITK overlay showing real-time FPS sparkline, …

@@ -349,7 +349,8 @@ class UnityBridge(HeartbeatMixin):
         try:
             self._counter += 1
             ping_id = f"rc{self._counter:04x}"
-            ping = json.dumps({"id": ping_id, "cmd": "ping", "args": {}}, ensure_ascii=False).encode("utf-8")
+            _role = "chat-relay" if os.environ.get("UNITY_MCP_CHAT") == "1" else "mcp"
+            ping = json.dumps({"id": ping_id, "cmd": "ping", "role": _role, "args": {}}, ensure_ascii=False).encode("utf-8")
             writer.write(struct.pack("!I", len(ping)) + ping)
             await writer.drain()
             # Read ping response directly from local reader (not self._reader)

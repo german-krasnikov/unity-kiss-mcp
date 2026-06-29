@@ -221,6 +221,27 @@ namespace UnityMCP.Editor.Chat.Tests
         }
 
         [Test]
+        public void WriteLine_RelayError_EnqueuesErrorAndStops()
+        {
+            bool spawnDone = false;
+            _sut = new RelayChatProcess(json =>
+            {
+                if (!spawnDone) { spawnDone = true; return "{\"ok\":true,\"data\":\"\"}"; }
+                if (json.Contains("\"cmd\":\"send\"")) return "{\"ok\":false,\"err\":\"binary 'codex' not found in PATH\"}";
+                return "{\"ok\":true,\"data\":\"\"}";
+            });
+            _sut.SpawnViaRelay(0, "/bin/cli", new string[0], EmptyEnv, EmptyStrip);
+            _sut.WriteLine("hello");
+            Thread.Sleep(50);
+            var output = new List<string>();
+            _sut.DrainLines(output);
+            Assert.Greater(output.Count, 0, "Error line must be enqueued");
+            Assert.IsTrue(output.Exists(l => l.StartsWith("e|") && l.Contains("binary")),
+                $"Expected e|relay:... error, got: {string.Join(", ", output)}");
+            Assert.IsFalse(_sut.IsRunning, "IsRunning must be false after relay error");
+        }
+
+        [Test]
         public void WriteLine_WhenSendThrows_DoesNotPropagate()
         {
             bool spawnDone = false;
@@ -551,6 +572,67 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(2, output.Count, $"Expected 2 lines, got {output.Count}");
             Assert.IsTrue(output[0].Contains("\n"), "First event must have embedded newline");
             Assert.AreEqual("c", output[1]);
+        }
+
+        // ── Tool call / result pass-through ───────────────────────────────────
+
+        [Test]
+        public void DrainLines_ToolCallEvent_DeliversTcLine()
+        {
+            bool delivered = false;
+            _sut = Spawn(json =>
+            {
+                if (!json.Contains("events")) return "{\"ok\":true,\"data\":\"\"}";
+                if (!delivered) { delivered = true; return "{\"ok\":true,\"data\":\"0\\ntc|bash|tid1|{}\\n\"}"; }
+                return "{\"ok\":true,\"data\":\"\"}";
+            }, out _);
+            Thread.Sleep(250);
+            var output = new List<string>();
+            _sut.DrainLines(output);
+            Assert.AreEqual(1, output.Count, "Expected one tc| line");
+            Assert.IsTrue(output[0].StartsWith("tc|"), $"Expected tc| prefix, got: {output[0]}");
+            Assert.IsTrue(output[0].Contains("bash"),  $"Tool name missing: {output[0]}");
+        }
+
+        [Test]
+        public void DrainLines_ToolResultEvent_DeliversTrLine()
+        {
+            bool delivered = false;
+            _sut = Spawn(json =>
+            {
+                if (!json.Contains("events")) return "{\"ok\":true,\"data\":\"\"}";
+                if (!delivered) { delivered = true; return "{\"ok\":true,\"data\":\"0\\ntr|tid1|true|output\\n\"}"; }
+                return "{\"ok\":true,\"data\":\"\"}";
+            }, out _);
+            Thread.Sleep(250);
+            var output = new List<string>();
+            _sut.DrainLines(output);
+            Assert.AreEqual(1, output.Count, "Expected one tr| line");
+            Assert.IsTrue(output[0].StartsWith("tr|"), $"Expected tr| prefix, got: {output[0]}");
+        }
+
+        [Test]
+        public void DrainLines_ToolCallSequence_AllThreeEventsDeliveredInOrder()
+        {
+            bool delivered = false;
+            _sut = Spawn(json =>
+            {
+                if (!json.Contains("events")) return "{\"ok\":true,\"data\":\"\"}";
+                if (!delivered)
+                {
+                    delivered = true;
+                    // seq=0 ToolStart, seq=1 TextDelta, seq=2 ToolResult
+                    return "{\"ok\":true,\"data\":\"0\\ntc|bash|tid1|{}\\n1\\nt|processing...\\n2\\ntr|tid1|true|done\\n\"}";
+                }
+                return "{\"ok\":true,\"data\":\"\"}";
+            }, out _);
+            Thread.Sleep(250);
+            var output = new List<string>();
+            _sut.DrainLines(output);
+            Assert.AreEqual(3, output.Count, $"Expected 3 events, got {output.Count}: [{string.Join(", ", output)}]");
+            Assert.IsTrue(output[0].StartsWith("tc|"), $"Event 0 must be tc|, got: {output[0]}");
+            Assert.IsTrue(output[1].StartsWith("t|"),  $"Event 1 must be t|, got: {output[1]}");
+            Assert.IsTrue(output[2].StartsWith("tr|"), $"Event 2 must be tr|, got: {output[2]}");
         }
 
         // ── Dispose ───────────────────────────────────────────────────────────

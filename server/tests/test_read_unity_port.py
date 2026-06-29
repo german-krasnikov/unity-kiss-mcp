@@ -296,7 +296,11 @@ def test_cwd_nested_projects_prefers_longest_match(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_skip_probe_true_returns_port_without_tcp_check(monkeypatch, tmp_path):
-    """skip_probe=True: port returned even when TCP probe would fail."""
+    """skip_probe: PID-alive candidate always included — _tcp_probe removed to stop Unity console spam.
+    Previously skip_probe=False caused the candidate to be TCP-probed and skipped on failure.
+    Now the probe is gone; PID liveness is the only gate in both modes.
+    skip_probe=False still controls the no-candidates fallback (None vs 9500).
+    """
     monkeypatch.delenv("UNITY_MCP_PORT", raising=False)
     ports_dir = tmp_path / ".unity-mcp" / "ports"
     ports_dir.mkdir(parents=True)
@@ -307,17 +311,13 @@ def test_skip_probe_true_returns_port_without_tcp_check(monkeypatch, tmp_path):
 
     def fail_probe(port, timeout=0.2):
         probe_calls.append(port)
-        return False  # would reject the candidate
+        return False
 
     monkeypatch.setattr("unity_mcp.server_filtering._tcp_probe", fail_probe)
-    # Without skip_probe → candidate rejected → default 9500
-    assert _read_unity_port(skip_probe=False) == 9500
-    assert probe_calls  # probe was called
-
-    probe_calls.clear()
-    # With skip_probe=True → candidate accepted despite probe failure
+    # Probe is never called — candidate included in both modes
+    assert _read_unity_port(skip_probe=False) == 9510
     assert _read_unity_port(skip_probe=True) == 9510
-    assert not probe_calls  # probe was NOT called
+    assert not probe_calls  # probe was never called
 
 
 # ---------------------------------------------------------------------------

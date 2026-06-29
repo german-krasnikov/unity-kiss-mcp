@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.67.1] — 2026-06-29 <!-- Multi-backend output format: output_format enum, deferred spawn, 5 stream transformers, role-aware ping -->
+
+**Multi-Backend Output Format — Codex/Kimi/Agy/OpenCode Response Parsing:**
+
+- **output_format Discriminator** — Replaces `uses_stream_json: bool` with typed `output_format` enum (5 values: `stream-json`, `codex-json`, `kimi-json`, `plain-text`, `opencode-json`). Each backend gets a dedicated stream transformer function dispatched via `_TRANSFORM_FNS` dict.
+- **reads_stdin Flag** — New `BackendDef.reads_stdin` field distinguishes interactive backends (Claude=True) from single-turn CLIs (Codex/Kimi/Agy=False). OpenCode=False despite having stdin — it uses `run` subcommand.
+- **Deferred Spawn** — Single-turn backends (`reads_stdin=False`) defer process spawn until first `_cmd_send`. Initial `_cmd_start` without prompt returns `"deferred|no prompt yet"`, then `_cmd_send` extracts text from stream-json envelope and respawns with actual prompt. Fixes Codex/Kimi/Agy showing no response.
+- **4 New Stream Transformers** — `_transform_codex_line` (Codex NDJSON: item.started/completed/turn.completed), `_transform_kimi_line` (Kimi NDJSON: role=assistant/meta), `_transform_opencode_line` (OpenCode NDJSON: text/step_finish/tool_start), `_transform_plain_text_line` (Agy: wrap stdout as `t|text`).
+- **UNITY_MCP_PORT env_set** — Codex/Kimi/Agy/OpenCode now receive `UNITY_MCP_PORT` via `env_set` (was missing). ANTHROPIC_API_KEY no longer stripped for Claude.
+- **Role-Aware Ping (C#)** — Ping payload carries `"role"` field (`"chat-relay"` or `"mcp"`). `MCPServer.RoleToLabel()` maps role to human-readable label. Connection logged only after first real message (probes stay silent).
+- **WriteLine Error Handling (C#)** — `RelayChatProcess.WriteLine()` checks relay response; on error, enqueues error event and sets `_running=false`.
+- **tcp_probe Removal** — `read_unity_port()` no longer TCP-probes each candidate port (was causing connection spam on startup).
+
+### Tests
+- 327+ new lines in test_stream_transform.py (all 5 transformers), new tests in test_chat_relay.py (deferred spawn), test_build_args_contract.py (output_format/reads_stdin/env_set), test_bridge_reconnect.py (role field), C# RelayChatProcessTests (WriteLine error), RelayEventParserTests, MCPServerStartGuardTests.
+- New live test infrastructure: `server/tests/live/relay_test_helpers.py` + `test_live_chat_backends.py` (137 tests for 5 backends via relay).
+
 ## [v0.67.0] — 2026-06-29 <!-- Chat Relay System: Python sidecar + 5 backends (Claude/Codex/Kimi/Agy/OpenCode) + stream-json transformer + 400+ UI monkey tests -->
 
 **Chat Relay System — Multi-Backend Integration, In-Unity Session Continuity, Domain Reload Survival:**

@@ -38,5 +38,50 @@ namespace UnityMCP.Editor.Tests
             StringAssert.Contains("ShouldStartServer", code,
                 "static ctor must call ShouldStartServer to guard against batch mode / AssetImportWorker");
         }
+
+        private static string LoadMCPServerSrc()
+        {
+            var src = Path.GetFullPath(
+                Path.Combine("Packages", "com.unity-mcp.plugin", "Editor", "MCPServer.cs"));
+            if (!File.Exists(src))
+                Assert.Ignore($"MCPServer.cs not found at {src} — skip in CI");
+            return File.ReadAllText(src);
+        }
+
+        // ---------------------------------------------------------------------------
+        // Transparent connections — probe silence + role labels (ARCH-transparent-connections)
+        // ---------------------------------------------------------------------------
+
+        [Test]
+        public void HandleClientAsync_DefersConnectedLog_UntilFirstMessage()
+        {
+            var code = LoadMCPServerSrc();
+            StringAssert.Contains("receivedFirstMessage", code,
+                "HandleClientAsync must use receivedFirstMessage flag to defer 'connected' log");
+        }
+
+        [Test]
+        public void HandleClientAsync_ContainsRoleToLabel()
+        {
+            var code = LoadMCPServerSrc();
+            StringAssert.Contains("RoleToLabel", code,
+                "HandleClientAsync must call RoleToLabel to resolve role field from ping to human-readable label");
+        }
+
+        [Test]
+        public void RoleToLabel_MapsChateRelayLabel()
+        {
+            var code = LoadMCPServerSrc();
+            StringAssert.Contains("Chat relay", code,
+                "RoleToLabel must map 'chat-relay' to 'Chat relay'");
+        }
+
+        [Test]
+        public void RoleToLabel_MapsClaudeCodeSessionLabel()
+        {
+            var code = LoadMCPServerSrc();
+            StringAssert.Contains("Claude Code session", code,
+                "RoleToLabel must map 'mcp' to 'Claude Code session'");
+        }
     }
 }

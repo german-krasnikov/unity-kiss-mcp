@@ -116,7 +116,15 @@ namespace UnityMCP.Editor.Chat
         internal void WriteLine(string text)
         {
             if (!_running) return;
-            try { _sendFunc($"{{\"cmd\":\"send\",\"args\":{{\"line\":\"{JsonHelper.EscapeJson(text)}\"}}}}"); }
+            try
+            {
+                var resp = _sendFunc($"{{\"cmd\":\"send\",\"args\":{{\"line\":\"{JsonHelper.EscapeJson(text)}\"}}}}");
+                if (!IsOk(resp))
+                {
+                    _lines.Enqueue($"e|relay: {ExtractErr(resp)}");
+                    _running = false;
+                }
+            }
             catch { }
         }
 

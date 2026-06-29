@@ -278,8 +278,11 @@ async def test_handler_preserves_core_full_schema():
 # A3: _tcp_probe + read_unity_port TCP-probe integration
 # ---------------------------------------------------------------------------
 
-def test_read_unity_port_skips_candidate_if_tcp_probe_fails(tmp_path):
-    """PID alive but TCP refused → skip candidate, return default 9500."""
+def test_read_unity_port_pid_alive_candidate_always_included(tmp_path):
+    """PID alive → candidate always included. TCP probe was removed to stop Unity console spam.
+    Previously this test checked that tcp_probe=False skipped the candidate; that behavior
+    is gone — PID liveness is the only gate.
+    """
     from unittest.mock import patch, MagicMock
     from pathlib import Path
 
@@ -291,10 +294,8 @@ def test_read_unity_port_skips_candidate_if_tcp_probe_fails(tmp_path):
     with (
         patch("unity_mcp.server_filtering.Path") as mock_path_cls,
         patch("os.kill"),  # PID alive, no exception
-        patch("unity_mcp.server_filtering._tcp_probe", return_value=False),
         patch.dict("os.environ", {}, clear=False),
     ):
-        # Wire Path.home() / ".unity-mcp" / "ports" to our tmp dir
         mock_home = MagicMock()
         mock_path_cls.home.return_value = mock_home
         mock_home.__truediv__ = lambda self, x: tmp_path / x if x == ".unity-mcp" else MagicMock()
@@ -303,7 +304,7 @@ def test_read_unity_port_skips_candidate_if_tcp_probe_fails(tmp_path):
         with patch.object(Path, "home", return_value=tmp_path):
             result = server_filtering.read_unity_port()
 
-    assert result == 9500
+    assert result == 9501  # candidate included — no probe skipping
 
 
 def test_read_unity_port_includes_candidate_if_tcp_probe_succeeds(tmp_path):
@@ -398,6 +399,26 @@ def test_read_unity_port_no_chat_flag_ignores_chat_port_file(tmp_path):
         result = server_filtering.read_unity_port()
 
     assert result == 9500  # no *.port files → default
+
+
+def test_read_unity_port_never_calls_tcp_probe(tmp_path):
+    """read_unity_port must not call _tcp_probe — removed to avoid Unity console spam.
+    PID liveness check is sufficient; bridge heartbeat handles transient port unreadiness.
+    """
+    ports_dir = tmp_path / ".unity-mcp" / "ports"
+    ports_dir.mkdir(parents=True)
+    (ports_dir / "12345.port").write_bytes(b"9501\n/some/project\nMyProject")
+
+    probe_calls = []
+    with (
+        patch("unity_mcp.server_filtering._tcp_probe", side_effect=lambda p: probe_calls.append(p) or True),
+        patch("os.kill"),  # PID alive — no exception
+        patch.object(Path, "home", return_value=tmp_path),
+    ):
+        from unity_mcp import server_filtering
+        server_filtering.read_unity_port()
+
+    assert probe_calls == [], "_tcp_probe must never be called from read_unity_port"
 
 
 # ---------------------------------------------------------------------------

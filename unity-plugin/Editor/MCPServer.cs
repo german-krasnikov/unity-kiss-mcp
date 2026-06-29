@@ -553,15 +553,18 @@ namespace UnityMCP.Editor
         // WARNING: All awaits in HandleClientAsync use ConfigureAwait(false).
         // Code after any await here runs on ThreadPool, NOT main thread.
         // Do NOT call Unity Editor APIs directly — use _mainThreadQueue.Enqueue().
+        private static string RoleToLabel(string role) => role switch
+        {
+            "mcp"        => "Claude Code session",
+            "chat-relay" => "Chat relay",
+            _            => role,
+        };
+
         private static async Task HandleClientAsync(TcpClient client, ClientSlot slot, int index, long generation,
             string label, CancellationToken clientToken)
         {
             var endPoint = client.Client.RemoteEndPoint?.ToString() ?? "unknown";
-            _mainThreadQueue.Enqueue(() =>
-            {
-                Debug.Log($"[MCP] {label} client connected from {endPoint}");
-                RefManager.Invalidate();
-            });
+            var receivedFirstMessage = false;
             try
             {
                 using (client)
@@ -586,6 +589,16 @@ namespace UnityMCP.Editor
                             break;
 
                         var json = Encoding.UTF8.GetString(payload);
+
+                        // Log "connected" on first real message; probes (no data) stay silent.
+                        if (!receivedFirstMessage)
+                        {
+                            var role = JsonHelper.ExtractString(json, "role");
+                            if (!string.IsNullOrEmpty(role)) label = RoleToLabel(role);
+                            var ep0 = endPoint; var lbl0 = label;
+                            _mainThreadQueue.Enqueue(() => { Debug.Log($"[MCP] {lbl0} connected from {ep0}"); RefManager.Invalidate(); });
+                            receivedFirstMessage = true;
+                        }
 
                         // Fast-path: ping/get_version/status bypass main thread (works even when Editor is busy)
                         var cmdName = JsonHelper.ExtractString(json, "cmd");
@@ -670,8 +683,11 @@ namespace UnityMCP.Editor
             finally
             {
                 slot.Clear(index, generation);
-                var lbl = label; var gen = generation;
-                _mainThreadQueue.Enqueue(() => Debug.Log($"[MCP] {lbl} client disconnected (gen={gen})"));
+                if (receivedFirstMessage)
+                {
+                    var lbl = label; var gen = generation;
+                    _mainThreadQueue.Enqueue(() => Debug.Log($"[MCP] {lbl} disconnected (gen={gen})"));
+                }
             }
         }
 

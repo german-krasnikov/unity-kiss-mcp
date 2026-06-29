@@ -783,13 +783,24 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 
 ### Chat Relay System (v0.66.6+, replaces CliBackendBase + 5 backend variants with unified RelayBackend)
 
-**Architecture:** Python sidecar (`chat_relay.py`) manages single CLI backend lifecycle. C# RelayBackend communicates via TCP (same 4-byte BE prefix as MCP bridge). NDJSON from CLI → text-format pipe-protocol for token efficiency.
+**Architecture:** Python sidecar (`chat_relay.py`) manages single CLI backend lifecycle via output_format discriminator. C# RelayBackend communicates via TCP (same 4-byte BE prefix as MCP bridge). CLI output → pipe-protocol transformer for token efficiency. Role-aware ping distinguishes relay-backed connections from direct MCP probes.
 
 **Python Components:**
-- **chat_relay.py**: Standalone TCP server spawned by Unity, survives domain reload. Single-client design (displaces previous on reconnect). Manages CliSession lifecycle, buffer, transform. Commands: `send` (to CLI), `events` (long-poll), `set_mode` (respawn CLI with new mode), `status` (health check).
-- **cli_session.py**: Subprocess wrapper. Lifecycle: spawn (with env isolation), write_line, read_stdout_line (with UTF-8 error recovery), kill (SIGTERM→SIGKILL with 2s grace). SessionMeta dataclass tracks backend/mode/model/mcp_port/prompt/config_dir for mode-switching re-spawn.
+- **backend_def.py**: Backend definitions with 5 output format types (output_format enum). ClaudeDef (reads_stdin=True, OUTPUT_FORMAT_STREAM_JSON), CodexDef/KimiDef/AgyDef/OpenCodeDef (reads_stdin=False, respective JSON formats). Env vars: UNITY_MCP_PORT passed through env_set for all non-Claude backends. --format flag added to _BLOCKED_FLAGS. Backwards-compat: ANTHROPIC_API_KEY no longer stripped from Claude.
+
+- **chat_relay.py**: Standalone TCP server spawned by Unity, survives domain reload. Single-client design (displaces previous on reconnect). Manages CliSession lifecycle, buffer, _transform_fn dispatch. Commands: `send` (to CLI), `events` (long-poll), `set_mode` (respawn CLI with new mode), `status` (health check), `close_stdin` (unblock single-turn backends). Deferred spawn: single-turn backends (reads_stdin=False) respawn at _cmd_send with actual prompt if no prompt at _cmd_start. _TRANSFORM_FNS dict maps output_format → transform function. EOF handling: synthetic error/done result JSON emitted via _transform_line (never backend's transform).
+
+- **cli_session.py**: Subprocess wrapper. Lifecycle: spawn (with env isolation), write_line, read_stdout_line (with UTF-8 error recovery), kill (SIGTERM→SIGKILL with 2s grace). SessionMeta dataclass tracks backend/mode/model/mcp_port/prompt/config_dir for mode-switching re-spawn. close_stdin() mechanism for single-turn CLI unblocking.
+
 - **relay_buffer.py**: Reconnect-safe ring buffer (maxlen=500, ~30s @ 15 lines/sec). Append-only log with monotonic seq IDs. `enqueue()` mutates lines (escape \n/\r). `cmd_events(after_seq, timeout_ms)` implements long-poll with asyncio.Event signaling. Status field tracks seq/buf/dropped counts.
-- **stream_transform.py**: Pure stateless NDJSON→pipe-format converter. Input: Claude/Kimi stream-json lines. Output: pipe-prefixed strings (t|, e|, tc|, tr|, etc.). Tool call accumulator handles multi-line args. Unknown input → empty list (never raises).
+
+- **stream_transform.py**: Pure stateless CLI output → pipe-format converter. Four transform functions:
+  - `_transform_line`: Claude stream-json NDJSON → pipe-format (stateful tool accumulator)
+  - `_transform_plain_text_line`: Agy stdout wrapping → `t|text` events (line 116)
+  - `_transform_codex_line`: Codex NDJSON → pipe-format (tool call / result dispatch, line 124)
+  - `_transform_opencode_line`: OpenCode NDJSON → pipe-format (text/step_finish/error/tool_start, line 181)
+  - `_transform_kimi_line`: Kimi NDJSON → pipe-format (role dispatch: assistant=text, meta=session_hint, line 220)
+  All handle EOF gracefully, never raise. Selected per backend via _TRANSFORM_FNS dict in chat_relay.py:26-32.
 
 **Pipe-Format Protocol (text-based binary replacement for NDJSON):**
   - Prefixes (all single-char): `t` (text delta), `e` (error), `ar` (auto-reply), `rl` (rate limit), `si` (session init), `hb` (heartbeat), `ss` (session state), `tc` (tool call start), `tr` (tool result), `pp` (permission prompt), `au` (ask user), `tp` (tool progress), `d` (done with cost)
@@ -801,9 +812,9 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
   - ~60% token savings vs NDJSON (prefixes + field elimination)
 
 **C# Components:**
-- **RelayBackend**: Single backend implementation (v0.66.6+, replaces 5 old CliBackendBase subclasses). Zero CLI-specific knowledge — semantic commands only. Owns RelayChatProcess, ToolCallAccumulator, SessionId (persisted to SessionState). Lifecycle: Start() → _proc.StartViaRelay(...) → DrainEvents() → SetMode() (respawns). No CliBackendBase parent.
+- **RelayBackend**: Single backend implementation (v0.66.6+, replaces 5 old CliBackendBase subclasses). Zero CLI-specific knowledge — semantic commands only. Owns RelayChatProcess, ToolCallAccumulator, SessionId (persisted to SessionState). Lifecycle: Start() → _proc.StartViaRelay(...) → DrainEvents() → SetMode() (respawns). No CliBackendBase parent. RoleToLabel() maps role from ping: "chat-relay" → Chat Relay label (vs "mcp" for direct MCP).
 - **RelayEventParser**: Pure static parser (no allocations beyond Split). Converts pipe-format line → ChatEvent. 13 event types (TextDelta, Error, AutoReply, RateLimit, SessionInit, Heartbeat, SessionState, ToolStart, ToolResult, PermissionPrompt, AskUser, ToolProgress, Done).
-- **RelayChatProcess**: TCP client connecting to chat_relay.py. Owns socket, reader queue, LineBufferDeque. StartViaRelay() sends `{"cmd":"send","args":{...}}` init message. WriteLine() → JSON to relay. DrainLines() → long-poll events. SendSetMode() → respawn via relay. Heartbeat every 30s (via separate timer).
+- **RelayChatProcess**: TCP client connecting to chat_relay.py. Owns socket, reader queue, LineBufferDeque. StartViaRelay() sends `{"cmd":"send","args":{...}}` init message. WriteLine() → JSON to relay with error checking (sets error event on failure). DrainLines() → long-poll events. SendSetMode() → respawn via relay. Heartbeat every 30s (via separate timer).
 - **RelaySpawner**: Manages relay process lifecycle. EnsureRunning() spawns `python -m unity_mcp.chat_relay` on free port (via FindFreePort in Python, similar to MCP bridge). Returns port number. Handles stale process cleanup (checks ppid, kills orphans).
 - **SessionState Persistence (v0.66.8+)**: SessionId written to SessionState on init/resume. On domain reload, SessionState restored (key="MCPChat_BackendSessionId"). Survives reload without network loss.
 
@@ -815,12 +826,12 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **Buffer Safety**: relay_buffer escapes \n/\r → \\n/\\r to prevent line corruption. Dropped counter tracks silent eviction. Long-poll ensures no events lost mid-reconnect.
 
 **5 Backends on Relay (via backend_def.py):**
-  - **Claude**: `claude -p` with stream-json, system-prompt injection
-  - **Codex**: `codex app-server` (JSON-RPC streaming)
-  - **Kimi**: `kimi` with NDJSON + model autoconfig
-  - **Agy** (Antigravity): `agy` with model selection
-  - **OpenCode**: `opencode` with multi-provider model selection
-  - All five managed by Python CLI arg builders; C# RelayBackend dispatches via backend_id string (user selects UI backend dropdown).
+  - **Claude**: `claude -p` with stream-json, system-prompt injection. reads_stdin=True. OUTPUT_FORMAT_STREAM_JSON.
+  - **Codex**: `codex app-server` (single-turn). reads_stdin=False. OUTPUT_FORMAT_CODEX_JSON. Respawned at _cmd_send with prompt.
+  - **Kimi**: `kimi -p --output-format stream-json` (single-turn). reads_stdin=False. OUTPUT_FORMAT_KIMI_JSON. Respawned at _cmd_send.
+  - **Agy** (Antigravity): `agy` with model selection (single-turn). reads_stdin=False. OUTPUT_FORMAT_PLAIN_TEXT. Plain stdout wrapped as `t|` events.
+  - **OpenCode**: `opencode` with multi-provider model selection (single-turn). reads_stdin=False. OUTPUT_FORMAT_OPENCODE_JSON. Respawned at _cmd_send.
+  - All five managed by Python CLI arg builders; C# RelayBackend dispatches via backend_id string (user selects UI backend dropdown). Env var UNITY_MCP_PORT passed to Codex/Kimi/Agy/OpenCode via env_set.
 
 **Tests (feature/chat-relay):**
   - Python: 70 relay tests (stream_transform, relay_buffer, cli_session, chat_relay)

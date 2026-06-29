@@ -7,6 +7,7 @@ import asyncio
 import sys
 
 from unity_mcp.chat_relay import ChatRelay
+from unity_mcp.stream_transform import _transform_line, _transform_plain_text_line, _transform_codex_line
 
 # ── Mock CLI scripts (executed via sys.executable -c) ────────────────────────
 
@@ -62,7 +63,9 @@ async def wait_for_events(relay: ChatRelay, after: int = -1, timeout: float = 2.
 
 
 async def spawn(relay: ChatRelay, script: str, transform: bool = True) -> None:
-    relay._transform = transform
+    """Spawn subprocess. transform=True → stream-json; False → plain-text."""
+    # Set before _cmd_spawn so drain task sees the correct fn from the start
+    relay._transform_fn = _transform_line if transform else _transform_plain_text_line
     await relay._cmd_spawn({
         "binary": sys.executable,
         "argv": ["-c", script],
@@ -117,13 +120,12 @@ async def test_pipeline_exit1_produces_error_event():
     await relay._kill_current()
 
 
-async def test_pipeline_transform_false_passes_raw():
-    """transform=False: raw stdout lines land verbatim in the event buffer."""
+async def test_pipeline_plain_text_wraps_as_t_event():
+    """plain-text transform: raw stdout lines arrive as t| events."""
     relay = ChatRelay()
     await spawn(relay, RAW_LINE, transform=False)
     lines = await wait_for_events(relay)
-    assert any("raw_output_line" in l for l in lines)
-    assert not any(l.startswith("t|") for l in lines)
+    assert any(l == "t|raw_output_line" for l in lines)
     await relay._kill_current()
 
 
@@ -151,3 +153,76 @@ async def test_pipeline_kill_clears_buffer():
 
     await relay._kill_current()
     assert len(relay._buf) == 0
+
+
+# ── Codex pipeline scripts ────────────────────────────────────────────────────
+
+CODEX_MCP_TOOL_CALL = """\
+import sys, json
+print(json.dumps({"type": "item.started", "item": {
+    "type": "mcp_tool_call",
+    "tool": "get_hierarchy",
+    "id": "item_1",
+    "arguments": {"full": True}
+}}), flush=True)
+print(json.dumps({"type": "item.completed", "item": {
+    "type": "mcp_tool_call",
+    "id": "item_1",
+    "status": "success",
+    "result": {"content": [{"type": "text", "text": "Main Camera"}]}
+}}), flush=True)
+"""
+
+PRINT_PORT_ENV = """\
+import os, sys
+print(os.environ.get('UNITY_MCP_PORT', 'MISSING'), flush=True)
+"""
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+
+async def test_pipeline_codex_mcp_tool_call_emits_tc_event():
+    """T5: Codex item.started mcp_tool_call → tc| event in buffer."""
+    relay = ChatRelay()
+    relay._transform_fn = _transform_codex_line
+    await relay._cmd_spawn({
+        "binary": sys.executable,
+        "argv": ["-c", CODEX_MCP_TOOL_CALL],
+        "env_set": {},
+        "env_strip": [],
+    })
+    lines = await wait_for_events(relay)
+    assert any(l.startswith("tc|get_hierarchy|item_1|") for l in lines), \
+        f"tc| event not found; got: {lines}"
+    await relay._kill_current()
+
+
+async def test_pipeline_codex_mcp_tool_result_emits_tr_event():
+    """T6: Codex item.completed mcp_tool_call → tr| event in buffer."""
+    relay = ChatRelay()
+    relay._transform_fn = _transform_codex_line
+    await relay._cmd_spawn({
+        "binary": sys.executable,
+        "argv": ["-c", CODEX_MCP_TOOL_CALL],
+        "env_set": {},
+        "env_strip": [],
+    })
+    lines = await wait_for_events(relay)
+    assert any(l == "tr|item_1|true|Main Camera" for l in lines), \
+        f"tr| event not found; got: {lines}"
+    await relay._kill_current()
+
+
+async def test_pipeline_env_port_forwarded_to_subprocess():
+    """T7: env_set UNITY_MCP_PORT is forwarded to the real subprocess environment."""
+    relay = ChatRelay()
+    relay._transform_fn = _transform_plain_text_line
+    await relay._cmd_spawn({
+        "binary": sys.executable,
+        "argv": ["-c", PRINT_PORT_ENV],
+        "env_set": {"UNITY_MCP_PORT": "9601"},
+        "env_strip": [],
+    })
+    lines = await wait_for_events(relay)
+    assert any(l == "t|9601" for l in lines), \
+        f"t|9601 not found; got: {lines}"
+    await relay._kill_current()

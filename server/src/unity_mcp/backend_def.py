@@ -25,6 +25,7 @@ _BLOCKED_FLAGS = frozenset({
     "--output-format", "--input-format",
     "--permission-mode", "--permission-prompt-tool",
     "--mcp-config", "--config",
+    "--format",
 })
 
 
@@ -47,6 +48,13 @@ def _sanitize_extra_args(raw: str) -> list[str]:
     return result
 MCP_PERMISSION_TOOL = MCP_BLANKET + "__permission_prompt"
 MCP_TOOL_PREFIX    = MCP_BLANKET + "__"
+
+# ── Output format discriminators ──────────────────────────────────────────────
+OUTPUT_FORMAT_STREAM_JSON   = "stream-json"    # Claude
+OUTPUT_FORMAT_PLAIN_TEXT    = "plain-text"     # Agy (plain stdout)
+OUTPUT_FORMAT_CODEX_JSON    = "codex-json"     # Codex (OpenAI Responses API)
+OUTPUT_FORMAT_OPENCODE_JSON = "opencode-json"  # OpenCode run --format json
+OUTPUT_FORMAT_KIMI_JSON     = "kimi-json"      # Kimi -p --output-format stream-json
 
 
 async def _which_via_login_shell(binary: str) -> str | None:
@@ -75,10 +83,16 @@ async def _which_via_login_shell(binary: str) -> str | None:
 
 @dataclass
 class BackendDef:
-    name:            str
-    binary:          str
-    has_resume:      bool
-    uses_stream_json: bool = False
+    name:          str
+    binary:        str
+    has_resume:    bool
+    output_format: str  = OUTPUT_FORMAT_STREAM_JSON
+    reads_stdin:   bool = False
+
+    @property
+    def uses_stream_json(self) -> bool:
+        """Backward-compat: True iff output_format is stream-json."""
+        return self.output_format == OUTPUT_FORMAT_STREAM_JSON
 
     async def resolve_binary(self) -> str | None:
         """shutil.which → login shell fallback → None."""
@@ -102,10 +116,10 @@ class BackendDef:
 
 @dataclass
 class ClaudeDef(BackendDef):
-    name:            str  = "claude"
-    binary:          str  = "claude"
-    has_resume:      bool = True
-    uses_stream_json: bool = True
+    name:          str  = "claude"
+    binary:        str  = "claude"
+    has_resume:    bool = True
+    reads_stdin:   bool = True
 
     def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
                    config_dir=None, agent_name=None, allowed_mcp_tools=None,
@@ -142,7 +156,7 @@ class ClaudeDef(BackendDef):
         if extra_args:
             argv += _sanitize_extra_args(extra_args)
 
-        strip = ["ANTHROPIC_API_KEY", "CLAUDECODE", "UNITY_MCP_PORT", "UNITY_MCP_CHAT"]
+        strip = ["CLAUDECODE", "UNITY_MCP_PORT", "UNITY_MCP_CHAT"]
         return argv, {}, strip
 
 
@@ -150,9 +164,10 @@ class ClaudeDef(BackendDef):
 
 @dataclass
 class CodexDef(BackendDef):
-    name:       str  = "codex"
-    binary:     str  = "codex"
-    has_resume: bool = True  # resume via subcommand switch
+    name:          str  = "codex"
+    binary:        str  = "codex"
+    has_resume:    bool = True  # resume via subcommand switch
+    output_format: str  = OUTPUT_FORMAT_CODEX_JSON
 
     def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
                    config_dir=None, extra_args=None, **kwargs):
@@ -187,17 +202,17 @@ class CodexDef(BackendDef):
         if prompt:
             argv.append(prompt)
 
-        return argv, {}, ["OPENAI_API_KEY"]
+        return argv, {"UNITY_MCP_PORT": str(mcp_port)}, []
 
 
 # ── Kimi ──────────────────────────────────────────────────────────────────────
 
 @dataclass
 class KimiDef(BackendDef):
-    name:            str  = "kimi"
-    binary:          str  = "kimi"
-    has_resume:      bool = False
-    uses_stream_json: bool = True
+    name:          str  = "kimi"
+    binary:        str  = "kimi"
+    has_resume:    bool = False
+    output_format: str  = OUTPUT_FORMAT_KIMI_JSON
 
     def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
                    config_dir=None, extra_args=None, **kwargs):
@@ -210,16 +225,17 @@ class KimiDef(BackendDef):
         if extra_args:
             argv += _sanitize_extra_args(extra_args)
 
-        return argv, {}, []
+        return argv, {"UNITY_MCP_PORT": str(mcp_port)}, []
 
 
 # ── Agy ───────────────────────────────────────────────────────────────────────
 
 @dataclass
 class AgyDef(BackendDef):
-    name:       str  = "agy"
-    binary:     str  = "agy"
-    has_resume: bool = False
+    name:          str  = "agy"
+    binary:        str  = "agy"
+    has_resume:    bool = False
+    output_format: str  = OUTPUT_FORMAT_PLAIN_TEXT
 
     def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
                    config_dir=None, extra_args=None, **kwargs):
@@ -234,16 +250,17 @@ class AgyDef(BackendDef):
         if extra_args:
             argv += _sanitize_extra_args(extra_args)
 
-        return argv, {}, ["GEMINI_API_KEY"]
+        return argv, {"UNITY_MCP_PORT": str(mcp_port)}, []
 
 
 # ── OpenCode ──────────────────────────────────────────────────────────────────
 
 @dataclass
 class OpenCodeDef(BackendDef):
-    name:       str  = "opencode"
-    binary:     str  = "opencode"
-    has_resume: bool = True  # -s <id>
+    name:          str  = "opencode"
+    binary:        str  = "opencode"
+    has_resume:    bool = True  # -s <id>
+    output_format: str  = OUTPUT_FORMAT_OPENCODE_JSON
 
     def build_args(self, mode, model, mcp_port, prompt="", session_id=None,
                    config_dir=None, extra_args=None, **kwargs):
@@ -259,7 +276,7 @@ class OpenCodeDef(BackendDef):
             argv += _sanitize_extra_args(extra_args)
         argv.append(prompt)
 
-        return argv, {"OPENCODE_CONFIG": config_path}, []
+        return argv, {"OPENCODE_CONFIG": config_path, "UNITY_MCP_PORT": str(mcp_port)}, []
 
 
 # ── Registry ──────────────────────────────────────────────────────────────────

@@ -166,6 +166,60 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.IsNull(RelayEventParser.Parse(""));
             Assert.IsNull(RelayEventParser.Parse(null));
         }
+
+        // ── ToolStart edge cases ───────────────────────────────────────────────
+
+        [Test]
+        public void Parse_ToolStart_EmbeddedPipeInArgs_Preserved()
+        {
+            // SplitN(maxParts=3) must not split the argsJson on its own '|'
+            var ev = RelayEventParser.Parse("tc|get_hierarchy|id1|{\"path\":\"Scene|Child\"}");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual(ChatEventKind.ToolStart, ev.Value.Kind);
+            Assert.AreEqual("get_hierarchy",          ev.Value.Text);
+            Assert.AreEqual("id1",                    ev.Value.ToolId);
+            Assert.AreEqual("{\"path\":\"Scene|Child\"}", ev.Value.ArgsJson);
+        }
+
+        [Test]
+        public void Parse_ToolStart_MissingArgsField_ReturnsNull()
+        {
+            // tc|name|id — only 2 fields after prefix → not enough → null
+            var ev = RelayEventParser.Parse("tc|name|id");
+            Assert.IsNull(ev);
+        }
+
+        // ── ToolResult edge cases ──────────────────────────────────────────────
+
+        [Test]
+        public void Parse_ToolResult_ErrorFlag_TextPreserved()
+        {
+            var ev = RelayEventParser.Parse("tr|item_1|false|timeout after 30s");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual(ChatEventKind.ToolResult, ev.Value.Kind);
+            Assert.AreEqual("item_1",          ev.Value.ToolId);
+            Assert.IsFalse(ev.Value.IsOk);
+            Assert.AreEqual("timeout after 30s", ev.Value.Text);
+        }
+
+        [Test]
+        public void Parse_ToolResult_TextWithEmbeddedNewline_Preserved()
+        {
+            // Text field may contain actual newlines after de-escaping by RelayChatProcess
+            var ev = RelayEventParser.Parse("tr|call_123|true|Main Camera\nHouse");
+            Assert.IsNotNull(ev);
+            Assert.AreEqual("call_123", ev.Value.ToolId);
+            Assert.IsTrue(ev.Value.IsOk);
+            Assert.AreEqual("Main Camera\nHouse", ev.Value.Text);
+        }
+
+        [Test]
+        public void Parse_ToolResult_NoFields_ReturnsNull()
+        {
+            // tr| alone → rest="" → SplitN yields 1 part → null
+            var ev = RelayEventParser.Parse("tr|");
+            Assert.IsNull(ev);
+        }
     }
 }
 #endif

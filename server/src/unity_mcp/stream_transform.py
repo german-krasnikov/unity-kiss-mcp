@@ -5,6 +5,8 @@ Pure stateful transformer. Never raises. Unknown input → empty list.
 import json
 from dataclasses import dataclass, field
 
+_MAX_TOOL_RESULT_LEN = 200
+
 
 @dataclass
 class _ToolCallAcc:
@@ -109,6 +111,134 @@ def _handle_stream_event(obj: dict, acc: _ToolCallAcc) -> list[str]:
         return []
 
     return []  # message_start/delta/stop and future events
+
+
+def _transform_plain_text_line(line: str, acc: _ToolCallAcc) -> list[str]:
+    """Wrap plain-text backend stdout lines as pipe-format text events."""
+    stripped = line.strip() if line else ""
+    if not stripped:
+        return []
+    return [f"t|{stripped}"]
+
+
+def _transform_codex_line(line: str, acc: _ToolCallAcc) -> list[str]:
+    """Convert Codex CLI NDJSON (codex exec --json) → pipe-format."""
+    if not line or not line.strip():
+        return []
+    try:
+        obj = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return [f"t|{line.strip()}"] if line.strip() else []
+
+    t = obj.get("type", "")
+
+    if t == "item.started":
+        item = obj.get("item") or {}
+        if item.get("type") == "mcp_tool_call":
+            name = item.get("tool", "")
+            id_ = item.get("id", "")
+            args = item.get("arguments", {})
+            if isinstance(args, dict):
+                args = json.dumps(args, ensure_ascii=False, separators=(",", ":"))
+            return [f"tc|{name}|{id_}|{args}"] if name else []
+        return []
+
+    if t == "item.completed":
+        item = obj.get("item") or {}
+        kind = item.get("type", "")
+        if kind == "agent_message":
+            text = item.get("text", "")
+            return [f"t|{text}"] if text else []
+        if kind in ("tool_call", "function_call"):
+            name = item.get("name", "")
+            id_ = item.get("call_id") or item.get("id", "")
+            args = item.get("arguments", "")
+            if isinstance(args, dict):
+                args = json.dumps(args, ensure_ascii=False, separators=(",", ":"))
+            return [f"tc|{name}|{id_}|{args}"] if name else []
+        if kind == "mcp_tool_call":
+            # chip was already emitted on item.started; emit result now
+            id_ = item.get("id", "")
+            result = item.get("result") or {}
+            content = result.get("content") or []
+            text = " ".join(c.get("text", "") for c in content if c.get("type") == "text")
+            ok = item.get("status", "") != "error"
+            return [f"tr|{id_}|{'true' if ok else 'false'}|{text[:_MAX_TOOL_RESULT_LEN]}"] if id_ else []
+        return []
+
+    if t == "turn.completed":
+        usage = obj.get("usage") or {}
+        inp = usage.get("input_tokens", 0)
+        out = usage.get("output_tokens", 0)
+        return [f"d||0|{inp}|{out}"]
+
+    if t == "error":
+        return [f"e|{obj.get('message', 'Codex error')}"]
+
+    return []
+
+
+def _transform_opencode_line(line: str, acc: _ToolCallAcc) -> list[str]:
+    """Convert OpenCode NDJSON (opencode run --format json) → pipe-format."""
+    if not line or not line.strip():
+        return []
+    try:
+        obj = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return [f"t|{line.strip()}"] if line.strip() else []
+
+    t = obj.get("type", "")
+
+    if t == "text":
+        part = obj.get("part") or {}
+        text = part.get("text", "")
+        return [f"t|{text}"] if text else []
+
+    if t == "step_finish":
+        part = obj.get("part") or {}
+        tokens = part.get("tokens") or {}
+        inp = tokens.get("input", 0)
+        out = tokens.get("output", 0)
+        sid = obj.get("sessionID", "")
+        cost = part.get("cost", 0) or 0
+        return [f"d|{sid}|{cost}|{inp}|{out}"]
+
+    if t == "error":
+        part = obj.get("part") or {}
+        return [f"e|{part.get('error', 'OpenCode error')}"]
+
+    if t == "tool_start":
+        part = obj.get("part") or {}
+        name = part.get("name", "")
+        tid = part.get("id", "")
+        args = json.dumps(part.get("input", {}), ensure_ascii=False, separators=(",", ":"))
+        return [f"tc|{name}|{tid}|{args}"] if name else []
+
+    return []  # step_start, tool_finish, etc.
+
+
+def _transform_kimi_line(line: str, acc: _ToolCallAcc) -> list[str]:
+    """Convert Kimi NDJSON (kimi -p --output-format stream-json) → pipe-format."""
+    if not line or not line.strip():
+        return []
+    try:
+        obj = json.loads(line)
+    except (json.JSONDecodeError, ValueError):
+        return [f"t|{line.strip()}"] if line.strip() else []
+
+    role = obj.get("role", "")
+
+    if role == "assistant":
+        text = obj.get("content", "")
+        return [f"t|{text}"] if text else []
+
+    if role == "meta":
+        if obj.get("type") == "session.resume_hint":
+            sid = obj.get("session_id", "")
+            return [f"d|{sid}|0|0|0"]
+        return []
+
+    return []
 
 
 def _parse_control_request(obj: dict) -> list[str]:

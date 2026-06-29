@@ -471,3 +471,46 @@ async def test_heartbeat_reconnect_fires_callbacks():
 def test_min_reconnect_interval_default_is_5s():
     """MIN_RECONNECT_INTERVAL default must be 5.0 (was 2.0) — defense in depth."""
     assert bridge_mod.MIN_RECONNECT_INTERVAL == 5.0
+
+
+# ---------------------------------------------------------------------------
+# Role in reconnect ping (transparent connection labels)
+# ---------------------------------------------------------------------------
+
+async def _run_reconnect_and_capture_ping(monkeypatch, env_overrides=None):
+    """Helper: run _reconnect with mocked TCP; return parsed ping JSON."""
+    if env_overrides:
+        for k, v in env_overrides.items():
+            monkeypatch.setenv(k, v)
+
+    written_chunks: list[bytes] = []
+    writer = make_writer()
+    writer.write = Mock(side_effect=lambda data: written_chunks.append(data))
+
+    async def mock_open(host, port):
+        reader = AsyncMock()
+        reader.readexactly = AsyncMock(side_effect=[*reconnect_preamble()])
+        return reader, writer
+
+    bridge = UnityBridge("127.0.0.1", 9999)
+    with patch.object(bridge_mod.asyncio, "open_connection", side_effect=mock_open):
+        await bridge._reconnect(fire_callbacks=False)
+
+    # First write() call is the ping (4-byte header + JSON body)
+    ping_raw = written_chunks[0][4:]  # strip length prefix
+    return json.loads(ping_raw.decode("utf-8"))
+
+
+@pytest.mark.asyncio
+async def test_reconnect_ping_includes_role_mcp(monkeypatch):
+    """Without UNITY_MCP_CHAT, reconnect ping must include role='mcp'."""
+    monkeypatch.delenv("UNITY_MCP_CHAT", raising=False)
+    ping = await _run_reconnect_and_capture_ping(monkeypatch)
+    assert ping.get("role") == "mcp", f"Expected role=mcp, got: {ping}"
+
+
+@pytest.mark.asyncio
+async def test_reconnect_ping_role_chat_relay_when_env_set(monkeypatch):
+    """UNITY_MCP_CHAT=1 → reconnect ping must include role='chat-relay'."""
+    ping = await _run_reconnect_and_capture_ping(monkeypatch, {"UNITY_MCP_CHAT": "1"})
+    assert ping.get("role") == "chat-relay", f"Expected role=chat-relay, got: {ping}"
