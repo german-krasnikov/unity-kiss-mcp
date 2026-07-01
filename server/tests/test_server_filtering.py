@@ -10,7 +10,7 @@ from unity_mcp.server import _filter_tools, mcp
 
 
 def _tool(name: str):
-    return SimpleNamespace(name=name)
+    return SimpleNamespace(name=name, description=f"{name} tool.", inputSchema={"type": "object"})
 
 
 ALL_TOOLS = [_tool("get_hierarchy"), _tool("scene"), _tool("shader"), _tool("get_enabled_tools")]
@@ -224,6 +224,85 @@ async def test_disabled_tools_empty_csv_gives_empty_set():
     finally:
         srv._disabled_tools_cache = orig
         srv._refresh_tools_lock = orig_lock
+
+
+# ---------------------------------------------------------------------------
+# Fix 4: _refresh_tools_cache notifies the live MCP session when the disabled
+# set actually changes — closes Gap B (client never re-fetches ListTools).
+# ---------------------------------------------------------------------------
+
+async def test_refresh_tools_cache_notifies_session_on_disabled_set_change():
+    import unity_mcp.server as srv
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": "screenshot"})
+
+    fake_session = AsyncMock()
+    orig_cache = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
+    try:
+        srv._disabled_tools_cache = set()  # differs from the new {"screenshot"} value
+        srv._refresh_tools_lock = None
+        with patch("unity_mcp.server_filtering.get_active_session", return_value=fake_session):
+            await srv._refresh_tools_cache(bridge)
+        fake_session.send_tool_list_changed.assert_awaited_once()
+    finally:
+        srv._disabled_tools_cache = orig_cache
+        srv._refresh_tools_lock = orig_lock
+
+
+async def test_refresh_tools_cache_no_notify_when_disabled_set_unchanged():
+    import unity_mcp.server as srv
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": "screenshot"})
+
+    fake_session = AsyncMock()
+    orig_cache = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
+    try:
+        srv._disabled_tools_cache = {"screenshot"}  # same as the new value
+        srv._refresh_tools_lock = None
+        with patch("unity_mcp.server_filtering.get_active_session", return_value=fake_session):
+            await srv._refresh_tools_cache(bridge)
+        fake_session.send_tool_list_changed.assert_not_awaited()
+    finally:
+        srv._disabled_tools_cache = orig_cache
+        srv._refresh_tools_lock = orig_lock
+
+
+async def test_refresh_tools_cache_no_notify_when_no_session_captured():
+    import unity_mcp.server as srv
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": "screenshot"})
+
+    orig_cache = srv._disabled_tools_cache
+    orig_lock = srv._refresh_tools_lock
+    try:
+        srv._disabled_tools_cache = set()
+        srv._refresh_tools_lock = None
+        with patch("unity_mcp.server_filtering.get_active_session", return_value=None):
+            await srv._refresh_tools_cache(bridge)  # must not raise
+        assert srv._disabled_tools_cache == {"screenshot"}
+    finally:
+        srv._disabled_tools_cache = orig_cache
+        srv._refresh_tools_lock = orig_lock
+
+
+def test_filter_tools_hides_disabled():
+    """Tool in disabled set must not appear in filter_tools result."""
+    from types import SimpleNamespace
+    from unity_mcp.server_filtering import filter_tools
+    import unity_mcp.tools.gating as gating
+    gating.reset()
+    tools = [SimpleNamespace(name="screenshot", description="x", inputSchema={})]
+    result = filter_tools(tools, {"screenshot"})
+    assert not any(t.name == "screenshot" for t in result)
+    gating.reset()
 
 
 # --- test handler registration ---
@@ -454,7 +533,7 @@ def test_strip_uses_canonical_stub():
     from unity_mcp.server_filtering import _strip_deferred_schemas
     from unity_mcp.tools.schema_registry import STUB_SCHEMA
 
-    tool = SimpleNamespace(name="animation", inputSchema={"type": "object", "properties": {}})
+    tool = SimpleNamespace(name="animation", description="Animate things.", inputSchema={"type": "object", "properties": {}})
     result = _strip_deferred_schemas([tool])
     assert result[0].inputSchema is STUB_SCHEMA
 
@@ -625,3 +704,85 @@ async def test_filter_tools_disabled_set_hides_non_force_visible():
     assert "screenshot" not in names, "disabled non-FORCE_VISIBLE tool must be hidden"
     assert "get_hierarchy" in names, "non-disabled tool must remain visible"
     gating.reset()
+
+
+# ---------------------------------------------------------------------------
+# Issue 25: deferred description truncation (token budget)
+# ---------------------------------------------------------------------------
+
+def test_short_description_truncates_at_sentence_boundary():
+    from unity_mcp.server_filtering import _short_description, _SHORT_DESC_MAX_LEN
+    long_desc = "Do X. " + "y" * _SHORT_DESC_MAX_LEN
+    result = _short_description(long_desc)
+    assert result == "Do X."
+
+
+def test_short_description_hard_truncates_no_early_sentence():
+    from unity_mcp.server_filtering import _short_description, _SHORT_DESC_MAX_LEN
+    long_desc = "a" * 200  # single sentence, no ". " boundary anywhere
+    result = _short_description(long_desc)
+    assert len(result) <= _SHORT_DESC_MAX_LEN + 1  # +1 for the '…' suffix
+    assert result.endswith('…')
+
+
+def test_short_description_noop_when_already_short():
+    from unity_mcp.server_filtering import _short_description
+    short = "Take a screenshot."
+    assert _short_description(short) == short
+
+
+def test_strip_deferred_details_shortens_description_for_non_core_tool():
+    """Non-core tool: description shortened AND schema stubbed, same pass."""
+    from unity_mcp.server_filtering import _strip_deferred_schemas, _short_description
+    from unity_mcp.tools.schema_registry import STUB_SCHEMA
+    long_desc = (
+        "Runs a scripted playtest sequence against the live scene using a compact DSL. "
+        "Supports ASSERT, ASSERT_CONSOLE_CLEAN, WAIT and other directives for verifying "
+        "gameplay behavior end to end without manual clicking."
+    )
+    tool = SimpleNamespace(name="run_playtest", description=long_desc,
+                           inputSchema={"type": "object", "properties": {"script": {"type": "string"}}})
+    result = _strip_deferred_schemas([tool])
+    assert result[0].description == _short_description(long_desc)
+    assert result[0].description != long_desc
+    assert result[0].inputSchema is STUB_SCHEMA
+
+
+def test_strip_deferred_details_preserves_full_description_for_core_tool():
+    """Core tool: description untouched, schema untouched."""
+    from unity_mcp.server_filtering import _strip_deferred_schemas
+    long_desc = (
+        "Returns the full scene hierarchy as a compact indented text tree, one line per "
+        "GameObject, with component markers and active-state flags for quick inspection."
+    )
+    full_schema = {"type": "object", "properties": {"path": {"type": "string"}}}
+    tool = SimpleNamespace(name="get_hierarchy", description=long_desc, inputSchema=full_schema)
+    result = _strip_deferred_schemas([tool])
+    assert result[0].description == long_desc
+    assert result[0].inputSchema == full_schema
+
+
+async def test_schema_registry_capture_stores_full_description_before_truncation():
+    """resolve_tool_schema must still return the ORIGINAL description after the
+    list-tools pipeline truncates the live Tool object (capture-before-strip ordering)."""
+    from unity_mcp.tools.schema_registry import SchemaRegistry
+    from unity_mcp.server_filtering import _strip_deferred_schemas, _short_description
+
+    long_desc = (
+        "Runs a scripted playtest sequence against the live scene using a compact DSL. "
+        "Supports ASSERT, ASSERT_CONSOLE_CLEAN, WAIT and other directives for verifying "
+        "gameplay behavior end to end without manual clicking."
+    )
+    tool = SimpleNamespace(name="run_playtest", description=long_desc,
+                           inputSchema={"type": "object", "properties": {"script": {"type": "string"}}})
+
+    registry = SchemaRegistry()
+    # Mirror install_list_tools_filter's capture-before-strip ordering.
+    registry.capture(tool.name, tool.inputSchema, tool.description)
+    _strip_deferred_schemas([tool])
+
+    # Live tool object is now truncated...
+    assert tool.description == _short_description(long_desc)
+    assert tool.description != long_desc
+    # ...but the registry still holds the ORIGINAL full text.
+    assert registry.get_full("run_playtest")["description"] == long_desc

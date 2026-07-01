@@ -282,22 +282,7 @@ fps = await project_settings("get", key="Time/FixedTimestep")
 
 ## shader
 
-Look up and configure shaders (Category: `asset`).
-
-**Parameters:**
-- `action` (string) — "find" | "get_properties"
-- `name` (string) — Shader name
-- `material_path` (string, optional) — Material using shader
-
-**Example:**
-
-```python
-# Find shader
-await shader("find", name="Standard")
-
-# Get properties
-props = await shader("get_properties", name="Standard")
-```
+Manage shaders and their properties. See [Shader Tools](shaders.md) for the complete reference.
 
 ---
 

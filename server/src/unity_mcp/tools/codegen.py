@@ -1,6 +1,7 @@
 """C# code execution, schema introspection, and sampling-backed error fixing."""
 import re
 from ._annotations import RO as _RO, RW as _RW
+from ..console_levels import PROBLEM_LEVELS
 from ..metrics import METRICS
 
 _send = None
@@ -31,7 +32,7 @@ except ImportError:
 async def auto_fix(ctx: _Context) -> str:
     """Auto-detect and fix Unity errors. Uses MCP sampling to ask Claude for fixes."""
     from .. import editor_log
-    console = await _send("get_console", {"count": 10, "level": "Error"})
+    console = await _send("get_console", {"count": 10, "level": PROBLEM_LEVELS})
     compile_errors = editor_log.corroborate(await _send("get_compile_errors", {}))
     if "No compilation errors" in compile_errors and not console:
         return "No errors to fix."
@@ -69,6 +70,10 @@ async def smart_build(description: str, ctx: _Context) -> str:
             code = m.group(1).strip()
         if not code.strip():
             return "Sampling returned empty code."
+        opens, closes = code.count('{'), code.count('}')
+        if opens != closes:
+            return (f"err: LLM produced unbalanced braces ({opens} open, {closes} close), "
+                     "retry smart_build with simpler description.")
         return await _send("execute_code", {"code": code})
     except Exception as e:
         return f"Sampling unavailable: {e}. Use execute_code manually."

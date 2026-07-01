@@ -6,6 +6,7 @@ import asyncio
 import time
 from typing import Optional, Callable
 
+from .console_levels import PROBLEM_LEVELS
 from .middleware import WRITE_CMDS
 
 HIGH_BLAST_CMDS = {"delete_object", "scene", "batch"}
@@ -42,8 +43,12 @@ class ProactiveWatchdog:
         try:
             refs, console = await asyncio.gather(
                 self._send("validate_references", {"path": "/", "depth": "3"}, timeout=5.0),
-                self._send("get_console", {"count": "5", "level": "Error"}, timeout=5.0),
+                self._send("get_console", {"count": "5", "level": PROBLEM_LEVELS}, timeout=5.0),
             )
+            # NOTE: do NOT run console through editor_log.corroborate() here — that
+            # helper is scoped to compile-error corroboration, not runtime console
+            # logs. Applying it here could replace a real runtime error with a
+            # stale compile-error dump. Trust get_console() output directly.
             issues = []
             if "ERROR" in refs:
                 issues.append(refs.split("\n")[0])

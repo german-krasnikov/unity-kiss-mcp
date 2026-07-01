@@ -29,9 +29,11 @@ def register_write_cmds(*names: str):
     WRITE_CMDS.update(names)
 
 
-def register_tools(category: str, tools: set, tier1: set | None = None):
+def register_tools(category: str, tools: set):
+    """Register plugin tools into a category. Visibility (TIER1) is platform-controlled —
+    plugins cannot promote themselves into the always-on tool budget."""
     from unity_mcp.tools.gating import register_tools as _rt
-    _rt(category, tools, tier1)
+    _rt(category, tools)
 
 
 def register_features(features: dict):

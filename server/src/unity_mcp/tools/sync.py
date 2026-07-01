@@ -16,13 +16,13 @@ from mcp.server.fastmcp.exceptions import ToolError
 
 from unity_mcp.bridge import DomainReloadError
 from unity_mcp import editor_log
+from unity_mcp.constants import SESSION_TIMEOUT as _DEFAULT_TIMEOUT
 from unity_mcp.lockfile import read_reload_port
 from unity_mcp.tools.reload_ladder import make_reload_send, _send_with_fallback, run_ladder as _run_ladder
 
 _send = None
 
 _POLL_INTERVAL = 1.0
-_DEFAULT_TIMEOUT = 120.0
 _FOCUS_HINT_AFTER = 15.0  # see backgrounded-editor hint in sync_unity
 _RECOVERY_TIMEOUT = 30.0  # max wait for MVID delta after force_refresh
 _RECOVERY_POLL    = 1.0   # interval between MVID re-checks during recovery

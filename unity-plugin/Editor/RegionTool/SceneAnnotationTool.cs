@@ -46,8 +46,8 @@ namespace UnityMCP.Editor.RegionTool
         public override void OnActivated()
         {
             _instance = this;
-            _modeId   = (AnnotationModeId)EditorPrefs.GetInt("MCP_DefaultAnnotationMode", (int)AnnotationModeId.Point);
-            _gridSnap = EditorPrefs.GetBool("MCP_AnnotSnap", false);
+            _modeId   = (AnnotationModeId)EditorPrefs.GetInt(PrefKeys.DefaultAnnotationMode, (int)AnnotationModeId.Point);
+            _gridSnap = EditorPrefs.GetBool(PrefKeys.AnnotationGridSnap, false);
             _mode     = AnnotationModeFactory.Create(_modeId);
             CurrentModeId = _modeId;
             GridSnap      = _gridSnap;
@@ -131,7 +131,7 @@ namespace UnityMCP.Editor.RegionTool
             {
                 _gridSnap = !_gridSnap;
                 GridSnap  = _gridSnap;
-                EditorPrefs.SetBool("MCP_AnnotSnap", _gridSnap);
+                EditorPrefs.SetBool(PrefKeys.AnnotationGridSnap, _gridSnap);
                 e.Use();
             }
         }
@@ -171,7 +171,7 @@ namespace UnityMCP.Editor.RegionTool
 
             if (snap == null) return;
             SceneRegionState.SetRegion(snap);
-            SessionState.SetString("MCP_ActiveRegionId", snap.Id);
+            SessionState.SetString(PrefKeys.ActiveRegionId, snap.Id);
             OnAnnotationCommitted?.Invoke(snap.Id, snap.ShortLabel);
             CancelToIdle();
         }

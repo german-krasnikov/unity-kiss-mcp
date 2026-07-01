@@ -1,4 +1,5 @@
 """MCP Resources — live Unity context exposed as resource URIs."""
+from .console_levels import PROBLEM_LEVELS
 
 _send = None
 
@@ -17,7 +18,7 @@ async def scene_hierarchy() -> str:
 
 async def console_errors() -> str:
     """Recent console errors."""
-    return await _safe_send("get_console", {"count": 20, "level": "Error"})
+    return await _safe_send("get_console", {"count": 20, "level": PROBLEM_LEVELS})
 
 
 async def editor_state() -> str:

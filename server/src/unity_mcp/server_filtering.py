@@ -17,6 +17,20 @@ from .tools.schema_registry import _registry as _schema_registry, STUB_SCHEMA
 # Core tools keep full schemas; all others get stub schema on ListTools.
 _SCHEMA_KEEP_FULL: frozenset[str] = _CORE_TOOLS
 
+# Non-core tool descriptions are truncated to this length in the initial
+# ListTools response; full text remains available via resolve_tool_schema.
+_SHORT_DESC_MAX_LEN = 120
+
+
+def _short_description(desc: str) -> str:
+    """First sentence or hard-truncate at _SHORT_DESC_MAX_LEN."""
+    if not desc or len(desc) <= _SHORT_DESC_MAX_LEN:
+        return desc
+    dot = desc.find('. ')
+    if 0 < dot < _SHORT_DESC_MAX_LEN:
+        return desc[:dot + 1]
+    return desc[:_SHORT_DESC_MAX_LEN] + '…'
+
 
 def _apply_gating(tools: list) -> list:
     if os.environ.get("UNITY_MCP_NO_GATING"):
@@ -25,17 +39,22 @@ def _apply_gating(tools: list) -> list:
 
 
 def _strip_deferred_schemas(tools: list) -> list:
-    """Replace inputSchema of non-core tools with STUB unless UNITY_MCP_FULL_SCHEMAS=1.
+    """Replace inputSchema + shorten description of non-core tools, unless
+    UNITY_MCP_FULL_SCHEMAS=1.
 
     Safe: these are ListTools *response* objects, separate from mcp._tool_manager._tools
     which holds the callable fn. FastMCP dispatches via _tool_manager (validate_input=False
     path), so stripping inputSchema here cannot block tool execution.
+
+    Full description is captured into _schema_registry BEFORE this runs (see
+    install_list_tools_filter), so resolve_tool_schema still serves the untruncated text.
     """
     if os.environ.get("UNITY_MCP_FULL_SCHEMAS", "0") == "1":
         return tools
     for t in tools:
         if t.name not in _SCHEMA_KEEP_FULL:
             t.inputSchema = STUB_SCHEMA
+            t.description = _short_description(t.description)
     return tools
 
 
@@ -200,6 +219,17 @@ def read_unity_port(skip_probe: bool = False) -> int | None:
     return port
 
 
+# Fix 4: last live ServerSession seen while handling a ListTools request. Lets
+# reconnect_unity()/_refresh_tools_cache() push a tool_list_changed notification
+# to the client outside of a request context (e.g. from a manual reconnect).
+_active_session = None
+
+
+def get_active_session():
+    """Return the most recently captured ServerSession, or None if none seen yet."""
+    return _active_session
+
+
 def install_list_tools_filter(mcp_server, get_disabled_cache_fn):
     """Patch mcp._mcp_server.request_handlers to inject filtering + schema capture."""
     import mcp.types as mcp_types
@@ -207,6 +237,11 @@ def install_list_tools_filter(mcp_server, get_disabled_cache_fn):
     original_handler = mcp_server._mcp_server.request_handlers[mcp_types.ListToolsRequest]
 
     async def _filtered_tools_handler(req):
+        global _active_session
+        try:
+            _active_session = mcp_server._mcp_server.request_context.session
+        except LookupError:
+            pass
         result = await original_handler(req)
         # Capture full schemas into registry BEFORE stripping
         for t in result.root.tools:

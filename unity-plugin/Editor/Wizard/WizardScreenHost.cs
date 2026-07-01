@@ -11,6 +11,9 @@ namespace UnityMCP.Editor.Wizard
     /// </summary>
     public sealed class WizardScreenHost
     {
+        // Local to this file — EditorPrefs key for the wizard's own completion flag.
+        private const string DonePrefKey = "MCPWizard.Done";
+
         private readonly IWizardScreen[] _screens;
         private readonly ConfigureScreen _configureScreen;
         private VisualElement[] _dots;
@@ -60,7 +63,7 @@ namespace UnityMCP.Editor.Wizard
 
         public void Complete()
         {
-            EditorPrefs.SetBool("MCPWizard.Done", true);
+            EditorPrefs.SetBool(DonePrefKey, true);
             _closeCallback?.Invoke();
         }
 

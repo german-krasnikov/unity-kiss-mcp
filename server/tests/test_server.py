@@ -1208,6 +1208,158 @@ async def test_lifespan_on_reconnect_throttles_refresh(monkeypatch):
     assert len(disabled_calls) <= 1, f"Debounce failed: {len(disabled_calls)} calls"
 
 
+# ---------------------------------------------------------------------------
+# Issue 24 / C3: gating.reset() must NOT be wired as an automatic reconnect
+# callback — heartbeat reconnects (incl. domain reload of the SAME project)
+# must not wipe discover_tools() unlocks. Only the manual reconnect_unity()
+# tool (tools/connection.py) resets gating. _on_reconnect must still read the
+# LIVE slot.port, not the port captured once at lifespan startup.
+# ---------------------------------------------------------------------------
+
+def _make_reconnect_fake_slot(reconnect_cbs, port_holder, bridge):
+    """Shared FakeSlot for Issue 24 tests — mirrors test_lifespan_on_reconnect_throttles_refresh."""
+
+    class FakeSlot:
+        def __init__(self, **kwargs):
+            pass
+
+        @property
+        def bridge(self):
+            return bridge
+        connected = True
+
+        @property
+        def port(self):
+            return port_holder["port"]
+
+        def add_reconnect_callback(self, cb):
+            reconnect_cbs.append(cb)
+
+        async def connect(self, *a, **kw):
+            return "ok"
+
+        async def close(self):
+            pass
+
+    return FakeSlot
+
+
+async def test_gating_reset_not_wired_as_automatic_reconnect_callback(monkeypatch):
+    """C3 regression guard: gating.reset must NOT be in the slot's automatic
+    reconnect-callback list. An automatic heartbeat reconnect (incl. domain
+    reload of the SAME project) must not silently wipe discover_tools()
+    unlocks — only the explicit reconnect_unity() tool may do that."""
+    import unity_mcp.server as srv
+    from unity_mcp.tools import gating
+
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+    bridge.start_heartbeat = MagicMock()
+    bridge.stop_heartbeat = MagicMock()
+
+    reconnect_cbs = []
+    FakeSlot = _make_reconnect_fake_slot(reconnect_cbs, {"port": 9500}, bridge)
+
+    monkeypatch.setattr(srv, "ConnectionSlot", FakeSlot)
+    monkeypatch.setattr(srv, "slot", None)
+    monkeypatch.setattr(srv, "manager", None)
+    monkeypatch.setattr(srv, "_middleware", None)
+
+    class FakeApp:
+        pass
+
+    async with srv.lifespan(FakeApp()):
+        pass
+
+    assert gating.reset not in reconnect_cbs
+
+
+async def test_heartbeat_reconnect_does_not_clear_session_enabled(monkeypatch):
+    """C3: firing the slot's automatic reconnect callbacks (simulating a
+    heartbeat reconnect / domain reload) must leave gating._session_enabled
+    untouched."""
+    import asyncio
+    import unity_mcp.server as srv
+    from unity_mcp.tools import gating
+
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+    bridge.start_heartbeat = MagicMock()
+    bridge.stop_heartbeat = MagicMock()
+
+    reconnect_cbs = []
+    FakeSlot = _make_reconnect_fake_slot(reconnect_cbs, {"port": 9500}, bridge)
+
+    monkeypatch.setattr(srv, "ConnectionSlot", FakeSlot)
+    monkeypatch.setattr(srv, "slot", None)
+    monkeypatch.setattr(srv, "manager", None)
+    monkeypatch.setattr(srv, "_middleware", None)
+    monkeypatch.setattr(gating, "_session_enabled", {"asset"})
+
+    class FakeApp:
+        pass
+
+    async with srv.lifespan(FakeApp()):
+        for cb in reconnect_cbs:
+            cb()
+        await asyncio.sleep(0.05)
+
+    assert gating._session_enabled == {"asset"}
+
+
+async def test_on_reconnect_uses_live_slot_port_not_stale_closure(monkeypatch):
+    """_on_reconnect must read slot.port at call time — an automatic port-drift
+    reconnect must corroborate the NEW project's Editor.log, not the OLD one
+    captured in the `unity_port` closure variable at lifespan startup."""
+    import asyncio
+    import unity_mcp.server as srv
+
+    monkeypatch.setenv("UNITY_MCP_BUDGET", "0")
+    monkeypatch.setenv("UNITY_MCP_HINTS", "0")
+
+    bridge = AsyncMock()
+    bridge.connected = True
+    bridge.send = AsyncMock(return_value={"ok": True, "data": ""})
+    bridge.start_heartbeat = MagicMock()
+    bridge.stop_heartbeat = MagicMock()
+
+    reconnect_cbs = []
+    port_holder = {"port": 9500}
+    FakeSlot = _make_reconnect_fake_slot(reconnect_cbs, port_holder, bridge)
+
+    monkeypatch.setattr(srv, "ConnectionSlot", FakeSlot)
+    monkeypatch.setattr(srv, "slot", None)
+    monkeypatch.setattr(srv, "manager", None)
+    monkeypatch.setattr(srv, "_middleware", None)
+
+    calls = []
+    monkeypatch.setattr(
+        "unity_mcp.editor_log.init_corroboration",
+        lambda port=None: calls.append(port),
+    )
+
+    class FakeApp:
+        pass
+
+    async with srv.lifespan(FakeApp()):
+        calls.clear()  # drop the initial startup call captured before drift
+        port_holder["port"] = 9601  # simulate automatic drift to a different Unity project
+        for cb in reconnect_cbs:
+            cb()
+        await asyncio.sleep(0.05)
+
+    assert 9601 in calls, f"Expected corroboration re-init with live port 9601, got {calls}"
+    assert 9500 not in calls, f"Stale startup port 9500 must not be used, got {calls}"
+
+
 # ── lifespan lock lifecycle ───────────────────────────────────────────────────
 
 async def test_lifespan_raises_when_acquire_lock_fails(monkeypatch):

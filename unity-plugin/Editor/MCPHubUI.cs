@@ -112,7 +112,7 @@ namespace UnityMCP.Editor
         {
             // TODO(F24d): refresh subtitle dynamically when auth probe completes
             if (!ChatSettingsHook.IsChatBinaryAvailable()) return "CLI not configured";
-            var auth = EditorPrefs.GetString("UnityMCP_Chat_AuthStatus", "");
+            var auth = EditorPrefs.GetString(PrefKeys.ChatAuthStatus, "");
             return auth == "ok"   ? "Claude CLI · logged in"
                  : auth == "fail" ? "Claude CLI · not logged in"
                  : "Claude CLI · checking...";

@@ -11,7 +11,7 @@ _dsl_tools: set[str] = set()
 
 async def batch(commands: str, on_error: str = "continue", timeout: float = 30.0,
                 atomic: bool = False) -> str:
-    """Execute multiple commands in one call. Use for 2+ operations — reads AND writes. commands: one command per line (cmd key=value). on_error: continue|stop. timeout: seconds (default 30). atomic: when True, first failing op reverts ALL prior ops in this batch (uses Unity Undo). Note: file-system side-effects from execute_code are NOT reverted. Commands validated before execution; errors include 'Did you mean' suggestions. PREFER this over individual tool calls."""
+    """Execute multiple commands in one call. Use for 2+ operations — reads AND writes. commands: one command per line (cmd key=value). on_error: continue|stop. timeout: seconds (default 30). atomic: when True, first failing op reverts ALL prior ops in this batch (uses Unity Undo). Note: file-system side-effects from execute_code are NOT reverted. Commands validated before execution: !param = missing required parameter, ?param→suggestion = unknown parameter (with did-you-mean suggestion when close enough), plus an auto-generated usage line. PREFER this over individual tool calls."""
     for line in commands.splitlines():
         cmd = line.strip().split()[0] if line.strip() else ""
         if cmd in _dsl_tools:

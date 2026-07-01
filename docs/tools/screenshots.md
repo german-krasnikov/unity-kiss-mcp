@@ -204,4 +204,4 @@ result = await screenshot_compare(name="gameplay", mode="auto")
 
 ---
 
-**See also:** [Scene Tools](scene.md) for screenshot variants and editor control, [Spatial Tools](spatial.md) for object positioning verification.
+**See also:** [Scene Tools](scene.md) for screenshot variants and editor control, [UI Tools](ui.md) for object positioning verification via `get_spatial_context`.

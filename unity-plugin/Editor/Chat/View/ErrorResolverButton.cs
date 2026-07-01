@@ -13,6 +13,10 @@ namespace UnityMCP.Editor.Chat
     [InitializeOnLoad]
     internal sealed class ErrorResolverButton : IToolbarButtonProvider
     {
+        // Local to this file — EditorPrefs keys for the error-resolver's own preset state.
+        private const string PresetPrefKey       = "MCP.ErrorResolver.Preset";
+        private const string CustomPrefixPrefKey = "MCP.ErrorResolver.CustomPrefix";
+
         public string Key         => "error_resolver";
         public int    Order       => 10;
         public string ButtonLabel => "Fix Errors";
@@ -47,7 +51,7 @@ namespace UnityMCP.Editor.Chat
 
         static void DispatchPreset(MCPChatWindow chat, string grouped, string preset)
         {
-            EditorPrefs.SetString("MCP.ErrorResolver.Preset", preset);
+            EditorPrefs.SetString(PresetPrefKey, preset);
             chat.InjectMessage(BuildPrompt(grouped, preset));
         }
 
@@ -80,7 +84,7 @@ namespace UnityMCP.Editor.Chat
             {
                 "best_practices" => "Fix these Unity runtime errors following SOLID/Unity best practices:\n",
                 "quick_fix"      => "Fix these Unity runtime errors with minimal code changes:\n",
-                _                => EditorPrefs.GetString("MCP.ErrorResolver.CustomPrefix", ""),
+                _                => EditorPrefs.GetString(CustomPrefixPrefKey, ""),
             };
             return prefix + grouped;
         }

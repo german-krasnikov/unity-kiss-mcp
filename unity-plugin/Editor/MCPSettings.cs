@@ -32,7 +32,7 @@ namespace UnityMCP.Editor
                 { "VFX",        new[] { "vfx_intent" } },
                 { "UI",         new[] { "create_ui","set_rect","validate_layout","get_spatial_context","ui_intent" } },
                 { "SCREENSHOTS",new[] { "screenshot","screenshot_baseline","screenshot_compare" } },
-                { "UNIT_TESTS", new[] { "run_tests","get_test_results","run_playtest","fuzz_playtest","test_step" } },
+                { "UNIT_TESTS", new[] { "run_tests","get_test_results","run_playtest","test_step" } },
                 { "RUNTIME",    new[] { "invoke_method","set_runtime_property","wait_until","move_to","query_state" } },
                 { "ASSETS",     new[] { "asset","prefab","scriptable_object","project_settings" } },
                 { "ADVANCED_CODE", new[] { "execute_code","recompile","find_references","semantic_at","compile_preflight","get_schema","auto_fix","smart_build","checkpoint","validate_references","menu" } },

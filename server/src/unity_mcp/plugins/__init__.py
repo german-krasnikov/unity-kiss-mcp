@@ -33,11 +33,28 @@ def _should_skip(name):
     return False
 
 
+def _auto_gate_new_tools(mcp, before: set) -> None:
+    """Any tool name added to mcp's registry during a plugin's register() call
+    that the plugin did NOT self-declare via register_tools() gets auto-enrolled
+    into the hidden 'plugins' category (Issue 26 — plugin tools default OFF Tier1)."""
+    from unity_mcp.tools import gating
+    after = set(mcp._tool_manager._tools.keys())
+    new_unclaimed = (after - before) - gating._ALL_KNOWN
+    if new_unclaimed:
+        gating.register_tools("plugins", new_unclaimed)
+        log.info(
+            f"Plugin tools auto-gated (hidden by default, "
+            f"see discover_tools(category='plugins')): {sorted(new_unclaimed)}"
+        )
+
+
 def _load_module(fqn, name, mcp, send_fn, args_fn):
     try:
         module = import_module(fqn)
         if hasattr(module, 'register'):
+            before = set(mcp._tool_manager._tools.keys())
             module.register(mcp, send_fn, args_fn)
+            _auto_gate_new_tools(mcp, before)
             log.info(f"Plugin loaded: {name}")
     except Exception as e:
         log.warning(f"Plugin {name} skipped: {e}")
@@ -64,7 +81,9 @@ def _load_entry_points(mcp, send_fn, args_fn):
                 if not _check_api_version(plugin, ep.name):
                     continue
                 if hasattr(plugin, 'register'):
+                    before = set(mcp._tool_manager._tools.keys())
                     plugin.register(mcp, send_fn, args_fn)
+                    _auto_gate_new_tools(mcp, before)
                     log.info(f"Plugin loaded (entry_point): {ep.name}")
             except Exception as e:
                 log.warning(f"Plugin {ep.name} (entry_point) skipped: {e}")
@@ -90,7 +109,9 @@ def _load_plugin_dirs(mcp, send_fn, args_fn):
                 if not _check_api_version(module, name):
                     continue
                 if hasattr(module, 'register'):
+                    before = set(mcp._tool_manager._tools.keys())
                     module.register(mcp, send_fn, args_fn)
+                    _auto_gate_new_tools(mcp, before)
                     log.info(f"Plugin loaded (plugin_dirs): {name}")
             except Exception as e:
                 log.warning(f"Plugin {name} (plugin_dirs) skipped: {e}")

@@ -1,6 +1,8 @@
 """TDD tests: codegen.auto_fix corroboration via editor_log.corroborate + smart_build branches."""
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from unity_mcp.console_levels import PROBLEM_LEVELS
+
 
 async def test_auto_fix_corroborates_get_compile_errors(monkeypatch):
     """auto_fix must pass get_compile_errors result through editor_log.corroborate."""
@@ -23,6 +25,29 @@ async def test_auto_fix_corroborates_get_compile_errors(monkeypatch):
     mock_cor.assert_called_once_with(raw_csharp)
     # auto_fix sees corroborated (has errors) → includes error in output
     assert "CS0117" in result or "stale" in result
+
+
+async def test_auto_fix_uses_problem_levels(monkeypatch):
+    """Issue 27: auto_fix's get_console call must scan Error+Exception+Assert, not just Error."""
+    import unity_mcp.editor_log as el
+    import unity_mcp.tools.codegen as codegen
+
+    seen_args = {}
+
+    async def send(cmd, args=None, **kw):
+        if cmd == "get_console":
+            seen_args["level"] = args["level"]
+            return ""
+        return "No compilation errors."
+
+    monkeypatch.setattr(codegen, "_send", send)
+
+    ctx = MagicMock()
+
+    with patch.object(el, "corroborate", return_value="No compilation errors."):
+        await codegen.auto_fix(ctx)
+
+    assert seen_args["level"] == PROBLEM_LEVELS
 
 
 async def test_auto_fix_no_errors_returns_no_errors_to_fix(monkeypatch):
@@ -145,5 +170,38 @@ async def test_smart_build_extracts_code_from_single_object_content(monkeypatch)
 
     await codegen.smart_build("create a cube", ctx)
 
+    called_code = send_mock.call_args[0][1]["code"]
+    assert called_code == inner
+
+
+async def test_smart_build_unbalanced_braces_rejected(monkeypatch):
+    """smart_build must reject LLM code with unbalanced braces before calling execute_code."""
+    import unity_mcp.tools.codegen as codegen
+
+    inner = "var go = new GameObject(\"Test\"); {"  # unbalanced: one open, zero close
+    ctx = _make_ctx(f"```csharp\n{inner}\n```")
+
+    send_mock = AsyncMock(return_value="ok")
+    monkeypatch.setattr(codegen, "_send", send_mock)
+
+    result = await codegen.smart_build("create a cube", ctx)
+
+    send_mock.assert_not_called()
+    assert "unbalanced" in result.lower()
+
+
+async def test_smart_build_balanced_code_forwarded(monkeypatch):
+    """smart_build forwards balanced-brace code to execute_code unchanged."""
+    import unity_mcp.tools.codegen as codegen
+
+    inner = "if (true) { var go = new GameObject(\"Test\"); }"
+    ctx = _make_ctx(f"```csharp\n{inner}\n```")
+
+    send_mock = AsyncMock(return_value="ok")
+    monkeypatch.setattr(codegen, "_send", send_mock)
+
+    await codegen.smart_build("create a cube", ctx)
+
+    send_mock.assert_called_once()
     called_code = send_mock.call_args[0][1]["code"]
     assert called_code == inner

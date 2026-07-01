@@ -18,23 +18,23 @@ namespace UnityMCP.Editor.Chat
         public void BuildUI(VisualElement parent)
         {
             var autoAdd = new Toggle("Auto-add to chat")
-                { value = EditorPrefs.GetBool("MCP_RegionAutoAdd", true) };
+                { value = EditorPrefs.GetBool(PrefKeys.RegionAutoAdd, true) };
             autoAdd.RegisterValueChangedCallback(e =>
-                EditorPrefs.SetBool("MCP_RegionAutoAdd", e.newValue));
+                EditorPrefs.SetBool(PrefKeys.RegionAutoAdd, e.newValue));
             parent.Add(autoAdd);
 
             var toolOptions = new List<string> { "Point", "Path", "Ruler" };
             var toolDropdown = new DropdownField("Default tool", toolOptions,
-                EditorPrefs.GetInt("MCP_DefaultAnnotationMode", 0));
+                EditorPrefs.GetInt(PrefKeys.DefaultAnnotationMode, 0));
             toolDropdown.RegisterValueChangedCallback(e =>
-                EditorPrefs.SetInt("MCP_DefaultAnnotationMode", toolOptions.IndexOf(e.newValue)));
+                EditorPrefs.SetInt(PrefKeys.DefaultAnnotationMode, toolOptions.IndexOf(e.newValue)));
             parent.Add(toolDropdown);
 
             var maxObj = new IntegerField("Max objects shown")
-                { value = EditorPrefs.GetInt("MCP_RegionMaxObjects", 10) };
+                { value = EditorPrefs.GetInt(PrefKeys.RegionMaxObjects, 10) };
             maxObj.tooltip = "Max contained object paths in region chip payload (1-100)";
             maxObj.RegisterValueChangedCallback(e =>
-                EditorPrefs.SetInt("MCP_RegionMaxObjects", Mathf.Clamp(e.newValue, 1, 100)));
+                EditorPrefs.SetInt(PrefKeys.RegionMaxObjects, Mathf.Clamp(e.newValue, 1, 100)));
             parent.Add(maxObj);
         }
     }

@@ -6,6 +6,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Optional, Callable, Awaitable
 
+from .console_levels import PROBLEM_LEVELS
+
 
 @dataclass
 class Prediction:
@@ -36,7 +38,7 @@ class SpeculativeLayer:
                 "confirm wire",
             )
         if cmd == "batch":
-            return Prediction("get_console", {"count": "5", "level": "Error"}, "batch errors")
+            return Prediction("get_console", {"count": "5", "level": PROBLEM_LEVELS}, "batch errors")
         if cmd == "recompile":
             return Prediction("get_compile_errors", {}, "post-compile check")
         return None

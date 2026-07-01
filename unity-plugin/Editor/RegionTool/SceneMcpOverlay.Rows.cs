@@ -89,7 +89,7 @@ namespace UnityMCP.Editor.RegionTool
                 if (ActiveTool() == typeof(SceneRegionTool))
                     SceneRegionTool.SetGridSnapAction?.Invoke(evt.newValue);
                 else if (ActiveTool() == typeof(SceneAnnotationTool))
-                    EditorPrefs.SetBool("MCP_AnnotSnap", evt.newValue);
+                    EditorPrefs.SetBool(PrefKeys.AnnotationGridSnap, evt.newValue);
             });
             return toggle;
         }

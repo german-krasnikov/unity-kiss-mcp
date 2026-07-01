@@ -29,17 +29,18 @@ from unity_mcp.plugin_api import RO, RW, RW_IDEM, DEL
 | `RW_IDEM` | Idempotent write | Set operations: set_property |
 | `DEL` | Destructive | Deletions: delete_object |
 
-### `register_tools(category, tools, tier1=None)`
+### `register_tools(category, tools)`
 
 Register tools into capability gating.
 
 ```python
-register_tools("my_category", {"tool_a", "tool_b"}, tier1={"tool_a"})
+register_tools("my_category", {"tool_a", "tool_b"})
 ```
 
 - `category: str` — gating category name
 - `tools: set[str]` — tool names
-- `tier1: set[str] | None` — always visible subset (rest need `discover_tools`)
+
+**Auto-gating:** If a plugin uses `@mcp.tool()` without calling `register_tools()`, those tools are automatically enrolled into the hidden `"plugins"` category (visible only via `discover_tools(category="plugins")`). This prevents undeclared plugin tools from cluttering the default Tier1 budget.
 
 ### `register_read_cmds(*names)`
 

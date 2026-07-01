@@ -296,15 +296,17 @@ result = await test_step(
 Natural language control for animator state machines (Category: Intent).
 
 **Parameters:**
-- `instruction` (string) — Natural language command (e.g., "make player jump")
+- `target` (string, required) — GameObject path (e.g., "Player", "NPC/Animator")
+- `intent` (string, required) — Natural language command (e.g., "make player jump")
+- `dry_run` (bool, default=false) — Preview the batch plan without executing
 
 **Example:**
 
 ```python
 # Natural language animator control
-await animator_intent("make player jump")
-await animator_intent("transition to idle animation")
-await animator_intent("set walk speed to 2.0")
+result = await animator_intent(target="Player", intent="make player jump")
+result = await animator_intent(target="Player", intent="transition to idle animation")
+result = await animator_intent(target="Enemy", intent="set walk speed to 2.0")
 ```
 
 ---
@@ -314,15 +316,18 @@ await animator_intent("set walk speed to 2.0")
 Natural language VFX and particle control (Category: Intent).
 
 **Parameters:**
-- `instruction` (string) — Natural language command
+- `target` (string, required) — GameObject path (e.g., "Player", "Particles/Emitter")
+- `intent` (string, required) — Natural language command (e.g., "create explosion effect")
+- `kind` (string, default="auto") — VFX kind: "particle" | "auto" (shader effects not yet implemented)
+- `dry_run` (bool, default=false) — Preview the batch plan without executing
 
 **Example:**
 
 ```python
 # Natural language VFX control
-await vfx_intent("create explosion effect at player position")
-await vfx_intent("spawn rain particles over scene")
-await vfx_intent("fade out all particle systems")
+result = await vfx_intent(target="Player", intent="create explosion effect")
+result = await vfx_intent(target="Scene", intent="spawn rain particles", kind="particle")
+result = await vfx_intent(target="Enemy", intent="fade out particle system", dry_run=False)
 ```
 
 ---
@@ -332,14 +337,18 @@ await vfx_intent("fade out all particle systems")
 Natural language UI manipulation (Category: Intent).
 
 **Parameters:**
-- `instruction` (string) — Natural language command
+- `intent` (string, required) — Natural language description (e.g., "Create a health bar at top-left, score at top-right")
+- `parent` (string, optional) — Parent path (default: new Canvas)
+- `template` (string, optional) — Preset template: "hud" | "menu" | "dialog" | "grid"
+- `dry_run` (bool, default=false) — Preview the batch plan without executing
 
 **Example:**
 
 ```python
-await ui_intent("show health bar above player")
-await ui_intent("hide pause menu")
-await ui_intent("flash screen red")
+# Natural language UI creation
+result = await ui_intent(intent="show health bar above player")
+result = await ui_intent(intent="create pause menu with Play/Quit buttons", parent="Canvas", template="menu")
+result = await ui_intent(intent="flash screen red", dry_run=False)
 ```
 
 ---

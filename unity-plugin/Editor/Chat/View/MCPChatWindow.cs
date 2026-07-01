@@ -83,15 +83,16 @@ namespace UnityMCP.Editor.Chat
             RefreshColorResolver();
             ChipPillFactory.AddToContextAction = chip => _chipField?.AddChip(chip);
             RegionTool.SceneRegionTool.OnRegionCommitted = (id, label) =>
-            { if (EditorPrefs.GetBool("MCP_RegionAutoAdd", true)) ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0)); };
+            { if (EditorPrefs.GetBool(PrefKeys.RegionAutoAdd, true)) ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0)); };
             RegionTool.SceneAnnotationTool.OnAnnotationCommitted = (id, label) =>
-            { if (EditorPrefs.GetBool("MCP_RegionAutoAdd", true)) ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0)); };
+            { if (EditorPrefs.GetBool(PrefKeys.RegionAutoAdd, true)) ChipPillFactory.AddToContextAction?.Invoke(new ChipData(ChipKindKeys.Region, id, label, 0)); };
             ScreenshotToolbarButton.OnScreenshotCaptured = path =>
                 ProcessExternalPath(path, InsertInlineChip);
             Annotation.AnnotationEditorWindow.OnAnnotationReady = (path, displayName) =>
                 ChipPillFactory.AddToContextAction?.Invoke(
                     new ChipData(ChipKindKeys.AnnotatedScreenshot, path, displayName, 0));
             CopyFlash.ShowAction = ShowCopyFlash;
+            RestoreSelectedBackendFromPrefs(); // Issue 28: restore _selectedKind/_selectedAgent BEFORE CreateBackend()
             CreateBackend();
             ResetTokenCounters();
             RelaySpawner.OnAfterReloadResume += TryResumePendingTurn;
@@ -120,7 +121,7 @@ namespace UnityMCP.Editor.Chat
         private void OnDisable()
         {
             // P0-A: persist transcript so window close/reopen restores history (not just domain reload)
-            SessionState.SetString("MCPChat_Transcript", _transcript?.SerializeForReload() ?? "");
+            SessionState.SetString(PrefKeys.ChatTranscript, _transcript?.SerializeForReload() ?? "");
             CommandRouter.OnAskUser -= OnMcpAskUser;
             EditorApplication.hierarchyChanged -= RefreshResolver;
             AssemblyReloadEvents.beforeAssemblyReload -= SaveStateBeforeReload;
@@ -169,11 +170,11 @@ namespace UnityMCP.Editor.Chat
             _transcript = new ChatTranscript(inner, registry);
             _transcript.SceneObjects = () => _resolver?.Objects;
             // F21: restore transcript that was saved before domain reload
-            var savedTranscript = SessionState.GetString("MCPChat_Transcript", "");
+            var savedTranscript = SessionState.GetString(PrefKeys.ChatTranscript, "");
             if (!string.IsNullOrEmpty(savedTranscript))
             {
                 _transcript.RestoreFromReload(savedTranscript);
-                SessionState.EraseString("MCPChat_Transcript");
+                SessionState.EraseString(PrefKeys.ChatTranscript);
             }
             _transcriptRestored = !string.IsNullOrEmpty(savedTranscript); // P0-1: guard duplicate bubble
             root.Add(_scroll);
@@ -238,7 +239,7 @@ namespace UnityMCP.Editor.Chat
 
         private void CreateBackend()
         {
-            SessionState.EraseString("MCPChat_BackendSessionId");
+            SessionState.EraseString(PrefKeys.ChatBackendSessionId);
             CreateBackendWithSession(null);
         }
 

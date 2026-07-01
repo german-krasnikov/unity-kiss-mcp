@@ -20,16 +20,16 @@ Claude Code ←─stdio─→ Python MCP Server ←─TCP:9500─→ Unity Edito
 ## Implementation Notes
 
 ### Validation Layer (Anti-Hallucination)
-- **CommandSchema.cs** (192 lines): Schema dictionary for all 35+ commands with required/optional params
-  - `Validate(cmd, args)` method checks: command exists, required params present, unknown params detected
-  - Returns error with "Did you mean" suggestions via StringDistance fuzzy matching
-  - Called in BatchHelper before ExecuteCommand
-- **StringDistance.cs** (48 lines): Levenshtein distance + ClosestMatch for typo detection
+- **CommandValidator.cs** (119 lines): Pure validation functions over CommandRegistry's per-command contract
+  - `Validate(cmd, argsJson)` checks: command exists, required params present, unknown params detected
+  - Contract declared at `CommandRegistry.Register()` call site via `required:` and `optional:` CSV params (not a separate schema dict)
+  - Returns error message with sigil grammar: `!param` (missing), `?param→closest` (unknown with suggestion), or `?param` (unknown, no suggestion)
+  - `AutoUsage()` computes usage string (e.g. `wire_event path=... component=... [mode=...]`), never hand-written
+- **StringDistance.cs** (48 lines): Levenshtein distance + ClosestMatch for fuzzy suggestion matching
 - **What it catches**:
-  - Wrong command names: `move_object` → "Unknown command 'move_object'."
-  - Typo command names: `creat_object` → "Did you mean 'create_object'?"
-  - Missing required params: `set_property path=/A` → "missing required: component, prop, value"
-  - Wrong param names (typo): `valuee=1` → "Did you mean 'value'?"
+  - Wrong command names: `move_object` → "Unknown command 'move_object'. Did you mean 'create_object'?"
+  - Missing required params: `set_property path=/A` → "set_property !component !prop !value Unknown param.\n  set_property path=... component=... prop=... value=..."
+  - Wrong param names (typo): `set_property path=/A ?valuee→value` → "set_property ?valuee→value Unknown param.\n  set_property path=... component=... prop=... value=..."
 
 ### Data Format (Text-based, Phase 11+)
 - Commands as text, one per line: `cmd key=value key=value`
@@ -79,13 +79,14 @@ ToolError: <tool_name> requires typed MCP tool (Python DSL expansion), not batch
 
 - Python tool: `server/src/unity_mcp/tools/batch.py` (batch tool)
 - Auto-batch: `server/src/unity_mcp/tools/autobatch.py` (setup_objects, set_properties, configure_objects)
-- C# executor: `unity-plugin/Editor/BatchHelper.cs` (Execute + CommandSchema.Validate, ParseLines, ParseLine, ParseKeyValuePairs, ParseValue, BuildJsonObject; uses JsonHelper.EscapeJson, JsonHelper.UnescapeJsonString)
-- Validation layer: `unity-plugin/Editor/CommandSchema.cs` (schema dict, Validate, ExtractKeys)
+- C# executor: `unity-plugin/Editor/BatchHelper.cs` (Execute, ParseLines, ParseLine, ParseKeyValuePairs, ParseValue, BuildJsonObject; uses JsonHelper.EscapeJson, JsonHelper.UnescapeJsonString)
+- Validation layer: `unity-plugin/Editor/CommandValidator.cs` (Validate, AutoUsage, ExtractKeys — pure functions over CommandRegistry contract)
 - String matching: `unity-plugin/Editor/StringDistance.cs` (Levenshtein, ClosestMatch)
+- Command registry: `unity-plugin/Editor/CommandRegistry.cs` (Register/RegisterAction — declares required/optional params via CSV, contract source of truth)
 - Command dispatch: `unity-plugin/Editor/CommandRouter.cs` (batch case, timeout_ms support)
 - Python tests: `server/tests/test_batch.py`, `test_batch_conflict.py`, `test_batch_timeout.py`, `test_autobatch.py`
 - C# tests: `unity-test-project/Assets/Tests/Editor/MCPBatchTests.cs` (EditMode tests)
-- Validation tests: `unity-test-project/Assets/Tests/Editor/MCPCommandSchemaTests.cs`
+- Validation tests: `unity-test-project/Assets/Tests/Editor/CommandValidatorOptionalParamsTests.cs`
 
 ## Atomic Mode (F27, Transactional Batches)
 
@@ -190,7 +191,7 @@ ok:N err:M timeout:K  # when timeout hit
 - [x] Token efficiency: saves 80-95% vs N individual calls (~20 tokens/cmd vs ~150 JSON)
 - [x] Text parsing: quoted values, comments, empty lines handled
 - [x] Edge cases: empty text, disabled tools, stop vs continue modes, special chars
-- [x] Anti-hallucination: CommandSchema validates all commands before execution, catches typos with suggestions
+- [x] Anti-hallucination: CommandValidator validates all commands before execution via contracts declared at Register() call site, catches typos with fuzzy suggestions, error format uses sigils (!missing, ?unknown→suggestion)
 
 ## Related
 

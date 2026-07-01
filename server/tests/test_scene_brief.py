@@ -2,6 +2,8 @@
 import os
 from unittest.mock import AsyncMock, patch
 
+from unity_mcp.console_levels import PROBLEM_LEVELS
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +79,26 @@ async def test_scene_brief_ensure_calls_send_raw(monkeypatch):
     assert "editor" in call_log
     assert result == "5 objects, no errors, stopped"
     assert brief.brief == "5 objects, no errors, stopped"
+
+
+async def test_scene_brief_ensure_uses_problem_levels(monkeypatch):
+    """Issue 27: get_console call inside ensure() must scan Error+Exception+Assert."""
+    monkeypatch.setenv("UNITY_MCP_SCENE_BRIEF", "1")
+    brief = _make_brief()
+    seen_args = {}
+
+    async def fake_send(cmd, args, **kw):
+        if cmd == "get_console":
+            seen_args["level"] = args["level"]
+        return f"data:{cmd}"
+
+    with patch("unity_mcp.scene_brief.SamplingService") as MockSvc:
+        instance = MockSvc.return_value
+        instance.enabled = True
+        instance.summarize = AsyncMock(return_value="5 objects, no errors, stopped")
+        await brief.ensure(fake_send)
+
+    assert seen_args["level"] == PROBLEM_LEVELS
 
 
 async def test_scene_brief_ensure_caches_result(monkeypatch):

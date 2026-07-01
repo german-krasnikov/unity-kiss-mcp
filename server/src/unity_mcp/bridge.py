@@ -11,7 +11,7 @@ import struct
 import time
 from dataclasses import dataclass
 from typing import Callable, Optional
-from .constants import DEFAULT_PORT
+from .constants import DEFAULT_PORT, SESSION_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,6 @@ def check_protocol_version(python_proto: int, unity_proto: int) -> None:
         )
 
 CONNECT_TIMEOUT = float(os.environ.get("UNITY_MCP_CONNECT_TIMEOUT", "5.0"))
-SESSION_TIMEOUT = float(os.environ.get("UNITY_MCP_SESSION_TIMEOUT", "120.0"))
 MAX_RETRIES = int(os.environ.get("UNITY_MCP_MAX_RETRIES", "3"))
 MIN_RECONNECT_INTERVAL = float(os.environ.get("UNITY_MCP_MIN_RECONNECT_INTERVAL", "5.0"))
 STARTUP_GRACE_S = float(os.environ.get("UNITY_MCP_STARTUP_GRACE", "90.0"))

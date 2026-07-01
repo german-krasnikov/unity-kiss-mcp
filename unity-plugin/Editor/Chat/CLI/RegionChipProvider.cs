@@ -183,7 +183,7 @@ namespace UnityMCP.Editor.Chat
 
             sb.Append('\n');
 
-            int limit = EditorPrefs.GetInt("MCP_RegionMaxObjects", 10);
+            int limit = EditorPrefs.GetInt(PrefKeys.RegionMaxObjects, 10);
             if (depth == "full" || paths.Length <= limit)
             {
                 foreach (var p in paths) sb.Append(p).Append('\n');

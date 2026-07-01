@@ -24,7 +24,8 @@ namespace UnityMCP.Editor
                         var m = method;
                         CommandRegistry.Register(attr.Name,
                             args => (string)m.Invoke(null, new object[] { args }),
-                            attr.Mutating, attr.Runtime);
+                            attr.Mutating, attr.Runtime,
+                            attr.Required ?? "", attr.Optional ?? "");
                         count++;
                     }
             }

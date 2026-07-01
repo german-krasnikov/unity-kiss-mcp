@@ -48,27 +48,19 @@ namespace UnityMCP.Editor.Chat
             var choices = new List<string>();
             foreach (var b in _backends) choices.Add(b.DisplayName);
 
-            _agentDropdown = new DropdownField(choices, 0)
+            // Issue 28: _selectedKind/_selectedAgent are already restored by
+            // RestoreSelectedBackendFromPrefs() (called from OnEnable() before CreateBackend()) —
+            // just reflect that state as the dropdown's initial value. No second mutation / backend
+            // recreation happens here anymore (removes the old "P0-3" double-create).
+            var current      = _backends.Find(b => b.Kind == _selectedKind && b.AgentName == _selectedAgent);
+            var initialIndex = choices.IndexOf(current.DisplayName);
+            if (initialIndex < 0) initialIndex = 0;
+
+            _agentDropdown = new DropdownField(choices, initialIndex)
             {
                 tooltip = "Backend / Agent"
             };
             _agentDropdown.AddToClassList("agent-selector");
-
-            // F23: restore last selection from EditorPrefs.
-            var saved = EditorPrefs.GetString(DropdownPrefKey, "");
-            if (saved == "Codex (Session)") saved = "Codex"; // F28: migrate renamed backend
-            if (!string.IsNullOrEmpty(saved) && choices.Contains(saved))
-            {
-                _agentDropdown.SetValueWithoutNotify(saved);
-                var spec = _backends.Find(b => b.DisplayName == saved);
-                if (spec.Enabled)
-                {
-                    _selectedKind  = spec.Kind;
-                    _selectedAgent = spec.AgentName;
-                    _backend?.Stop();    // P0-3: OnEnable created a default-Kind backend before this restore
-                    CreateBackend();     // P0-3: recreate to match restored selection
-                }
-            }
 
             _agentDropdown.RegisterValueChangedCallback(evt =>
             {
@@ -85,7 +77,7 @@ namespace UnityMCP.Editor.Chat
                 _selectedKind  = spec.Kind;
                 _selectedAgent = spec.AgentName;
                 _selectedModel = ""; // reset before CreateBackend so stale model doesn't leak to new backend
-                EditorPrefs.SetString(DropdownPrefKey, chosenName); // F23: persist selection.
+                EditorPrefs.SetString(DropdownPrefKey, StableIdFor(spec)); // Issue 28: persist stable id, not DisplayName
                 _backend?.Stop();
                 ResetTokenCounters();
                 CreateBackend();
@@ -93,6 +85,48 @@ namespace UnityMCP.Editor.Chat
             });
 
             return _agentDropdown;
+        }
+
+        // Issue 28: stable identifier for EditorPrefs persistence — survives DisplayName renames.
+        // Built-in backends key by BackendKind (the enum name never changes); custom project-level
+        // agents (Kind == Claude with a non-null AgentName) key by AgentName, which stays fixed even
+        // if the rendered DisplayName changes.
+        private static string StableIdFor(BackendSpec spec)
+            => spec.AgentName == null ? spec.Kind.ToString() : spec.AgentName;
+
+        // Issue 28: restore _selectedKind/_selectedAgent from EditorPrefs. Must run BEFORE
+        // CreateBackend() (called from OnEnable()) so the very first backend spawned after a
+        // domain reload / window reopen is already the correct CLI — not a default-Claude
+        // backend that gets silently recreated later.
+        internal void RestoreSelectedBackendFromPrefs()
+        {
+            if (_backends == null) RefreshBackends();
+
+            var saved = EditorPrefs.GetString(DropdownPrefKey, "");
+            if (saved == "Codex (Session)") saved = "Codex"; // legacy F28 rename shim, kept for old installs
+            if (string.IsNullOrEmpty(saved)) return;
+
+            var spec = FindBackendByStableId(saved);
+            if (spec != null)
+            {
+                _selectedKind  = spec.Value.Kind;
+                _selectedAgent = spec.Value.AgentName;
+                return;
+            }
+
+            // Issue 28: previously a silent no-op fallback to whatever _selectedKind already was
+            // (BackendKind.Claude by default) — now explicit, so a rename/removal is diagnosable.
+            Debug.LogWarning($"[MCP Chat] Saved backend '{saved}' not found — falling back to {_selectedKind}.");
+        }
+
+        private BackendSpec? FindBackendByStableId(string saved)
+        {
+            foreach (var b in _backends)
+                // DisplayName equality is a backward-compat fallback for prefs written by older
+                // plugin versions (pre-Issue-28), which stored the free-form DisplayName.
+                if (b.Enabled && (StableIdFor(b) == saved || b.DisplayName == saved))
+                    return b;
+            return null;
         }
 
         private VisualElement BuildModelSelector()

@@ -1,10 +1,10 @@
-# MCP Tools Reference (99 total)
+# MCP Tools Reference (120 total)
 
-All tools organized by category. CORE tools are always visible. Themed categories enable groups via `enable_category()`. Plugin tools discovered dynamically.
+All tools organized by category. TIER1 tools (43) are always visible. Themed categories (Tier2) require `discover_tools(category)` to enable. Plugin tools discovered dynamically via auto-gating.
 
-## CORE Tools (Always Visible)
+## TIER1 Tools (Always Visible, 43 total)
 
-Essential read/scene, meta, connection, repair.
+Essential read/scene, meta, connection, repair, plus high-value tools for screenshots, testing, runtime, and code intelligence.
 
 | Tool | Purpose | Key Params | Category |
 |------|---------|------------|----------|
@@ -32,6 +32,24 @@ Essential read/scene, meta, connection, repair.
 | list_connections | Show connection status | — | connection |
 | resolve_tool_schema | Deferred schema fetch | tool_name | meta |
 | doctor | Health diagnostics | fix (auto-fix stale PIDs) | diagnostics |
+| screenshot | Capture frame | width, height, camera, path (output) | visual |
+| run_tests | Execute NUnit tests | mode (EditMode/PlayMode), filter | testing |
+| setup_objects | Batch create + wire objects | spec (JSON template array) | setup |
+| set_properties | Batch set properties | objects_and_values (JSON) | setup |
+| configure_objects | Batch configure components | objects_and_config (JSON) | setup |
+| find_references | Locate usages of symbol | symbol_name, include_tests | code-intel |
+| compile_preflight | Check compile readiness | fix (bool) | code-intel |
+| semantic_at | Language server: definition/hover | path, line, col, action | code-intel |
+| await_compile | Block until compile done | timeout | code-intel |
+| sync_unity | Reload and restart | reason, wait (bool) | editor-control |
+| invoke_method | Call method at runtime | path, component, method, args (JSON) | runtime |
+| set_runtime_property | Set field/property at runtime | path, component, prop, value | runtime |
+| wait_until | Busy-wait on condition | query, op, value, timeout | runtime |
+| move_to | Pathfind + walk to position | path, dest_pos, speed, timeout | runtime |
+| query_state | Read runtime GameObject state | path, queries (CSV) | runtime |
+| test_step | Execute single DSL step | step (JSON), config | testing |
+| run_playtest | Run playtest DSL script | script (21-step DSL), config | testing |
+| fuzz_playtest | Random input fuzzing | count, duration, seed | testing |
 
 ## SCENE_EDIT (8 tools)
 
@@ -48,7 +66,7 @@ Scene object manipulation: find, detail, components, active, material, delta, di
 | object_diff | Compare two objects | path1, path2 |
 | transfer_object | Move object between scenes | path, target_scene |
 
-## COMPONENTS (2 tools)
+## COMPONENTS (3 tools)
 
 Component event wiring: connect/disconnect event listeners.
 
@@ -56,6 +74,7 @@ Component event wiring: connect/disconnect event listeners.
 |------|---------|------------|
 | wire_event | Connect event to method | path, component, event, target_path, target_method |
 | unwire_event | Disconnect event listener | path, component, event, target_path |
+| auto_wire | Auto-wire compatible event | path, component, event |
 
 ## ANIMATION (4 tools)
 
@@ -68,23 +87,24 @@ Animation playback, timeline, animator state.
 | animator | Get/set Animator parameters | path, param_name, param_type, value |
 | particle | Emit/stop particles | path, action (play/stop/clear), count |
 
-## SHADERS_MATERIAL (3 tools)
+## SHADERS_MATERIAL (4 tools)
 
-Shader, material, and reference operations.
+Shader, material, reference, and asset audit operations.
 
 | Tool | Purpose | Key Params |
 |------|---------|------------|
 | shader | Find shader, list properties | name, action (find/get_props) |
 | material | Assign/inspect material | path, material_path, slot |
 | references | Find asset references | asset_path, include_indirect |
+| material_audit | Audit material usage and performance | filter, fix (bool) |
 
-## VFX (1 tool)
+## VFX (1 Tier2 tool)
 
 Visual effects intent — AI-driven VFX tweaks.
 
 | Tool | Purpose | Key Params |
 |------|---------|------------|
-| vfx_intent | AI vfx description → settings | path, description, context |
+| vfx_intent | AI vfx description → settings | target, intent, kind |
 
 ## UI (5 tools)
 
@@ -98,39 +118,32 @@ UI creation, rect layout, validation, spatial context.
 | get_spatial_context | Proximity query | path, radius, layer_mask |
 | ui_intent | AI ui description → components | parent, description, context |
 
-## SCREENSHOTS (3 tools)
+## SCREENSHOTS (2 Tier2 tools)
 
-Visual capture, baseline diff, regression detection.
+Baseline diff and regression detection. Note: `screenshot` itself is TIER1 (see above).
 
 | Tool | Purpose | Key Params |
 |------|---------|------------|
-| screenshot | Capture frame | width, height, camera, path (output) |
 | screenshot_baseline | Save baseline for regression | name, width, height, camera |
 | screenshot_compare | Diff baseline ↔ current | name, mode (auto/pixel/structural/targeted), question |
 
-## UNIT_TESTS (5 tools)
+## UNIT_TESTS (1 Tier2 tool)
 
-Test execution, playtest DSL runner, fuzz testing.
+Test result polling. Note: `run_tests`, `run_playtest`, `fuzz_playtest`, `test_step` are TIER1 (see TIER1 section above).
 
 | Tool | Purpose | Key Params |
 |------|---------|------------|
-| run_tests | Execute NUnit tests | mode (EditMode/PlayMode), filter |
 | get_test_results | Poll test status | — |
-| run_playtest | Run playtest DSL script | script (21-step DSL), config |
-| fuzz_playtest | Random input fuzzing | count, duration, seed |
-| test_step | Execute single DSL step | step (JSON), config |
 
-## RUNTIME (5 tools)
+## RUNTIME (3 Tier2 tools)
 
-Runtime-only (Play Mode): invoke methods, set properties, wait conditions, movement.
+Performance and debugging at runtime. Note: `invoke_method`, `set_runtime_property`, `wait_until`, `move_to`, `query_state` are TIER1 (see TIER1 section above).
 
 | Tool | Purpose | Key Params |
 |------|---------|------------|
-| invoke_method | Call method at runtime | path, component, method, args (JSON) |
-| set_runtime_property | Set field/property at runtime | path, component, prop, value |
-| wait_until | Busy-wait on condition | query, op, value, timeout |
-| move_to | Pathfind + walk to position | path, dest_pos, speed, timeout |
-| query_state | Read runtime GameObject state | path, queries (CSV) |
+| get_perf | Profiling data (draw calls, meshes, etc) | filter |
+| debug_animator | Animator state inspection | path |
+| debug_physics | Physics debugger | mode, layer_mask |
 
 ## ASSETS (4 tools)
 
@@ -143,24 +156,20 @@ Asset database: import/export, prefab, ScriptableObject, project settings.
 | scriptable_object | ScriptableObject create/read/write | action, type, path, values |
 | project_settings | Project config | action (get/set), target (tags/layers/quality), prop, value |
 
-## ADVANCED_CODE (14 tools)
+## ADVANCED_CODE (10 Tier2 tools)
 
-Code generation, refactoring, compilation, static analysis.
+Code generation, refactoring, validation, and diagnostics. Note: `find_references`, `semantic_at`, `compile_preflight`, `await_compile`, `sync_unity` are TIER1 (see TIER1 section above).
 
 | Tool | Purpose | Key Params |
 |------|---------|------------|
 | execute_code | Run C# in Editor | code (C# method body), undo_label |
 | recompile | Force script compilation | — |
-| sync_unity | Reload and restart | reason, wait (bool) |
-| find_references | Locate usages of symbol | symbol_name, include_tests |
-| semantic_at | Language server: definition/hover | path, line, col, action |
-| compile_preflight | Check compile readiness | fix (bool) |
-| await_compile | Block until compile done | timeout |
 | get_schema | Inspect class/type schema | type_name, include_bases |
 | auto_fix | Apply code fix suggestion | file_path, fix_id |
 | smart_build | Rebuild affected assemblies | affected_paths |
 | checkpoint | Save named revision | name, description |
 | validate_references | Check all refs valid | fix (bool) |
+| undo_last | Revert last operation | steps |
 | menu | Execute Editor menu item | menu_path |
 | diagnose | Deep troubleshooting | system (compile/tcp/memory/reload) |
 
@@ -182,21 +191,62 @@ Persistent reusable skills, templates, session snapshots, change tracking.
 | save_session | Snapshot hierarchy to .claude/session-context.json | — |
 | load_session | Load + diff previous session | — |
 
-## META (9 tools)
+## META (8 Tier2 tools)
 
-Batch setup, batch property set, metrics, scene scanning, collider checks, spatial queries, config.
+Scene scanning, spatial queries, and config. Note: `setup_objects`, `set_properties`, `configure_objects` are TIER1 (see TIER1 section above).
 
 | Tool | Purpose | Key Params |
 |------|---------|------------|
-| animator_intent | AI animator description → setup | path, description, context |
-| get_metrics | Scene stats (mesh count, draw calls, etc) | filter |
-| setup_objects | Batch create + wire objects | spec (JSON template array) |
-| set_properties | Batch set properties | objects_and_values (JSON) |
-| configure_objects | Batch configure components | objects_and_config (JSON) |
 | scan_scene | Audit for issues | checks (CSV: refs/colliders/physics/null_components) |
 | check_colliders | Collision layer conflicts | fix (bool) |
 | spatial_query | Radial/box search + filter | origin, radius, layer_mask, type_filter |
+| region_clear | Clear region of GameObjects | region, layer_mask |
+| navmesh_query | Pathfinding query | start_pos, end_pos, area_mask |
+| scene_health | Comprehensive scene audit | — |
 | set_llm_config | Store LLM settings | param, value |
+| budget_status | Token usage tracking | — |
+
+## DEBUG (8 Tier2 tools)
+
+Session debugging, breakpoints, metric snapshots.
+
+| Tool | Purpose | Key Params |
+|------|---------|------------|
+| debug | Session debugger | action (run/step/continue), bp_path |
+| snapshot | Take memory snapshot | name, labels |
+| watch_add | Add watch expression | expr, name |
+| get_watches | Retrieve all watches | — |
+| watch_remove | Delete watch | name |
+| watch_clear | Clear all watches | — |
+| watch_reset | Reset watch history | name |
+| get_metrics | Profiling metrics | filter |
+
+## PROFILING (3 Tier2 tools)
+
+Performance profiling and frame analysis.
+
+| Tool | Purpose | Key Params |
+|------|---------|------------|
+| get_frame_stats | Frame profiling data | mode (full/summary), frames |
+| profile | CPU/GPU profiler control | action (start/stop/dump), target |
+| get_memory | Memory profiling | detailed (bool) |
+
+## RENDERING (2 Tier2 tools)
+
+Rendering analysis and optimization.
+
+| Tool | Purpose | Key Params |
+|------|---------|------------|
+| render_analyze | Rendering bottleneck analysis | — |
+| analyze_lod_culling | LOD and culling audit | — |
+
+## PLUGINS (0 tools by default)
+
+Auto-gated category for external plugins. Tools registered via `@mcp.tool()` without `register_tools()` are automatically enrolled here and hidden by default.
+
+## CONNECTION (0 tools, internal only)
+
+Empty category — `list_connections` and `reconnect_unity` are in TIER1/CORE and always visible.
 
 ---
 

@@ -36,6 +36,7 @@ class CrashLogger:
     def __init__(self, log_dir: Optional[Path] = None, max_entries: int = 500):
         self._path = _crash_path(log_dir)
         self._closed = False
+        self._max_entries = max_entries
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             self._path.touch(exist_ok=True)
@@ -60,7 +61,7 @@ class CrashLogger:
             return
         try:
             if self._path.exists() and self._path.stat().st_size > self.MAX_BYTES:
-                self._rotate(500)
+                self._rotate(self._max_entries)
             entry["t"] = time.time()
             with self._path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")

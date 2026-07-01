@@ -1,6 +1,7 @@
 """Tests for SpeculativeLayer — predict + prefetch."""
 import asyncio
 from unittest.mock import AsyncMock
+from unity_mcp.console_levels import PROBLEM_LEVELS
 from unity_mcp.speculation import SpeculativeLayer, Prediction
 
 
@@ -41,6 +42,14 @@ def test_predict_batch_returns_get_console():
     pred = sl.predict("batch", {}, "ok")
     assert pred is not None
     assert pred.cmd == "get_console"
+
+
+def test_predict_batch_uses_problem_levels():
+    """Issue 27: batch prediction must scan Error+Exception+Assert, not just Error."""
+    sl = SpeculativeLayer(AsyncMock())
+    pred = sl.predict("batch", {}, "ok")
+    assert pred is not None
+    assert pred.args["level"] == PROBLEM_LEVELS
 
 
 def test_predict_recompile_returns_get_compile_errors():

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.68.0] — 2026-07-01 <!-- Batch DSL, tool gating, console capture, DRY refactor (Issues 23-29) -->
+
+**Self-Describing Batch DSL, Tool Filter Reconnect Reset, Console Capture, DRY Consolidation:**
+
+- **Issue 23: Batch DSL with CommandValidator** — CommandValidator replaces CommandSchema as source of truth. Introduces sigil grammar for parameter hints: `!param` (required), `?param` (optional suggestion). Entry flags (`IsAlwaysAllowed`, `IsAllowedDuringCompile`) replace hardcoded OR-chains. Enables schema-aware batch validation in bridge layer.
+
+- **Issue 24: Tool Filter Reconnect Reset** — `gating.reset()` now fires only on manual reconnect (via `set_connection`), not on bridge auto-reconnect. Preserves disabled tool cache across network transients. Reduces tool list spam on connection hiccups.
+
+- **Issue 25: Description Truncation for Token Budget** — Tool descriptions truncated to 120 characters max. Targets 50K token budget for `get_enabled_tools` response when all 200+ tools listed. Single-line summaries sufficient for LLM decision-making.
+
+- **Issue 26: Plugin Tools Removed from Tier 1** — Tier 1 (core tools) now excludes plugin-contributed tools. `register_tools()` syncs themed categories independently. Platform visibility rules via `enabled_categories.csv`, not tool registration. Simplifies gating logic.
+
+- **Issue 27: Console Capture with SessionState Persistence** — Extended console capture to Error + Exception + Assert levels (was Info + Warning). New `ConsoleRingBuffer` and `ConsoleProblemPersistence` classes (<200 LOC each) survive domain reloads via `SessionState` backup/restore. Critical errors logged across recompilation.
+
+- **Issue 28: Codex Backend Label Fix** — Codex backend now shows "Claude" label (was broken label mapping). Fixed via `StableIdFor()` method mapping backend ID to stable label string.
+
+- **Issue 29: execute_code CS0161 Recovery** — New `WrapIfBareCode()` wraps bare expressions with `return null + pragma suppress` to avoid "not all code paths return value" error. Enables single-line expression execution in execute_code tool.
+
+- **DRY Refactoring** — Consolidated `PrefKeys.cs` (C#) and `constants.py` (Python). Single source for `SESSION_TIMEOUT` and other shared constants. Entry flags extracted from hardcoded IsAlwaysAllowed/IsAllowedDuringCompile into flag-based system. TIER1 derived from `_CORE_TOOLS` list.
+
+- **Tool Gating Improvements** — Removed intent tools from TIER1, catalogued `budget_status` field, deleted `tier1=` parameter from plugin API (platform controls visibility). Reconnect refresh clears disabled cache and sends `send_tool_list_changed` event.
+
+### Tests
+- 3893 Python tests (pytest) — unchanged test count, improved stability
+- 5550 C# NUnit EditMode tests (4 pre-existing failures unrelated to changes)
+- 278 live integration tests (requires Unity running)
+- 4 live_cli tests (Claude CLI required)
+
 ## [v0.67.1] — 2026-06-29 <!-- Multi-backend output format: output_format enum, deferred spawn, 5 stream transformers, role-aware ping -->
 
 **Multi-Backend Output Format — Codex/Kimi/Agy/OpenCode Response Parsing:**

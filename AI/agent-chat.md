@@ -2,7 +2,7 @@
 
 ## Overview
 
-An optional Editor window that brings agentic chat directly into Unity, spawning the user's local `claude` CLI as a child process. Zero new MCP tools — reuses all 99 existing tools via the spawn-the-CLI architecture.
+An optional Editor window that brings agentic chat directly into Unity, spawning the user's local `claude` CLI as a child process. Zero new MCP tools — reuses all 120 existing tools via the spawn-the-CLI architecture.
 
 **Isolation:** Behind the `UNITY_MCP_CHAT` scripting define in `UnityMCP.Editor.Chat.asmdef`. OFF by default; deleting the `Chat/` folder leaves core untouched.
 
@@ -18,7 +18,7 @@ Unity Editor Window (MCPChatWindow)
             └─ python -m unity_mcp.server
                 │
                 └─ TCP:9500 → Unity Editor Plugin
-                    └─ ~90 MCP tools (create, set_property, screenshot, etc.)
+                    └─ ~120 MCP tools (create, set_property, screenshot, etc.)
 ```
 
 ### Spawn Invocation (v0.36.0)
@@ -142,6 +142,37 @@ public interface IChatBackend
 - Raw event data preserved for debugging
 
 ## Features
+
+### Annotation Tools & Scene Regions (Plugin v0.18.0+)
+
+Scene annotations enable domain-specific markup via visual regions (points, polylines, measurements) that become selectable chip references in the chat. Implementation:
+
+**RegionChipProvider.cs** — Implements `IChipKindProvider` for scene region objects:
+- **Detects** region objects by component type (e.g., `PointMarker`, `RegionOutline`)
+- **Renders** regions as graphical overlays in the Scene view (via OnSceneGUI)
+- **Formats** annotations as `[region:path/to/annotation]` chips for send-time context
+- **Navigate** — Click chip → selects region object in Inspector + flashes in Scene view
+- **Ping** — Highlights region, moves focus to Scene view
+- **Context Menu** (`AppendContextMenuItems`)** — Right-click options: "Delete Annotation", "Edit Properties"
+
+**Annotation Types** (extensible via plugin registration):
+- **Point:** Single world-space position (e.g., "place trap here at position X")
+- **Polyline:** Connected line segments (e.g., "patrol path from A to B to C")
+- **Measurement:** Distance/angle between two points (e.g., "gap is 5 units wide")
+
+**Integration with Chat:**
+- Regions created via `create_object component=PointMarker` (MCP tool)
+- Chips render as colored pills matching the annotation kind
+- Send-time context includes region properties (position, length, label)
+- AI can modify via `set_property path=/region/name ...`
+
+**Classes:**
+- `RegionChipProvider.cs` — Chip kind provider for regions
+- `AnnotationMarker.cs` — Base component for all annotation types
+- `PointMarker.cs` — Single-point annotation
+- `PolylineMarker.cs` — Multi-point path
+- `MeasurementMarker.cs` — Distance/angle annotation
+- `RegionRenderer.cs` — OnSceneGUI drawing (handles selection highlight, label rendering)
 
 ### Compile Auto-Fix Loop (F5, plugin 0.8.0)
 

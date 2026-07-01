@@ -78,7 +78,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
         "animator_intent",
         "setup_objects", "set_properties", "configure_objects",
         "scan_scene", "check_colliders", "spatial_query", "region_clear", "navmesh_query", "scene_health",
-        "set_llm_config",
+        "set_llm_config", "budget_status",
     ],
     "PROFILING": [
         "get_frame_stats", "profile", "get_memory",
@@ -86,6 +86,7 @@ _THEMED_CATEGORIES: dict[str, list[str]] = {
     "RENDERING": [
         "render_analyze", "analyze_lod_culling",
     ],
+    "PLUGINS": [],  # auto-gated plugin tools (Issue 26) — kept in sync by register_tools()
 }
 
 # ---------------------------------------------------------------------------
@@ -105,6 +106,7 @@ _CATEGORY_ALIAS: dict[str, list[str]] = {
     "rendering":  ["RENDERING"],
     "debug":      ["DEBUG"],
     "perf":       ["PROFILING", "RENDERING"],
+    "plugins":    ["PLUGINS"],
 }
 
 CATEGORIES: dict[str, set[str]] = {
@@ -112,17 +114,12 @@ CATEGORIES: dict[str, set[str]] = {
     for alias, groups in _CATEGORY_ALIAS.items()
 }
 
-# TIER1: always visible (legacy + CORE)
-TIER1: set[str] = {
-    "get_hierarchy", "get_component", "inspect", "set_property",
-    "create_object", "delete_object", "manage_component", "batch",
-    "get_console", "get_compile_errors", "screenshot", "scene", "editor",
-    "search_scene", "run_tests", "discover_tools", "get_enabled_tools",
-    "setup_objects", "set_properties", "configure_objects",
-    "do", "ask", "ask_user", "permission_prompt",
-    "animator_intent", "vfx_intent", "ui_intent",
+# TIER1: always visible (CORE + the tools that are tier1 but NOT core).
+# Derived via union instead of retyping _CORE_TOOLS — a rename in _CORE_TOOLS can no
+# longer silently drift out of TIER1 (DRY audit issues-23-29 Cat.2).
+TIER1: set[str] = set(_CORE_TOOLS) | {
+    "screenshot", "run_tests", "get_test_results", "setup_objects", "set_properties", "configure_objects",
     "find_references", "compile_preflight", "semantic_at", "await_compile", "sync_unity",
-    "set_parent",
     # runtime tools — always available in Play Mode
     "invoke_method", "set_runtime_property", "wait_until", "move_to",
     "query_state", "test_step", "run_playtest", "fuzz_playtest",
@@ -172,13 +169,20 @@ def is_core(name: str) -> bool:
 # Legacy API (unchanged)
 # ---------------------------------------------------------------------------
 
-def register_tools(category: str, tools: set, tier1: set | None = None) -> None:
-    """Plugin self-registration: add tools to a category and optionally to TIER1."""
+def register_tools(category: str, tools: set) -> None:
+    """Plugin self-registration: add tools to a category.
+
+    Plugins do NOT control their own visibility — the platform does. There is no
+    tier1= escape hatch: a plugin cannot promote its own tools into the always-on
+    TIER1 budget. Registered tools are Tier2 (category-gated, hidden by default,
+    reachable via discover_tools())."""
     CATEGORIES.setdefault(category, set()).update(tools)
     _ALL_KNOWN.update(tools)
-    if tier1:
-        TIER1.update(tier1)
-        _ALL_KNOWN.update(tier1)
+    # M6: get_catalog() (Unity plugin catalog UI) reads _THEMED_CATEGORIES, not
+    # CATEGORIES — keep both in sync so registered tools become visible there too.
+    themed_key = category.upper()
+    if themed_key in _THEMED_CATEGORIES:
+        _THEMED_CATEGORIES[themed_key] = list(set(_THEMED_CATEGORIES[themed_key]) | set(tools))
 
 
 def reset() -> None:

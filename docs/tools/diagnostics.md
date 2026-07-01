@@ -92,7 +92,7 @@ else:
 Read Unity Console output (errors, warnings, logs).
 
 **Parameters:**
-- `level` (string, optional) — "error" | "warning" | "log" (default: all)
+- `level` (string, optional) — "error" | "warning" | "log" (default: all). Note: "error" catches **Error logs only**. For comprehensive problem detection (including Exception and Assert, where most C# runtime crashes land), use `level="Error,Exception,Assert"` per the PROBLEM_LEVELS convention.
 - `count` (int, default=10) — Number of lines to return
 - `first` (int, default=0) — If > 0, return first N from init buffer + last (count-first) from ring
 
@@ -113,8 +113,11 @@ Read Unity Console output (errors, warnings, logs).
 # All console output
 console = await get_console()
 
-# Errors only
+# Error logs only (excludes Exception/Assert)
 errors = await get_console(level="error")
+
+# All problem types (Error + Exception + Assert)
+problems = await get_console(level="Error,Exception,Assert")
 
 # Last 10 lines
 recent = await get_console(count=10)
@@ -353,7 +356,7 @@ Lightweight non-blocking diagnostics.
 Commands hanging or timing out?
 ├─ Run: doctor()
 ├─ If errors: doctor(fix=True)
-├─ Check console: get_console(level="error")
+├─ Check console: get_console(level="Error,Exception,Assert")  # Problem-levels convention
 ├─ Check compile: get_compile_errors()
 ├─ If compiling: await_compile(timeout=30)
 ├─ If disconnected: reconnect_unity()

@@ -45,7 +45,7 @@ def register(mcp, send, args):
         """Count GameObjects matching a name filter."""
         return await send("my_count_objects", args(name_filter=name_filter))
 
-    register_tools("my_plugin", _MY_TOOLS, tier1=_MY_TOOLS)
+    register_tools("my_plugin", _MY_TOOLS)
 ```
 
 ## 2. Scaffold (C# side)
@@ -115,6 +115,8 @@ ln -s /path/to/my-unity-plugin/unity/Editor /path/to/game-project/Assets/MyPlugi
 ```
 
 **Plugin Discovery:** Plugins are discovered from 3 sources in order: (1) built-in plugins, (2) pip entry points in `pyproject.toml`, (3) `UNITY_MCP_PLUGIN_DIRS` environment variable. Your plugin is auto-loaded when the MCP server starts or reconnects.
+
+**Important:** Always call `register_tools()` to declare your plugin's tools. If you use `@mcp.tool()` without declaring the tool via `register_tools()`, it will be automatically hidden in the `"plugins"` category (visible only via `discover_tools(category="plugins")`). This prevents undeclared tools from cluttering the budget.
 
 Verify: call `my_count_objects` from Claude Code. If tools don't appear, run the Setup Wizard to diagnose.
 

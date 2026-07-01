@@ -71,8 +71,9 @@ namespace UnityMCP.Editor
 
                 var (cmd, argsJson) = commands[i];
 
-                // Async-only commands cannot run inside batch
-                if (cmd == "wait_until" || cmd == "move_to" || cmd == "run_tests" || cmd == "test_step" || cmd == "run_playtest")
+                // Async-only commands cannot run inside batch (structural check — also
+                // catches ask_user, which the old hardcoded name list here used to miss).
+                if (!CommandRegistry.IsBatchable(cmd))
                 {
                     sb.AppendLine($"[{i}] err: '{cmd}' requires async dispatch, not supported in batch");
                     if (AtomicFail(i)) break; else continue;
@@ -106,7 +107,7 @@ namespace UnityMCP.Editor
                 }
 
                 // Validate schema before execution
-                var validationErr = CommandSchema.Validate(cmd, argsJson);
+                var validationErr = CommandValidator.Validate(cmd, argsJson);
                 if (validationErr != null)
                 {
                     sb.AppendLine($"[{i}] err: {validationErr}");

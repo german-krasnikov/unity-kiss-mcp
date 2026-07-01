@@ -13,8 +13,8 @@ namespace UnityMCP.Editor.Chat
         internal static void BuildContent(VisualElement parent)
         {
             // F22: Auto-scroll toggle — at the top, outside any foldout.
-            var autoScrollToggle = new Toggle("Auto-scroll") { value = EditorPrefs.GetBool("MCPChat.AutoScroll", true) };
-            autoScrollToggle.RegisterValueChangedCallback(evt => EditorPrefs.SetBool("MCPChat.AutoScroll", evt.newValue));
+            var autoScrollToggle = new Toggle("Auto-scroll") { value = EditorPrefs.GetBool(PrefKeys.ChatAutoScroll, true) };
+            autoScrollToggle.RegisterValueChangedCallback(evt => EditorPrefs.SetBool(PrefKeys.ChatAutoScroll, evt.newValue));
             parent.Add(autoScrollToggle);
 
             // General settings
@@ -154,7 +154,7 @@ namespace UnityMCP.Editor.Chat
                     if (label?.panel == null) return;
                     label.text = ok ? "Auth: logged in" : "Auth: not logged in";
                     label.style.color = new StyleColor(ok ? new Color(0.5f, 0.8f, 0.5f) : new Color(0.8f, 0.4f, 0.4f));
-                    EditorPrefs.SetString("UnityMCP_Chat_AuthStatus", ok ? "ok" : "fail");
+                    EditorPrefs.SetString(PrefKeys.ChatAuthStatus, ok ? "ok" : "fail");
                 };
             });
         }

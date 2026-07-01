@@ -4,10 +4,12 @@ from ._annotations import RO as _RO, RW as _RW
 _send = None
 _args = None
 
+_DEFAULT_INTERVAL_MS = 500
+
 
 async def watch_add(path: str, component: str, field: str,
                     condition: str = "", action: str = "log",
-                    interval_ms: int = 500) -> str:
+                    interval_ms: int = _DEFAULT_INTERVAL_MS) -> str:
     """Add a watch on a component field. Play Mode only.
     condition: optional comparison like '< 10', '> 0', '== null'.
     action: 'log' (default) or 'pause' (pauses the editor when triggered).
@@ -16,7 +18,7 @@ async def watch_add(path: str, component: str, field: str,
         path=path, component=component, field=field,
         condition=condition or None,
         action=None if action == "log" else action,
-        interval_ms=str(interval_ms) if interval_ms != 500 else None,
+        interval_ms=str(interval_ms) if interval_ms != _DEFAULT_INTERVAL_MS else None,
     ))
 
 

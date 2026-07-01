@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace UnityMCP.Editor
@@ -12,6 +13,19 @@ namespace UnityMCP.Editor
             public Action<string, string, TaskCompletionSource<string>> AsyncHandler;
             public bool Mutating;
             public bool Runtime;
+            // true = dispatched outside the normal Handler/AsyncHandler path (e.g. screenshot,
+            // intercepted in CommandRouter.Process for file-response formatting). Its Handler
+            // here is a throwing stub, not a real implementation — must never be batchable.
+            public bool SpecialDispatch;
+            // Guard-list flags (DRY audit issues-23-29 Cat.1): travel with the registration
+            // instead of being re-typed as a separate hardcoded OR-chain in CommandRouter.
+            public bool AlwaysAllowed;
+            public bool AllowedDuringCompile;
+            // null = free-form (e.g. execute_code) — skip validation entirely.
+            // non-null (possibly empty) array = structured contract, validated by CommandValidator.
+            public string[] Required;
+            public string[] Optional;
+            public string Description;
         }
 
         // All mutations happen on Unity main thread (dispatched by MCPServer).
@@ -24,23 +38,47 @@ namespace UnityMCP.Editor
             CommandRouter.RegisterAll();
         }
 
-        public static void Register(string cmd, Func<string, string> handler, bool mutating = false, bool runtime = false)
+        /// <summary>CSV → string[]. null stays null (free-form marker); "" becomes empty array (zero-param).</summary>
+        private static string[] Split(string csv) =>
+            csv == null ? null : (csv.Length == 0 ? Array.Empty<string>() : csv.Split(','));
+
+        /// <summary>Guards against double-registration. Returns true (and logs) if `cmd` is already taken.</summary>
+        private static bool AlreadyRegistered(string cmd)
         {
-            if (_commands.ContainsKey(cmd))
-            {
-                UnityEngine.Debug.LogWarning($"[MCP] Command '{cmd}' already registered, skipping duplicate");
-                return;
-            }
-            _commands[cmd] = new Entry { Handler = handler, Mutating = mutating, Runtime = runtime };
+            if (!_commands.ContainsKey(cmd)) return false;
+            UnityEngine.Debug.LogWarning($"[MCP] Command '{cmd}' already registered, skipping duplicate");
+            return true;
         }
 
-        public static void RegisterAction(string cmd, Func<string, string, string> handler, bool mutating = false, bool runtime = false)
+        public static void Register(string cmd, Func<string, string> handler, bool mutating = false, bool runtime = false,
+            string required = null, string optional = null, bool specialDispatch = false,
+            bool alwaysAllowed = false, bool allowedDuringCompile = false, string description = null)
         {
-            if (_commands.ContainsKey(cmd))
+            if (AlreadyRegistered(cmd)) return;
+            _commands[cmd] = new Entry
             {
-                UnityEngine.Debug.LogWarning($"[MCP] Command '{cmd}' already registered, skipping duplicate");
-                return;
-            }
+                Handler = handler,
+                Mutating = mutating,
+                Runtime = runtime,
+                SpecialDispatch = specialDispatch,
+                AlwaysAllowed = alwaysAllowed,
+                AllowedDuringCompile = allowedDuringCompile,
+                Required = Split(required),
+                Optional = Split(optional),
+                Description = description
+            };
+        }
+
+        // action is always required (enforced by the wrapper below) — callers only
+        // declare the REMAINING required params via `required`.
+        public static void RegisterAction(string cmd, Func<string, string, string> handler, bool mutating = false, bool runtime = false,
+            string required = null, string optional = null, bool alwaysAllowed = false, bool allowedDuringCompile = false,
+            string description = null)
+        {
+            if (AlreadyRegistered(cmd)) return;
+            var req = new List<string> { "action" };
+            var extra = Split(required);
+            if (extra != null) req.AddRange(extra);
             _commands[cmd] = new Entry
             {
                 Handler = args =>
@@ -51,25 +89,66 @@ namespace UnityMCP.Editor
                     return handler(action, args);
                 },
                 Mutating = mutating,
-                Runtime = runtime
+                Runtime = runtime,
+                AlwaysAllowed = alwaysAllowed,
+                AllowedDuringCompile = allowedDuringCompile,
+                Required = req.ToArray(),
+                Optional = Split(optional),
+                Description = description
             };
         }
 
         // handler signature: (id, argsJson, tcs)
         public static void RegisterAsync(string cmd, Action<string, string, TaskCompletionSource<string>> handler,
-            bool mutating = false, bool runtime = false)
+            bool mutating = false, bool runtime = false, string required = null, string optional = null,
+            bool alwaysAllowed = false, bool allowedDuringCompile = false, string description = null)
         {
-            if (_commands.ContainsKey(cmd))
+            if (AlreadyRegistered(cmd)) return;
+            _commands[cmd] = new Entry
             {
-                UnityEngine.Debug.LogWarning($"[MCP] Command '{cmd}' already registered, skipping duplicate");
-                return;
-            }
-            _commands[cmd] = new Entry { AsyncHandler = handler, Mutating = mutating, Runtime = runtime };
+                AsyncHandler = handler,
+                Mutating = mutating,
+                Runtime = runtime,
+                AlwaysAllowed = alwaysAllowed,
+                AllowedDuringCompile = allowedDuringCompile,
+                Required = Split(required),
+                Optional = Split(optional),
+                Description = description
+            };
         }
 
         public static bool IsRegistered(string cmd) => _commands.ContainsKey(cmd);
         internal static bool IsMutating(string cmd) => _commands.TryGetValue(cmd, out var entry) && entry.Mutating;
         internal static bool IsRuntime(string cmd) => _commands.TryGetValue(cmd, out var entry) && entry.Runtime;
+        // Guard-list flags (DRY audit issues-23-29 Cat.1) — single source of truth, travels
+        // with the registration. CommandRouter.IsAlwaysAllowed/IsAllowedDuringCompile delegate here.
+        internal static bool IsAlwaysAllowed(string cmd) => _commands.TryGetValue(cmd, out var entry) && entry.AlwaysAllowed;
+        internal static bool IsAllowedDuringCompile(string cmd) => _commands.TryGetValue(cmd, out var entry) && entry.AllowedDuringCompile;
+
+        // Structural batchability check — replaces a hand-maintained name list.
+        // Unregistered commands are treated as "batchable" so they fall through to
+        // Validate(), which reports "Unknown command" instead of a misleading
+        // "not batchable" error. A REGISTERED command is blocked here if it's async-only
+        // OR marked SpecialDispatch (e.g. screenshot — its Handler is a throwing stub,
+        // the real implementation runs outside CommandRegistry.Execute).
+        internal static bool IsBatchable(string cmd) =>
+            !_commands.TryGetValue(cmd, out var e) || (e.AsyncHandler == null && !e.SpecialDispatch);
+
+        /// <summary>Read-only view of a command's contract for CommandValidator. Returns false if unregistered.</summary>
+        internal static bool TryGetContract(string cmd, out string[] required, out string[] optional, out bool isFreeForm)
+        {
+            if (!_commands.TryGetValue(cmd, out var e))
+            {
+                required = null;
+                optional = null;
+                isFreeForm = false;
+                return false;
+            }
+            isFreeForm = e.Required == null && e.Optional == null;
+            required = e.Required ?? Array.Empty<string>();
+            optional = e.Optional ?? Array.Empty<string>();
+            return true;
+        }
 
         internal static string Execute(string cmd, string args)
         {
@@ -93,5 +172,23 @@ namespace UnityMCP.Editor
 
         internal static IEnumerable<string> GetAllCommands() => _commands.Keys;
         internal static void Clear() => _commands.Clear();
+
+        public static string GetDescription(string cmd) =>
+            _commands.TryGetValue(cmd, out var e) ? e.Description : null;
+
+        /// <summary>Build help text for all commands matching a prefix (e.g. "bt_", "am_").</summary>
+        public static string BuildHelp(string prefix)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var cmd in GetAllCommands().Where(c => c.StartsWith(prefix)).OrderBy(c => c))
+            {
+                if (!TryGetContract(cmd, out var req, out var opt, out _)) continue;
+                var rw = IsMutating(cmd) ? "RW" : "RO";
+                var desc = GetDescription(cmd) ?? "";
+                var usage = CommandValidator.AutoUsage(cmd, req, opt);
+                sb.AppendLine($"{usage} [{rw}] | {desc}");
+            }
+            return sb.ToString().TrimEnd();
+        }
     }
 }

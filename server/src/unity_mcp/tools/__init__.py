@@ -8,13 +8,16 @@ from .metrics_tool import register as register_metrics
 from ..debug import snapshots as snapshot_tool
 
 
-def register_all(mcp, send, args, *, get_slot, get_middleware=None):
+def register_all(mcp, send, args, *, get_slot, get_middleware=None,
+                  refresh_tools_cache=None, push_catalog=None):
     for mod in [scene, objects, asset, animation, runtime, watch, code_intel,
                 batch, codegen, skills, spatial, ui, sync, diagnose,
                 debug_tool, diagnostics, snapshot_tool, profiling, rendering, scene_health, auto_wire]:
         mod.register(mcp, send, args)
     connection.register(mcp, send, args, get_slot=get_slot,
-                        get_middleware=get_middleware)
+                        get_middleware=get_middleware,
+                        refresh_tools_cache=refresh_tools_cache,
+                        push_catalog=push_catalog)
     autobatch.register(mcp, send, args)
     do_tool.register(mcp, send, args)
     ask_tool.register(mcp, send, args)

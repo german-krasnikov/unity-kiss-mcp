@@ -4,6 +4,7 @@ Enable: UNITY_MCP_SCENE_BRIEF=1
 """
 import os
 from typing import Optional, Callable, Awaitable
+from .console_levels import PROBLEM_LEVELS
 from .sampling import SamplingService
 
 META_CMDS = {"list_connections", "reconnect_unity",
@@ -43,7 +44,7 @@ class SceneBrief:
 
         try:
             hierarchy = await send_raw("get_hierarchy", {"summary": "true"})
-            console = await send_raw("get_console", {"count": "5", "level": "Error"})
+            console = await send_raw("get_console", {"count": "5", "level": PROBLEM_LEVELS})
             state = await send_raw("editor", {"action": "state"})
         except Exception:
             return None

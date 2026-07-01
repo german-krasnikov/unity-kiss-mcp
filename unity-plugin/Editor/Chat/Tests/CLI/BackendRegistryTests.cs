@@ -166,5 +166,48 @@ namespace UnityMCP.Editor.Chat.Tests
             Assert.AreEqual(1, codexEntries.Count);
             Assert.IsTrue(codexEntries[0].Enabled);
         }
+
+        // ── Issue 28: collision guard must cover ALL BackendKind names, not just Claude/Codex —
+        // otherwise a custom agent named e.g. "Kimi" could collide with MCPChatWindow's stable
+        // persistence id (BackendKind.ToString()) and restore the wrong backend. ──
+
+        [TestCase("Antigravity")]
+        [TestCase("Kimi")]
+        [TestCase("OpenCode")]
+        public void Discover_AgentNamedBuiltInKind_IsSkipped(string builtInName)
+        {
+            var projDir = MakeAgentsDir("proj");
+            WriteAgent(projDir, "custom.md", builtInName);
+
+            var result = BackendRegistry.Discover(new[] { projDir });
+
+            var matches = result.FindAll(b => b.DisplayName == builtInName);
+            Assert.AreEqual(1, matches.Count, $"exactly one '{builtInName}' entry — the built-in, not a custom collision");
+            Assert.IsNull(matches[0].AgentName, "built-in entry must not carry a custom AgentName");
+        }
+
+        // ── Issue 28: rename-survival regression guard. MCPChatWindow persists custom agents by
+        // AgentName (parsed from frontmatter `name:`), not by the .md filename or DisplayName.
+        // Renaming the underlying file (stem changes) while the frontmatter name: is unchanged
+        // must keep yielding the SAME AgentName — this is the stable id EditorPrefs restore relies on. ──
+
+        [Test]
+        public void Discover_AgentFileRenamed_SameFrontmatterName_AgentNameStable()
+        {
+            var projDir = MakeAgentsDir("proj");
+            WriteAgent(projDir, "old-filename.md", "code-reviewer");
+            var before     = BackendRegistry.Discover(new[] { projDir });
+            var beforeSpec = before.Find(b => b.AgentName == "code-reviewer");
+
+            File.Delete(Path.Combine(projDir, "old-filename.md"));
+            WriteAgent(projDir, "new-filename.md", "code-reviewer"); // file renamed, frontmatter name: unchanged
+
+            var after     = BackendRegistry.Discover(new[] { projDir });
+            var afterSpec = after.Find(b => b.AgentName == "code-reviewer");
+
+            Assert.AreEqual(beforeSpec.AgentName, afterSpec.AgentName,
+                "AgentName (stable persistence key) must survive a file rename");
+            Assert.AreEqual(beforeSpec.Kind, afterSpec.Kind);
+        }
     }
 }

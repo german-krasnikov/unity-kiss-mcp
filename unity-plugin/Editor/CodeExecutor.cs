@@ -76,8 +76,16 @@ namespace UnityMCP.Editor
             if (code.Contains("class ") || code.Contains("namespace "))
                 return code;
 
+            // Trailing "return null;" guarantees every code path returns (fixes CS0161 for
+            // bare statements with no return). #pragma suppresses the resulting CS0162
+            // "unreachable code" warning when the user's snippet already has its own return.
             return $"{Usings}\n" +
-                   $"public static class __MCPScript {{ public static object Run() {{\n{code}\n}} }}";
+                   "public static class __MCPScript { public static object Run() {\n" +
+                   "#pragma warning disable 162\n" +
+                   $"{code}\n" +
+                   "return null;\n" +
+                   "#pragma warning restore 162\n" +
+                   "} }";
         }
 
         internal static void SecurityScan(string code)

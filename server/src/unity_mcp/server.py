@@ -151,6 +151,10 @@ async def _refresh_tools_cache(bridge_) -> None:
 
     Idempotent: if already refreshing, skip. Failures are silent — stale cache
     is acceptable until next successful reconnect.
+
+    Fix 4: when the disabled set actually changes, notify the live MCP session
+    (if one was captured during a prior ListTools call) so the client re-fetches
+    ListTools instead of keeping a stale list around after a manual reconnect.
     """
     global _disabled_tools_cache, _refresh_tools_lock
     if _refresh_tools_lock is None:
@@ -164,7 +168,14 @@ async def _refresh_tools_cache(bridge_) -> None:
             result = await bridge_.send("get_disabled_tools", {}, timeout=5.0)
             if result.get("ok"):
                 data = result.get("data", "").strip()
-                _disabled_tools_cache = set(data.split(",")) if data else set()
+                new_cache = set(data.split(",")) if data else set()
+                changed = new_cache != _disabled_tools_cache
+                _disabled_tools_cache = new_cache
+                if changed:
+                    from . import server_filtering
+                    session = server_filtering.get_active_session()
+                    if session is not None:
+                        await session.send_tool_list_changed()
         except Exception:
             pass
 
@@ -313,7 +324,9 @@ async def lifespan(app):
                 nonlocal _last_refresh_ts
                 now = time.monotonic()
                 # P9: re-resolve project path on reconnect — may be a different Unity instance.
-                _editor_log.init_corroboration(port=unity_port)
+                # Read slot.port live (not the `unity_port` closed over at startup) — an
+                # automatic port-drift reconnect otherwise keeps corroborating the OLD project.
+                _editor_log.init_corroboration(port=slot.port)
                 if now - _last_refresh_ts < 30.0:
                     return
                 _last_refresh_ts = now
@@ -321,6 +334,11 @@ async def lifespan(app):
                 asyncio.ensure_future(_push_catalog(slot.bridge))
             slot.add_reconnect_callback(_on_reconnect)
             slot.add_reconnect_callback(_sync_reset_bump)
+            # gating.reset() is intentionally NOT wired here — automatic heartbeat
+            # reconnects (incl. domain-reload of the SAME project) would otherwise
+            # wipe discover_tools() unlocks on every recompile. Manual reconnects
+            # (explicit user action, possibly a different project) reset gating
+            # from tools/connection.py:reconnect_unity() instead.
             if _middleware is not None:
                 slot.add_reconnect_callback(_middleware.reset_session)
                 wire_circuit_breaker(_middleware, active)
@@ -344,7 +362,9 @@ async def lifespan(app):
 mcp = _UnstructuredMCP("UnityMCP", lifespan=lifespan)
 
 register_all(mcp, _send, _args, get_slot=lambda: slot,
-             get_middleware=lambda: _middleware)
+             get_middleware=lambda: _middleware,
+             refresh_tools_cache=_refresh_tools_cache,
+             push_catalog=_push_catalog)
 load_plugins(mcp, _send, _args)
 
 

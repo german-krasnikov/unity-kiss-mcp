@@ -65,6 +65,21 @@ def test_rotation_truncates_on_init(tmp_path):
     assert count == 250  # max_entries // 2
 
 
+def test_write_rotation_uses_instance_max_entries(tmp_path):
+    """_write()'s over-MAX_BYTES rotation must call _rotate(self._max_entries),
+    not a hardcoded 500 (regression: literal 500 in _write() ignored a caller's
+    custom max_entries — a small-cap logger would silently keep up to 500 entries)."""
+    logger = CrashLogger(log_dir=tmp_path, max_entries=7)
+    logger.MAX_BYTES = 0  # any existing file content counts as "over budget"
+    logger.log_disconnect(cmd="prime", retry=0, error_type="E", unity_busy=False, port=9500)
+
+    calls = []
+    logger._rotate = lambda n: calls.append(n)
+    logger.log_disconnect(cmd="trigger", retry=0, error_type="E", unity_busy=False, port=9500)
+
+    assert calls == [7]
+
+
 def test_no_rotation_under_limit(tmp_path):
     log_file = tmp_path / "crash.jsonl"
     lines = [json.dumps({"ev": "disconnect", "i": i}) for i in range(100)]

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-_STALE_SECONDS = 120.0
+from .constants import SESSION_TIMEOUT as _STALE_SECONDS
 
 
 @dataclass

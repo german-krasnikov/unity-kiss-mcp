@@ -8,12 +8,10 @@ In-Unity chat supports multiple CLI-based LLM backends.
 |---------|-----|-------|-----------|--------|
 | Claude | claude | Claude 4 (Opus, Sonnet) | Per-turn | ✅ Stable |
 | Claude Desktop | claude | Claude 4 (Opus, Sonnet) | Per-turn | ✅ Stable |
-| Codex | codex | OpenAI GPT-4 | Session | ✅ Stable |
+| Codex | codex | OpenAI GPT-4 | Per-turn (supports resume) | ✅ Stable |
 | Kimi | kimi | Kimi (Moonshot) | Per-turn | ✅ Stable |
-| Antigravity | curl | Various | Per-turn | ✅ Stable |
-| Cursor | cursor | Claude (Cursor config) | Per-turn | ✅ Stable |
-| Windsurf | windsurf | Claude (Windsurf config) | Per-turn | ✅ Stable |
-| VS Code | opencode | Various | Per-turn | ✅ Testing |
+| Antigravity | agy | Various | Per-turn | ✅ Stable |
+| OpenCode | opencode | Various | Per-turn | ✅ Testing |
 
 ## Claude & Claude Desktop
 
@@ -34,13 +32,13 @@ In-Unity chat supports multiple CLI-based LLM backends.
 
 ## Codex (OpenAI)
 
-**Executable:** `codex app-server`
+**Executable:** `codex exec`
 
-**Models:** GPT-4.1, o3, o4-mini and newer
+**Models:** GPT-4, o3, o4-mini and newer
 
-**Session:** Persistent (one process per chat, maintains conversation history)
+**Session:** Per-turn (new process each turn; supports session resume via `codex exec resume <session-id>` subcommand)
 
-**Protocol:** JSON-RPC 2.0 (not REST)
+**Protocol:** NDJSON (line-delimited JSON via `--json` flag, parsed as OpenAI Responses API format)
 
 **Setup:**
 ```bash
@@ -68,43 +66,25 @@ kimi login
 
 **Pricing:** Check Moonshot AI's pricing page for current rates.
 
-## Antigravity
+## Antigravity (Agy)
 
-**Executable:** curl (HTTP client)
+**Executable:** `agy` (CLI binary)
 
 **Models:** Configurable backend (Claude via API, custom LLM)
 
 **Session:** Per-turn
 
 **Setup:**
+```bash
+# Install Agy CLI
+go install github.com/antigravityai/agy@latest
+agy login  # if required by your Agy instance
 ```
-Manual configuration in MCPSettings
-- Base URL: https://api.antigravity.ai/...
-- API key: User provides
-```
 
-## VS Code Extensions
+Configure credentials via your Agy instance documentation.
 
-### Cursor
-**Executable:** cursor (Cursor IDE integrated)
-
-**Models:** Claude (via Cursor's subscription)
-
-**Session:** Per-turn
-
-**Note:** Requires Cursor IDE installed; CLI auto-detected.
-
-### Windsurf
-**Executable:** windsurf (Windsurf IDE integrated)
-
-**Models:** Claude (via Windsurf's subscription)
-
-**Session:** Per-turn
-
-**Note:** Requires Windsurf IDE installed; CLI auto-detected.
-
-### OpenCode (VS Code)
-**Executable:** opencode (VS Code plugin)
+## OpenCode
+**Executable:** `opencode` (standalone Go CLI)
 
 **Models:** Configurable (Claude, GitHub Copilot, custom)
 
@@ -127,22 +107,23 @@ Manual configuration in MCPSettings
 ### Per-Turn
 - New CLI process started each time (stateless)
 - Faster startup (~100ms)
-- No memory between turns
-- Example: Claude, Kimi, Cursor
+- No memory between turns unless session resume is used
+- Example: Claude, Codex, Kimi, Cursor, OpenCode
 
 **Pros:**
 - Simple; no session management
 - Works offline (no session server)
+- Each backend can optionally support session resume
 
 **Cons:**
-- Each turn must re-context the entire conversation
-- Slower for long conversations
+- Each turn must re-context the entire conversation (unless resumed)
+- Slower for long conversations without resume
 
-### Session (Persistent)
-- Single CLI process for entire chat session
-- Slower startup (~1s)
-- Full conversation history maintained
-- Example: Codex, Antigravity (if configured)
+### Session Resume (Optional)
+- Some backends (Codex, OpenCode) support resuming previous sessions
+- Faster recovery after network issues or crash
+- Full conversation history maintained if resumed
+- Example: `codex resume <session-id>`, `opencode run -s <session-id>`
 
 **Pros:**
 - Faster per-turn response
@@ -167,9 +148,11 @@ Unity Editor → MCP → Settings → Chat → API Keys
 
 ### Environment Variables
 
-Backend inherits only `UNITY_MCP_SESSION_TIMEOUT=300` (extended for reasoning models).
+**Injected to all backends:**
+- `UNITY_MCP_PORT`: TCP port where MCP server is listening (v0.67.1+)
+- `UNITY_MCP_SESSION_TIMEOUT`: Default 300 seconds (extended for reasoning models)
 
-**Not injected:** `UNITY_MCP_PORT` (delivered via scoped --mcp-config only, v0.55.0+).
+**Claude only:** `UNITY_MCP_PORT` is stripped (not passed to Claude CLI; delivered via `--mcp-config` file instead).
 
 ## Cost Tracking
 

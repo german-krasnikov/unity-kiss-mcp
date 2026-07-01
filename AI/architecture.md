@@ -41,7 +41,7 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
      │                        ├─ Capability Gating (TIER1+cat)   ├─ AttributeScanner → MCPToolAttribute (v0.57.0)
      │                        ├─ Plugin system (auto-discovery)  ├─ CommandRegistry (sync+async handlers, v0.57.0)
      │                        │  - opt-in disable: env UNITY_MCP_SKIP_PLUGINS=prefix ├─ PluginRegistry (IMCPPlugin)
-     │                        ├─ Deferred Schema Loading         ├─ CommandSchema (validation)
+     │                        ├─ Deferred Schema Loading         ├─ CommandValidator (validation)
      │                        │  (stub schemas + lazy resolve)   ├─ ValueParser
      │                        ├─ 23-layer Middleware (opt-in)    ├─ 7 Serializers
      │                        ├─ CompileStateProbe               ├─ RefManager ($a-$zz)
@@ -67,11 +67,11 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
 ### Components
 
 1. **MCP Server** (Python: 80+ modules total, including `server.py`, 23 tools modules + support, v0.42.0: +25 config/TOML tests, v0.47.1: +73+78 config validation tests)
-   - **99 core MCP tools registered** (v0.50.3+). Gating: TIER1=42 core (hardcoded). External plugins can add more tools dynamically. `_UnstructuredMCP(FastMCP)` subclass forces `structured_output=False` on all tools. Ungated (always visible): `get_test_results`, `budget_status`, `diagnose`.
+   - **120 core MCP tools registered** (v0.50.3+). Gating: TIER1=42 core (hardcoded). External plugins can add more tools dynamically. `_UnstructuredMCP(FastMCP)` subclass forces `structured_output=False` on all tools. Ungated (always visible): `get_test_results`, `budget_status`, `diagnose`.
    - **Config Module (v0.42.0+v0.44.0)**: `server/src/unity_mcp/config/` extended with TOML merger for Codex backend. `merge_toml_mcp(path, section)` merges MCP config into TOML with diff-based updates (preserves user settings). Python 3.9 compat: `Optional[X]` instead of `X | None`. ValueError raised on corrupt JSON. **Stale entry cleanup (v0.44.0)**: strips `[mcp_servers.unity]` duplicates on first write, creates .bak backup. **v0.47.1**: `validator.py` skips json.loads for TOML clients, checks string presence in configs. Adds 25 new tests (v0.42.0) + 9 new tests (v0.44.0) + 151 new tests (v0.47.1: 73 Python + 78 C# in test_config_gaps.py)
    - **CodeExecutor.SecurityScan (v0.31.0)**: Hardened pipeline — (1) strip C# comments via regex (2) whitespace densification (3) OrdinalIgnoreCase matching (4) 11 new blocked patterns (EditorApplication.Exit, Application.Quit, Environment.FailFast, ExportPackage, ImportPackage, OpenProject, ProjectWindowUtil, using-aliases for System.IO/Diagnostics/Net/Reflection)
    - **In-Unity Chat System (v0.66.6+)**: Unified RelayBackend on C# side communicates with Python chat_relay.py sidecar. Five backends managed server-side (Claude, Codex, Kimi, Agy, OpenCode) via `backend_def.py` with CLI arg builders + parsers. C# simply dispatches semantic commands (send turn, get events, set mode); relay handles all CLI protocol details, binary resolution, model selection, NDJSON/stream-json parsing, transport over pipe-format (60% token savings). See Chat Relay System section above for full architecture.
-   - `_UnstructuredMCP(FastMCP)` subclass: overrides `add_tool()` to force `structured_output=False` on all 99 registered tools, eliminating duplicate `content` + `structuredContent` in responses + `outputSchema` from ListTools (v0.50.3). Reduces MCP response size & Claude parsing overhead.
+   - `_UnstructuredMCP(FastMCP)` subclass: overrides `add_tool()` to force `structured_output=False` on all 120 registered tools, eliminating duplicate `content` + `structuredContent` in responses + `outputSchema` from ListTools (v0.50.3). Reduces MCP response size & Claude parsing overhead.
    - Lifespan: auto-discover Unity port from `~/.unity-mcp/ports/*.port`, acquire exclusive PID lockfile, create ConnectionSlot, connect bridge, fetch disabled tools cache (`get_disabled_tools`), push Python-authoritative catalog (`_push_catalog`), start heartbeat, register reconnect callbacks, load_plugins()
    - **MCP SDK Version (v0.31.0, v0.50.3)**: Pinned `mcp>=1.28.0,<2` — v2.0 ships 2026-07-28 with breaking changes (e.g., `response.content` structure). Upper bound prevents silent breakage. v0.50.3: bumped to 1.28.0+ for structured_output support.
    - Plugin system (3-source discovery: pkgutil built-in, entry_points, UNITY_MCP_PLUGIN_DIRS env): each plugin has `register(mcp, send_fn, args_fn)`. UNITY_MCP_SKIP_PLUGINS env (comma-separated prefixes) skips matching plugins.
@@ -117,11 +117,11 @@ Claude Code ←──stdio──→ Python MCP Server ←──TCP:PORT[+CHAT]�
    - **MCPToolAttribute** (v0.57.0 new): `[MCPTool(name, description="", Mutating=false, Runtime=false)]` attribute for user-extensible tool registration. Decorates public static methods returning `string(string args)`.
    - **AttributeScanner.cs** (v0.57.0 new): `ScanAndRegister()` discovers MCPToolAttribute methods in user assemblies (avoids UnityMCP.* + System + Unity frameworks). Validates signature, calls `CommandRegistry.Register()` for each tool. Returns tool count. Wired into CommandRouter.RegisterAll() after core commands.
    - **PluginRegistry.cs**: Static registry for IMCPPlugin implementations. Plugins register via `[InitializeOnLoad]`. One-way asmdef dependency: external → public.
-   - **IMCPPlugin.cs** (v0.64.0: DIMs for settings UI; v0.65.1: documentation): Interface — Name, CommandPrefix, RegisterCommands(), OnDomainReload(), AdditionalCommands (DIMs). **v0.64.0 DIMs**: `string Description` (plugin purpose), `bool HasSettingsUI` (default false), `VisualElement BuildSettingsUI()` (configurable settings). Enables plugin UI registration without breaking backward compatibility. **v0.65.1 complete guide**: `docs/plugin-development.md` (2100+ lines) documents IMCPPlugin contract, registration patterns, PluginConfig storage, UI building, PluginUIHelpers layer, testing patterns, best practices, troubleshooting.
+   - **IMCPPlugin.cs** (v0.64.0: DIMs for settings UI; v0.65.1: documentation): Interface — Name, CommandPrefix, RegisterCommands(), OnDomainReload(), AdditionalCommands (DIMs). **v0.64.0 DIMs**: `string Description` (plugin purpose), `bool HasSettingsUI` (default false), `VisualElement BuildSettingsUI()` (configurable settings). Enables plugin UI registration without breaking backward compatibility. **v0.65.1 complete guide**: `docs/plugins/quickstart.md` and `docs/plugins/api-reference.md` document IMCPPlugin contract, registration patterns, PluginConfig storage, UI building, PluginUIHelpers layer, testing patterns, best practices, troubleshooting.
    - **PluginConfig.cs** (v0.65.1 new): Isolated EditorPrefs storage for plugins. Namespace: `MCPPlugin_{pluginId}_{key}`. Methods: GetString/SetString, GetBool/SetBool, GetInt/SetInt, GetFloat/SetFloat, Delete. All main-thread only. Zero conflicts with core MCP or other plugins.
    - **PluginUIHelpers.cs** (v0.65.1 new): Convenience layer for plugin settings UI. 7 methods: MakeCard (bordered foldout), InlineRow (flex row), AddTextField (auto-persist), AddToggle (auto-persist), AddSlider (float, auto-persist), AddIntSlider (int, auto-persist), AddDropdown (with fallback, auto-persist), LoadStyles (standalone EditorWindows). Each control binds to PluginConfig automatically.
    - **SettingsPageFactory.cs** (v0.64.0): `BuildPluginsPage()` method generates MCP Hub settings section for all registered plugins. Lists descriptions, renders `BuildSettingsUI()` per plugin. Integrated into MCPHubUI. 52 tests in PluginSettingsPageTests.
-   - **CommandSchema.cs**: parameter validation with fuzzy did-you-mean suggestions (79 schemas)
+   - **CommandValidator.cs**: parameter validation via `CommandRegistry.TryGetContract()`, fuzzy did-you-mean via `StringDistance.ClosestMatch`, contract declared at `Register()` call site
    - **ValueParser.cs**: vectors, quaternions, colors, arrays, 100+ types (Rect/Bounds/RectInt/BoundsInt/LayerMask + Int64/Double precision), type-aware SetPropertyValue
    - **InputNormalizer.cs**: component/property/value normalization
    - **BatchHelper.cs**: multi-command text parser + executor (on_error=continue/stop). **v0.37.0:** testable IsCompiling seam via CommandRouter (supports reload-latch testing)
@@ -607,40 +607,40 @@ Root cause: v0.42.0 asmdef split (7→9 assemblies) amplified 3 latent bugs into
 
 ### TIER1 (always visible, 42 core)
 
-Core (42): 24 base + 3 intent + 3 code-intel + 8 runtime + 4 session = get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects, set_parent, do, ask, get_metrics, animator_intent, vfx_intent, ui_intent, find_references, compile_preflight, semantic_at, invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest, ask_user, permission_prompt, await_compile, sync_unity
+Core (42): 24 CORE + 18 extras = get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, scene, search_scene, set_parent, get_console, get_compile_errors, get_enabled_tools, discover_tools, editor, do, ask, ask_user, permission_prompt, reconnect_unity, list_connections, resolve_tool_schema, doctor, screenshot, run_tests, setup_objects, set_properties, configure_objects, find_references, compile_preflight, semantic_at, await_compile, sync_unity, invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 
-### Category: object (8)
-find_objects, get_object_detail, get_components_list, set_active, set_material, wire_event, unwire_event, set_property_delta
+### Category: object (11, SCENE_EDIT + COMPONENTS)
+find_objects, get_object_detail, get_components_list, set_active, set_material, set_property_delta, object_diff, transfer_object, wire_event, unwire_event, auto_wire
 
 ### Category: animation (4)
 animation, timeline, animator, particle
 
-### Category: asset (6)
-asset, material, prefab, scriptable_object, project_settings, validate_move (v0.30.4)
+### Category: asset (8, ASSETS + SHADERS_MATERIAL)
+asset, prefab, scriptable_object, project_settings, shader, material, references, material_audit
 
-### Category: advanced (16)
-shader, references, validate_references, menu, checkpoint, recompile, execute_code, check_colliders, get_schema, scan_scene, spatial_query, auto_fix, smart_build, apply_template, save_template, list_templates
+### Category: advanced (27, ADVANCED_CODE + META)
+execute_code, recompile, sync_unity, find_references, semantic_at, compile_preflight, await_compile, get_schema, auto_fix, smart_build, checkpoint, undo_last, validate_references, menu, diagnose, animator_intent, setup_objects, set_properties, configure_objects, scan_scene, check_colliders, spatial_query, region_clear, navmesh_query, scene_health, set_llm_config, budget_status
 
-### Category: ui (4)
-create_ui, set_rect, validate_layout, get_spatial_context
+### Category: ui (6, UI + VFX)
+create_ui, set_rect, validate_layout, get_spatial_context, ui_intent, vfx_intent
 
-### Category: runtime (8)
-invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
+### Category: runtime (13, RUNTIME + UNIT_TESTS)
+invoke_method, set_runtime_property, wait_until, move_to, query_state, get_perf, debug_animator, debug_physics, run_tests, get_test_results, run_playtest, fuzz_playtest, test_step
 
 ### Category: connection (2)
 list_connections, reconnect_unity
 
-### Category: session (10)
-fingerprint, scene_diff, get_changes, save_session, load_session, screenshot_baseline, screenshot_compare, save_skill, use_skill, list_skills
+### Category: session (14, SESSION_SKILLS + SCREENSHOTS)
+save_skill, use_skill, list_skills, apply_template, save_template, list_templates, fingerprint, scene_diff, get_changes, save_session, load_session, screenshot, screenshot_baseline, screenshot_compare
 
-### Category: profiling (2, v0.60.0)
-profile, get_frame_stats
+### Category: profiling (3, v0.60.0)
+get_frame_stats, profile, get_memory
 
-### Category: rendering (3, v0.60.0)
-render_analyze, material_audit, analyze_lod_culling
+### Category: rendering (2, v0.60.0)
+render_analyze, analyze_lod_culling
 
-### Category: debug (5, v0.59.0+, moved from TIER1 v0.60.0)
-debug, snapshot, watch_add, watch_get, watch_remove, watch_clear, watch_reset, get_metrics
+### Category: debug (8, v0.59.0+, moved from TIER1 v0.60.0)
+debug, snapshot, watch_add, get_watches, watch_remove, watch_clear, watch_reset, get_metrics
 
 ## C# Commands (CommandRouter)
 
@@ -668,7 +668,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 - **Catalog serialization (v0.18.0+)**: Plain-text format sent to C# (`set_tool_catalog`): `CORE:tool1,tool2\nSCENE_EDIT:tool3,tool4\n...` via `CatalogParser.Parse()` (no JSON encoding). Reduces ~40% wire size vs JSON + eliminates C# JSON deserializer cost.
 - **Filtering pipeline**: (1) apply TIER1+session gating via `_apply_gating()`, (2) subtract disabled set from Unity MCPSettings via `_filter_tools()` (cache=None → gating-only fallback). Approach is "hide-disabled-set" (NOT allowlist — Python-only tools not in Unity's CSV wouldn't be wrongly hidden)
 - **Sessions**: session-enabled via `discover_tools(category, enable)` (legacy CATEGORIES dict still works for back-compat)
-- **Plugin self-registration**: `gating.register_tools("category", tools_set, tier1=tier1_subset)` lets plugins add to CATEGORIES + TIER1 without hardcoding
+- **Plugin self-registration**: `gating.register_tools("category", tools_set)` lets plugins add to CATEGORIES. Platform controls TIER1 membership (no tier1= escape hatch for plugins)
 - **Push catalog**: `_push_catalog()` sends Python-authoritative catalog to Unity on connect/reconnect via `set_tool_catalog` command (plain-text, TCP-only, silent on failure)
 - **Cache model**: `_disabled_tools_cache` (refreshed on connect/reconnect); None ⇒ gating-only mode
 
@@ -759,7 +759,7 @@ invoke_method, set_runtime_property, query_state, wait_until, move_to, test_step
 ### Intent Meta-Tools
 - `do(intent, dry_run)` — NL → Haiku plan → validate → batch execute
 - `ask(question)` — NL read-only question → deterministic route → Haiku summarize
-- `animator_intent`, `vfx_intent`, `ui_intent` — domain-specific NL intent tools (core)
+- `animator_intent`, `vfx_intent`, `ui_intent` — domain-specific NL intent tools (Tier2, discoverable via discover_tools)
 
 ### Test Infrastructure (C#: TestRunner + MultiSceneTestBase, v0.25.0)
 - **TestRunner.cs**: Wraps Unity Test Framework API with SessionState-based pending tracking. Exposes Execute(mode, onComplete, group, **filter**) with pipe-separated test class filtering. **filter="Class1|Class2"** runs ONLY matching groupNames (~2s vs ~65s full suite)
@@ -1056,8 +1056,8 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 
 ## Test Infrastructure
 
-### Python Tests: 2840 unit tests + 78 live integration tests + 4 live CLI tests
-- Default: `PYTHONWARNDEFAULTENCODING=1 pytest -m "not live" -q` — unit tests, $0 cost (2840 tests, includes test_llm_config.py + test_ask.py + intent tests)
+### Python Tests: (See CLAUDE.md Commands section for live count)
+- Default: `PYTHONWARNDEFAULTENCODING=1 pytest -m "not live" -q` — unit tests, $0 cost (see CLAUDE.md for exact test count)
 - With Unity: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> pytest -m "live and not live_cli" -q` — 78 live integration tests, $0 cost (requires Unity running, sampling disabled)
 - Real CLI: `PYTHONWARNDEFAULTENCODING=1 UNITY_MCP_PORT=<port> UNITY_MCP_VISUAL_VERIFY=1 pytest -m "live_cli" -v` — 4 real CLI tests, ~$0.001/call (requires Unity + claude CLI, visual verification enabled)
 - Test order: unit → C# EditMode → C# PlayMode → live integration → live_cli (live/live_cli always last, occupy TCP)
@@ -1123,7 +1123,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 - `server/src/unity_mcp/sampling_postproc.py` — Haiku output normalizer
 
 **C#** (165+ files, 17800+ LOC):
-- **Core** (55+ files): MCPServer, CommandRouter (3 partials), CommandRegistry/Schema, IMCPPlugin/PluginRegistry, ObjectManager, ValueParser, InputNormalizer, BatchHelper, HierarchySerializer, ComponentSerializer, RefManager, ErrorHelper, RuntimeHelper, PlaytestRunner (2 partials), PlaytestParser, MultiViewCapture, CodeExecutor, SearchHelper, SpatialHelper, AnimationHelper, TimelineHelper, AnimatorControllerHelper, ParticleHelper, ShaderHelper, ShaderGraphHelper, UIHelper, ReferenceHelper, AssetDatabaseHelper, ProjectSettingsHelper, MaterialHelper, PrefabHelper, ScriptableObjectHelper, MCPSettings (data class), MCPToolSettingsWindow, MCPPermissionsWindow, MCPConnectionWindow, MCPStatusWindow, MCPStatusModel, MCPStatusBarWidget, MCPActions, ChatSettingsHook (event hook)
+- **Core** (55+ files): MCPServer, CommandRouter (3 partials), CommandRegistry/Validator, IMCPPlugin/PluginRegistry, ObjectManager, ValueParser, InputNormalizer, BatchHelper, HierarchySerializer, ComponentSerializer, RefManager, ErrorHelper, RuntimeHelper, PlaytestRunner (2 partials), PlaytestParser, MultiViewCapture, CodeExecutor, SearchHelper, SpatialHelper, AnimationHelper, TimelineHelper, AnimatorControllerHelper, ParticleHelper, ShaderHelper, ShaderGraphHelper, UIHelper, ReferenceHelper, AssetDatabaseHelper, ProjectSettingsHelper, MaterialHelper, PrefabHelper, ScriptableObjectHelper, MCPSettings (data class), MCPToolSettingsWindow, MCPPermissionsWindow, MCPConnectionWindow, MCPStatusWindow, MCPStatusModel, MCPStatusBarWidget, MCPActions, ChatSettingsHook (event hook)
 - **Debug Subsystem (v0.59.0)** (12 files): MCPDebugPanel, MCPDebugUI (5 partials: WatchRows, EvalBar, AddWatch, ConsolePreview), DebugOverlayDrawer, SparklineHelper, ProfilerHelper, MemoryHelper, AnimatorHelper, PhysicsHelper, WatchEntry, WatchCondition, WatchEvaluator, WatchRegistry, WatchScheduler, WatchCommandHandler (+ 10 test files: WatchEntryTests, WatchRegistryTests, ProfilerHelperTests, SparklineHelperTests, WatchEvaluatorTests, WatchCommandHandlerTests, MCPDebugUITests, WatchConditionTests, MemoryHelperTests, AnimatorHelperTests, PhysicsHelperTests). Stylesheet: MCPDebug.uss.
 - **Chat Module** (130+ files, optional behind UNITY_MCP_CHAT define, v0.29.2 split into CLI + View assemblies, v0.66.6 unified RelayBackend):
   - **CLI Assembly** (UnityMCP.Editor.Chat.CLI, protocol + single RelayBackend, compiles independently when main broken):
@@ -1263,7 +1263,7 @@ Claude → MCP tool call → TCP send → Unity dispatch → Serialize → TCP r
 **NUnit Test Count (v0.44.0)**
 - **Total: 3945 EditMode + PlayMode** (was 3912), +33 new tests (12 LevelUp + 9 Config + 12 misc)
 - **Green: 3945** (5 pre-existing reds, same as v0.42.0)
-- **Python pytest: 2840** (current count; see CLAUDE.md for exact command)
+- **Python pytest**: see CLAUDE.md Commands section for live count and exact test command
 
 ## Related
 

@@ -9,6 +9,9 @@ namespace UnityMCP.Editor.Chat
 {
     public sealed class ChatTranscript
     {
+        // Local to this file — kill-switch EditorPrefs key for scene-name normalization.
+        private const string DisableSceneNameNormKey = "MCPChat.DisableSceneNameNorm";
+
         private readonly VisualElement             _container;
         private readonly ChatBlockRendererRegistry _registry;
         private readonly StringBuilder             _assistantRaw = new StringBuilder();
@@ -216,8 +219,8 @@ namespace UnityMCP.Editor.Chat
                 }
             }
             // Scene object normalization: convert bare names even when no chips were sent.
-            // Kill-switch: EditorPrefs.GetBool("MCPChat.DisableSceneNameNorm", false) disables this pass.
-            if (!UnityEditor.EditorPrefs.GetBool("MCPChat.DisableSceneNameNorm", false))
+            // Kill-switch: EditorPrefs.GetBool(DisableSceneNameNormKey, false) disables this pass.
+            if (!UnityEditor.EditorPrefs.GetBool(DisableSceneNameNormKey, false))
             {
                 var sceneMap = SceneObjects?.Invoke();
                 if (sceneMap != null && sceneMap.Count > 0)

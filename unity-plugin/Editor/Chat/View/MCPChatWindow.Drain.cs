@@ -18,7 +18,7 @@ namespace UnityMCP.Editor.Chat
         private void SaveStateBeforeReload()
         {
             // F21: save transcript before UI tree is destroyed
-            SessionState.SetString("MCPChat_Transcript",
+            SessionState.SetString(PrefKeys.ChatTranscript,
                 _transcript?.SerializeForReload() ?? "");
             string[] chipPaths, kindKeys;
             int[]    chipOffsets;
@@ -48,7 +48,7 @@ namespace UnityMCP.Editor.Chat
             var state = new PendingTurnState(
                 isIdle ? null
                        : (_backend?.SessionId
-                          ?? SessionState.GetString("MCPChat_BackendSessionId", null)),
+                          ?? SessionState.GetString(PrefKeys.ChatBackendSessionId, null)),
                 inputText,
                 chipPaths,
                 _agentMode,
@@ -225,7 +225,7 @@ namespace UnityMCP.Editor.Chat
             _transcript.FlushStreaming();
             // _needsRefresh is now debounced to TurnDone (HandleEvent case TurnDone).
             // Do NOT act on it here — mid-stream partial compiles cause phantom CS errors.
-            if (EditorPrefs.GetBool("MCPChat.AutoScroll", true))
+            if (EditorPrefs.GetBool(PrefKeys.ChatAutoScroll, true))
                 _scroll.scrollOffset = new Vector2(0, float.MaxValue);
         }
 

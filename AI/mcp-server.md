@@ -2,7 +2,7 @@
 
 ## Overview
 
-Python MCP server with 99 core registered tools for controlling Unity Editor. `_UnstructuredMCP(FastMCP)` subclass (v0.50.3) + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically. Structured output disabled on all tools to eliminate duplicate `content` + `structuredContent` in MCP responses (reduces size & parsing overhead).
+Python MCP server with 120 MCP tools for controlling Unity Editor. `_UnstructuredMCP(FastMCP)` subclass (v0.50.3) + ConnectionSlot + capability gating + 23 middleware layers. External plugins can add more tools dynamically. Structured output disabled on all tools to eliminate duplicate `content` + `structuredContent` in MCP responses (reduces size & parsing overhead).
 
 ## Architecture (for Architect)
 
@@ -45,50 +45,42 @@ server/src/unity_mcp/
     └── __init__.py              # 3-source auto-discovery (pkgutil, entry_points, UNITY_MCP_PLUGIN_DIRS)
 ```
 
-### Tools (99 core)
+### Tools (120 total)
 
 **TIER1 — always visible (42 tools):**
 
-Core (20): get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, get_console, get_compile_errors, screenshot, scene, editor, search_scene, run_tests, discover_tools, get_enabled_tools, setup_objects, set_properties, configure_objects
+Core (24): get_hierarchy, get_component, inspect, set_property, create_object, delete_object, manage_component, batch, scene, search_scene, set_parent, get_console, get_compile_errors, get_enabled_tools, discover_tools, editor, do, ask, ask_user, permission_prompt, reconnect_unity, list_connections, resolve_tool_schema, doctor
 
-Meta (4): do, ask, ask_user, permission_prompt
-
-Intent (3): animator_intent, vfx_intent, ui_intent
-
-Code Intel (5): find_references, compile_preflight, semantic_at, await_compile, sync_unity
-
-Runtime (8): invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
-
-Other (2): get_metrics, set_parent
+Other (18): screenshot, run_tests, setup_objects, set_properties, configure_objects, find_references, compile_preflight, semantic_at, await_compile, sync_unity, invoke_method, set_runtime_property, wait_until, move_to, query_state, test_step, run_playtest, fuzz_playtest
 
 ### Compile-Tool Corroboration (v0.7.0+)
 
 `get_compile_errors`, `await_compile`, `auto_fix`, and `ask` now cross-verify clean responses via `editor_log.py`: an out-of-band reader of Unity's `Editor.log` that catches cases where the in-plugin C# reporter is itself broken (stale bytecode, unsafe to trust). Only overrides when both signals agree: log shows errors AND dll is stale. Zero false positives (fresh dll trusted). Resolves P0 silent-blindness bug where plugin compile failures masked themselves.
 
-**Ungated (always visible, not in TIER1 or categories — pass through as "unknown"):**
-
-get_test_results, budget_status, diagnose
-
 **Category-gated (enabled via `discover_tools`):**
 
 | Category | Tools |
 |----------|-------|
-| object | find_objects, get_object_detail, get_components_list, set_active, set_material, wire_event, unwire_event, set_property_delta, object_diff, transfer_object |
+| object | find_objects, get_object_detail, get_components_list, set_active, set_material, wire_event, unwire_event, auto_wire, set_property_delta, object_diff, transfer_object |
 | animation | animation, timeline, animator, particle |
-| asset | asset, material, prefab, scriptable_object, project_settings, shader, references |
-| advanced | auto_fix, await_compile, check_colliders, checkpoint, compile_preflight, execute_code, find_references, get_schema, menu, recompile, scan_scene, semantic_at, smart_build, spatial_query, validate_references, validate_layout, diagnose |
-| ui | create_ui, set_rect, get_spatial_context, ui_intent, vfx_intent |
-| runtime | run_tests, get_test_results, run_playtest, fuzz_playtest |
-| connection | (empty — list_connections + reconnect_unity are in TIER1/CORE) |
-| session | fingerprint, scene_diff, get_changes, save_session, load_session, screenshot, screenshot_baseline, screenshot_compare, save_skill, use_skill, list_skills, apply_template, save_template, list_templates |
+| asset | asset, material, prefab, scriptable_object, project_settings, shader, references, material_audit |
+| advanced | execute_code, recompile, get_schema, auto_fix, smart_build, checkpoint, undo_last, validate_references, menu, diagnose, scan_scene, check_colliders, spatial_query, region_clear, navmesh_query, scene_health, set_llm_config, budget_status |
+| ui | create_ui, set_rect, validate_layout, get_spatial_context, ui_intent, vfx_intent |
+| runtime | get_test_results, get_perf, debug_animator, debug_physics |
+| session | fingerprint, scene_diff, get_changes, save_session, load_session, screenshot_baseline, screenshot_compare, save_skill, use_skill, list_skills, apply_template, save_template, list_templates |
+| debug | debug, snapshot, watch_add, get_watches, watch_remove, watch_clear, watch_reset, get_metrics |
+| profiling | get_frame_stats, profile, get_memory |
+| rendering | render_analyze, analyze_lod_culling |
+| plugins | (auto-gated: tools registered without register_tools() call) |
+| connection | (empty — list_connections and reconnect_unity are in TIER1/CORE) |
 
 ### Capability Gating (gating.py)
 
-- TIER1 tools always visible to LLM
+- TIER1 tools (42) always visible to LLM
 - Categories enabled per-session via `discover_tools(category, enable=True)`
 - Double-filtered: Python gating × Unity-side MCPSettings (tool cache from `get_enabled_tools`)
-- Unknown (plugin) tools pass through by default
-- Plugin self-registration: `gating.register_tools("category", tools_set, tier1=subset)` lets plugins add to CATEGORIES + TIER1
+- Unknown (plugin) tools auto-gated to hidden `plugins` category by default
+- Plugin self-registration: `gating.register_tools("category", tools_set)` adds tools to Tier2 category (no tier1 escape hatch — platform controls TIER1 membership)
 
 **Tool Visibility Logic (v0.57.0, commit 2fac0bd)** — fixed AND logic in `server_filtering.py`:
 - Previously: tool visibility had OR bug; disabled tools remained visible
@@ -170,7 +162,7 @@ Simplified detector for Unity C# compile/domain-reload:
 
 - `do(intent, dry_run)` — NL → Haiku plan → validate → batch execute
 - `ask(question)` — NL read-only question → deterministic route → Haiku summarize
-- `animator_intent`, `vfx_intent`, `ui_intent` — domain-specific NL intent tools (core)
+- `animator_intent`, `vfx_intent`, `ui_intent` — domain-specific NL intent tools (Tier2, discoverable via discover_tools)
 
 ### MCP Resources (resources.py)
 

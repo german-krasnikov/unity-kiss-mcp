@@ -28,7 +28,7 @@ namespace UnityMCP.Editor.Chat
             {
                 _sessionId = value;
                 if (!string.IsNullOrEmpty(value))
-                    SessionState.SetString("MCPChat_BackendSessionId", value);
+                    SessionState.SetString(PrefKeys.ChatBackendSessionId, value);
             }
         }
 

@@ -1,6 +1,8 @@
 """ToolPlan dataclass and canonical templates for ask() tool."""
 from dataclasses import dataclass
 
+from ..console_levels import PROBLEM_LEVELS
+
 
 @dataclass
 class ToolPlan:
@@ -19,7 +21,7 @@ CANONICAL_PLANS: dict[str, ToolPlan | None] = {
         [
             ("scan_scene", {}),
             ("validate_references", {"path": "/", "depth": "3"}),
-            ("get_console", {"count": "10", "level": "Error"}),
+            ("get_console", {"count": "10", "level": PROBLEM_LEVELS}),
             ("get_compile_errors", {}),
         ],
         "summarize top issues",

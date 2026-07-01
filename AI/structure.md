@@ -9,9 +9,9 @@ unity-kiss-mcp/
 │   ├── ui.py                   # Terminal UI (prompt, confirm, boxes, colors)
 │   ├── commands.py             # Subcommand implementations (setup, update, doctor, configure, uninstall, connect, disconnect, pull - v0.45.0)
 │   └── tests/                  # Bootstrap + UI + install tests
-├── server/                     # Python MCP Server (2970 unit tests total, v0.66.0: +27 diagnose/reload stability tests; v0.65.0: +8 run_tests pre-flight gate tests; v0.64.0: +75 polyline/scene tests; v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
+├── server/                     # Python MCP Server (see CLAUDE.md Commands section for current test count; v0.66.0: +27 diagnose/reload stability tests; v0.65.0: +8 run_tests pre-flight gate tests; v0.64.0: +75 polyline/scene tests; v0.54.1: +54 connection/focus-loss stability tests; v0.47.1: +151 config validation tests)
 │   ├── src/unity_mcp/
-│   │   ├── server.py           # _UnstructuredMCP(FastMCP) instance, lifespan, 99 registered MCP tools (v0.50.3)
+│   │   ├── server.py           # _UnstructuredMCP(FastMCP) instance, lifespan, 120 registered MCP tools (v0.50.3)
 │   │   ├── bridge.py           # UnityBridge (TCP, heartbeat, SO_KEEPALIVE)
 │   │   ├── connection_slot.py  # ConnectionSlot: dual connections (CLI + Chat agent)
 │   │   ├── chat_relay.py       # Chat relay TCP server: 5 backends, deferred spawn for single-turn, _TRANSFORM_FNS dispatch, EOF handling (v0.67.0: +output_format/reads_stdin, +close_stdin, role-aware ping)
@@ -128,7 +128,7 @@ unity-kiss-mcp/
 │   │   │   └── _annotations.py          # Tool annotations
 │   │   └── plugins/            # Plugin system — 3-source auto-discovery (auto-disabled via UNITY_MCP_SKIP_PLUGINS env)
 │   │       └── __init__.py     # load_plugins(mcp, send_fn, args_fn), 3-source discovery, UNITY_MCP_SKIP_PLUGINS filtering
-│   └── tests/                  # 2970 unit tests + 80 live tests + conftest.py (v0.66.0: +relay/stream_transform tests; v0.59.0: +11 debug tests; v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests)
+│   └── tests/                  # Test suite (see CLAUDE.md Commands section for current count; v0.66.0: +relay/stream_transform tests; v0.59.0: +11 debug tests; v0.26.0 quality audit, v0.30.4: +2 asset validate_move baseline, v0.42.0: +25 config/TOML tests, v0.47.1: +151 config validation tests)
 │       ├── helpers.py                  # DRY: make_mock_bridge() + shared test utilities (v0.26.0)
 │       ├── test_server*.py             # Core + edge cases + tools
 │       ├── test_bridge*.py             # TCP bridge + reconnect + resilience
@@ -214,7 +214,7 @@ unity-kiss-mcp/
 │       ├── PluginUIHelpers.cs              # Convenience UI builders (MakeCard, InlineRow, AddTextField/Toggle/Slider/IntSlider/Dropdown with auto-persist, LoadStyles, v0.65.1)
 │       ├── PluginToolGrouping.cs           # Stateless grouping by subcategory (v0.55.10)
 │       ├── CommandRegistry.cs              # Command registration + runtime flag
-│       ├── CommandSchema.cs                # Parameter validation + fuzzy matching
+│       ├── CommandValidator.cs             # Parameter validation via contract at Register() + fuzzy matching
 │       ├── ObjectManager.cs                # CRUD + Undo + SetActive + WireEvent + SetParent
 │       ├── ObjectManager.Properties.cs     # Property setter + auto-redirect (v0.23.0: set_property("active") → SetActive)
 │       ├── ObjectManager.Transfer.cs       # Move/copy objects between scenes (v0.24.3: transfer_object)
@@ -255,7 +255,11 @@ unity-kiss-mcp/
 │       ├── ProjectSettingsHelper.cs + MaterialHelper.cs
 │       ├── PrefabHelper.cs + ScriptableObjectHelper.cs
 │       ├── GameStateHelper.cs + TestRunner.cs # TestRunner v0.25.0: filter param (pipe-separated class names), SessionState-based pending tracking
-│       ├── ConsoleCapture.cs + CompileErrorCapture.cs + CompileNotifier.cs
+│       ├── ConsoleCapture.cs               # Logs → text (Issue 27: orchestrates ring buffer + problem persistence)
+│       ├── ConsoleRingBuffer.cs            # Bounded in-memory log capture: init buffer (50, 5s window) + ring (450 entries)
+│       ├── ConsoleProblemPersistence.cs    # SessionState-persisted problem entries (Error/Exception/Assert) across domain reload
+│       ├── PrefKeys.cs                     # Central SessionState/EditorPrefs key literals (DRY)
+│       ├── CompileErrorCapture.cs + CompileNotifier.cs
 │       ├── FingerprintHelper.cs + ScanHelper.cs + SceneDiffHelper.cs
 │       ├── ChangeWatcher.cs + ColliderChecker.cs + SchemaHelper.cs
 │       ├── MCPSettings.cs                 # Pure static data class (catalog, EnabledTools, no EditorWindow)

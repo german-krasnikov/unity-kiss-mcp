@@ -1,6 +1,8 @@
 """Tests for MCP resources (Part B)."""
 from unittest.mock import AsyncMock
 
+from unity_mcp.console_levels import PROBLEM_LEVELS
+
 
 async def test_hierarchy_resource():
     from unity_mcp import resources
@@ -14,7 +16,7 @@ async def test_console_errors_resource():
     from unity_mcp import resources
     resources._send = AsyncMock(return_value="[Error] NullRef")
     result = await resources.console_errors()
-    resources._send.assert_called_once_with("get_console", {"count": 20, "level": "Error"})
+    resources._send.assert_called_once_with("get_console", {"count": 20, "level": PROBLEM_LEVELS})
     assert "Error" in result
 
 

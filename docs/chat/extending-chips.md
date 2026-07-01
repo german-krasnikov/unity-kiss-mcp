@@ -131,18 +131,18 @@ namespace MyPlugin.Chat
             Selection.activeObject = asset;
         }
 
-        // Build an inline preview VisualElement for the given path.
-        // Return null if this provider has no visual preview.
-        // Called lazily when the preview panel is opened (not on every render).
-        public VisualElement BuildPreview(string path)
+        // Append custom menu items to the chip's context menu (right-click on transcript chip).
+        // This allows plugins to add actions beyond the default Navigate/Ping/Copy options.
+        public void AppendContextMenuItems(DropdownMenu menu, string reference)
         {
-            var asset = AssetDatabase.LoadAssetAtPath<Object>(path);
-            if (asset == null)
-                return null;
-
-            // Example: display asset name in a Label
-            var label = new UnityEngine.UIElements.Label($"Preview: {asset.name}");
-            return label;
+            menu.AppendAction("Custom Action", action =>
+            {
+                var asset = AssetDatabase.LoadAssetAtPath<Object>(reference);
+                if (asset != null)
+                {
+                    Debug.Log($"Custom action invoked on {asset.name}");
+                }
+            });
         }
     }
 }
@@ -171,7 +171,7 @@ Your plugin will auto-register on domain load and appear in chip detection.
 | `FormatPayload(chip, ctx)` | `string` (method) | Render AI-facing bracket text. Return `""` to omit. |
 | `Navigate(reference)` | `void` (method) | Handle click on a chip link (e.g., open asset, select object) |
 | `Ping(reference)` | `void` (method) | Highlight/ping object when inline preview first shown |
-| `BuildPreview(path)` | `VisualElement` (method) | Build inline preview element for lazy-load panel. Return null if no preview. |
+| `AppendContextMenuItems(menu, reference)` | `void` (method) | Add custom context menu items to chip (e.g., "Custom Action"). Called on right-click in transcript. |
 
 ### ChipKindRegistry Public API
 

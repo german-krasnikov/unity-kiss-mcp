@@ -138,6 +138,7 @@ Natural language → UI DSL → batch create_ui commands. Convert NL description
 - `intent` (string) — Natural language description (e.g., "Create a health bar at top-left, score at top-right")
 - `parent` (string, optional) — Parent path (default: new Canvas)
 - `template` (string, optional) — Preset: "hud" | "menu" | "dialog" | "grid"
+- `dry_run` (bool, optional) — If True, return DSL without executing (default: False)
 
 **Templates:**
 
@@ -155,7 +156,7 @@ Natural language → UI DSL → batch create_ui commands. Convert NL description
 result = await ui_intent(intent="Create a health bar at the top-left showing red, and score counter at top-right showing white text")
 
 # Use preset template
-result = await ui_intent(template="hud", parent="Canvas")
+result = await ui_intent(intent="Create HUD", template="hud", parent="Canvas")
 
 # Create menu from intent
 result = await ui_intent(intent="Main menu with Play, Settings, Quit buttons centered on screen")
@@ -235,4 +236,4 @@ result = await validate_layout(root="Dungeon", min_distance=5.0)
 
 ---
 
-**See also:** [Scene Tools](scene.md) for screenshot with UI, [Spatial Tools](spatial.md) for advanced layout queries, [Objects Tools](objects.md) for component management.
+**See also:** [Scene Tools](scene.md) for screenshot with UI, [Objects Tools](objects.md) for component management.

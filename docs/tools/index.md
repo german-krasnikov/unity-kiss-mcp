@@ -1,10 +1,10 @@
 # Tools Reference
 
-99 MCP tools organized by category. Every tool is documented with parameters, examples, and real-world usage patterns.
+120 MCP tools organized by category. Every tool is documented with parameters, examples, and real-world usage patterns.
 
 ## How Tools Work
 
-**TIER1 tools (42 core)** — Always visible to your AI assistant.
+**TIER1 tools (43 core)** — Always visible to your AI assistant.
 
 **Category-gated tools** — Enable via `discover_tools(category, enable=True)` or through the Unity MCP Settings panel.
 
@@ -81,21 +81,11 @@
 - do, ask, ask_user, permission_prompt
 - reconnect_unity, list_connections, resolve_tool_schema, doctor
 
-**Intent (3):**
-- animator_intent, vfx_intent, ui_intent
-
-**Code Intel (5):**
+**Non-Core TIER1 (18):**
+- screenshot, run_tests, setup_objects, set_properties, configure_objects
 - find_references, compile_preflight, semantic_at, await_compile, sync_unity
-
-**Runtime (8):**
 - invoke_method, set_runtime_property, wait_until, move_to, query_state
 - test_step, run_playtest, fuzz_playtest
-
-**Other (2):**
-- get_metrics, set_parent
-
-**Ungated (always visible, not counted in TIER1):**
-- get_test_results, budget_status, diagnose
 
 ## Enabling Tools by Category
 
@@ -122,6 +112,12 @@ After enabling, the tools appear in your AI's tool list and become callable.
 - `ui` — UI element creation & layout
 - `runtime` — Runtime property access
 - `session` — State snapshots, visual baselines, templates
+- `connection` — TCP status, multi-instance management
+- `debug` — Runtime debugging, watches, performance snapshots
+- `profiling` — Frame stats, memory analysis, performance profiling
+- `rendering` — LOD culling analysis, render optimization
+- `perf` — Profiling & rendering combined
+- `plugins` — Plugin-registered tools (auto-discovered)
 
 ## Batch: Combine Operations for Token Savings
 
@@ -143,7 +139,7 @@ get_component path=Player component=Transform
 
 **Result:** 93% fewer tokens, same outcome.
 
-See [Batch Reference](batch.md) for all 35+ commands.
+See [Batch Reference](batch.md) for all batch-eligible commands.
 
 ## Tool Status & Discovery
 
@@ -175,7 +171,7 @@ This helps your AI assistant optimize its decision tree — it only offers tools
 
 3. Check for plugin errors:
    ```python
-   await get_console(level="error")
+   await get_console(level="Error,Exception,Assert")  # All problem levels (per PROBLEM_LEVELS convention)
    ```
 
 4. Run diagnostics:

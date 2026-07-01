@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Text;
 
 namespace UnityMCP.Editor
@@ -9,15 +8,18 @@ namespace UnityMCP.Editor
         internal static void RegisterAll()
         {
             // watch_add: runtime-only (polling only makes sense in Play Mode)
-            CommandRegistry.Register("watch_add", ExecWatchAdd, runtime: true);
+            CommandRegistry.Register("watch_add", ExecWatchAdd, runtime: true,
+                required: "path,component,field", optional: "condition,action,interval_ms");
             // read/management: available outside Play Mode too
-            CommandRegistry.Register("get_watches",  _ => ExecGetWatches());
+            CommandRegistry.Register("get_watches",  _ => ExecGetWatches(),
+                required: "", optional: "");
             CommandRegistry.Register("watch_remove", args =>
             {
                 var id = JsonHelper.ExtractString(args, "id");
                 return WatchRegistry.Remove(id ?? "") ? $"removed {id}" : $"not found: {id}";
-            });
-            CommandRegistry.Register("watch_clear",  _ => { WatchRegistry.Clear(); WatchRegistry.Save(); return "cleared"; });
+            }, required: "id", optional: "");
+            CommandRegistry.Register("watch_clear",  _ => { WatchRegistry.Clear(); WatchRegistry.Save(); return "cleared"; },
+                required: "", optional: "");
             CommandRegistry.Register("watch_reset",  args =>
             {
                 var id = JsonHelper.ExtractString(args, "id");
@@ -27,7 +29,7 @@ namespace UnityMCP.Editor
                     return $"reset {id}";
                 }
                 return $"not found: {id}";
-            });
+            }, required: "id", optional: "");
         }
 
         private static string ExecWatchAdd(string args)
@@ -40,11 +42,7 @@ namespace UnityMCP.Editor
             if (string.IsNullOrEmpty(field))     throw new ArgumentException("'field' is required");
             var condition = JsonHelper.ExtractString(args, "condition") ?? "";
             var action    = JsonHelper.ExtractString(args, "action") ?? "log";
-            var intervalStr = JsonHelper.ExtractString(args, "interval_ms");
-            float interval = 500f;
-            if (intervalStr != null)
-                float.TryParse(intervalStr, NumberStyles.Float,
-                    CultureInfo.InvariantCulture, out interval);
+            var interval  = CommandRouter.ExtractFloat(args, "interval_ms", 500f);
 
             var id = WatchRegistry.Add(path, component, field, condition, action, interval);
             if (id == null) throw new System.Exception("MaxWatches (20) reached — remove some first");

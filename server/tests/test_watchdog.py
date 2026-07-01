@@ -2,6 +2,7 @@
 import asyncio
 import time
 from unittest.mock import AsyncMock
+from unity_mcp.console_levels import PROBLEM_LEVELS
 from unity_mcp.watchdog import ProactiveWatchdog
 
 
@@ -189,6 +190,19 @@ async def test_dedup_within_60s_returns_no_alert():
 
 
 # ── F01-qw: watchdog gather ────────────────────────────────────────────────────
+
+async def test_watchdog_scan_uses_problem_levels():
+    """Issue 27: _scan's get_console call must scan Error+Exception+Assert, not just Error."""
+    seen_args = {}
+
+    async def send(cmd, args, **kw):
+        if cmd == "get_console":
+            seen_args["level"] = args["level"]
+        return ""
+    wd = ProactiveWatchdog(send)
+    await wd._scan()
+    assert seen_args["level"] == PROBLEM_LEVELS
+
 
 async def test_watchdog_scan_dispatches_pings_concurrently():
     """F01-behavioral: _scan must dispatch its two probes concurrently (gather), not serially."""

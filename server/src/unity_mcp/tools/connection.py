@@ -1,7 +1,10 @@
+from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ._annotations import RO as _RO, RW_IDEM as _RW_IDEM
 
 _get_slot = None
+_refresh_tools_cache = None
+_push_catalog = None
 
 
 async def list_connections() -> str:
@@ -13,7 +16,7 @@ async def list_connections() -> str:
     return f"port {s.port} ({status})"
 
 
-async def reconnect_unity(port: int = 0) -> str:
+async def reconnect_unity(port: int = 0, ctx: Context = None) -> str:
     """Reconnect to Unity. Port 0 or omitted = auto-discover from port files."""
     s = _get_slot() if _get_slot else None
     if s is None:
@@ -21,11 +24,26 @@ async def reconnect_unity(port: int = 0) -> str:
     if port <= 0:
         from unity_mcp.server_filtering import read_unity_port
         port = read_unity_port()
-    return await s.connect(port)
+    result = await s.connect(port)
+    if s.connected:
+        from unity_mcp.tools.gating import reset as _reset_gating
+        _reset_gating()  # clear session-enabled tools only after a successful connect —
+        # a failed connect must not wipe gating for the still-active prior project.
+        if _refresh_tools_cache is not None:
+            await _refresh_tools_cache(s.bridge)
+        if _push_catalog is not None:
+            await _push_catalog(s.bridge)
+        if ctx is not None:
+            # Manual reconnect must invalidate the client's in-session tool list —
+            # no debounce here (unlike automatic reconnects), the user explicitly asked.
+            await ctx.session.send_tool_list_changed()
+    return result
 
 
-def register(mcp, send, args, *, get_slot, **_kw):
-    global _get_slot
+def register(mcp, send, args, *, get_slot, refresh_tools_cache=None, push_catalog=None, **_kw):
+    global _get_slot, _refresh_tools_cache, _push_catalog
     _get_slot = get_slot
+    _refresh_tools_cache = refresh_tools_cache
+    _push_catalog = push_catalog
     mcp.tool(annotations=_RO)(list_connections)
     mcp.tool(annotations=_RW_IDEM)(reconnect_unity)

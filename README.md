@@ -222,7 +222,7 @@ This clones the repo, creates a venv, installs dependencies, configures your AI 
 
 </details>
 
-<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 8743 Tests (3845 Python · 4614 Unity · 284 Live) · 80–95% Batch Savings">
+<img src="docs/assets/stats.svg" width="100%" alt="120 MCP Tools · 4412 Tests (3898 Python · 230 Unity · 284 Live) · 80–95% Batch Savings">
 
 <img src="docs/assets/divider-wave.svg" width="100%" alt="">
 
@@ -281,6 +281,13 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 
 <!-- CHANGELOG_START -->
 <details>
+<summary><b>v0.68.0</b> — 2026-07-01 — **Issue 23: Batch DSL with CommandValidator** — CommandValidator replaces …</summary>
+
+**Issue 23: Batch DSL with CommandValidator** — CommandValidator replaces CommandSchema as source of truth.
+
+</details>
+
+<details>
 <summary><b>v0.67.1</b> — 2026-06-29 — **output_format Discriminator** — Replaces `uses_stream_json: bool` with typed …</summary>
 
 **output_format Discriminator** — Replaces `uses_stream_json: bool` with typed `output_format` enum (5 values: `stream-json`, `codex-json`, …
@@ -309,15 +316,9 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 </details>
 
 <details>
-<summary><b>v0.65.0</b> — 2026-06-27 — **Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` …</summary>
-
-**Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` blocks test execution if compilation unstable.
-
-</details>
-
-<details>
 <summary>Older releases</summary>
 
+- **v0.65.0** — 2026-06-27 — **Python run_tests Pre-Flight Gate** — `diagnose(expected_compile=False)` …
 - **v0.64.0** — 2026-06-27 — **T1: Bare-Name Chip Detection** — `SceneObjectNormalizer._resolver?.Refresh()` …
 - **v0.63.0** — 2026-06-27 — **IToolbarButtonProvider.MenuOnly DIM** — New default interface member `bool …
 - **v0.62.0** — 2026-06-26 — **Error Resolver Toolbar** — Chat toolbar button ("Fix Errors") for …
@@ -442,7 +443,7 @@ Drop the file in `tools/` and add it to `tools/__init__.py` — it registers on 
 <details>
 <summary><b>How is this different from Unity 6.2's built-in AI assistant?</b></summary>
 
-Unity's built-in AI is limited to code generation. Unity MCP gives full editor control: scene CRUD, animation, VFX, playtesting, screenshots. 99 tools vs basic code completion.
+Unity's built-in AI is limited to code generation. Unity MCP gives full editor control: scene CRUD, animation, VFX, playtesting, screenshots. 120 tools vs basic code completion.
 
 </details>
 
@@ -493,14 +494,14 @@ Yes. Drop a Python file in `tools/`, add it to `__init__.py`, implement the `reg
 
 | Feature | Unity MCP | CoplayDev | IvanMurzak | CoderGamester |
 |---------|-----------|-----------|------------|---------------|
-| MCP Tools | 99 | ~40 | 70+ | 28 |
+| MCP Tools | 120 | ~40 | 70+ | 28 |
 | In-Editor Chat | ✅ 5 backends | ❌ | ❌ | ❌ |
 | Token Optimization | 80-95% batch savings | ❌ | ❌ | ❌ |
 | One-Liner Install | ✅ curl/iex | ❌ | ❌ | ❌ |
 | PlayTest DSL | ✅ 21 commands | ❌ | ❌ | ❌ |
 | Multi-Scene Support | ✅ | ❌ | ✅ | ❌ |
 | AI Backends | 9 (Claude, Codex, Kimi, Antigravity, OpenCode, etc.) | 1 | 4 | 9 |
-| Tests | 7,274 | — | — | — |
+| Tests | 8,743 | — | — | — |
 | Code Intelligence | ✅ Roslyn-powered | ❌ | ❌ | ❌ |
 | Cross-Platform | ✅ Win/Mac/Linux | ✅ | ✅ | ✅ |
 | License | MIT | MIT | MIT | MIT |
@@ -512,10 +513,10 @@ Yes. Drop a Python file in `tools/`, add it to `__init__.py`, implement the `reg
 ## Contributing
 
 ```bash
-# Python unit tests (no Unity, 2728 tests)
+# Python unit tests (no Unity, 3845 tests)
 cd server && pytest -m "not live" -q
 
-# Python live integration tests (Unity running on :9500, 78 tests)
+# Python live integration tests (Unity running on :9500, 80 tests)
 pytest -m "live and not live_cli" -q
 
 # C# EditMode tests (no play mode)
@@ -523,8 +524,8 @@ pytest -m "live and not live_cli" -q
 ```
 
 **Test Tiers:**
-- **Tier 1 (Unit):** Mocked Python (230 tests, $0) + C# EditMode (2389 tests, $0)
-- **Tier 2 (Integration):** Python live (78 tests, $0) + NUnit PlayMode (73 tests, $0) + reload stability (39 tests, $0)
+- **Tier 1 (Unit):** LLM-mocked Python (230 tests, $0) + C# EditMode (4614 tests, $0)
+- **Tier 2 (Integration):** Python live (80 tests, $0) + NUnit PlayMode (73 tests, $0) + reload stability (36 tests, $0)
 - **Tier 3 (CLI):** Real `claude` CLI with interactive I/O (4 tests, ~$0.004)
 
 Architecture overview: [`AI/architecture.md`](AI/architecture.md) · Full tool catalog: [`AI/mcp-server.md`](AI/mcp-server.md)

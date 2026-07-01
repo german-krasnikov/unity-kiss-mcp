@@ -62,8 +62,8 @@ namespace UnityMCP.Editor
             // in the compiling state; here we always emit for completeness).
             bool isCompiling = EditorApplication.isCompiling;
             bool cnActive    = CompileNotifier.IsCompiling;
-            bool started     = SessionState.GetBool("MCP_SyncCompileStarted", false);
-            var  stampAtTrig = SessionState.GetString("MCP_StampAtTrigger", "");
+            bool started     = SessionState.GetBool(SyncHelper.CompileStartedKey, false);
+            var  stampAtTrig = SessionState.GetString(SyncHelper.StampAtTriggerKey, "");
             bool stampFrozen = !string.IsNullOrEmpty(domainStamp) && domainStamp == stampAtTrig;
             sb.AppendLine(
                 $"iscompiling={isCompiling.ToString().ToLower()}" +

@@ -71,3 +71,22 @@ def test_domain_reload_expiry_is_120s():
 def test_disconnect_window_matches_domain_reload_expiry():
     from unity_mcp.compile_state import _DISCONNECT_WINDOW_S
     assert _DISCONNECT_WINDOW_S == DOMAIN_RELOAD_EXPIRY_S
+
+
+def test_session_timeout_family_shares_one_source():
+    """DOMAIN_RELOAD_EXPIRY_S, _DISCONNECT_WINDOW_S, _STALE_SECONDS, _DEFAULT_TIMEOUT
+    and bridge.SESSION_TIMEOUT must all be the *same object* re-exported from
+    constants.SESSION_TIMEOUT (import), not independently redeclared literals that
+    happen to share a value today. `is` identity proves import — two independent
+    `120.0` literals in different modules are never the same object in CPython."""
+    from unity_mcp.constants import SESSION_TIMEOUT
+    from unity_mcp.bridge import SESSION_TIMEOUT as bridge_timeout
+    from unity_mcp.compile_state import _DISCONNECT_WINDOW_S
+    from unity_mcp.unity_state import _STALE_SECONDS
+    from unity_mcp.tools.sync import _DEFAULT_TIMEOUT
+
+    assert bridge_timeout is SESSION_TIMEOUT
+    assert DOMAIN_RELOAD_EXPIRY_S is SESSION_TIMEOUT
+    assert _DISCONNECT_WINDOW_S is SESSION_TIMEOUT
+    assert _STALE_SECONDS is SESSION_TIMEOUT
+    assert _DEFAULT_TIMEOUT is SESSION_TIMEOUT

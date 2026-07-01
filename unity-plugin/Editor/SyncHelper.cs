@@ -16,9 +16,11 @@ namespace UnityMCP.Editor
         private const string StateKey          = "MCP_SyncState";  // idle|compiling|ready|failed
         private const string ErrKey            = "MCP_SyncError";
         private const string TriggerTimeKey    = "MCP_SyncTriggerTime";
-        private const string CompileStartedKey = "MCP_SyncCompileStarted";
+        // internal (not private): DiagnoseCommand.cs reads these directly instead
+        // of re-typing the literal (DRY audit issues-23-29 Cat.3), same pattern as AllAsmErrKey below.
+        internal const string CompileStartedKey = "MCP_SyncCompileStarted";
         private const string StampKey          = "MCP_DomainStamp";
-        private const string StampAtTriggerKey = "MCP_StampAtTrigger";
+        internal const string StampAtTriggerKey = "MCP_StampAtTrigger";
         internal const string AllAsmErrKey     = "MCP_AllCompileErrors";
 
         // RC-2 fix: lowered from 10s to 3s — self-heal is only needed for the

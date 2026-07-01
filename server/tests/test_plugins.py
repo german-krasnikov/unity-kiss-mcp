@@ -4,6 +4,39 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from unity_mcp.plugins import load_plugins
 
 
+def _make_tool(name: str):
+    t = MagicMock()
+    t.name = name
+    return t
+
+
+class _DictToolManager:
+    def __init__(self):
+        self._tools = {}
+
+
+class _DictMcp:
+    """Minimal fake mirroring real FastMCP's mcp._tool_manager._tools registry
+    (dict-backed, unlike the name-list FakeMcp used elsewhere in this file) —
+    needed so _auto_gate_new_tools can diff before/after tool names."""
+
+    def __init__(self):
+        self._tool_manager = _DictToolManager()
+
+    def tool(self, **kwargs):
+        def decorator(fn):
+            self._tool_manager._tools[fn.__name__] = fn
+            return fn
+        return decorator
+
+
+def _clear_sys_modules(*substrings):
+    import sys
+    for k in list(sys.modules.keys()):
+        if any(s in k for s in substrings):
+            del sys.modules[k]
+
+
 def test_load_plugins_calls_register():
     """load_plugins calls register on discovered plugins."""
     called = []
@@ -120,14 +153,15 @@ def test_plugin_api_register_write_cmds():
 
 
 def test_plugin_api_register_tools():
+    """Plugins register into a category only — the platform (not the plugin) controls
+    TIER1 visibility. tier1= param no longer exists on register_tools()."""
     from unity_mcp.plugin_api import register_tools
     from unity_mcp.tools.gating import CATEGORIES, TIER1, _ALL_KNOWN
-    register_tools("test_cat", {"tool_a", "tool_b"}, tier1={"tool_a"})
+    register_tools("test_cat", {"tool_a", "tool_b"})
     assert "tool_a" in CATEGORIES["test_cat"]
     assert "tool_b" in CATEGORIES["test_cat"]
-    assert "tool_a" in TIER1
+    assert "tool_a" not in TIER1, "plugins must never self-promote to TIER1"
     del CATEGORIES["test_cat"]
-    TIER1.discard("tool_a")
     _ALL_KNOWN.discard("tool_a")
     _ALL_KNOWN.discard("tool_b")
 
@@ -271,3 +305,157 @@ def test_load_plugin_dirs_calls_check_api_version(tmp_path, monkeypatch):
     plug._load_plugin_dirs(mcp, MagicMock(), MagicMock())
 
     assert "fake_plugin" in checked, f"_check_api_version not called. checked={checked}"
+
+
+# ── Issue 26: plugin tools default OFF Tier1 (auto-gated hidden) ──────────────
+
+async def test_discover_tools_plugins_category_exists_with_zero_plugins_loaded():
+    """The 'plugins' pseudo-category is pre-declared — discover_tools never
+    raises even before any plugin auto-enrolls into it."""
+    from unity_mcp.tools import gating
+
+    result = await gating.discover_tools(category="plugins", enable=False)
+    assert result == "Category 'plugins': "
+
+
+def test_plugin_tool_without_register_tools_is_auto_gated_hidden(tmp_path, monkeypatch):
+    """Fix Issue 26: a plugin tool registered via bare mcp.tool() (no
+    register_tools() call) is auto-enrolled into the hidden 'plugins' category —
+    known but not Tier1, so filter_by_tier hides it by default."""
+    from unity_mcp.plugins import _load_plugin_dirs
+    from unity_mcp.tools import gating
+
+    name = "untamed_plugin_tool"
+    plugin_file = tmp_path / "fake_untamed_plugin.py"
+    plugin_file.write_text(
+        "def register(mcp, send, args):\n"
+        f"    @mcp.tool()\n"
+        f"    def {name}():\n"
+        "        pass\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("UNITY_MCP_PLUGIN_DIRS", str(tmp_path))
+    monkeypatch.setenv("UNITY_MCP_SKIP_PLUGINS", "")
+    _clear_sys_modules("fake_untamed_plugin")
+
+    mcp = _DictMcp()
+    try:
+        _load_plugin_dirs(mcp, MagicMock(), MagicMock())
+
+        assert name in gating.CATEGORIES["plugins"]
+        assert name in gating._ALL_KNOWN
+        assert name not in gating.TIER1
+        assert gating.filter_by_tier([_make_tool(name)]) == []
+    finally:
+        gating.CATEGORIES["plugins"].discard(name)
+        gating._ALL_KNOWN.discard(name)
+
+
+async def test_plugin_tool_visible_after_discover_tools_plugins_category(tmp_path, monkeypatch):
+    """Fix Issue 26: once auto-gated, a plugin tool becomes visible again via
+    the public discover_tools(category='plugins', enable=True) escape hatch."""
+    from unity_mcp.plugins import _load_plugin_dirs
+    from unity_mcp.tools import gating
+
+    name = "discoverable_plugin_tool"
+    plugin_file = tmp_path / "fake_discoverable_plugin.py"
+    plugin_file.write_text(
+        "def register(mcp, send, args):\n"
+        f"    @mcp.tool()\n"
+        f"    def {name}():\n"
+        "        pass\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("UNITY_MCP_PLUGIN_DIRS", str(tmp_path))
+    monkeypatch.setenv("UNITY_MCP_SKIP_PLUGINS", "")
+    _clear_sys_modules("fake_discoverable_plugin")
+
+    mcp = _DictMcp()
+    tool = _make_tool(name)
+    try:
+        _load_plugin_dirs(mcp, MagicMock(), MagicMock())
+        assert gating.filter_by_tier([tool]) == []  # hidden before discover
+
+        await gating.discover_tools(category="plugins", enable=True)
+
+        assert gating.filter_by_tier([tool]) == [tool]
+    finally:
+        gating.CATEGORIES["plugins"].discard(name)
+        gating._ALL_KNOWN.discard(name)
+        gating.reset()
+
+
+def test_well_behaved_plugin_calling_register_tools_is_unaffected_by_auto_gate(tmp_path, monkeypatch):
+    """Fix Issue 26 + architecture fix: a plugin that self-declares via
+    plugin_api.register_tools() is untouched by the auto-gate diff — its explicit
+    category choice wins, and it does NOT also land in the fallback 'plugins' bucket.
+    tier1= no longer exists: the platform controls visibility, plugins never
+    self-promote into TIER1 — the tool stays Tier2 (discoverable via its own category)."""
+    from unity_mcp.plugins import _load_plugin_dirs
+    from unity_mcp.tools import gating
+
+    name = "well_behaved_tool"
+    plugin_file = tmp_path / "fake_well_behaved_plugin.py"
+    plugin_file.write_text(
+        "from unity_mcp.plugin_api import register_tools\n"
+        "def register(mcp, send, args):\n"
+        f"    @mcp.tool()\n"
+        f"    def {name}():\n"
+        "        pass\n"
+        f"    register_tools('custom_cat', {{'{name}'}})\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("UNITY_MCP_PLUGIN_DIRS", str(tmp_path))
+    monkeypatch.setenv("UNITY_MCP_SKIP_PLUGINS", "")
+    _clear_sys_modules("fake_well_behaved_plugin")
+
+    mcp = _DictMcp()
+    try:
+        _load_plugin_dirs(mcp, MagicMock(), MagicMock())
+
+        assert name not in gating.TIER1, "plugins must never self-promote to TIER1"
+        assert name in gating.CATEGORIES.get("custom_cat", set())
+        assert name not in gating.CATEGORIES.get("plugins", set())
+    finally:
+        gating._ALL_KNOWN.discard(name)
+        gating.CATEGORIES.pop("custom_cat", None)
+        gating.CATEGORIES["plugins"].discard(name)
+
+
+def test_auto_gate_diffs_per_plugin_not_across_all_plugins(tmp_path, monkeypatch):
+    """Fix Issue 26: two plugins loaded in the same pass each get their own
+    tool auto-enrolled — guards against a diff computed once across all
+    plugins that could misattribute or drop entries."""
+    from unity_mcp.plugins import _load_plugin_dirs
+    from unity_mcp.tools import gating
+
+    name_a, name_b = "plugin_a_tool", "plugin_b_tool"
+    (tmp_path / "fake_plugin_a.py").write_text(
+        "def register(mcp, send, args):\n"
+        f"    @mcp.tool()\n"
+        f"    def {name_a}():\n"
+        "        pass\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "fake_plugin_b.py").write_text(
+        "def register(mcp, send, args):\n"
+        f"    @mcp.tool()\n"
+        f"    def {name_b}():\n"
+        "        pass\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("UNITY_MCP_PLUGIN_DIRS", str(tmp_path))
+    monkeypatch.setenv("UNITY_MCP_SKIP_PLUGINS", "")
+    _clear_sys_modules("fake_plugin_a", "fake_plugin_b")
+
+    mcp = _DictMcp()
+    try:
+        _load_plugin_dirs(mcp, MagicMock(), MagicMock())
+
+        assert name_a in gating.CATEGORIES["plugins"]
+        assert name_b in gating.CATEGORIES["plugins"]
+    finally:
+        gating.CATEGORIES["plugins"].discard(name_a)
+        gating.CATEGORIES["plugins"].discard(name_b)
+        gating._ALL_KNOWN.discard(name_a)
+        gating._ALL_KNOWN.discard(name_b)

@@ -291,7 +291,7 @@ Ephemeral short references ($a–$zz) valid within a single scene serialization.
 - `unity-plugin/Editor/HierarchySerializer.cs` — Scene → text tree (MAX_NODES=3000, summary mode, incremental cache, $refs)
 - `unity-plugin/Editor/ComponentSerializer.cs` — Component → key-value + ObjectReference + UnityEvent
 - `unity-plugin/Editor/VersionTracker.cs` — Version tracking
-- `unity-plugin/Editor/ConsoleCapture.cs` — Logs → text
+- `unity-plugin/Editor/ConsoleCapture.cs` — Logs → text (orchestrates bounded ring buffer + SessionState-persisted problem entries)
 - `unity-plugin/Editor/ScreenshotCapture.cs` — Camera modes: default, overview, overview_game, multi_view
 - `unity-plugin/Editor/MultiViewCapture.cs` — 4-panel grid (Front, Left, Top, Isometric)
 - `unity-plugin/Editor/MultiViewOverlay.cs` — Overlay rendering for multi-view
@@ -336,7 +336,12 @@ m_UseGravity: true
 string text = ComponentSerializer.Serialize("/Player", "Rigidbody");
 ```
 
-## ConsoleCapture (196 lines)
+## ConsoleCapture + Console Buffers (Issue 27)
+
+**Files (3-file split for domain-reload survival):**
+- `ConsoleCapture.cs` (183 lines) — Public query API + wiring between ring buffer and problem persistence
+- `ConsoleRingBuffer.cs` (141 lines) — Bounded in-memory log capture: init phase (50 entries, 5s window) + fixed-size ring (450 entries)
+- `ConsoleProblemPersistence.cs` (144 lines) — SessionState-persisted problem-type entries (Error/Exception/Assert) across domain reload
 
 ### Output Format
 
@@ -344,21 +349,28 @@ string text = ComponentSerializer.Serialize("/Player", "Rigidbody");
 [Log] 14:30:22.123 Log message here
 [Warning] 14:30:22.456 Warning message
 [Error] 14:30:22.789 Error message
+[Exception] 14:30:23.100 Unhandled exception
+[Assert] 14:30:23.200 Assertion failed
 ```
 
 **Features:**
 - Captures Unity debug logs via `Application.logMessageReceived`
-- Two-phase buffer: init buffer (50 entries, 5s window) + ring buffer (450 entries)
-- Filters by level: Log, Warning, Error
+- Dual-buffer capture:
+  - **Init buffer** (ConsoleRingBuffer): 50 entries, 5-second post-load window — captures initial setup spam
+  - **Ring buffer** (ConsoleRingBuffer): 450 entries, wraps on overflow
+  - **SessionState persistence** (ConsoleProblemPersistence): stores Error/Exception/Assert entries across domain reload (FIFO cap: 20 entries)
+- Problem-level convention: `PROBLEM_LEVELS = Error,Exception,Assert` (per `console_levels.py`) — not just Error alone
+  - Unhandled C# exceptions arrive as `LogType.Exception`, not Error
+  - Assertions fail as `LogType.Assert`
 - `count=-1` returns all; `first=N` returns first N from init + last from ring
+- `GetErrorsSince(DateTime since)` for post-playtest problem checks (filters by PROBLEM_LEVELS)
 - Thread-safe (lock-based)
-- `GetErrorsSince(DateTime since)` for post-playtest error checks
 
 ### Usage
 
 ```csharp
-var logs = ConsoleCapture.GetLogs(count: 20, level: "Error");
-var errors = ConsoleCapture.GetErrorsSince(startTime, maxCount: 5);
+var logs = ConsoleCapture.GetLogs(count: 20, level: "Error,Exception,Assert");
+var problems = ConsoleCapture.GetErrorsSince(startTime, maxCount: 5); // catches all problem types
 ConsoleCapture.Clear();
 ```
 

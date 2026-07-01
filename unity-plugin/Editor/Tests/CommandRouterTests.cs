@@ -1,7 +1,7 @@
 // TDD: CommandRouter pure-logic tests — no TCP required, EditMode only.
 // Covers: IsAllowedDuringCompile, IsAlwaysAllowed, SuggestNext,
 //         CommandRegistry flags, BuildResponse (via Process stub),
-//         CommandSchema validation coverage.
+//         CommandValidator validation coverage.
 using NUnit.Framework;
 using UnityMCP.Editor;
 
@@ -13,7 +13,6 @@ namespace UnityMCP.Editor.Tests
         // ── IsAllowedDuringCompile ────────────────────────────────────────────
 
         [TestCase("ping",              ExpectedResult = true)]
-        [TestCase("get_version",       ExpectedResult = true)]
         [TestCase("get_console",       ExpectedResult = true)]
         [TestCase("screenshot",        ExpectedResult = true)]
         [TestCase("get_enabled_tools", ExpectedResult = true)]
@@ -38,7 +37,6 @@ namespace UnityMCP.Editor.Tests
         // ── IsAlwaysAllowed ───────────────────────────────────────────────────
 
         [TestCase("ping",              ExpectedResult = true)]
-        [TestCase("get_version",       ExpectedResult = true)]
         [TestCase("get_enabled_tools", ExpectedResult = true)]
         [TestCase("get_disabled_tools",ExpectedResult = true)]
         [TestCase("set_tool_catalog",  ExpectedResult = true)]
@@ -216,22 +214,31 @@ namespace UnityMCP.Editor.Tests
             }
         }
 
-        // ── CommandSchema: all registered commands have schema entries ────────
+        // ── CommandValidator: all registered commands have a contract ─────────
 
+        // Every command reached via CommandRegistry.GetAllCommands() is by definition
+        // registered, so CommandValidator.Validate(cmd, ...) can NEVER return an
+        // "Unknown command" error for it — the old test asserted a tautology.
+        // The real invariant: every registered command either declares a structured
+        // contract (Required != null, possibly empty) OR is explicitly whitelisted as
+        // free-form. Plugin commands are exempt (3rd-party, not our contract to enforce).
         [Test]
-        public void Schema_AllRegisteredCommands_HaveSchemaOrPassValidation()
+        public void Contract_AllRegisteredCommands_HaveContractOrAreWhitelisted()
         {
-            // Every registered command must either be in schema or pass null-args validation
-            // (not return "Unknown command"). Plugin-registered commands are exempt.
+            // No command is free-form anymore (Issue 23 review M7 closed execute_code's
+            // last free-form gap — it now declares required: "code", optional: "undo_label").
+            // Kept as an explicit (currently empty) whitelist so any future intentionally
+            // free-form command has a documented escape hatch instead of silently failing here.
+            var freeFormWhitelist = new System.Collections.Generic.HashSet<string>();
             var failures = new System.Collections.Generic.List<string>();
             foreach (var cmd in CommandRegistry.GetAllCommands())
             {
-                var err = CommandSchema.Validate(cmd, "{}");
-                // "Unknown command" means schema gap; missing-required is acceptable
-                if (err != null && err.StartsWith("Unknown command"))
-                    failures.Add(cmd + ": " + err);
+                if (PluginRegistry.IsPluginCommand(cmd)) continue;
+                CommandRegistry.TryGetContract(cmd, out _, out _, out var isFreeForm);
+                if (isFreeForm && !freeFormWhitelist.Contains(cmd))
+                    failures.Add(cmd);
             }
-            Assert.IsEmpty(failures, "Commands missing schema: " + string.Join(", ", failures));
+            Assert.IsEmpty(failures, "Commands with no contract and not free-form-whitelisted: " + string.Join(", ", failures));
         }
 
         [Test]
@@ -260,7 +267,7 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Schema_GetDisabledTools_HallucinatedParam_Rejected()
         {
-            var result = CommandSchema.Validate("get_disabled_tools", "{\"hallucinated\":\"x\"}");
+            var result = CommandValidator.Validate("get_disabled_tools", "{\"hallucinated\":\"x\"}");
             Assert.IsNotNull(result, "get_disabled_tools must have a schema entry");
             StringAssert.Contains("Unknown param", result);
         }
@@ -268,7 +275,7 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Schema_SetToolCatalog_HallucinatedParam_Rejected()
         {
-            var result = CommandSchema.Validate("set_tool_catalog", "{\"hallucinated\":\"x\"}");
+            var result = CommandValidator.Validate("set_tool_catalog", "{\"hallucinated\":\"x\"}");
             Assert.IsNotNull(result, "set_tool_catalog must have a schema entry");
             StringAssert.Contains("Unknown param", result);
         }
@@ -276,7 +283,7 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void Schema_SetToolCatalog_ValidCatalogParam_Passes()
         {
-            var result = CommandSchema.Validate("set_tool_catalog", "{\"catalog\":\"[]\"}");
+            var result = CommandValidator.Validate("set_tool_catalog", "{\"catalog\":\"[]\"}");
             Assert.IsNull(result, result);
         }
 
@@ -329,16 +336,16 @@ namespace UnityMCP.Editor.Tests
             Assert.AreEqual("outer", result);
         }
 
-        // ── CommandSchema.ExtractKeys ─────────────────────────────────────────
+        // ── CommandValidator.ExtractKeys ──────────────────────────────────────
 
         [Test]
         public void ExtractKeys_EmptyJson_ReturnsEmpty()
-            => Assert.IsEmpty(CommandSchema.ExtractKeys("{}"));
+            => Assert.IsEmpty(CommandValidator.ExtractKeys("{}"));
 
         [Test]
         public void ExtractKeys_SingleKey_ReturnsThatKey()
         {
-            var keys = CommandSchema.ExtractKeys("{\"path\":\"/Obj\"}");
+            var keys = CommandValidator.ExtractKeys("{\"path\":\"/Obj\"}");
             Assert.AreEqual(1, keys.Count);
             Assert.AreEqual("path", keys[0]);
         }
@@ -346,7 +353,7 @@ namespace UnityMCP.Editor.Tests
         [Test]
         public void ExtractKeys_MultipleKeys_ReturnsAll()
         {
-            var keys = CommandSchema.ExtractKeys("{\"path\":\"/Obj\",\"component\":\"Transform\"}");
+            var keys = CommandValidator.ExtractKeys("{\"path\":\"/Obj\",\"component\":\"Transform\"}");
             Assert.AreEqual(2, keys.Count);
             Assert.Contains("path", keys);
             Assert.Contains("component", keys);
@@ -354,7 +361,7 @@ namespace UnityMCP.Editor.Tests
 
         [Test]
         public void ExtractKeys_NullJson_ReturnsEmpty()
-            => Assert.IsEmpty(CommandSchema.ExtractKeys(null));
+            => Assert.IsEmpty(CommandValidator.ExtractKeys(null));
 
         // ── Step 2: sync + sync_status commands (#11, #12) ───────────────────
 

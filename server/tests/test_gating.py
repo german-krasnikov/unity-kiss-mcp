@@ -128,26 +128,20 @@ def test_runtime_tools_in_tier1():
 
 
 def test_batch_allows_invoke_method():
-    """invoke_method is sync — must NOT be in BatchHelper async blocklist."""
-    import re
+    """invoke_method is sync — BatchHelper delegates to CommandRegistry.IsBatchable()."""
     from pathlib import Path
     path = str(Path(__file__).parents[2] / "unity-plugin" / "Editor" / "BatchHelper.cs")
     src = open(path, encoding="utf-8").read()
-    # Find the async-blocklist condition line
-    match = re.search(r'if \(cmd == "wait_until"[^)]+\)', src)
-    assert match, "async blocklist line not found"
-    assert "invoke_method" not in match.group(), "invoke_method should NOT be in async blocklist"
+    assert "IsBatchable" in src, "BatchHelper must use CommandRegistry.IsBatchable()"
+    assert 'cmd == "invoke_method"' not in src, "invoke_method must not be hardcoded in blocklist"
 
 
 def test_batch_blocks_run_playtest():
-    """run_playtest is async — must be in BatchHelper async blocklist."""
-    import re
+    """run_playtest is async (RegisterAsync) — IsBatchable returns false for it."""
     from pathlib import Path
     path = str(Path(__file__).parents[2] / "unity-plugin" / "Editor" / "BatchHelper.cs")
     src = open(path, encoding="utf-8").read()
-    match = re.search(r'if \(cmd == "wait_until"[^)]+\)', src)
-    assert match, "async blocklist line not found"
-    assert "run_playtest" in match.group(), "run_playtest must be in async blocklist"
+    assert "IsBatchable" in src, "BatchHelper must use CommandRegistry.IsBatchable()"
 
 
 # --- TDD Phase 2: register_tools() self-registration ---
@@ -165,31 +159,66 @@ def test_register_tools_adds_to_category():
         gating._ALL_KNOWN.discard("tool_y")
 
 
-def test_register_tools_adds_to_tier1():
-    """register_tools(tier1=...) promotes tools to TIER1."""
+def test_register_tools_no_tier1_promotion():
+    """Plugins do not control their own visibility — the platform does.
+    register_tools() must NOT accept a tier1 param at all."""
+    import inspect
+    from unity_mcp.tools.gating import register_tools
+    sig = inspect.signature(register_tools)
+    assert "tier1" not in sig.parameters, "tier1 param must be removed from plugin API"
+
+
+def test_plugin_tools_default_tier2():
+    """Plugin-registered tools must NOT appear in TIER1 — category-only, discoverable."""
     from unity_mcp.tools import gating
-    gating.register_tools("test_cat2", {"tool_a", "tool_b"}, tier1={"tool_a"})
+    gating.register_tools("test_plugin", {"plugin_tool_x", "plugin_tool_y"})
     try:
-        assert "tool_a" in gating.TIER1
+        assert "plugin_tool_x" not in gating.TIER1
+        assert "plugin_tool_y" not in gating.TIER1
     finally:
-        gating.TIER1.discard("tool_a")
-        del gating.CATEGORIES["test_cat2"]
-        gating._ALL_KNOWN.discard("tool_a")
-        gating._ALL_KNOWN.discard("tool_b")
+        del gating.CATEGORIES["test_plugin"]
+        gating._ALL_KNOWN.discard("plugin_tool_x")
+        gating._ALL_KNOWN.discard("plugin_tool_y")
 
 
 def test_register_tools_idempotent():
     """Calling register_tools twice does not duplicate entries."""
     from unity_mcp.tools import gating
-    gating.register_tools("test_cat3", {"tool_z"}, tier1={"tool_z"})
+    gating.register_tools("test_cat3", {"tool_z"})
     try:
-        size_before = len(gating.TIER1)
-        gating.register_tools("test_cat3", {"tool_z"}, tier1={"tool_z"})
-        assert len(gating.TIER1) == size_before  # set.update is idempotent
+        size_before = len(gating.CATEGORIES["test_cat3"])
+        gating.register_tools("test_cat3", {"tool_z"})
+        assert len(gating.CATEGORIES["test_cat3"]) == size_before  # set.update is idempotent
     finally:
-        gating.TIER1.discard("tool_z")
         del gating.CATEGORIES["test_cat3"]
         gating._ALL_KNOWN.discard("tool_z")
+
+
+def test_register_tools_plugins_category_updates_themed_categories():
+    """M6: register_tools('plugins', ...) must also update _THEMED_CATEGORIES['PLUGINS']
+    so the auto-gated plugin tool shows up in get_catalog() (Unity plugin catalog UI),
+    not just in the legacy CATEGORIES dict."""
+    from unity_mcp.tools import gating
+    gating.register_tools("plugins", {"my_plugin_tool"})
+    try:
+        assert "my_plugin_tool" in gating._THEMED_CATEGORIES["PLUGINS"]
+        assert "my_plugin_tool" in gating.get_catalog()["categories"]["PLUGINS"]
+    finally:
+        gating._THEMED_CATEGORIES["PLUGINS"].remove("my_plugin_tool")
+        gating.CATEGORIES["plugins"].discard("my_plugin_tool")
+        gating._ALL_KNOWN.discard("my_plugin_tool")
+
+
+def test_register_tools_unknown_category_does_not_touch_themed_categories():
+    """register_tools() for a category with no _THEMED_CATEGORIES counterpart (e.g. a
+    plugin-defined custom category) must not create a spurious themed entry."""
+    from unity_mcp.tools import gating
+    gating.register_tools("test_cat_no_theme", {"tool_w"})
+    try:
+        assert "TEST_CAT_NO_THEME" not in gating._THEMED_CATEGORIES
+    finally:
+        del gating.CATEGORIES["test_cat_no_theme"]
+        gating._ALL_KNOWN.discard("tool_w")
 
 
 # --- Integration tests: plugin self-registration composability ---
@@ -327,7 +356,7 @@ def test_themed_tools_hidden_by_default():
     but must be in _ALL_KNOWN so filter_by_tier gates them (not passes as unknown plugins)."""
     from unity_mcp.tools import gating
     gating.reset()
-    for name in ["get_test_results", "object_diff", "set_llm_config", "transfer_object"]:
+    for name in ["object_diff", "set_llm_config", "transfer_object"]:
         tool = _make_tool(name)
         result = gating.filter_by_tier([tool])
         assert result == [], f"{name} must be gated (hidden) by default, not pass as unknown plugin"
@@ -417,3 +446,114 @@ def test_category_alias_mapping_is_exhaustive():
     assert non_empty_themed.issubset(mapped_groups), (
         f"Themed groups not mapped to any alias: {non_empty_themed - mapped_groups}"
     )
+
+
+# --- DRY audit issues-23-29 Cat.2: TIER1 derived from _CORE_TOOLS, not re-typed ---
+
+def test_tier1_is_superset_of_core_tools():
+    """TIER1 must contain every _CORE_TOOLS entry — derived via union, not a hand-typed
+    fresh literal that can silently drift from _CORE_TOOLS on a rename."""
+    from unity_mcp.tools.gating import TIER1, _CORE_TOOLS
+    missing = _CORE_TOOLS - TIER1
+    assert not missing, f"_CORE_TOOLS entries missing from TIER1: {sorted(missing)}"
+
+
+def test_tier1_residual_names_still_present():
+    """Regression: the genuinely tier1-only names (not in _CORE_TOOLS) must survive the
+    literal→union refactor untouched. animator_intent/vfx_intent/ui_intent are
+    deliberately EXCLUDED — Fix 1 removed them from TIER1 (they are themed VFX/UI/META
+    tools, not always-on core)."""
+    from unity_mcp.tools.gating import TIER1, _CORE_TOOLS
+    residual_expected = {
+        "screenshot", "run_tests", "setup_objects", "set_properties", "configure_objects",
+        "find_references", "compile_preflight", "semantic_at", "await_compile", "sync_unity",
+        "invoke_method", "set_runtime_property", "wait_until", "move_to", "query_state",
+        "test_step", "run_playtest", "fuzz_playtest",
+    }
+    missing = residual_expected - TIER1
+    assert not missing, f"TIER1-only names dropped by refactor: {sorted(missing)}"
+    # Sanity: none of the residual names were accidentally already in _CORE_TOOLS
+    # (that would mean they're not genuinely tier1-only information).
+    assert not (residual_expected & _CORE_TOOLS)
+
+
+# --- TDD Fix 1: TIER1 pollution — vfx_intent/animator_intent/ui_intent must be Tier2+ ---
+
+def test_tier1_excludes_intent_tools():
+    """vfx_intent, animator_intent, ui_intent must NOT be in TIER1 — they are themed
+    (VFX/UI/META) tools, not always-on core."""
+    from unity_mcp.tools.gating import TIER1
+    for name in ("vfx_intent", "animator_intent", "ui_intent"):
+        assert name not in TIER1, f"{name} should be Tier2+, not TIER1"
+
+
+def test_vfx_intent_hidden_by_default():
+    from unity_mcp.tools import gating
+    gating.reset()
+    assert gating.filter_by_tier([_make_tool("vfx_intent")]) == []
+
+
+def test_animator_intent_hidden_by_default():
+    from unity_mcp.tools import gating
+    gating.reset()
+    assert gating.filter_by_tier([_make_tool("animator_intent")]) == []
+
+
+def test_ui_intent_hidden_by_default():
+    from unity_mcp.tools import gating
+    gating.reset()
+    assert gating.filter_by_tier([_make_tool("ui_intent")]) == []
+
+
+async def test_vfx_intent_visible_after_discover_ui_category():
+    from unity_mcp.tools import gating
+    gating.reset()
+    await gating.discover_tools(category="ui")
+    try:
+        assert gating.is_visible("vfx_intent")
+    finally:
+        gating.reset()
+
+
+async def test_animator_intent_visible_after_discover_advanced_category():
+    from unity_mcp.tools import gating
+    gating.reset()
+    await gating.discover_tools(category="advanced")
+    try:
+        assert gating.is_visible("animator_intent")
+    finally:
+        gating.reset()
+
+
+async def test_ui_intent_visible_after_discover_ui_category():
+    from unity_mcp.tools import gating
+    gating.reset()
+    await gating.discover_tools(category="ui")
+    try:
+        assert gating.is_visible("ui_intent")
+    finally:
+        gating.reset()
+
+
+# --- TDD Fix 2: budget_status orphan ---
+
+def test_budget_status_in_all_known():
+    """budget_status must be in _ALL_KNOWN (not an orphan)."""
+    from unity_mcp.tools.gating import _ALL_KNOWN
+    assert "budget_status" in _ALL_KNOWN
+
+
+def test_budget_status_hidden_by_default():
+    from unity_mcp.tools import gating
+    gating.reset()
+    assert gating.filter_by_tier([_make_tool("budget_status")]) == []
+
+
+async def test_budget_status_visible_after_discover_advanced():
+    from unity_mcp.tools import gating
+    gating.reset()
+    await gating.discover_tools(category="advanced")
+    try:
+        assert gating.is_visible("budget_status")
+    finally:
+        gating.reset()

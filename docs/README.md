@@ -1,12 +1,12 @@
 # Unity MCP Documentation
 
-Documentation for Unity MCP v0.56.0 — MCP server for controlling Unity Editor from AI coding assistants.
+Documentation for Unity MCP v0.67.1 — MCP server for controlling Unity Editor from AI coding assistants.
 
 ## Getting Started
 - [Installation & First Steps](getting-started/index.md)
 
 ## Tools Reference
-- [All Tools (99)](tools/index.md)
+- [All Tools (120)](tools/index.md)
 - [Scene Tools](tools/scene.md)
 - [Object Tools](tools/objects.md)
 - [Batch Operations](tools/batch.md)

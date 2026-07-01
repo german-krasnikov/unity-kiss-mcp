@@ -16,6 +16,10 @@ namespace UnityMCP.Editor.RegionTool
     [EditorTool("MCP Region Select")]
     internal sealed class SceneRegionTool : EditorTool
     {
+        // Local to this file — EditorPrefs keys for the tool's own mode/snap state.
+        private const string RegionModeKey = "MCP_RegionMode";
+        private const string RegionSnapKey = "MCP_RegionSnap";
+
         enum State { Idle, Drawing, Preview }
 
         State          _state   = State.Idle;
@@ -49,8 +53,8 @@ namespace UnityMCP.Editor.RegionTool
         public override void OnActivated()
         {
             _modeId   = Enum.TryParse<DrawingModeId>(
-                EditorPrefs.GetString("MCP_RegionMode", "Lasso"), out var m) ? m : DrawingModeId.Lasso;
-            _gridSnap = EditorPrefs.GetBool("MCP_RegionSnap", false);
+                EditorPrefs.GetString(RegionModeKey, "Lasso"), out var m) ? m : DrawingModeId.Lasso;
+            _gridSnap = EditorPrefs.GetBool(RegionSnapKey, false);
             _activeMode = DrawingModeFactory.Create(_modeId);
             CurrentModeId = _modeId;
             GridSnap      = _gridSnap;
@@ -59,7 +63,7 @@ namespace UnityMCP.Editor.RegionTool
             CommitAction      = CommitRegion;
             SetModeAction     = SwitchMode;
             RequestResimplify = Resimplify;
-            SetGridSnapAction = v => { _gridSnap = v; GridSnap = v; EditorPrefs.SetBool("MCP_RegionSnap", v); };
+            SetGridSnapAction = v => { _gridSnap = v; GridSnap = v; EditorPrefs.SetBool(RegionSnapKey, v); };
             ConfirmPointAction = () => { if (_activeMode?.CanConfirm == true) _activeMode.ConfirmPending(); };
             CanConfirmQuery    = () => _state == State.Drawing && (_activeMode?.CanConfirm ?? false);
             CanCommitQuery     = () => _state == State.Preview || (_state == State.Drawing && (_activeMode?.IsComplete ?? false));
@@ -148,7 +152,7 @@ namespace UnityMCP.Editor.RegionTool
             {
                 _gridSnap = !_gridSnap;
                 GridSnap  = _gridSnap;
-                EditorPrefs.SetBool("MCP_RegionSnap", _gridSnap);
+                EditorPrefs.SetBool(RegionSnapKey, _gridSnap);
                 e.Use();
             }
         }
@@ -191,7 +195,7 @@ namespace UnityMCP.Editor.RegionTool
                 objects:   _matchedObjects ?? Array.Empty<GameObject>(),
                 sceneName: SceneManager.GetActiveScene().name);
             SceneRegionState.SetRegion(snap);
-            SessionState.SetString("MCP_ActiveRegionId", snap.Id);
+            SessionState.SetString(PrefKeys.ActiveRegionId, snap.Id);
             OnRegionCommitted?.Invoke(snap.Id, snap.ShortLabel);
             CancelToIdle();
         }
@@ -212,7 +216,7 @@ namespace UnityMCP.Editor.RegionTool
             _modeId     = id;
             CurrentModeId = id;
             _activeMode = DrawingModeFactory.Create(id);
-            EditorPrefs.SetString("MCP_RegionMode", id.ToString());
+            EditorPrefs.SetString(RegionModeKey, id.ToString());
             if (_state == State.Drawing) CancelToIdle();
         }
 

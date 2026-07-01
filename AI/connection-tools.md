@@ -37,6 +37,12 @@ await reconnect_unity(port=9500)
 
 **Returns:** Connection status message or error.
 
+**Post-connect behavior (on successful connection):**
+- `gating.reset()` — clears session-enabled tools (only on manual reconnect; passive TCP reconnect does not wipe gating)
+- `_refresh_tools_cache(bridge)` — rebuilds tool cache from current state
+- `_push_catalog(bridge)` — synchronizes tool catalog with client
+- `ctx.session.send_tool_list_changed()` — sends MCP notification, forcing client re-query of `ListTools` (no debounce; user explicitly asked for reconnect)
+
 ---
 
 ### doctor(fix: bool = False)
@@ -196,13 +202,13 @@ await reconnect_unity()
 
 **Single ConnectionSlot per MCP session:**
 - Maintains TCP socket to one Unity instance
-- Auto-reconnect on disconnect (5s backoff, max 60s)
-- Heartbeat every 30s to detect stale connections
+- Auto-reconnect on disconnect (5s backoff, max 60s exponential backoff with ±10% jitter)
+- Heartbeat every 15s (via `_raw_ping()`) to detect stale connections; fast-path bypass of retry machinery
 - Graceful shutdown: closes socket + cleanup on MCP exit
 
 **Blocking behavior:** All MCP tool calls block on socket I/O (TCP call-response).
 
-**Timeout:** Default 30s per command (configurable via `UNITY_MCP_TIMEOUT`).
+**Timeout:** Default 25s per command (configurable via `UNITY_MCP_TIMEOUT`). Per-command overrides exist: `run_tests`/`run_playtest` use 130s; `batch` uses 65s; `wait_until`/`move_to`/`test_step` use 30s. Hard deadline (450s) applies to all send() retries.
 
 ---
 
